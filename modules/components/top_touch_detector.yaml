@@ -1,0 +1,21 @@
+---
+
+obj:
+  x: 0
+  y: 0
+  width: 100%
+  height: 20
+  bg_opa: TRANSP
+  border_width: 0
+
+  on_press:
+    then:
+      - lambda: |-
+          ESP_LOGD("swipe_navigation", "Top touch detector pressed");
+          id(swipe_started_at_top) = true;
+
+  on_release:
+    then:
+      - lambda: |-
+          ESP_LOGD("swipe_navigation", "Top touch detector released");
+          id(swipe_started_at_top) = false;

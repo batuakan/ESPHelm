@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ESPHome Compile",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m esphome compile ${file}",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

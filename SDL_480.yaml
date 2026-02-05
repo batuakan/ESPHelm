@@ -1,0 +1,30 @@
+substitutions:
+  # # Screen Size
+  screen_height: 480
+  screen_width: 480
+
+  #theme
+  # info_font: roboto_large
+  # text_font: roboto_scriptsize
+  # text_color: white
+
+
+
+packages:
+  # Harware description file
+  hardware: !include modules/hardware/sdl.yaml
+  fonts: !include modules/base/fonts_480.yaml
+  images: !include modules/base/images.yaml
+  signalk: !include modules/sensors/signalk_base.yaml
+  globals: !include modules/sections/globals.yaml
+  theme: !include { file: modules/base/theme_dark.yaml }
+
+
+  notification: !include modules/components/notification.yaml
+  autopilot: !include modules/applications/autopilot.yaml
+  wind: !include modules/applications/wind.yaml
+  energy: !include modules/applications/energy.yaml
+  switches: !include modules/applications/switchboard.yaml
+  grid: !include modules/applications/grid.yaml
+  weather: !include modules/applications/weather.yaml
+  settings: !include modules/applications/settings.yaml

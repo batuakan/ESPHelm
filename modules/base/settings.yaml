@@ -1,0 +1,6 @@
+substitutions:
+  speed_units: "knots"
+  distance_units: "nm"
+  temperature_units: "celsius"
+
+  

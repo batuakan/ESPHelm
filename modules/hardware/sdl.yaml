@@ -1,0 +1,57 @@
+substitutions:
+  # Screen Size
+  # screen_height: 720
+  # screen_width: 720
+  byte_order: big_endian
+  color_encoding: RGB565
+
+
+esphome:
+  name: sdl2
+  friendly_name: SDL2 Test
+  project:
+    name: esphome.host
+    version: "1.1"
+
+host:
+
+api:
+
+json:
+
+logger:
+  level: DEBUG
+  
+
+display:
+  - platform: sdl
+    id: my_display
+    # show_test_card: true
+    dimensions:
+      width: $screen_width
+      height: $screen_height
+
+touchscreen:
+  - platform: sdl
+    id: my_touchscreen
+    display: my_display
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+# Give your external component an ID
+sdl_screenshot:
+  id: my_screenshot
+
+# Keyboard F11 triggers screenshot
+binary_sensor:
+  - platform: sdl
+    key: SDLK_F11
+    name: "F11 Screenshot"
+    on_press:
+      then:
+        - lambda: |-
+            ESP_LOGI("sdl", "Saving screenshot via F11");
+            id(my_screenshot)->take_screenshot();

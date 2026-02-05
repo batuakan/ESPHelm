@@ -1,0 +1,232 @@
+
+substitutions:
+  ap_btn_padding: 8
+  ap_btn_height:  ${((screen_height * 0.40) - (ap_btn_padding * 3)) / 2}
+  ap_btn_width: ${((screen_width) - (ap_btn_padding * 5)) / 4}
+  
+
+
+sensor:
+  - platform: signalk
+    id: ap_target
+    path: steering.autopilot.target
+    unit: degrees
+    on_value:
+      - lvgl.label.update:
+          id: label_ap_target
+          text:
+            format: "%4.0f"
+            args: [ 'x' ]
+
+text_sensor:
+  - platform: signalk
+    id: ap_state
+    path: steering.autopilot.state
+    on_value:
+      - lvgl.label.update:
+          id: label_ap_state
+          text:
+            format: "%s"
+            args: [ x.c_str() ]
+
+lvgl:
+  pages:
+    - id: autopilot_page
+      <<: !include
+        file: ../sections/swipe_navigation.yaml
+      widgets:
+        - image:
+            src: background_image
+            align: CENTER
+        
+        - obj:
+            id: autopilot_display
+            width: 100%
+            height: ${screen_height - (ap_btn_height * 2 + 24)}
+            align: TOP_MID
+            pad_all: 8
+            bg_opa: 30%
+            radius: 20
+            scrollable: false
+
+            widgets:
+              - label:
+                  id: label_ap_target
+                  text: "180"
+                  text_font: roboto_Huge
+                  align: CENTER
+                  text_align: CENTER
+              - label:
+                  id: label_ap_state
+                  text: "---"
+                  text_font: roboto_scriptsize
+                  align: TOP_MID
+                  text_align: LEFT
+
+        - obj:
+            id: autopilot_panel
+            width: 100%
+            height: 40% # ${ap_btn_height * 2 + 24}
+            align: BOTTOM_MID
+            pad_all: ${ap_btn_padding}
+            bg_opa: 30%
+            radius: 20
+            scrollable: false
+
+            layout:
+              type: grid
+              grid_row_align: end
+              grid_rows: [ fr(1), fr(1) ]
+              grid_columns: [ fr(1), fr(1),fr(1), fr(1) ]
+              pad_row: ${ap_btn_padding}px
+              pad_column: ${ap_btn_padding}px
+            widgets:
+              - button:
+                  grid_cell_row_pos: 0
+                  grid_cell_column_pos: 0
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0x515151
+                  widgets:
+                    - label:
+                        text: "<<< -10"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.actions.adjustHeading
+                        value: -10
+
+              - button:
+                  grid_cell_row_pos: 0
+                  grid_cell_column_pos: 1
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0x515151
+                  widgets:
+                    - label:
+                        text: "< -1"
+
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.actions.adjustHeading
+                        value: -1
+
+              - button:
+                  grid_cell_row_pos: 0
+                  grid_cell_column_pos: 2
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0x515151
+                  widgets:
+                    - label:
+                        text: "1 >"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.actions.adjustHeading
+                        value: 1
+
+              - button:
+                  grid_cell_row_pos: 0
+                  grid_cell_column_pos: 3
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0x515151
+                  widgets:
+                    - label:
+                        text: "10 >>>"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.actions.adjustHeading
+                        value: 10
+
+              - button:
+                  grid_cell_row_pos: 1
+                  grid_cell_column_pos: 0
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0xc70814
+                  widgets:
+                    - label:
+                        text: "AUTO"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.state
+                        value: auto
+
+              - button:
+                  grid_cell_row_pos: 1
+                  grid_cell_column_pos: 1
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0xc70814
+                  widgets:
+                    - label:
+                        text: "WIND"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.state
+                        value: wind
+
+
+              - button:
+                  grid_cell_row_pos: 1
+                  grid_cell_column_pos: 2
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0xc70814
+                  widgets:
+                    - label:
+                        text: "TRACK"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.state
+                        value: "route"
+
+              - button:
+                  grid_cell_row_pos: 1
+                  grid_cell_column_pos: 3
+                  width: ${ap_btn_width}
+                  height: ${ap_btn_height}
+                  bg_color: 0xc70814
+                  widgets:
+                    - label:
+                        text: "STANDBY"
+                        text_font: roboto_scriptsize
+                  on_press:
+                    - signalk.put_request:
+                        path: steering.autopilot.state
+                        value: "standby"
+
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.actions.advanceWaypoint
+                    #     value: "port"
+
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.actions.tack
+                    #     value: "port"
+
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.actions.tack
+                    #     value: "starboard"
+                    
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.target.headingMagnetic
+                    #     value: 80
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.target.headingMagnetic
+                    #     value: 80
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.target.windAngleApparent
+                    #     value: 80
+                    #     unit: "degrees"
+                    # - signalk.put_request:
+                    #     path: steering.autopilot.hullType
+                    #     value: "power"
+                    
+        - !include { file: ../components/top_touch_detector.yaml }

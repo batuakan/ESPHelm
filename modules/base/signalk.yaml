@@ -1,0 +1,13 @@
+external_components:
+  # equivalent shorthand for GitHub
+  - source: github://batuakan/ESPHomeSignalK
+    components: [ signalk ]
+
+# external_components:
+# - source:
+#     type: local
+#     path: /home/batu/dev/ESPHomeSignalK/components
+
+signalk:
+  host: !secret signalk_host
+#   port: !secret signalk_port

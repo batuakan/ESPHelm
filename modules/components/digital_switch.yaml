@@ -1,0 +1,33 @@
+---
+obj:
+  height: ${switch_height}
+  width: 100%
+  pad_left: 28
+  pad_right: 28
+  bg_opa: TRANSP
+
+  layout:
+    type: FLEX
+    flex_flow: ROW
+    flex_align_main: SPACE_BETWEEN
+    flex_align_cross: CENTER
+
+  widgets:
+    - label:
+        text: ${name}
+        text_font: roboto_small
+        align: LEFT_MID
+        text_align: LEFT
+    - switch:
+        id: ${switch_id}
+        bg_color: 0xc70814
+        height: 52
+        width: 96
+        indicator:
+          checked:
+            bg_color: 0x009900
+        knob:
+          radius: 24
+          width: 48
+          height: 48
+          # bg_color: 0x0000FF

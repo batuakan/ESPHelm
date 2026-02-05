@@ -1,0 +1,15 @@
+lvgl:
+  pages:
+    - id: tanklevels_page
+      widgets:
+        - image:
+            src: background_image
+            align: CENTER
+        # =========================
+        # FULLSCREEN CONTAINER
+        # =========================
+        - obj:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            pad_all: 12

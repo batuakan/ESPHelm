@@ -1,0 +1,123 @@
+
+
+
+text_sensor:
+  # - platform: homeassistant
+  #   id: weather_condition
+  #   entity_id: weather.home
+  #   on_value:
+  #     - lvgl.label.update:
+  #         id: weather_condition_today
+  #         text: !lambda |-
+  #           return x.c_str();
+  #     - lambda: |-
+  #         const std::string &cond = id(weather_condition).state;
+
+  #         if (cond == "sunny") {
+  #           lv_img_set_src(id(weather_icon), id(weather_sunny));
+  #         } else if (cond == "cloudy") {
+  #           lv_img_set_src(id(weather_icon), id(weather_cloudy));
+  #         } else {
+  #           // fallback
+  #           lv_img_set_src(id(weather_icon), id(weather_cloudy));
+  #         }
+
+  # Daily text sensors
+  - platform: homeassistant
+    entity_id: sensor.daily_weather_forecast_sensor 
+    attribute: day${id}
+    id: sensor_forecast_day_${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_day_${id}
+          text:
+            format: "%s"
+            args: [ x.c_str() ]
+
+  - platform: homeassistant
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: condition${id}
+    id: sensor_forecast_condition_${id}
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: forecast_icon_${id}
+            text:
+              format: "%s"
+              args: [ map_weather_glyph(x) ]
+            # text: !lambda |-
+            #   return map_weather_glyph(x);
+
+sensor:
+  # - platform: homeassistant
+  #   id: sensor_outside_temperature
+  #   entity_id: weather.home
+  #   attribute: temperature
+  #   on_value:
+  #     - lvgl.label.update:
+  #         id: outdoor_temp
+  #         text:
+  #           format: "%.1f°C"
+  #           args: [ 'x' ]
+            
+    # Daily sensors
+  - platform: homeassistant
+    id: sensor_forecast_temp_high_${id}
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: temperature${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_temp_high_${id}
+          text:
+            format: "%.1f°C"
+            args: [ 'x' ]
+
+  - platform: homeassistant
+    id: sensor_forecast_temp_low_${id}
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: templow${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_temp_low_${id}
+          text:
+            format: "%.1f°C"
+            args: [ 'x' ]
+
+  - platform: homeassistant
+    id: sensor_forecast_wind_gust_speed_${id}
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: wind_gust_speed${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_wind_gust_speed_${id}
+          text:
+            format: "%.1f"
+            args: [ 'x' ]
+
+  - platform: homeassistant
+    id: sensor_forecast_wind_speed_${id}
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: wind_speed${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_wind_speed_${id}
+          text:
+            format: "%.1f"
+            args: [ 'x' ]
+
+  - platform: homeassistant
+    id: sensor_forecast_wind_bearing_${id}
+    entity_id: sensor.daily_weather_forecast_sensor
+    attribute: wind_bearing${id}
+    on_value:
+      - lvgl.label.update:
+          id: forecast_wind_bearing_${id}
+          transform_angle: !lambda |-
+            // HA gives degrees FROM north (meteorological)
+            float deg = x;
+            // Rotate arrow to show where wind is GOING TO
+            // (meteorological wind is FROM direction)
+            float rotation = deg + 180.0;
+            if (rotation >= 360) rotation -= 360;
+
+            return rotation * 10;

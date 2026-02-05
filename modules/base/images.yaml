@@ -1,0 +1,9 @@
+---
+# Graphic assets
+image:
+  - file: modules/assets/background.png
+    id: background_image
+    resize: ${screen_width}x${screen_height}
+    type: ${color_encoding}
+    transparency: alpha_channel
+    byte_order: ${byte_order}

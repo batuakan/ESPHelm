@@ -1,0 +1,30 @@
+---
+
+obj:
+  # height: 48
+  width: 100%
+  height: ${height}
+  pad_left: 0
+  pad_right: 0
+  bg_opa: TRANSP
+  align: CENTER
+  scrollable: "off"
+  scrollbar_mode: "OFF"
+
+  # layout:
+  #   type: FLEX
+  #   flex_flow: COLUMN
+  #   # flex_align_main: SPACE_BETWEEN
+  #   flex_align_cross: CENTER
+
+  widgets:
+    - label:
+        id: ${id}
+        text: ${text}
+        align: RIGHT_MID
+        text_font: roboto_LARGE
+        x: 50
+    - image:
+        src: ${image}
+        align: LEFT_MID
+        # x: -100

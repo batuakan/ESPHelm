@@ -1,0 +1,52 @@
+lvgl:
+  theme:
+    obj:
+      border_width: 0
+      pad_all: 0
+      # bg_opa: TRANSP
+      scrollable: false
+      # outline_width: 1
+      # outline_color: red
+      bg_color: 0x000000
+      
+      scrollbar_mode: "OFF"
+    label:
+      bg_opa: TRANSP
+      border_width: 0
+      scrollable: false
+      text_color: white
+      align: CENTER
+      text_align: CENTER
+      outline_width: 0
+      width: 100%
+#      outline_color: red
+    image:
+      border_width: 0
+      scrollable: false
+#      outline_width: 1
+#      outline_color: red
+    meter:
+      bg_opa: TRANSP
+      border_width: 0
+      scrollable: false
+      text_color: white
+      align: CENTER
+      outline_width: 0
+
+        
+    switch:
+      indicator:
+        checked:
+          bg_color: 0xFF0000
+    # button:
+    #   text_font: $text_font
+    #   checkable: false
+    #   press_lock: false
+    #   scroll_on_focus: true
+    #   radius: 25px
+    #   width: $button_width
+    #   height: $button_height_single
+    #   pad_all: 10px
+    #   shadow_width: 0 # This is required even though the default is supposed to be 0
+    #   bg_color: $button_off_color
+    #   text_color: $label_off_color

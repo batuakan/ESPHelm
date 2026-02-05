@@ -1,0 +1,30 @@
+// AUTOMATICALLY GENERATED FILE. PLEASE DO NOT MODIFY IT MANUALLY
+//
+// PlatformIO Debugging Solution
+//
+// Documentation: https://docs.platformio.org/en/latest/plus/debugging.html
+// Configuration: https://docs.platformio.org/en/latest/projectconf/sections/env/options/debug/index.html
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug ESPHome Host Binary",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/.esphome/build/sdl2/.pioenvs/sdl2/program",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

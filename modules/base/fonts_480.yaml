@@ -1,0 +1,127 @@
+font:
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto64
+    size: 64
+    bpp: 8
+  
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: 900
+    id: roboto_Huge
+    size: 64
+
+    extras: 
+      - file: 'modules/assets/fonts/materialdesignicons-webfont.ttf'
+        glyphs: [
+          "\U000F059A", # mdi-weather-sunset
+          "\U000F059C", # mdi-weather-sunrise
+          "\U000F0594", # clear-night
+          "\U000F0590", # cloudy
+          "\U000F0F2F", # exceptional
+          "\U000F0591", # fog
+          "\U000F0592", # hail
+          "\U000F0593", # lightning
+          "\U000F067E", # lightning-rainy
+          "\U000F0595", # partlycloudy
+          "\U000F0596", # pouring
+          "\U000F0597", # rainy
+          "\U000F0598", # snowy
+          "\U000F067F", # snowy-rainy
+          "\U000F0599", # sunny
+          "\U000F059D", # windy
+          "\U000F059E", # windy-variant
+          "\U000F14E4", # sunny-off
+          "\U000F1404",
+        ]
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_LARGE
+    size: 48
+    bpp: 8
+
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_large
+    size: 48
+    bpp: 8
+    # extras:
+    #   - file: "modules/assets/fonts/materialdesignicons-webfont.ttf"
+    #     glyphs: 
+    #       - ${mdi_wifi}
+    #       - ${mdi_wifi_off}
+    #       - ${mdi_power}
+    #       - ${mdi_fire}
+    #       - ${mdi_snowflake}
+    #       - ${mdi_fan}
+    #       - ${mdi_fan_auto}
+    #       - ${mdi_fan_speed_1}
+    #       - ${mdi_fan_speed_2}
+    #       - ${mdi_fan_speed_3}
+    #       - ${mdi_fan_off}
+
+  # - file: 'modules/assets/fonts/Roboto.ttf'
+  #   id: roboto42
+  #   size: 42
+  #   bpp: 8
+
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_normalsize
+    size: 36
+    bpp: 8
+
+    extras: 
+      - file: 'modules/assets/fonts/materialdesignicons-webfont.ttf'
+        glyphs: [
+          "\U000F059A", # mdi-weather-sunset
+          "\U000F059C", # mdi-weather-sunrise
+          "\U000F0594", # clear-night
+          "\U000F0590", # cloudy
+          "\U000F0F2F", # exceptional
+          "\U000F0591", # fog
+          "\U000F0592", # hail
+          "\U000F0593", # lightning
+          "\U000F067E", # lightning-rainy
+          "\U000F0595", # partlycloudy
+          "\U000F0596", # pouring
+          "\U000F0597", # rainy
+          "\U000F0598", # snowy
+          "\U000F067F", # snowy-rainy
+          "\U000F0599", # sunny
+          "\U000F059D", # windy
+          "\U000F059E", # windy-variant
+          "\U000F14E4", # sunny-off
+          "\U000F005E", # arrow
+        ]
+  
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_small
+    size: 32
+    bpp: 8
+
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_scriptsize
+    size: 24
+    bpp: 8
+
+  - file: 'modules/assets/fonts/Roboto.ttf'
+    id: roboto_tiny
+    size: 20
+    bpp: 8
+
+  # - file: 'modules/assets/fonts/Roboto.ttf'
+  #   id: roboto18
+  #   size: 17
+  #   bpp: 8
+
+  # - file: 'modules/assets/fonts/Roboto.ttf'
+  #   id: roboto14
+  #   size: 14
+  #   bpp: 8
+
+  # - file: 'modules/assets/fonts/Roboto.ttf'
+  #   id: roboto12
+  #   size: 12
+  #   bpp: 8
+
+  # - file: 'modules/assets/fonts/PoetsenOne-Regular.ttf'
+  #   id: poetsen64
+  #   size: 64

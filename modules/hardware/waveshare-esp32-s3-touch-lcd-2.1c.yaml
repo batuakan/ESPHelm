@@ -1,0 +1,207 @@
+# 2.8" Round Display Development Board, 480×480
+# waveshare-esp32-s3-touch-lcd-2.1c
+substitutions:
+  # Screen Size
+  screen_height: 480
+  screen_width: 480
+
+esphome:
+  min_version: 2025.2.0
+  project:
+    name: "Sunton.ESP32-S3-8048S070"
+    version: "1.0"    
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHFREQ: "80MHz" # this is needed for flashing
+      CONFIG_ESPTOOLPY_FLASHMODE_QIO: y
+      CONFIG_FLASHMODE_QIO: y
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240: y
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: '240'
+      CONFIG_SPIRAM_RODATA: "y"
+
+api:
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+preferences:
+  flash_write_interval: 5min
+  
+# PCA9554 GPIO extender
+pca9554:
+  - id: p_c_a
+    address: 0x20
+    i2c_id: i2c_bus  
+
+# Backlight PWM output and light component
+output:
+    # Backlight LED
+  - platform: ledc
+    id: gpio_backlight_pwm
+    pin: GPIO06
+    frequency: 2000Hz
+    channel: 0
+
+switch:
+  - platform: gpio
+    name: "Buzzer"
+    pin:
+      pca9554: p_c_a
+      # Use pin number 0
+      number: 7
+      # One of INPUT or OUTPUT
+      mode:
+        output: true
+
+light:
+  - platform: monochromatic
+    output: gpio_backlight_pwm
+    name: Display Backlight
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+    gamma_correct: 1
+
+    default_transition_length: 500ms
+    # # restore_mode: RESTORE_AND_ON
+    # on_turn_on: 
+    #   then:
+    #     - script.execute: turn_on_screen_light
+    # on_turn_off: 
+    #   then:
+    #     - lvgl.pause:
+
+#-------------------------------------------
+# Touchscreen GT911 i2c
+#-------------------------------------------
+i2c:
+  - id: i2c_bus
+    sda: GPIO15
+    scl: GPIO07
+
+# GT911 Touchscreen Controller
+touchscreen:
+  - platform: cst816
+    id: my_touchscreen
+    i2c_id: i2c_bus
+    skip_probe: true
+    reset_pin:
+      pca9554: p_c_a
+      number: 1
+    interrupt_pin: GPIO16
+    # on_touch:
+    #   - script.execute: turn_on_screen_light
+    # on_update:
+    #     # - lvgl.label.update:
+    #     #     id: coord_text
+    #     #     text: !lambda return str_sprintf("Touch points:\n id=%d x=%d, y=%d", touches[0].id, touches[0].x, touches[0].y);
+    #     - lambda: |-
+    #         for (auto touch: touches)  {
+    #             if (touch.state <= 2) {
+    #               ESP_LOGI("Touch points:", "id=%d x=%d, y=%d", touch.id, touch.x, touch.y);
+    #             }
+    #         }
+
+#-------------------------------------------
+# Display ST7701S spi
+#-------------------------------------------
+spi:
+  - id: spi_lcd
+    clk_pin: GPIO02
+    mosi_pin: GPIO01
+    interface: spi3
+
+display:
+  - platform: st7701s
+    id: my_display
+    spi_id: spi_lcd
+    spi_mode: MODE1
+    color_order: bgr
+    auto_clear_enabled: false
+    # show_test_card: true
+    dimensions:
+      width: 480
+      height: 480
+    cs_pin:
+      pca9554: p_c_a
+      number: 2
+    reset_pin:
+      pca9554: p_c_a
+      number: 0
+    de_pin: GPIO40
+    hsync_pin: GPIO38
+    vsync_pin: GPIO39
+    pclk_pin: GPIO41
+    init_sequence:
+      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x10 ]
+      - [ 0xC0, 0x3B, 0x00 ] # Scan Line
+      - [ 0xC1, 0x0B, 0x02 ] # VBP
+      - [ 0xC2, 0x07, 0x02 ] # VBP
+      - [ 0xCC, 0x10 ]
+      - [ 0xCD, 0x08 ] # RGB format
+      - [ 0xB0, 0x00, 0x11, 0x16, 0x0E, 0x11, 0x06, 0x05, 0x09, 0x08, 0x21, 0x06, 0x13, 0x10, 0x29, 0x31, 0x18 ]
+      - [ 0xB1, 0x00, 0x11, 0x16, 0x0E, 0x11, 0x07, 0x05, 0x09, 0x09, 0x21, 0x05, 0x13, 0x11, 0x2a, 0x31, 0x18 ]
+      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x11 ]
+      - [ 0xB0, 0x6D ]
+      - [ 0xB1, 0x37 ]
+      - [ 0xB2, 0x81 ]
+      - [ 0xB3, 0x80 ]
+      - [ 0xB5, 0x43 ]
+      - [ 0xB7, 0x85 ]
+      - [ 0xB8, 0x20 ]
+      - [ 0xC1, 0x78 ]
+      - [ 0xC2, 0x78 ]
+      - [ 0xD0, 0x88 ]
+      # - [ 0xE0, 0x00, 0x00, 0x02 ]
+      - [ 0xE0, 0x1F ]
+      - [ 0xE1, 0x03, 0xa0, 0x00, 0x00, 0x04, 0xa0, 0x00, 0x00, 0x00, 0x20, 0x20 ]
+      - [ 0xE2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]
+      - [ 0xE3, 0x00, 0x00, 0x11, 0x00 ]
+      - [ 0xE4, 0x22, 0x00 ]
+      - [ 0xE5, 0x05, 0xec, 0xa0, 0xa0, 0x07, 0xee, 0xa0, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]
+      - [ 0xE6, 0x00, 0x00, 0x11, 0x00 ]
+      - [ 0xE7, 0x22, 0x00 ]
+      - [ 0xE8, 0x06, 0xed, 0xa0, 0xa0, 0x08, 0xef, 0xa0, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]
+      - [ 0xEB, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x00 ]
+      - [ 0xED, 0xFF, 0xFF, 0xFF, 0xba, 0x0a, 0xbF, 0x45, 0xFF, 0xFF, 0x54, 0xfb, 0xa0, 0xab, 0xFF, 0xFF, 0xFF ]
+      - [ 0xEF, 0x10, 0x0d, 0x04, 0x08, 0x3F, 0x1f ]
+      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x13 ]
+      - [ 0xEF, 0x08 ]
+      - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x00 ]
+      - [ 0x36, 0x00 ]
+      - [ 0x3A, 0x66 ]
+      - delay 120ms
+      - [ 0x11 ]
+      - delay 120ms
+      - [ 0x20 ]
+      - delay 120ms
+      - [ 0x29 ]
+    data_pins:
+      red:
+        - 46       #r1
+        - 3        #r2
+        - 8        #r3
+        - 18       #r4
+        - 17       #r5
+      green:
+        - 14       #g0
+        - 13       #g1
+        - 12       #g2
+        - 11       #g3
+        - 10       #g4
+        - 9        #g5
+      blue:
+        - 5        #b1
+        - 45       #b2
+        - 48       #b3
+        - 47       #b4
+        - 21       #b5
+    # lambda: |-
+    #       auto red = Color(128, 128, 0);
+    #       it.fill(red);

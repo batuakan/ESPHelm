@@ -1,0 +1,116 @@
+globals:
+  - id: notif_title
+    type: std::string
+  - id: notif_body
+    type: std::string
+
+text_sensor:
+  - platform: signalk
+    id: notifications
+    path: notifications.*
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGD("notify", "Notification: %s", x.c_str());
+
+            json::parse_json(x, [&](JsonObject root) -> bool {
+
+              if (!root["message"].is<const char*>() ||
+                  !root["state"].is<const char*>()) {
+                ESP_LOGW("notify", "Invalid notification JSON");
+                return false;
+              }
+
+              std::string message = root["message"].as<std::string>();
+              std::string state   = root["state"].as<std::string>();
+              std::string category =
+                root["category"].is<const char*>() ?
+                root["category"].as<std::string>() : "Notification";
+
+              /* Severity → icon & color */
+              const char *icon = "\U000F02DC"; // bell
+              lv_color_t bg = lv_color_hex(0x404040);
+
+              if (state == "alert" || state == "emergency") {
+                icon = "\U000F0026";
+                bg = lv_color_hex(0x802020);
+              } else if (state == "warn") {
+                icon = "\U000F0026";
+                bg = lv_color_hex(0x805000);
+              }
+
+              /* Build message text */
+              std::string body =
+                std::string(icon) + " " + message +
+                "\n\nState: " + state;
+
+              /* Buttons (must be static) */
+              static const char *btns[] = { "Mute", "Ack", nullptr };
+
+              /* Create msgbox (LVGL 8 API) */
+              lv_obj_t *mb = lv_msgbox_create(
+                lv_scr_act(),              // parent
+                category.c_str(),          // title
+                body.c_str(),              // text
+                btns,                      // buttons
+                true                       // close button
+              );
+              lv_obj_set_size(mb, 600, 600);   // width, height in pixels
+              lv_obj_center(mb);
+              lv_obj_set_style_bg_color(mb, bg, 0);
+
+              /* Bigger message text */
+              lv_obj_t *content = lv_msgbox_get_content(mb);
+              lv_obj_set_style_text_font(content, id(roboto_scriptsize), 0);
+              lv_obj_set_style_text_color(content, lv_color_hex(0xFFFFFF), 0);
+
+              lv_obj_t *title = lv_msgbox_get_title(mb);
+              lv_obj_set_style_text_font(title, id(roboto_small), 0);
+              lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
+
+              lv_obj_t *btns_obj = lv_msgbox_get_btns(mb);
+              // Make button text bigger
+              lv_obj_set_style_text_font(btns_obj, id(roboto_scriptsize), LV_PART_ITEMS);
+
+              // Increase button padding
+              lv_obj_set_style_pad_top(btns_obj, 12, LV_PART_ITEMS);
+              lv_obj_set_style_pad_bottom(btns_obj, 12, LV_PART_ITEMS);
+              lv_obj_set_style_pad_left(btns_obj, 20, LV_PART_ITEMS);
+              lv_obj_set_style_pad_right(btns_obj, 20, LV_PART_ITEMS);
+
+              // Optional: minimum button size
+              lv_obj_set_style_min_width(btns_obj, 120, LV_PART_ITEMS);
+              lv_obj_set_style_min_height(btns_obj, 50, LV_PART_ITEMS);
+
+              /* Close on button press */
+              lv_obj_add_event_cb(
+                mb,
+                [](lv_event_t *e) {
+                  if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+                    lv_obj_del_async(lv_event_get_target(e));
+                  }
+                },
+                LV_EVENT_ALL,
+                nullptr
+              );
+
+              return true;
+            });
+
+
+lvgl:
+  msgboxes:
+    - id: message_box
+      close_button: true
+      title: Message box
+      body:
+        text: "This is a sample message box."
+        bg_color: 0x808080
+      # buttons:
+      #   - id: msgbox_apply
+      #     text: "Apply"
+      #   - id: msgbox_close
+      #     text: "\uF00D"
+      #     on_click:
+      #       then:
+      #         - lvgl.widget.hide: message_box

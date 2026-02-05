@@ -1,0 +1,29 @@
+lvgl:
+  pages:
+    - id: settings_page
+      skip: true
+      # bg_color: 0x000000
+      on_swipe_up:
+        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
+        - logger.log: "Swipe up"
+        # - lvgl.page.previous:
+        #     animation: OUT_TOP
+        #     time: 500ms
+        - lambda: |-
+            if (id(last_screen) != nullptr) {
+              lv_scr_load_anim(
+                id(last_screen),
+                LV_SCR_LOAD_ANIM_OUT_TOP,
+                500,
+                0,
+                false
+              );
+            }
+      widgets:
+        - image:
+            src: background_image
+            align: CENTER
+        - label:
+            id: settings_label
+            text: "Settings Page Under construction"
+            text_font: roboto_small

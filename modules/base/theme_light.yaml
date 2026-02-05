@@ -1,0 +1,45 @@
+---
+    obj:
+      border_width: 0
+      pad_all: 0
+      # bg_opa: TRANSP
+      scrollable: false
+#      outline_width: 1
+#      outline_color: red
+      scrollbar_mode: "OFF"
+    label:
+      border_width: 0
+      scrollable: false
+      text_color: black
+      align: CENTER
+      outline_width: 0
+#      outline_color: red
+    image:
+      border_width: 0
+      scrollable: false
+#      outline_width: 1
+#      outline_color: red
+    meter:
+      border_width: 0
+      scrollable: false
+      text_color: white
+      align: CENTER
+      outline_width: 0
+    
+    switch:
+      indicator:
+        checked:
+          bg_color: 0xFF0000
+      
+    # button:
+    #   text_font: $text_font
+    #   checkable: false
+    #   press_lock: false
+    #   scroll_on_focus: true
+    #   radius: 25px
+    #   width: $button_width
+    #   height: $button_height_single
+    #   pad_all: 10px
+    #   shadow_width: 0 # This is required even though the default is supposed to be 0
+    #   bg_color: $button_off_color
+    #   text_color: $label_off_color

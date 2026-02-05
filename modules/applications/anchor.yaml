@@ -1,0 +1,8 @@
+lvgl:
+  pages:
+    - id: anchor_page
+      <<: !include
+        file: ../sections/swipe_navigation.yaml
+      widgets:
+        <<: !include
+          file: ../screens/anchor_watch_screen.yaml

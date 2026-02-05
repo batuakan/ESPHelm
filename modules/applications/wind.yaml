@@ -1,0 +1,234 @@
+substitutions:
+  size: ${screen_width}
+  meter_width: ${size / 15| int}
+  indicator_size: ${(size / 15)| int}
+  wind_compassrose_size: ${size-2*(meter_width+20)|int}
+
+sensor:  
+  - platform: signalk
+    id: environment_wind_speedApparent
+    path: environment.wind.speedApparent
+    name: "Apparent Wind Speed"
+    unit_of_measurement: "kn"
+    period: 200
+    accuracy_decimals: 2
+    unit: ${speed_units}
+    on_value:
+      - lvgl.label.update:
+          id: wind_speed_apparent
+          text:
+            format: "%4.1f"
+            args: [ 'x' ]
+
+  - platform: signalk
+    id: environment_wind_angleApparent
+    path: environment.wind.angleApparent
+    name: "Apparent Wind Angle"
+    unit_of_measurement: "°"
+    period: 200
+    accuracy_decimals: 2
+    unit: "degrees"
+    on_value:
+      - lvgl.indicator.update:
+          id: wind_needle_apparent
+          value: !lambda return x;
+
+  - platform: signalk
+    id: environment_wind_speedTrue
+    path: environment.wind.speedTrue
+    name: "True Wind Speed"
+    unit_of_measurement: "kn"
+    period: 200
+    accuracy_decimals: 2
+    unit: ${speed_units}
+    on_value:
+      - lvgl.label.update:
+          id: wind_speed_true
+          text:
+            format: "%4.1f"
+            args: [ 'x' ]
+
+  - platform: signalk
+    id: environment_wind_directionTrue
+    path: environment.wind.directionTrue
+    name: "True Wind Direction"
+    unit_of_measurement: "°"
+    period: 200
+    accuracy_decimals: 2
+    unit: "degrees"
+    on_value:
+      - lvgl.indicator.update:
+          id: wind_needle_true
+          value: !lambda | 
+            if (x > 180)
+              return x - 360;
+            return x;
+
+  - platform: signalk
+    id: navigation_headingTrue
+    path: navigation.headingTrue
+    name: "True Heading"
+    unit_of_measurement: "°"
+    period: 200
+    accuracy_decimals: 2
+    unit: "degrees"
+    on_value:
+      - lvgl.indicator.update:
+          id: compass_rose
+          value: !lambda | 
+            return -1 * x; 
+      - lvgl.label.update:
+          id: heading_magnetic
+          text:
+            format: "%.0f°T"
+            args: [ 'x' ]   
+
+  # - platform: signalk
+  #   id: navigation_headingMagnetic
+  #   path: navigation.headingMagnetic
+  #   accuracy_decimals: 2
+  #   unit: "degrees"
+    # on_value:
+    #   - lvgl.indicator.update:
+    #       id: compass_rose
+    #       value: !lambda | 
+    #         double degrees = x * -180.0 / 3.1415; 
+    #         return degrees;
+  
+  - platform: signalk
+    id: navigation_speedOverGround
+    path: navigation.speedOverGround
+    name: "Speed Over Ground"
+    unit_of_measurement: "kn"
+    period: 200
+    accuracy_decimals: 2
+    unit: ${speed_units}
+    on_value:
+      - lvgl.label.update:
+          id: speed_over_ground
+          text:
+            format: "%4.1f"
+            args: [ 'x' ]
+
+image:
+  - file: modules/assets/compassRose.svg
+    id: compass_rose_indicator
+    resize: ${wind_compassrose_size}x${wind_compassrose_size}
+    type: ${color_encoding}
+    transparency: alpha_channel
+    byte_order: ${byte_order}
+
+  
+  - file: modules/assets/trueWind.svg
+    id: trueWind_indicator
+    resize: ${indicator_size}x${indicator_size}
+    type: ${color_encoding}
+    transparency: alpha_channel
+    byte_order: ${byte_order}
+
+  - file: modules/assets/apparentWind.svg
+    id: apparentWind_indicator
+    resize: ${indicator_size}x${indicator_size}
+    type: ${color_encoding}
+    transparency: alpha_channel
+    byte_order: ${byte_order}
+
+lvgl:
+  pages:
+    - id: wind_page
+      <<: !include
+        file: ../sections/swipe_navigation.yaml
+      widgets:
+        - image:
+            src: background_image
+            align: CENTER
+        - meter:
+            height: $size
+            width: $size
+            scales:
+              - range_from: -180 # scale for the needle value
+                range_to: 180
+                angle_range: 360
+                rotation: 90
+                ticks:
+                  count: 13
+                  width: 8
+                  length: ${meter_width}
+                  color: 0xAAAAAA
+              - range_from: -180 # scale for the needle value
+                range_to: 180
+                angle_range: 360
+                rotation: 90
+                ticks:
+                  color: 0xAAAAAA
+                  width: 2
+                  count: 73
+                  length: ${meter_width-5}
+                  # major:
+                  #     stride: 6
+                  #     width: 8
+                  #     length: 30
+                  #     color: 0xFFFFFF
+                  #     label_gap: 30
+                indicators:  
+                  - image:
+                      id: compass_rose
+                      src: compass_rose_indicator
+                      pivot_x: ${wind_compassrose_size/2}
+                      pivot_y: ${wind_compassrose_size/2}
+                      value: 30  
+                  - image:
+                      id: wind_needle_true
+                      src: trueWind_indicator
+                      pivot_x: -${(size/2 - 1.2 * indicator_size)| int}
+                      pivot_y: ${indicator_size / 2}
+                      value: 40
+                  - image:
+                      id: wind_needle_apparent
+                      src: apparentWind_indicator
+                      pivot_x: -${(size/2 - 1.2 * indicator_size)| int}
+                      pivot_y: ${indicator_size / 2}
+                      value: 30     
+                  - arc:
+                      color: 0x00FF00
+                      start_value: 20
+                      end_value: 60
+                      width: ${meter_width}
+                  - arc:
+                      color: 0xFF0000
+                      start_value: -60
+                      end_value: -20
+                      width: ${meter_width}
+        - label:
+            id: heading_magnetic
+            text: "150°M"
+            align: TOP_MID
+            text_align: CENTER
+            # text_color: 0xFFFFFF
+            text_font: roboto_scriptsize
+            y: 100
+        - obj:
+            align: CENTER
+            height: 60%
+            width: 60%
+            scrollable: false
+            pad_top: 0
+            pad_bottom: 0
+            pad_left: 0
+            pad_right: 0
+            pad_all: 0
+            bg_opa: TRANSP
+            y: 10
+
+            layout:
+              type: FLEX
+              flex_flow: COLUMN
+              flex_align_main: space_evenly
+              flex_align_cross: stretch
+
+            widgets: 
+              - !include { file: ../components/label_withdescription.yaml, vars: { id: speed_over_ground, text: "00.0", description: "SOG Kn"} }
+              - !include { file: ../components/label_withdescription.yaml, vars: { id: wind_speed_true, text: "00.0", description: "TWS Kn"} }
+              - !include { file: ../components/label_withdescription.yaml, vars: { id: wind_speed_apparent, text: "00.0", description: "AWS Kn"} }
+        
+        - !include { file: ../components/top_touch_detector.yaml }

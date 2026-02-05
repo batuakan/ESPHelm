@@ -1,0 +1,30 @@
+---
+
+obj:
+  height: ${screen_height / 2 - 16}
+  width: ${screen_width / 2 - 16}
+  pad_left: 8
+  pad_right: 8
+  bg_opa: 30%
+  align: CENTER
+  radius: 20
+
+
+
+  widgets:
+    - label:
+        text: ${description}
+        text_font: roboto_normalsize
+        align: TOP_LEFT
+        text_align: LEFT
+    - label:
+        id: ${id}
+        text: ${text}
+        text_font: roboto_Huge
+        # pad_bottom: -24
+    - label:
+        text: ${unit}
+        text_font: roboto_normalsize
+        align: BOTTOM_RIGHT
+        text_align: RIGHT
+
