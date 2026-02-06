@@ -353,3 +353,81 @@ lvgl:
                     - !include { vars:{ day: Tue, id: 4 }, file: ../components/weather_forecast.yaml }
                     - !include { vars:{ day: Tue, id: 5 }, file: ../components/weather_forecast.yaml }
         - !include { file: ../components/top_touch_detector.yaml }
+
+
+
+### Setup for home assistant toreceive weather forecast data
+# Add the following to your homeassistant configuration.yaml file
+
+# template:
+#   - trigger:
+#       - platform: time_pattern
+#         hours: /1
+#       - platform: homeassistant
+#         event: start
+#     action:
+#       - service: weather.get_forecasts
+#         data:
+#           type: daily
+#         target:
+#           entity_id: weather.home
+#         response_variable: daily_data
+#     sensor:
+#       - name: "Weather forecast"
+#         unique_id: weather_forecast
+#         state: "{{ daily_data['weather.home'].forecast[0] }}"
+#         attributes:
+#           daily_forecast: "{{ daily_data['weather.home'].forecast }}"
+#         availability: "{{ states('weather.home') not in ['unknown', 'unavailable', 'none'] }}"
+#   - sensor:
+#       - name: "Daily weather forecast sensor"
+#         unique_id: daily_weather_forecast_sensor
+#         state: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0] }}"
+#         attributes:
+#           condition0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].condition }}"
+#           day0: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[0].datetime) | timestamp_custom('%a', True) }}"
+#           temperature0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].temperature | float }}"
+#           templow0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].templow | float }}"
+#           wind_bearing0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_bearing | float }}"
+#           wind_speed0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_speed | float }}"
+#           wind_gust_speed0: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_gust_speed | float }}"
+
+#           condition1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[1].condition }}"
+#           day1: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[1].datetime) | timestamp_custom('%a', True) }}"
+#           temperature1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[1].temperature | float }}"
+#           templow1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[1].templow | float }}"
+#           wind_bearing1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_bearing | float }}"
+#           wind_speed1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_speed | float }}"
+#           wind_gust_speed1: "{{ state_attr('sensor.weather_forecast','daily_forecast')[0].wind_gust_speed | float }}"
+
+#           condition2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].condition }}"
+#           day2: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[2].datetime) | timestamp_custom('%a', True) }}"
+#           temperature2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].temperature | float }}"
+#           templow2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].templow | float }}"
+#           wind_bearing2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].wind_bearing | float }}"
+#           wind_speed2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].wind_speed | float }}"
+#           wind_gust_speed2: "{{ state_attr('sensor.weather_forecast','daily_forecast')[2].wind_gust_speed | float }}"
+
+#           condition3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].condition }}"
+#           day3: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[3].datetime) | timestamp_custom('%a', True) }}"
+#           temperature3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].temperature | float }}"
+#           templow3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].templow | float }}"
+#           wind_bearing3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].wind_bearing | float }}"
+#           wind_speed3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].wind_speed | float }}"
+#           wind_gust_speed3: "{{ state_attr('sensor.weather_forecast','daily_forecast')[3].wind_gust_speed | float }}"
+
+#           condition4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].condition }}"
+#           day4: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[4].datetime) | timestamp_custom('%a', True) }}"
+#           temperature4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].temperature | float }}"
+#           templow4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].templow | float }}"
+#           wind_bearing4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].wind_bearing | float }}"
+#           wind_speed4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].wind_speed | float }}"
+#           wind_gust_speed4: "{{ state_attr('sensor.weather_forecast','daily_forecast')[4].wind_gust_speed | float }}"
+
+#           condition5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].condition }}"
+#           day5: "{{ as_timestamp(state_attr('sensor.weather_forecast','daily_forecast')[5].datetime) | timestamp_custom('%a', True) }}"
+#           temperature5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].temperature | float }}"
+#           templow5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].templow | float }}"
+#           wind_bearing5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].wind_bearing | float }}"
+#           wind_speed5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].wind_speed | float }}"
+#           wind_gust_speed5: "{{ state_attr('sensor.weather_forecast','daily_forecast')[5].wind_gust_speed | float }}"
