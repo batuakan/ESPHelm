@@ -8,7 +8,8 @@ It connects directly to HomeAssistant and SignalK servers to provide real-time v
 ---
 
 <p align="center">
- <img width="200px" src="/docs/images/weather.png">
+ <img width="200px" src="/docs/images/weather.png"> 
+ <img width="200px" src="/docs/images/engine.png">
  <img width="200px" src="/docs/images/wind.png">
  <img width="200px" src="/docs/images/chart.png">
  <img width="200px" src="/docs/images/switchboard.png">
@@ -138,7 +139,7 @@ Additionally this application subscribes to anchor position and anchor maxRadius
 **TODO:**
 
 - [ ] Clean up the view when the anchor is pulled up. Hide the anchor icon and the circle.
-- [ ] Anchow view feels a little iffy as the data received for vessel position and anchor position is not syncronized.
+- [ ] Anchor view feels a little iffy as the data received for vessel position and anchor position is received asychronously.
 - [ ] Display depth and current radius 
 - [ ] Add GUI buttons to drop and pull the anchor
 
