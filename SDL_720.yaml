@@ -17,6 +17,7 @@ packages:
 
   notification: !include modules/components/notification.yaml
   autopilot: !include modules/applications/autopilot.yaml
+  engine: !include modules/applications/engine.yaml
   chart: !include modules/applications/chart.yaml
   wind: !include modules/applications/wind.yaml
   energy: !include modules/applications/energy.yaml

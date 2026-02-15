@@ -137,7 +137,7 @@ lvgl:
   pages:
     - id: wind_page
       <<: !include
-        file: ../sections/swipe_navigation.yaml
+        file: ../base/swipe_navigation.yaml
       widgets:
         - image:
             src: background_image
@@ -145,6 +145,7 @@ lvgl:
         - meter:
             height: $size
             width: $size
+            anim_time: 500ms
             scales:
               - range_from: -180 # scale for the needle value
                 range_to: 180

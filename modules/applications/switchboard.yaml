@@ -6,7 +6,7 @@ lvgl:
   pages:
     - id: switchboard_page
       <<: !include
-        file: ../sections/swipe_navigation.yaml
+        file: ../base/swipe_navigation.yaml
       widgets:
         - image:
             src: background_image

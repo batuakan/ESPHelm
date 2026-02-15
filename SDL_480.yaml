@@ -13,15 +13,18 @@ substitutions:
 packages:
   # Harware description file
   hardware: !include modules/hardware/sdl.yaml
+  system_settings: !include modules/base/settings.yaml
   fonts: !include modules/base/fonts_480.yaml
   images: !include modules/base/images.yaml
-  signalk: !include modules/sensors/signalk_base.yaml
-  globals: !include modules/sections/globals.yaml
+  signalk: !include modules/base/signalk.yaml
+  globals: !include modules/base/globals.yaml
+  # toplayer: !include modules/base/toplayer.yaml
   theme: !include { file: modules/base/theme_dark.yaml }
 
 
   notification: !include modules/components/notification.yaml
   autopilot: !include modules/applications/autopilot.yaml
+  chart: !include modules/applications/chart.yaml
   wind: !include modules/applications/wind.yaml
   energy: !include modules/applications/energy.yaml
   switches: !include modules/applications/switchboard.yaml

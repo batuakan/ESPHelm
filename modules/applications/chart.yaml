@@ -1,16 +1,16 @@
-# external_components:
-#   - source:
-#       type: local
-#       path: components
-
 external_components:
-  # equivalent shorthand for GitHub
-  - source: github://batuakan/ESPTiles
-    components: [ esptiles ]
+  - source:
+      type: local
+      path: /home/batu/dev/ESPTiles/components
+
+# external_components:
+#   # equivalent shorthand for GitHub
+#   - source: github://batuakan/ESPTiles
+#     components: [ esptiles ]
 
 esptiles:
   id: tiles
-  url_template: "http://192.168.0.123:3000/rgb565/cmap/{z}/{x}/{y}?order=big_endian"
+  url_template: "http://192.168.0.123:3000/rgb565/cmap/{z}/{x}/{y}?order=${byte_order}"
 
 
 globals:
@@ -114,7 +114,7 @@ lvgl:
     - id: chart_page
 
       <<: !include
-        file: ../sections/swipe_navigation.yaml
+        file: ../base/swipe_navigation.yaml
       widgets:
         - container:
             width: 720

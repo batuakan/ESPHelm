@@ -6,9 +6,6 @@ lvgl:
       on_swipe_up:
         - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
         - logger.log: "Swipe up"
-        # - lvgl.page.previous:
-        #     animation: OUT_TOP
-        #     time: 500ms
         - lambda: |-
             if (id(last_screen) != nullptr) {
               lv_scr_load_anim(

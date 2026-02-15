@@ -81,6 +81,20 @@ Not much to say here, a wind instrument application showing:
 
 Rotating the compass rose on ESP32 C3 takes significant amount of resources, so comment it out if things get slow.
 
+
+### Engine
+
+<img width="200px" src="/docs/images/engine.png">
+
+A simple engine monitoring application, showing 
+
+- engine rpm
+- temperature
+- oil pressure
+- fuel level
+
+
+
 ### Energy
 
  <img width="200px" src="/docs/images/energy.png">
@@ -171,4 +185,17 @@ esphome run MFD.yaml
 Build and upload to your esp device.
 
 ## What is missing
+
+The following applications would be nice to have
+
+- [x] Engine monitoring
+  - [x] RPM
+  - [x] Oil Pressure
+  - [x] Various temperature measurements
+
+
+- [ ] Tanks monitoring
+  - [ ] Fresh Water
+  - [ ] Diesel
+  - [ ] Waste
 

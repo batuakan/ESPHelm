@@ -15,10 +15,13 @@ packages:
   images: !include modules/base/images.yaml
   theme: !include { file: modules/base/theme_dark.yaml }
   signalk: !include modules/base/signalk.yaml
+  # webserver: !include modules/base/webserver.yaml
+  # audio: !include modules/base/audio.yaml
 
   notification: !include modules/components/notification.yaml
 
   chart: !include modules/applications/chart.yaml
+  engine: !include modules/applications/engine.yaml
   weather: !include modules/applications/weather.yaml
   autopilot: !include modules/applications/autopilot.yaml
   wind: !include modules/applications/wind.yaml

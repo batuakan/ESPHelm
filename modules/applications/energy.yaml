@@ -108,7 +108,7 @@ lvgl:
   pages:
     - id: energy_page
       <<: !include
-        file: ../sections/swipe_navigation.yaml
+        file: ../base/swipe_navigation.yaml
       widgets:
 
 
