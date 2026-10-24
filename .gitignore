@@ -3,3 +3,13 @@
 # You can modify this file to suit your needs.
 /.esphome/
 /secrets.yaml
+
+# SignalK access token written by the host (SDL) build into the working directory
+/token
+# Local scratch output
+/out.txt
+# SDL screenshots taken from the repo root
+/screenshot_*.bmp
+__pycache__/
+# FreeCAD backups
+*.FCBak
