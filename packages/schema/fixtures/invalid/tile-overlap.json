@@ -1,0 +1,44 @@
+{
+  "description": "Two tiles share a cell",
+  "expect": [
+    {
+      "code": "TILE_OVERLAP",
+      "pointer": "/pages/0/tiles/1"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "a",
+            "x": 0,
+            "y": 0,
+            "w": 2,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          },
+          {
+            "type": "value",
+            "id": "b",
+            "x": 1,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "description": "Gauge min not below max",
+  "expect": [
+    {
+      "code": "INVALID_RANGE",
+      "pointer": "/pages/0/tiles/0/max"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "gauge",
+            "id": "g",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "propulsion.p0.revolutions",
+            "unit": "rpm",
+            "min": 100,
+            "max": 100
+          }
+        ]
+      }
+    ]
+  }
+}

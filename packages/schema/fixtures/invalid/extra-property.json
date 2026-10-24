@@ -1,0 +1,38 @@
+{
+  "description": "Unknown property at the top level",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/colors"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ],
+    "colors": {
+      "bg": "#000"
+    }
+  }
+}

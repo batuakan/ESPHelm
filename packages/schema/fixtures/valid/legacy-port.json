@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "legacy-port",
+  "name": "Port of the static MFD apps",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "widget",
+      "widget": "wind_rose",
+      "id": "wind",
+      "config": {
+        "apparentAngle": "environment.wind.angleApparent",
+        "trueDirection": "environment.wind.directionTrue",
+        "heading": "navigation.headingTrue"
+      },
+      "slots": {
+        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG Kn" },
+        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS Kn" },
+        "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS Kn" }
+      }
+    },
+    {
+      "kind": "grid",
+      "id": "grid",
+      "grid": { "cols": 2, "rows": 2 },
+      "tiles": [
+        { "type": "value", "id": "g-sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 2, "label": "SOG" },
+        { "type": "value", "id": "g-aws", "x": 1, "y": 0, "w": 1, "h": 1, "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 2, "label": "AWS" },
+        { "type": "value", "id": "g-tws", "x": 0, "y": 1, "w": 1, "h": 1, "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 2, "label": "TWS" },
+        { "type": "value", "id": "g-stw", "x": 1, "y": 1, "w": 1, "h": 1, "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 2, "label": "STW" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "energy",
+      "title": "Energy",
+      "grid": { "cols": 2, "rows": 3 },
+      "tiles": [
+        {
+          "type": "gauge", "id": "e-soc", "x": 0, "y": 0, "w": 2, "h": 2,
+          "path": "electrical.batteries.shunt.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "SoC",
+          "min": 0, "max": 100,
+          "zones": [
+            { "from": 0, "to": 30, "state": "alarm" },
+            { "from": 30, "to": 40, "state": "warn" }
+          ]
+        },
+        { "type": "value", "id": "e-voltage", "x": 0, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.shunt.voltage", "unit": "V", "decimals": 1, "label": "House" },
+        { "type": "value", "id": "e-current", "x": 1, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.shunt.current", "unit": "A", "decimals": 1, "label": "Current" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "engine",
+      "grid": { "cols": 2, "rows": 1 },
+      "tiles": [
+        { "type": "gauge", "id": "rpm", "x": 0, "y": 0, "w": 1, "h": 1, "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM", "min": 0, "max": 5000, "zones": [{ "from": 3500, "to": 5000, "state": "alarm" }] },
+        { "type": "gauge", "id": "temp", "x": 1, "y": 0, "w": 1, "h": 1, "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Temp", "min": 0, "max": 120 }
+      ]
+    }
+  ]
+}

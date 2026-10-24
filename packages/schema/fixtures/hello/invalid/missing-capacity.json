@@ -1,0 +1,32 @@
+{
+  "description": "capacity is required",
+  "expect": [
+    {
+      "code": "MISSING_FIELD",
+      "pointer": "/capacity"
+    }
+  ],
+  "hello": {
+    "deviceId": "aabbccdd-0011-2233-0ba2-aabbccddeeff",
+    "fw": {
+      "version": "0.3.0"
+    },
+    "schema": {
+      "major": 1
+    },
+    "board": "esp32-c3-gc9a01-240",
+    "display": {
+      "width": 240,
+      "height": 240,
+      "rotation": 0
+    },
+    "widgets": [
+      "value",
+      "bar"
+    ],
+    "capabilities": {
+      "touch": false,
+      "put": true
+    }
+  }
+}

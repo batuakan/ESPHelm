@@ -1,0 +1,75 @@
+{
+  "$comment": "Shared conversion cases, run by the TS tests and the generated C++ test. Expected values are derived from unit definitions (e.g. 1 nmi = 1852 m), not from units.json, so a typo in the table fails here. Tolerance: 1e-9 relative (min 1e-9 absolute).",
+  "cases": [
+    { "si": 1, "unit": "mps", "expected": 1 },
+    { "si": 10.288888888888889, "unit": "kn", "expected": 20 },
+    { "si": 1852, "unit": "kn", "expected": 3600 },
+    { "si": 1, "unit": "kmh", "expected": 3.6 },
+    { "si": 0.44704, "unit": "mph", "expected": 1 },
+
+    { "si": 0, "unit": "deg", "expected": 0 },
+    { "si": 0.17453292519943295, "unit": "deg", "expected": 10 },
+    { "si": 3.141592653589793, "unit": "deg", "expected": 180 },
+    { "si": 6.283185307179586, "unit": "deg", "expected": 0 },
+    { "si": -1.5707963267948966, "unit": "deg", "expected": 270 },
+    { "si": -0.35, "unit": "deg", "expected": 339.9464771704212 },
+    { "si": -9.42477796076938, "unit": "deg", "expected": 180 },
+    { "si": 3.141592653589793, "unit": "deg180", "expected": -180 },
+    { "si": -1.5707963267948966, "unit": "deg180", "expected": -90 },
+    { "si": 4.71238898038469, "unit": "deg180", "expected": -90 },
+    { "si": -0.35, "unit": "deg180", "expected": -20.05352282957881 },
+    { "si": 0.17453292519943295, "unit": "deg180", "expected": 10 },
+    { "si": 2, "unit": "rad", "expected": 2 },
+
+    { "si": 0.5, "unit": "radps", "expected": 0.5 },
+    { "si": 0.017453292519943295, "unit": "degps", "expected": 1 },
+    { "si": 0.017453292519943295, "unit": "degpm", "expected": 60 },
+
+    { "si": 0, "unit": "degC", "expected": -273.15 },
+    { "si": 373.15, "unit": "degC", "expected": 100 },
+    { "si": 273.15, "unit": "degF", "expected": 32 },
+    { "si": 310.15, "unit": "degF", "expected": 98.6 },
+    { "si": 300, "unit": "K", "expected": 300 },
+
+    { "si": 0.5, "unit": "pct", "expected": 50 },
+    { "si": 1, "unit": "ratio", "expected": 1 },
+
+    { "si": 1, "unit": "rpm", "expected": 60 },
+    { "si": 50, "unit": "Hz", "expected": 50 },
+
+    { "si": 1852, "unit": "nmi", "expected": 1 },
+    { "si": 0.3048, "unit": "ft", "expected": 1 },
+    { "si": 1.8288, "unit": "fathom", "expected": 1 },
+    { "si": 1000, "unit": "km", "expected": 1 },
+    { "si": 12.5, "unit": "m", "expected": 12.5 },
+
+    { "si": 0.001, "unit": "L", "expected": 1 },
+    { "si": 0.003785411784, "unit": "gal", "expected": 1 },
+    { "si": 2, "unit": "m3", "expected": 2 },
+
+    { "si": 1.6666666666666667e-5, "unit": "Lpm", "expected": 1 },
+    { "si": 2.777777777777778e-7, "unit": "Lph", "expected": 1 },
+    { "si": 1.0515032733333334e-6, "unit": "galph", "expected": 1 },
+    { "si": 1, "unit": "m3ps", "expected": 1 },
+
+    { "si": 101325, "unit": "hPa", "expected": 1013.25 },
+    { "si": 101325, "unit": "mbar", "expected": 1013.25 },
+    { "si": 101325, "unit": "bar", "expected": 1.01325 },
+    { "si": 6894.757293168361, "unit": "psi", "expected": 1 },
+    { "si": 5, "unit": "Pa", "expected": 5 },
+
+    { "si": 3600, "unit": "Ah", "expected": 1 },
+    { "si": 7, "unit": "coulomb", "expected": 7 },
+    { "si": 3600000, "unit": "kWh", "expected": 1 },
+    { "si": 9, "unit": "J", "expected": 9 },
+    { "si": 1500, "unit": "kW", "expected": 1.5 },
+    { "si": 3, "unit": "W", "expected": 3 },
+    { "si": 13.2, "unit": "V", "expected": 13.2 },
+    { "si": 0.5, "unit": "mA", "expected": 500 },
+    { "si": -4.2, "unit": "A", "expected": -4.2 },
+
+    { "si": 3600, "unit": "h", "expected": 1 },
+    { "si": 3600, "unit": "min", "expected": 60 },
+    { "si": 42, "unit": "s", "expected": 42 }
+  ]
+}

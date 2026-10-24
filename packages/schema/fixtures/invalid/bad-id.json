@@ -1,0 +1,35 @@
+{
+  "description": "Uppercase id",
+  "expect": [
+    {
+      "code": "INVALID_ID",
+      "pointer": "/pages/0/tiles/0/id"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "SOG",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

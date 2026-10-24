@@ -1,0 +1,54 @@
+{
+  "description": "Tile ids must be unique across the layout",
+  "expect": [
+    {
+      "code": "DUPLICATE_ID",
+      "pointer": "/pages/1/tiles/0/id"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "one",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      },
+      {
+        "kind": "grid",
+        "id": "two",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

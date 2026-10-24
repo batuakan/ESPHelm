@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "mixed-720",
+  "name": "Engine and power (720x720)",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "engine",
+      "title": "Engine",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        {
+          "type": "gauge", "id": "rpm", "x": 0, "y": 0, "w": 2, "h": 2,
+          "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM",
+          "min": 0, "max": 4000,
+          "zones": [
+            { "from": 0, "to": 3200, "state": "normal" },
+            { "from": 3200, "to": 3600, "state": "warn" },
+            { "from": 3600, "to": 4000, "state": "alarm" }
+          ]
+        },
+        {
+          "type": "gauge", "id": "coolant", "x": 2, "y": 0, "w": 1, "h": 1,
+          "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
+          "min": 40, "max": 120,
+          "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
+        },
+        { "type": "value", "id": "oil", "x": 2, "y": 1, "w": 1, "h": 1, "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil" },
+        {
+          "type": "bar", "id": "soc", "x": 0, "y": 2, "w": 2, "h": 1,
+          "path": "electrical.batteries.shunt.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "SoC",
+          "min": 0, "max": 100, "orientation": "horizontal",
+          "zones": [
+            { "from": 0, "to": 30, "state": "alarm" },
+            { "from": 30, "to": 50, "state": "warn" }
+          ]
+        },
+        { "type": "switch", "id": "nav-lights", "x": 2, "y": 2, "w": 1, "h": 1, "path": "electrical.switches.navigationLights.state", "label": "Nav lights" }
+      ]
+    }
+  ]
+}

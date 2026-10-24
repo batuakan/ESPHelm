@@ -1,0 +1,36 @@
+{
+  "description": "Label with a glyph the fonts do not contain",
+  "expect": [
+    {
+      "code": "INVALID_LABEL",
+      "pointer": "/pages/0/tiles/0/label"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "t",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround",
+            "label": "Kühlwasser"
+          }
+        ]
+      }
+    ]
+  }
+}

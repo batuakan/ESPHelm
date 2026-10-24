@@ -1,0 +1,37 @@
+{
+  "description": "deviceId must be hex and dashes",
+  "expect": [
+    {
+      "code": "INVALID_DEVICE_ID",
+      "pointer": "/deviceId"
+    }
+  ],
+  "hello": {
+    "deviceId": "my display",
+    "fw": {
+      "version": "0.3.0"
+    },
+    "schema": {
+      "major": 1
+    },
+    "board": "esp32-c3-gc9a01-240",
+    "display": {
+      "width": 240,
+      "height": 240,
+      "rotation": 0
+    },
+    "widgets": [
+      "value",
+      "bar"
+    ],
+    "capacity": {
+      "psram": false,
+      "maxLayoutBytes": 8192,
+      "freeHeapBytes": 95000
+    },
+    "capabilities": {
+      "touch": false,
+      "put": true
+    }
+  }
+}

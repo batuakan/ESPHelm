@@ -1,0 +1,36 @@
+{
+  "description": "Switch tiles take no unit",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/pages/0/tiles/0/unit"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "switch",
+            "id": "s",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "electrical.switches.anchorLight.state",
+            "unit": "pct"
+          }
+        ]
+      }
+    ]
+  }
+}

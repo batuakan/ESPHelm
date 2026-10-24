@@ -1,0 +1,35 @@
+{
+  "description": "Layout major version other than 1",
+  "expect": [
+    {
+      "code": "UNSUPPORTED_VERSION",
+      "pointer": "/version"
+    }
+  ],
+  "layout": {
+    "version": 2,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

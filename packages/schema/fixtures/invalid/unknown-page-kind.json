@@ -1,0 +1,20 @@
+{
+  "description": "Page kind not grid/widget",
+  "expect": [
+    {
+      "code": "UNKNOWN_PAGE_KIND",
+      "pointer": "/pages/0/kind"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "canvas",
+        "id": "p"
+      }
+    ]
+  }
+}

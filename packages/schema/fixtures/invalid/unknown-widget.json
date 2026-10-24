@@ -1,0 +1,22 @@
+{
+  "description": "Full-page widget not in the catalog",
+  "expect": [
+    {
+      "code": "UNKNOWN_WIDGET",
+      "pointer": "/pages/0/widget"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "widget",
+        "widget": "radar",
+        "id": "p",
+        "slots": {}
+      }
+    ]
+  }
+}
