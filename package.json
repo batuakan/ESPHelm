@@ -1,0 +1,30 @@
+{
+  "name": "esphelm",
+  "private": true,
+  "description": "ESPHelm: runtime-configurable ESP32 MFD for SignalK (TS workspace: schema, plugin, editor)",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "npm run generate --workspaces --if-present",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write . && eslint --fix .",
+    "build": "tsc -b packages/*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "10.12.0",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}
