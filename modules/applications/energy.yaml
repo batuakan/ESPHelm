@@ -109,6 +109,18 @@ lvgl:
     - id: energy_page
       <<: !include
         file: ../base/swipe_navigation.yaml
+      # ESPHome >= 2026.x rejects a negative meter image pivot_x, so the needles
+      # are pivoted around the dial centre (outside the image) here instead.
+      on_load:
+        - lambda: |-
+            auto pivot_outside = [](lv_obj_t *needle, int32_t offset) {
+              auto *src = static_cast<const lv_image_dsc_t *>(lv_image_get_src(needle));
+              lv_obj_set_x(needle, src->header.w / 2 + offset);
+              lv_obj_set_style_transform_pivot_x(needle, -offset, LV_PART_MAIN);
+            };
+            pivot_outside(id(battery_voltage_needle), ${energy_size / 2 - 60});
+            pivot_outside(id(engine_battery_voltage_needle), ${energy_size / 2 - 50});
+            pivot_outside(id(battery_state_of_charge_needle), ${energy_size / 2 - 60});
       widgets:
 
 
@@ -134,21 +146,13 @@ lvgl:
                   - image:
                       id: battery_voltage_needle
                       src: house_battery_voltage_indicator
-                      pivot_x: -${size/2 - 60}
                       pivot_y: 10
                       value: 132
                   - image:
                       id: engine_battery_voltage_needle
                       src: engine_battery_voltage_indicator
-                      pivot_x: -${size/2 -50}
                       pivot_y: 10
                       value: 128
-                  - tick_style:
-                      start_value: 15
-                      end_value: 10
-                      color_start: 0xFF00FF
-                      color_end: 0xFF00FF
-                      width: 2
               - range_from: 15 # scale for the needle value
                 range_to: 10
                 angle_range: 90
@@ -184,7 +188,6 @@ lvgl:
                   - image:
                       id: battery_state_of_charge_needle
                       src: house_battery_voltage_indicator
-                      pivot_x: -${size/2 - 60}
                       pivot_y: 10
                       value: 55
                   - tick_style:

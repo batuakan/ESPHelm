@@ -2,7 +2,8 @@ substitutions:
   # Screen Size
   # screen_height: 720
   # screen_width: 720
-  byte_order: big_endian
+  # ESPHome 2026.x SDL display expects little-endian RGB565 (big_endian swaps colours)
+  byte_order: little_endian
   color_encoding: RGB565
 
 

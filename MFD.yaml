@@ -1,4 +1,7 @@
 substitutions:
+  # Screen Size (must match the hardware package; app substitutions derive from it)
+  screen_height: 720
+  screen_width: 720
 
 esphome:
   name: "mfd"

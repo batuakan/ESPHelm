@@ -3,6 +3,8 @@ substitutions:
   meter_width: ${size / 15| int}
   indicator_size: ${(size / 15)| int}
   wind_compassrose_size: ${size-2*(meter_width+20)|int}
+  # Distance from the dial centre to the needle image's left edge
+  wind_needle_offset: ${(size/2 - 1.2 * indicator_size)| int}
 
 sensor:  
   - platform: signalk
@@ -138,6 +140,14 @@ lvgl:
     - id: wind_page
       <<: !include
         file: ../base/swipe_navigation.yaml
+      # ESPHome >= 2026.x rejects a negative meter image pivot_x, so the needles
+      # are pivoted around the dial centre (outside the image) here instead.
+      on_load:
+        - lambda: |-
+            for (lv_obj_t *needle : {id(wind_needle_true), id(wind_needle_apparent)}) {
+              lv_obj_set_x(needle, ${indicator_size / 2 | int} + ${wind_needle_offset});
+              lv_obj_set_style_transform_pivot_x(needle, -${wind_needle_offset}, LV_PART_MAIN);
+            }
       widgets:
         - image:
             src: background_image
@@ -181,13 +191,11 @@ lvgl:
                   - image:
                       id: wind_needle_true
                       src: trueWind_indicator
-                      pivot_x: -${(size/2 - 1.2 * indicator_size)| int}
                       pivot_y: ${indicator_size / 2}
                       value: 40
                   - image:
                       id: wind_needle_apparent
                       src: apparentWind_indicator
-                      pivot_x: -${(size/2 - 1.2 * indicator_size)| int}
                       pivot_y: ${indicator_size / 2}
                       value: 30     
                   - arc:

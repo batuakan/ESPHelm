@@ -44,17 +44,11 @@ text_sensor:
                 std::string(icon) + " " + message +
                 "\n\nState: " + state;
 
-              /* Buttons (must be static) */
-              static const char *btns[] = { "Mute", "Ack", nullptr };
-
-              /* Create msgbox (LVGL 8 API) */
-              lv_obj_t *mb = lv_msgbox_create(
-                lv_scr_act(),              // parent
-                category.c_str(),          // title
-                body.c_str(),              // text
-                btns,                      // buttons
-                true                       // close button
-              );
+              /* Create msgbox (LVGL 9 API) */
+              lv_obj_t *mb = lv_msgbox_create(lv_screen_active());
+              lv_obj_t *title = lv_msgbox_add_title(mb, category.c_str());
+              lv_msgbox_add_text(mb, body.c_str());
+              lv_msgbox_add_close_button(mb);
               lv_obj_set_size(mb, 600, 600);   // width, height in pixels
               lv_obj_center(mb);
               lv_obj_set_style_bg_color(mb, bg, 0);
@@ -64,35 +58,27 @@ text_sensor:
               lv_obj_set_style_text_font(content, id(roboto_scriptsize), 0);
               lv_obj_set_style_text_color(content, lv_color_hex(0xFFFFFF), 0);
 
-              lv_obj_t *title = lv_msgbox_get_title(mb);
               lv_obj_set_style_text_font(title, id(roboto_small), 0);
               lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
 
-              lv_obj_t *btns_obj = lv_msgbox_get_btns(mb);
-              // Make button text bigger
-              lv_obj_set_style_text_font(btns_obj, id(roboto_scriptsize), LV_PART_ITEMS);
-
-              // Increase button padding
-              lv_obj_set_style_pad_top(btns_obj, 12, LV_PART_ITEMS);
-              lv_obj_set_style_pad_bottom(btns_obj, 12, LV_PART_ITEMS);
-              lv_obj_set_style_pad_left(btns_obj, 20, LV_PART_ITEMS);
-              lv_obj_set_style_pad_right(btns_obj, 20, LV_PART_ITEMS);
-
-              // Optional: minimum button size
-              lv_obj_set_style_min_width(btns_obj, 120, LV_PART_ITEMS);
-              lv_obj_set_style_min_height(btns_obj, 50, LV_PART_ITEMS);
-
-              /* Close on button press */
-              lv_obj_add_event_cb(
-                mb,
-                [](lv_event_t *e) {
-                  if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
-                    lv_obj_del_async(lv_event_get_target(e));
-                  }
-                },
-                LV_EVENT_ALL,
-                nullptr
-              );
+              /* Footer buttons; either one closes the box */
+              for (const char *text : { "Mute", "Ack" }) {
+                lv_obj_t *btn = lv_msgbox_add_footer_button(mb, text);
+                // Make button text bigger, increase padding and minimum size
+                lv_obj_set_style_text_font(btn, id(roboto_scriptsize), 0);
+                lv_obj_set_style_pad_ver(btn, 12, 0);
+                lv_obj_set_style_pad_hor(btn, 20, 0);
+                lv_obj_set_style_min_width(btn, 120, 0);
+                lv_obj_set_style_min_height(btn, 50, 0);
+                lv_obj_add_event_cb(
+                  btn,
+                  [](lv_event_t *e) {
+                    lv_msgbox_close_async(static_cast<lv_obj_t *>(lv_event_get_user_data(e)));
+                  },
+                  LV_EVENT_CLICKED,
+                  mb
+                );
+              }
 
               return true;
             });
