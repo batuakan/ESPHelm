@@ -180,10 +180,10 @@ cd ESPHelm
 Adjust the project to your needs
 
 ```bash
-esphome run MFD.yaml
+esphome run legacy/MFD.yaml
 ```
 
-Build and upload to your esp device.
+Build and upload to your esp device. The static apps live under `legacy/` (with `secrets.yaml` next to the configs); the runtime-configurable firmware under `firmware/` is work in progress, see `CLAUDE.md`.
 
 ## What is missing
 

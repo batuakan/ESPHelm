@@ -1,15 +1,15 @@
 # Gitignore settings for ESPHome
 # This is an example and may include too much for your use-case.
 # You can modify this file to suit your needs.
-/.esphome/
-/secrets.yaml
+.esphome/
+secrets.yaml
 
 # SignalK access token written by the host (SDL) build into the working directory
-/token
+token
 # Local scratch output
 /out.txt
-# SDL screenshots taken from the repo root
-/screenshot_*.bmp
+# SDL screenshots
+screenshot_*.bmp
 __pycache__/
 # FreeCAD backups
 *.FCBak

@@ -40,7 +40,8 @@ touchscreen:
 external_components:
   - source:
       type: local
-      path: components
+      # Relative to the top-level config dir (legacy/ or firmware/)
+      path: ../firmware/components
 
 # Give your external component an ID
 sdl_screenshot:

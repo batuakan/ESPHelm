@@ -124,8 +124,8 @@ Weather/clock currently come from HomeAssistant; their future source is an open 
 
 Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, Node 22. The ESPHome CLI is `~/venv/bin/esphome` (not on PATH).
 
-- Validate: `~/venv/bin/esphome config {SDL_720,SDL_480,MFD}.yaml`
-- Build: `~/venv/bin/esphome compile <file>.yaml` (both SDL configs share `.esphome/build/sdl2/`)
+- Validate the static apps: `~/venv/bin/esphome config legacy/{SDL_720,SDL_480,MFD}.yaml` (secrets in `legacy/secrets.yaml`)
+- Build: `~/venv/bin/esphome compile legacy/<file>.yaml` (both SDL configs share `legacy/.esphome/build/sdl2/`)
 - Run the host build: `.esphome/build/<name>/.pioenvs/<name>/program` (F11 saves `screenshot_YYYYMMDD_HHMMSS.bmp` in the CWD; needs an X display)
 - Dev SignalK: `PORT=3999 signalk-server -c <scratch-dir> --sample-nmea0183-data [--securityenabled]`. **Never run it without `-c`**: that uses the real `~/.signalk`.
 - TS packages (npm workspaces, from the repo root): `npm ci`, `npm run generate` (units TS/C++ + JSON Schemas; output is committed), `npm test` (includes a g++-built C++ units test), `npm run typecheck`, `npm run lint`, `npm run build`.
@@ -133,7 +133,7 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 
 - **Schema/plugin/editor:** unit tests (vitest or jest), type-check, lint, plus contract tests that load every fixture in `packages/schema/fixtures`.
 - **Plugin:** run against a local dev SignalK server with a sample-data/demo source so paths have live values. Test the REST endpoints with real HTTP calls (ETag/304 behavior included).
-- **Firmware:** `esphome config` for validation; `esphome compile` for build; **SDL host build** (`SDL_480.yaml`, `SDL_720.yaml`, `components/sdl_screenshot`) to render layouts on the desktop and capture screenshots. Use screenshots to verify visual output and for golden-image regression tests.
+- **Firmware:** `esphome config` for validation; `esphome compile` for build; **SDL host build** (`legacy/SDL_480.yaml`, `legacy/SDL_720.yaml`, `firmware/components/sdl_screenshot`) to render layouts on the desktop and capture screenshots. Use screenshots to verify visual output and for golden-image regression tests.
 - **Hardware:** the person will flash and test on the real display. When a change needs a hardware check, say exactly what to look for.
 
 Never claim something works unless you ran it. If you could not run a check (no toolchain, no network, no hardware), say so explicitly.
