@@ -1,0 +1,938 @@
+{
+  "type": "object",
+  "required": [
+    "version",
+    "id",
+    "theme",
+    "pages"
+  ],
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1,
+      "errorCode": "UNSUPPORTED_VERSION"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "errorCode": "INVALID_ID",
+      "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+      "errorCode": "INVALID_LABEL",
+      "description": "Printable ASCII plus the degree sign (U+00B0)."
+    },
+    "theme": {
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "day"
+        },
+        {
+          "type": "string",
+          "const": "night"
+        }
+      ]
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "grid",
+              "tiles"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "grid"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "errorCode": "INVALID_ID",
+                "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+              },
+              "title": {
+                "type": "string",
+                "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                "errorCode": "INVALID_LABEL",
+                "description": "Printable ASCII plus the degree sign (U+00B0)."
+              },
+              "grid": {
+                "type": "object",
+                "required": [
+                  "cols",
+                  "rows"
+                ],
+                "properties": {
+                  "cols": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rows": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "tiles": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "path"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "value"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "path": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mps",
+                            "kn",
+                            "kmh",
+                            "mph",
+                            "rad",
+                            "deg",
+                            "deg180",
+                            "radps",
+                            "degps",
+                            "degpm",
+                            "K",
+                            "degC",
+                            "degF",
+                            "ratio",
+                            "pct",
+                            "Hz",
+                            "rpm",
+                            "m",
+                            "km",
+                            "nmi",
+                            "ft",
+                            "fathom",
+                            "m3",
+                            "L",
+                            "gal",
+                            "m3ps",
+                            "Lpm",
+                            "Lph",
+                            "galph",
+                            "Pa",
+                            "hPa",
+                            "mbar",
+                            "bar",
+                            "psi",
+                            "coulomb",
+                            "Ah",
+                            "J",
+                            "kWh",
+                            "W",
+                            "kW",
+                            "V",
+                            "A",
+                            "mA",
+                            "s",
+                            "min",
+                            "h"
+                          ],
+                          "errorCode": "UNKNOWN_UNIT",
+                          "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        },
+                        "staleAfter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Seconds without an update before the value is shown as stale."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "path",
+                        "min",
+                        "max"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "gauge"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "path": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mps",
+                            "kn",
+                            "kmh",
+                            "mph",
+                            "rad",
+                            "deg",
+                            "deg180",
+                            "radps",
+                            "degps",
+                            "degpm",
+                            "K",
+                            "degC",
+                            "degF",
+                            "ratio",
+                            "pct",
+                            "Hz",
+                            "rpm",
+                            "m",
+                            "km",
+                            "nmi",
+                            "ft",
+                            "fathom",
+                            "m3",
+                            "L",
+                            "gal",
+                            "m3ps",
+                            "Lpm",
+                            "Lph",
+                            "galph",
+                            "Pa",
+                            "hPa",
+                            "mbar",
+                            "bar",
+                            "psi",
+                            "coulomb",
+                            "Ah",
+                            "J",
+                            "kWh",
+                            "W",
+                            "kW",
+                            "V",
+                            "A",
+                            "mA",
+                            "s",
+                            "min",
+                            "h"
+                          ],
+                          "errorCode": "UNKNOWN_UNIT",
+                          "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        },
+                        "staleAfter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Seconds without an update before the value is shown as stale."
+                        },
+                        "min": {
+                          "type": "number",
+                          "description": "Scale start, in display units."
+                        },
+                        "max": {
+                          "type": "number",
+                          "description": "Scale end, in display units; must be greater than min."
+                        },
+                        "zones": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "from",
+                              "to",
+                              "state"
+                            ],
+                            "properties": {
+                              "from": {
+                                "type": "number"
+                              },
+                              "to": {
+                                "type": "number"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "const": "normal"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "warn"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "alarm"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "emergency"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "path",
+                        "min",
+                        "max"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "bar"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "path": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mps",
+                            "kn",
+                            "kmh",
+                            "mph",
+                            "rad",
+                            "deg",
+                            "deg180",
+                            "radps",
+                            "degps",
+                            "degpm",
+                            "K",
+                            "degC",
+                            "degF",
+                            "ratio",
+                            "pct",
+                            "Hz",
+                            "rpm",
+                            "m",
+                            "km",
+                            "nmi",
+                            "ft",
+                            "fathom",
+                            "m3",
+                            "L",
+                            "gal",
+                            "m3ps",
+                            "Lpm",
+                            "Lph",
+                            "galph",
+                            "Pa",
+                            "hPa",
+                            "mbar",
+                            "bar",
+                            "psi",
+                            "coulomb",
+                            "Ah",
+                            "J",
+                            "kWh",
+                            "W",
+                            "kW",
+                            "V",
+                            "A",
+                            "mA",
+                            "s",
+                            "min",
+                            "h"
+                          ],
+                          "errorCode": "UNKNOWN_UNIT",
+                          "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        },
+                        "staleAfter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Seconds without an update before the value is shown as stale."
+                        },
+                        "min": {
+                          "type": "number",
+                          "description": "Scale start, in display units."
+                        },
+                        "max": {
+                          "type": "number",
+                          "description": "Scale end, in display units; must be greater than min."
+                        },
+                        "zones": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "from",
+                              "to",
+                              "state"
+                            ],
+                            "properties": {
+                              "from": {
+                                "type": "number"
+                              },
+                              "to": {
+                                "type": "number"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "const": "normal"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "warn"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "alarm"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "emergency"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "orientation": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "horizontal"
+                            },
+                            {
+                              "type": "string",
+                              "const": "vertical"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "path"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "switch"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "path": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "errorCode": "EMPTY_PAGE"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "widget",
+              "id",
+              "slots"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "widget"
+              },
+              "widget": {
+                "type": "string",
+                "const": "wind_rose"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "errorCode": "INVALID_ID",
+                "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+              },
+              "title": {
+                "type": "string",
+                "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                "errorCode": "INVALID_LABEL",
+                "description": "Printable ASCII plus the degree sign (U+00B0)."
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "apparentAngle": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                    "errorCode": "INVALID_PATH",
+                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                  },
+                  "trueDirection": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                    "errorCode": "INVALID_PATH",
+                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                  },
+                  "heading": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                    "errorCode": "INVALID_PATH",
+                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                  },
+                  "showTrueWind": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "slots": {
+                "type": "object",
+                "properties": {
+                  "center1": {
+                    "type": "object",
+                    "required": [
+                      "path"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                        "errorCode": "INVALID_PATH",
+                        "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mps",
+                          "kn",
+                          "kmh",
+                          "mph",
+                          "rad",
+                          "deg",
+                          "deg180",
+                          "radps",
+                          "degps",
+                          "degpm",
+                          "K",
+                          "degC",
+                          "degF",
+                          "ratio",
+                          "pct",
+                          "Hz",
+                          "rpm",
+                          "m",
+                          "km",
+                          "nmi",
+                          "ft",
+                          "fathom",
+                          "m3",
+                          "L",
+                          "gal",
+                          "m3ps",
+                          "Lpm",
+                          "Lph",
+                          "galph",
+                          "Pa",
+                          "hPa",
+                          "mbar",
+                          "bar",
+                          "psi",
+                          "coulomb",
+                          "Ah",
+                          "J",
+                          "kWh",
+                          "W",
+                          "kW",
+                          "V",
+                          "A",
+                          "mA",
+                          "s",
+                          "min",
+                          "h"
+                        ],
+                        "errorCode": "UNKNOWN_UNIT",
+                        "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                      },
+                      "label": {
+                        "type": "string",
+                        "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                        "errorCode": "INVALID_LABEL",
+                        "description": "Printable ASCII plus the degree sign (U+00B0)."
+                      },
+                      "staleAfter": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Seconds without an update before the value is shown as stale."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "center2": {
+                    "type": "object",
+                    "required": [
+                      "path"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                        "errorCode": "INVALID_PATH",
+                        "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mps",
+                          "kn",
+                          "kmh",
+                          "mph",
+                          "rad",
+                          "deg",
+                          "deg180",
+                          "radps",
+                          "degps",
+                          "degpm",
+                          "K",
+                          "degC",
+                          "degF",
+                          "ratio",
+                          "pct",
+                          "Hz",
+                          "rpm",
+                          "m",
+                          "km",
+                          "nmi",
+                          "ft",
+                          "fathom",
+                          "m3",
+                          "L",
+                          "gal",
+                          "m3ps",
+                          "Lpm",
+                          "Lph",
+                          "galph",
+                          "Pa",
+                          "hPa",
+                          "mbar",
+                          "bar",
+                          "psi",
+                          "coulomb",
+                          "Ah",
+                          "J",
+                          "kWh",
+                          "W",
+                          "kW",
+                          "V",
+                          "A",
+                          "mA",
+                          "s",
+                          "min",
+                          "h"
+                        ],
+                        "errorCode": "UNKNOWN_UNIT",
+                        "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                      },
+                      "label": {
+                        "type": "string",
+                        "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                        "errorCode": "INVALID_LABEL",
+                        "description": "Printable ASCII plus the degree sign (U+00B0)."
+                      },
+                      "staleAfter": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Seconds without an update before the value is shown as stale."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "center3": {
+                    "type": "object",
+                    "required": [
+                      "path"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                        "errorCode": "INVALID_PATH",
+                        "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "mps",
+                          "kn",
+                          "kmh",
+                          "mph",
+                          "rad",
+                          "deg",
+                          "deg180",
+                          "radps",
+                          "degps",
+                          "degpm",
+                          "K",
+                          "degC",
+                          "degF",
+                          "ratio",
+                          "pct",
+                          "Hz",
+                          "rpm",
+                          "m",
+                          "km",
+                          "nmi",
+                          "ft",
+                          "fathom",
+                          "m3",
+                          "L",
+                          "gal",
+                          "m3ps",
+                          "Lpm",
+                          "Lph",
+                          "galph",
+                          "Pa",
+                          "hPa",
+                          "mbar",
+                          "bar",
+                          "psi",
+                          "coulomb",
+                          "Ah",
+                          "J",
+                          "kWh",
+                          "W",
+                          "kW",
+                          "V",
+                          "A",
+                          "mA",
+                          "s",
+                          "min",
+                          "h"
+                        ],
+                        "errorCode": "UNKNOWN_UNIT",
+                        "description": "Display unit id from units.json; the value is converted from SignalK SI units."
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                      },
+                      "label": {
+                        "type": "string",
+                        "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                        "errorCode": "INVALID_LABEL",
+                        "description": "Printable ASCII plus the degree sign (U+00B0)."
+                      },
+                      "staleAfter": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Seconds without an update before the value is shown as stale."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false,
+                "errorCode": "UNKNOWN_SLOT"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1,
+      "errorCode": "NO_PAGES"
+    }
+  },
+  "additionalProperties": false,
+  "$id": "https://github.com/batuakan/ESPHelm/schema/layout/v1.json",
+  "title": "ESPHelm layout v1"
+}

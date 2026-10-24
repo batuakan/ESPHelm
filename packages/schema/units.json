@@ -1,0 +1,132 @@
+{
+  "$comment": "ESPHelm display units. Single source of truth for TS and firmware (run `npm run generate`). display = si * factor + offset, then wrapped into [wrap[0], wrap[1]) if wrap is set. Unit ids are globally unique ASCII identifiers; labels use only ASCII and the degree sign.",
+  "version": 1,
+  "quantities": {
+    "speed": {
+      "si": "mps",
+      "units": {
+        "mps": { "label": "m/s", "factor": 1 },
+        "kn": { "label": "kn", "factor": 1.9438444924406046 },
+        "kmh": { "label": "km/h", "factor": 3.6 },
+        "mph": { "label": "mph", "factor": 2.2369362920544025 }
+      }
+    },
+    "angle": {
+      "si": "rad",
+      "units": {
+        "rad": { "label": "rad", "factor": 1 },
+        "deg": { "label": "°", "factor": 57.29577951308232, "wrap": [0, 360] },
+        "deg180": { "label": "°", "factor": 57.29577951308232, "wrap": [-180, 180] }
+      }
+    },
+    "angularVelocity": {
+      "si": "radps",
+      "units": {
+        "radps": { "label": "rad/s", "factor": 1 },
+        "degps": { "label": "°/s", "factor": 57.29577951308232 },
+        "degpm": { "label": "°/min", "factor": 3437.746770784939 }
+      }
+    },
+    "temperature": {
+      "si": "K",
+      "units": {
+        "K": { "label": "K", "factor": 1 },
+        "degC": { "label": "°C", "factor": 1, "offset": -273.15 },
+        "degF": { "label": "°F", "factor": 1.8, "offset": -459.67 }
+      }
+    },
+    "ratio": {
+      "si": "ratio",
+      "units": {
+        "ratio": { "label": "", "factor": 1 },
+        "pct": { "label": "%", "factor": 100 }
+      }
+    },
+    "frequency": {
+      "si": "Hz",
+      "units": {
+        "Hz": { "label": "Hz", "factor": 1 },
+        "rpm": { "label": "rpm", "factor": 60 }
+      }
+    },
+    "length": {
+      "si": "m",
+      "units": {
+        "m": { "label": "m", "factor": 1 },
+        "km": { "label": "km", "factor": 0.001 },
+        "nmi": { "label": "nm", "factor": 0.0005399568034557236 },
+        "ft": { "label": "ft", "factor": 3.280839895013123 },
+        "fathom": { "label": "fa", "factor": 0.5468066491688539 }
+      }
+    },
+    "volume": {
+      "si": "m3",
+      "units": {
+        "m3": { "label": "m3", "factor": 1 },
+        "L": { "label": "L", "factor": 1000 },
+        "gal": { "label": "gal", "factor": 264.17205235814845 }
+      }
+    },
+    "flow": {
+      "si": "m3ps",
+      "units": {
+        "m3ps": { "label": "m3/s", "factor": 1 },
+        "Lpm": { "label": "L/min", "factor": 60000 },
+        "Lph": { "label": "L/h", "factor": 3600000 },
+        "galph": { "label": "gal/h", "factor": 951019.3884893344 }
+      }
+    },
+    "pressure": {
+      "si": "Pa",
+      "units": {
+        "Pa": { "label": "Pa", "factor": 1 },
+        "hPa": { "label": "hPa", "factor": 0.01 },
+        "mbar": { "label": "mbar", "factor": 0.01 },
+        "bar": { "label": "bar", "factor": 0.00001 },
+        "psi": { "label": "psi", "factor": 0.00014503773773020923 }
+      }
+    },
+    "charge": {
+      "si": "coulomb",
+      "units": {
+        "coulomb": { "label": "C", "factor": 1 },
+        "Ah": { "label": "Ah", "factor": 0.0002777777777777778 }
+      }
+    },
+    "energy": {
+      "si": "J",
+      "units": {
+        "J": { "label": "J", "factor": 1 },
+        "kWh": { "label": "kWh", "factor": 2.7777777777777776e-7 }
+      }
+    },
+    "power": {
+      "si": "W",
+      "units": {
+        "W": { "label": "W", "factor": 1 },
+        "kW": { "label": "kW", "factor": 0.001 }
+      }
+    },
+    "voltage": {
+      "si": "V",
+      "units": {
+        "V": { "label": "V", "factor": 1 }
+      }
+    },
+    "current": {
+      "si": "A",
+      "units": {
+        "A": { "label": "A", "factor": 1 },
+        "mA": { "label": "mA", "factor": 1000 }
+      }
+    },
+    "time": {
+      "si": "s",
+      "units": {
+        "s": { "label": "s", "factor": 1 },
+        "min": { "label": "min", "factor": 0.016666666666666666 },
+        "h": { "label": "h", "factor": 0.0002777777777777778 }
+      }
+    }
+  }
+}
