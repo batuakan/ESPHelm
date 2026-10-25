@@ -311,6 +311,14 @@ select {
   --zone-emergency: #d34dd9;
   --tile-accent: #4a9eff;
   --tile-second: #f2c14e;
+  /* wind rose, the legacy wind page's colours */
+  --rose-port: #ff0000;
+  --rose-stbd: #00ff00;
+  --rose-apparent: #ff8000;
+  --rose-true: #a020f0;
+  --rose-ring: #aaaaaa;
+  --rose-card: #2e2e2e;
+  --rose-card-text: #f2f5f8;
 }
 .display-frame[data-theme-preview='night'] {
   --tile-bg: #140404;
@@ -323,6 +331,13 @@ select {
   --zone-emergency: #ff6060;
   --tile-accent: #e0302a;
   --tile-second: #9a2a22;
+  --rose-port: #ff3b30;
+  --rose-stbd: #7a1a12;
+  --rose-apparent: #e0302a;
+  --rose-true: #8a1e18;
+  --rose-ring: #6a2020;
+  --rose-card: #1c0606;
+  --rose-card-text: #9a2a22;
 }
 .display-theme {
   display: flex;
@@ -751,40 +766,55 @@ select.zone-emergency {
   position: relative;
   height: 100%;
   min-height: 0;
+  container-type: size; /* the values scale with the rose, as on the display */
 }
 .rose svg {
   height: 100%;
   max-width: 100%;
 }
-.rose .zone.thin {
-  stroke-width: 3;
-}
-.rose-ring,
-.rose-tick {
+.sector {
   fill: none;
-  stroke: var(--tile-muted);
-  stroke-width: 1;
 }
-.rose-label {
-  fill: var(--tile-muted);
-  font-size: 9px;
+.sector.stbd {
+  stroke: var(--rose-stbd);
+}
+.sector.port {
+  stroke: var(--rose-port);
+}
+.rose-tick {
+  stroke: var(--rose-ring);
+  stroke-width: 0.6;
+}
+.rose-tick.major {
+  stroke-width: 2.2;
+}
+.rose-card {
+  fill: none;
+  stroke: var(--rose-card);
+}
+.rose-point {
+  fill: var(--rose-card-text);
+  font-size: 7.5px;
   text-anchor: middle;
+  dominant-baseline: central;
 }
-.rose-heading {
-  fill: var(--tile-muted);
-  font-size: 10px;
+.marker polygon {
+  stroke: none;
+}
+.marker.apparent polygon {
+  fill: var(--rose-apparent);
+}
+.marker.true polygon {
+  fill: var(--rose-true);
+}
+.marker-letter {
+  fill: var(--canvas-bg);
+  font-size: 8px;
   text-anchor: middle;
+  dominant-baseline: central;
 }
-.pointer {
-  stroke-width: 5;
-  stroke-linecap: round;
-}
-.pointer.apparent {
-  stroke: var(--tile-accent);
-}
-.pointer.true {
-  stroke: var(--tile-second);
-  stroke-width: 4;
+.tile-type-wind_rose {
+  background: var(--canvas-bg) !important;
 }
 .rose-slots {
   position: absolute;
@@ -796,9 +826,6 @@ select.zone-emergency {
   gap: 0;
   pointer-events: none;
 }
-.rose-full .rose-slots {
-  padding-top: 8%;
-}
 .rose-slot {
   pointer-events: auto;
   background: transparent;
@@ -809,7 +836,7 @@ select.zone-emergency {
   align-items: center;
   padding: 0 8px;
   min-width: min(110px, 40%);
-  line-height: 1.15;
+  line-height: 1.1;
 }
 .rose-slot:hover,
 .rose-slot.empty {
@@ -819,12 +846,18 @@ select.zone-emergency {
   border: 2px solid var(--accent);
 }
 .slot-value {
-  font-size: clamp(16px, 4vmin, 28px);
+  font-size: 13cqmin;
+  line-height: 0.95;
   font-variant-numeric: tabular-nums;
 }
+.slot-caption,
+.rose-heading,
 .slot-label {
-  font-size: 12px;
-  color: var(--tile-muted);
+  font-size: max(9px, 4.2cqmin);
+  color: var(--tile-text);
+}
+.rose-compact .slot-value {
+  font-size: 9cqmin;
 }
 
 /* Drawer extras */

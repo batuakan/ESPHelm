@@ -195,12 +195,20 @@ export function TilePreview(props: {
 }
 
 const RAD = 180 / Math.PI;
-const ROSE_LABELS = [0, 30, 60, 90, 120, 150, 180, 150, 120, 90, 60, 30];
+const CARD_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+// Rose geometry in the SVG's 200x200 box, as the firmware draws it (widgets.cpp): ring about
+// d/15 wide, the compass card band just inside it, markers on the ring.
+const R = 96;
+const RING = 13;
+const CARD_R = R - RING - 3; // outer edge of the card band
+const BAND = 12;
 
 /**
- * A wind rose tile: live pointers, heading and clickable centre slots, drawn for the tier the
- * display will use at this tile's size (sizing.ts). Slot counts in compact roses depend on the
- * display's fonts, so the preview shows every slot and the size hint says what may be dropped.
+ * A wind rose tile in the legacy style: a fixed ring with red/green close-hauled sectors, a
+ * compass card turning with the heading, A/T markers, the heading and clickable centre slots,
+ * drawn for the tier the display will use at this tile's size (sizing.ts). Slot counts in
+ * compact roses depend on the display's fonts, so the preview shows every slot.
  */
 export function WindRosePreview(props: {
   tile: WindRoseTile;
@@ -218,47 +226,68 @@ export function WindRosePreview(props: {
   const awa = num(cfg.apparentAngle);
   const twd = num(cfg.trueDirection);
   const hdg = num(cfg.heading);
-  const pointer = (deg: number, inner: number, outer: number) => {
-    const [x1, y1] = polar(0, 0, 90 * inner, deg);
-    const [x2, y2] = polar(0, 0, 90 * outer, deg);
-    return { x1, y1, x2, y2 };
-  };
   const full = tier === 'full';
+  const suffix = cfg.heading.includes('Magnetic') ? 'M' : cfg.heading.includes('True') ? 'T' : '';
+  const hdgDeg = hdg === undefined ? 0 : (((hdg * RAD) % 360) + 360) % 360;
+  const marker = (deg: number, cls: string, letter: string) => {
+    const m = RING * 1.2;
+    const [bx, by] = polar(0, 0, R - 1, deg);
+    const [tx, ty] = polar(0, 0, R - 1 - m * 1.3, deg);
+    const a = (deg * Math.PI) / 180;
+    const px = Math.cos(a) * m * 0.62;
+    const py = Math.sin(a) * m * 0.62;
+    const [lx, ly] = polar(0, 0, R - 1 - m * 0.5, deg);
+    return (
+      <g className={`marker ${cls}`}>
+        <polygon points={`${bx + px},${by + py} ${bx - px},${by - py} ${tx},${ty}`} />
+        {full && (
+          <text x={lx} y={ly} className="marker-letter">
+            {letter}
+          </text>
+        )}
+      </g>
+    );
+  };
   return (
     <span className={`tile-graphic rose rose-${tier}`} data-testid={`rose-${tile.id}`}>
       <svg viewBox="-100 -100 200 200" aria-hidden>
-        <circle r={90} className="rose-ring" />
-        <path className={`zone zone-normal ${full ? '' : 'thin'}`} d={arc(0, 0, 90, 20, 60)} />
-        <path className={`zone zone-alarm ${full ? '' : 'thin'}`} d={arc(0, 0, 90, 300, 340)} />
-        {Array.from({ length: full ? 36 : 12 }, (_, i) => {
-          const deg = i * (full ? 10 : 30);
-          const [x1, y1] = polar(0, 0, 90, deg);
-          const [x2, y2] = polar(0, 0, deg % 30 === 0 ? 82 : 86, deg);
-          return <line key={i} className="rose-tick" x1={x1} y1={y1} x2={x2} y2={y2} />;
+        <path className="sector stbd" d={arc(0, 0, R - RING / 2, 20, 60)} style={{ strokeWidth: RING }} />
+        <path className="sector port" d={arc(0, 0, R - RING / 2, 300, 340)} style={{ strokeWidth: RING }} />
+        {Array.from({ length: full ? 72 : 12 }, (_, i) => {
+          const deg = i * (full ? 5 : 30);
+          const major = deg % 30 === 0;
+          const [x1, y1] = polar(0, 0, R, deg);
+          const [x2, y2] = polar(0, 0, R - (major ? RING : RING * 0.75), deg);
+          return (
+            <line key={i} className={`rose-tick ${major ? 'major' : ''}`} x1={x1} y1={y1} x2={x2} y2={y2} />
+          );
         })}
-        {full &&
-          ROSE_LABELS.map((label, i) => {
-            const [x, y] = polar(0, 0, 72, i * 30);
-            return (
-              <text key={i} x={x} y={y + 3} className="rose-label">
-                {label}
-              </text>
-            );
-          })}
-        {cfg.showTrueWind && twd !== undefined && hdg !== undefined && (
-          <line className="pointer true" {...pointer((twd - hdg) * RAD, 0.64, 0.86)} />
+        {tier !== 'pointers' && (
+          <g transform={`rotate(${-hdgDeg})`}>
+            <circle r={CARD_R - BAND / 2} className="rose-card" style={{ strokeWidth: BAND }} />
+            {CARD_POINTS.map((p, i) =>
+              full || i % 4 === 0 ? (
+                <text
+                  key={p}
+                  className="rose-point"
+                  transform={`rotate(${i * 22.5}) translate(0 ${-(CARD_R - BAND / 2)})`}
+                >
+                  {p}
+                </text>
+              ) : null,
+            )}
+          </g>
         )}
-        {awa !== undefined && (
-          <line className="pointer apparent" {...pointer(awa * RAD, 0.64, 0.97)} />
-        )}
-        {full && (
-          <text y={-46} className="rose-heading">
-            HDG {hdg === undefined ? '--' : `${Math.round((((hdg * RAD) % 360) + 360) % 360)}°`}
-          </text>
-        )}
+        {cfg.showTrueWind && twd !== undefined && hdg !== undefined && marker((twd - hdg) * RAD, 'true', 'T')}
+        {awa !== undefined && marker(awa * RAD, 'apparent', 'A')}
       </svg>
       {tier !== 'pointers' && (
         <span className="rose-slots">
+          {full && (
+            <span className="rose-heading">
+              {hdg === undefined ? '--' : Math.round(hdgDeg) % 360}°{suffix}
+            </span>
+          )}
           {WIND_ROSE_SLOTS.map((slot) => {
             const item = tile.slots[slot];
             return (
@@ -278,7 +307,7 @@ export function WindRosePreview(props: {
                     <span className="slot-value">
                       {item.path ? formatValue(values.get(item.path), item.unit, item.decimals) : '--'}
                     </span>
-                    <span className="slot-label">
+                    <span className="slot-caption">
                       {[item.label, item.unit ? UNITS[item.unit].label : '']
                         .filter(Boolean)
                         .join(' ') || 'Pick a path'}

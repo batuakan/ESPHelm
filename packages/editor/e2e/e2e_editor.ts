@@ -213,7 +213,7 @@ async function main(): Promise<void> {
     let roseLive = false;
     for (let i = 0; i < 40 && !roseLive; i++) {
       roseLive =
-        (await page.locator('.pointer.apparent').count()) > 0 &&
+        (await page.locator('.marker.apparent').count()) > 0 &&
         /^\d+\.\d$/.test(
           (await page.getByTestId('slot-wind-rose-center3').locator('.slot-value').textContent()) ??
             '',
