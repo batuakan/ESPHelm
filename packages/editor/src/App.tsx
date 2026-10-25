@@ -287,7 +287,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
             ))}
           </select>
         </label>
-        <div className="themes" role="group" aria-label="Theme">
+        <div className="themes" role="group" aria-label="Editor theme" title="Colours of this editor (this browser only)">
           {(['light', 'dark', 'night'] as Theme[]).map((t) => (
             <button
               key={t}
@@ -399,6 +399,19 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     aria-label="Rows"
                   />
                 </label>
+                <div className="display-theme" role="group" aria-label="Display theme">
+                  <span>Display</span>
+                  {(['day', 'night'] as const).map((t) => (
+                    <button
+                      key={t}
+                      className={`small ${layout.theme === t ? 'on' : ''}`}
+                      aria-pressed={layout.theme === t}
+                      onClick={() => edit({ ...layout, theme: t })}
+                    >
+                      {t === 'day' ? 'Day' : 'Night'}
+                    </button>
+                  ))}
+                </div>
                 <span className="device-size">
                   {device?.hello.display.width}×{device?.hello.display.height}
                 </span>

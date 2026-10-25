@@ -360,6 +360,26 @@ async function main(): Promise<void> {
       JSON.stringify(ap),
     );
 
+    // The display theme is part of the layout (the editor's own theme is not).
+    await page
+      .getByRole('group', { name: 'Display theme' })
+      .getByRole('button', { name: 'Day' })
+      .click();
+    await page.waitForTimeout(500);
+    await shot(page, '07b-desktop-night-editor-day-display');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
+    const dayLayout = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    check(
+      'the display gets the day theme',
+      dayLayout.body.theme === 'day',
+      String(dayLayout.body.theme),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

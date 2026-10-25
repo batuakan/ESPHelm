@@ -299,6 +299,26 @@ describe('editor', () => {
     expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Autopilot');
   });
 
+  it('sets the display theme in the layout, and the preview follows it', async () => {
+    const server = fakeServer([device('adopted')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    const group = screen.getByRole('group', { name: 'Display theme' });
+    const frame = () => screen.getByTestId('grid').closest('.display-frame') as HTMLElement;
+    expect(frame().dataset.themePreview).toBe('night'); // new layouts start at night
+    // The editor's own theme does not change the display's.
+    fireEvent.click(screen.getByRole('button', { name: 'light theme' }));
+    expect(frame().dataset.themePreview).toBe('night');
+    fireEvent.click(within(group).getByRole('button', { name: 'Day' }));
+    expect(frame().dataset.themePreview).toBe('day');
+    expect(within(group).getByRole('button', { name: 'Day' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('day');
+  });
+
   it('greys out tile types the display cannot render', async () => {
     const d = device('adopted');
     d.hello = { ...p4, widgets: ['value'] };

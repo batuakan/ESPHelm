@@ -278,6 +278,7 @@ select {
 .page-bar {
   width: min(100%, 560px);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
@@ -290,6 +291,44 @@ select {
   margin-left: auto;
   color: var(--muted);
   font-size: 13px;
+}
+/* The preview follows the layout's display theme (esphelm_runtime colors_for), whatever the
+   editor's own theme is. */
+.display-frame[data-theme-preview='day'] {
+  --tile-bg: #1e2a36;
+  --tile-text: #f2f5f8;
+  --tile-muted: #7a8794;
+  --canvas-bg: #10161c;
+  --zone-normal: #3dbb74;
+  --zone-warn: #f0b04a;
+  --zone-alarm: #e5484d;
+  --zone-emergency: #d34dd9;
+  --tile-accent: #4a9eff;
+  --tile-second: #f2c14e;
+}
+.display-frame[data-theme-preview='night'] {
+  --tile-bg: #140404;
+  --tile-text: #e0302a;
+  --tile-muted: #6a2020;
+  --canvas-bg: #000000;
+  --zone-normal: #6a2020;
+  --zone-warn: #b0401a;
+  --zone-alarm: #ff3b30;
+  --zone-emergency: #ff6060;
+  --tile-accent: #e0302a;
+  --tile-second: #9a2a22;
+}
+.display-theme {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.display-theme button.on {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
 }
 .display-frame {
   width: min(100%, 560px, calc((100vh - 300px)));
