@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "two-roses",
+  "name": "Two wind roses",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "roses",
+      "title": "Roses",
+      "grid": { "cols": 2, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "apparent", "x": 0, "y": 0, "w": 1, "h": 1,
+          "config": { "showTrueWind": false },
+          "slots": { "center1": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" } }
+        },
+        {
+          "type": "wind_rose", "id": "true", "x": 1, "y": 0, "w": 1, "h": 1,
+          "config": { "apparentAngle": "environment.wind.angleTrueWater", "heading": "navigation.headingMagnetic" },
+          "slots": { "center1": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" } }
+        }
+      ]
+    }
+  ]
+}

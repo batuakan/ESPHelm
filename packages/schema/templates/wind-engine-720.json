@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "template-wind-engine-720",
+  "name": "Wind and engine (large display)",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "wind-engine",
+      "title": "Wind + engine",
+      "grid": { "cols": 4, "rows": 2 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 2, "h": 2,
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" }
+          }
+        },
+        {
+          "type": "gauge", "id": "rpm", "x": 2, "y": 0, "w": 2, "h": 1,
+          "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM",
+          "min": 0, "max": 5000,
+          "zones": [{ "from": 3500, "to": 5000, "state": "alarm" }]
+        },
+        {
+          "type": "gauge", "id": "coolant", "x": 2, "y": 1, "w": 1, "h": 1,
+          "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
+          "min": 40, "max": 120,
+          "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "oil", "x": 3, "y": 1, "w": 1, "h": 1,
+          "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil",
+          "min": 0, "max": 6, "orientation": "vertical",
+          "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
+        }
+      ]
+    }
+  ]
+}

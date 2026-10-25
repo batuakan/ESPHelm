@@ -187,6 +187,26 @@ function renderUnitsHeader(units: FlatUnit[]): string {
   ].join('\n');
 }
 
+function renderSizesHeader(fit: { full: number; compact: number }): string {
+  return [
+    `// ${GENERATED_NOTE}`,
+    '// Widget size tiers shared with the TS schema package (WIND_ROSE_FIT in src/tiles.ts).',
+    '#pragma once',
+    '',
+    'namespace esphelm {',
+    'namespace sizes {',
+    '',
+    '// Wind rose: shorter side of the cell in pixels. full: tick labels, heading, slots;',
+    '// compact: slots as far as they fit; below compact: pointers only.',
+    `inline constexpr int WIND_ROSE_FULL = ${fit.full};`,
+    `inline constexpr int WIND_ROSE_COMPACT = ${fit.compact};`,
+    '',
+    '}  // namespace sizes',
+    '}  // namespace esphelm',
+    '',
+  ].join('\n');
+}
+
 function renderCasesHeader(cases: CasesFile['cases']): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -215,7 +235,15 @@ function renderCasesHeader(cases: CasesFile['cases']): string {
 /** Starter layouts (templates/*.json) as a typed module for the editor. */
 function renderTemplatesTs(): string {
   const dir = join(PACKAGE_ROOT, 'templates');
-  const order = ['wind', 'grid', 'energy', 'engine', 'switchboard'];
+  const order = [
+    'wind',
+    'grid',
+    'energy',
+    'engine',
+    'switchboard',
+    'sailing-720',
+    'wind-engine-720',
+  ];
   const files = readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.slice(0, -'.json'.length))
@@ -230,7 +258,10 @@ function renderTemplatesTs(): string {
     `// ${GENERATED_NOTE}`,
     "import type { Layout } from '../layout.js';",
     '',
-    '/** Starter layouts porting the legacy static apps (packages/schema/templates). */',
+    '/**',
+    ' * Starter layouts porting the legacy static apps (packages/schema/templates). Ids ending in',
+    ' * "-720" are denser layouts meant for larger displays.',
+    ' */',
     'export const TEMPLATES: Readonly<Record<string, Layout>> = {',
     ...entries,
     '};',
@@ -256,6 +287,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
+  const { WIND_ROSE_FIT } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -263,6 +295,8 @@ export async function renderAll(): Promise<Record<string, string>> {
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
+    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT),
+    '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),
   };

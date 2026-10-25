@@ -1,7 +1,7 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
 import { Hello } from './hello.js';
 import { Layout } from './layout.js';
-import { GridPage, PAGE_WIDGETS } from './pages.js';
+import { GridPage } from './pages.js';
 import { TILE_TYPES } from './tiles.js';
 
 /**
@@ -26,7 +26,6 @@ export const STRUCTURAL_CODES = [
   'UNKNOWN_UNIT',
   'UNKNOWN_SLOT',
   'UNKNOWN_PAGE_KIND',
-  'UNKNOWN_WIDGET',
   'UNKNOWN_TILE_TYPE',
 ] as const;
 export const SEMANTIC_CODES = [
@@ -85,9 +84,6 @@ function shell(schema: object, arrayProp: string): object {
 const validators = {
   layoutShell: ajv.compile(shell(Layout, 'pages')),
   gridPageShell: ajv.compile(shell(GridPage, 'tiles')),
-  widgetPages: Object.fromEntries(
-    Object.entries(PAGE_WIDGETS).map(([name, w]) => [name, ajv.compile(w.schema)]),
-  ) as Record<string, ValidateFunction>,
   tiles: Object.fromEntries(
     Object.entries(TILE_TYPES).map(([name, t]) => [name, ajv.compile(t)]),
   ) as Record<string, ValidateFunction>,
@@ -179,18 +175,6 @@ function validateStructure(input: unknown): ValidationError[] {
         }
         if (!validate(tile)) errors.push(...mapAjvErrors(validate.errors, tbase));
       });
-    } else if (page.kind === 'widget') {
-      const validate =
-        typeof page.widget === 'string' ? validators.widgetPages[page.widget] : undefined;
-      if (!validate) {
-        errors.push({
-          pointer: `${base}/widget`,
-          code: 'UNKNOWN_WIDGET',
-          message: `unknown full-page widget ${JSON.stringify(page.widget)}`,
-        });
-        return;
-      }
-      if (!validate(page)) errors.push(...mapAjvErrors(validate.errors, base));
     } else {
       errors.push({
         pointer: `${base}/kind`,
@@ -221,7 +205,6 @@ function validateSemantics(layout: Layout): ValidationError[] {
   layout.pages.forEach((page, i) => {
     const base = `/pages/${i}`;
     claimId(page.id, `${base}/id`);
-    if (page.kind !== 'grid') return;
     const { cols, rows } = page.grid;
     const placed: { x: number; y: number; w: number; h: number; j: number }[] = [];
     page.tiles.forEach((tile, j) => {

@@ -5,19 +5,20 @@
   "theme": "night",
   "pages": [
     {
-      "kind": "widget",
-      "widget": "wind_rose",
+      "kind": "grid",
       "id": "wind",
-      "config": {
-        "apparentAngle": "environment.wind.angleApparent",
-        "trueDirection": "environment.wind.directionTrue",
-        "heading": "navigation.headingTrue"
-      },
-      "slots": {
-        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG Kn" },
-        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS Kn" },
-        "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS Kn" }
-      }
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "config": { "apparentAngle": "environment.wind.angleApparent", "trueDirection": "environment.wind.directionTrue", "heading": "navigation.headingTrue" },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG Kn" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS Kn" },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS Kn" }
+          }
+        }
+      ]
     },
     {
       "kind": "grid",

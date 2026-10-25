@@ -58,7 +58,17 @@ describe('starter layouts (templates)', () => {
     expect(validateLayout(layout).errors).toEqual([]);
   });
 
-  it('ports every legacy app planned for Phase 5a', () => {
-    expect(Object.keys(TEMPLATES)).toEqual(['wind', 'grid', 'energy', 'engine', 'switchboard']);
+  it('ports every legacy app, plus denser layouts for large displays', () => {
+    expect(Object.keys(TEMPLATES)).toEqual([
+      'wind',
+      'grid',
+      'energy',
+      'engine',
+      'switchboard',
+      'sailing-720',
+      'wind-engine-720',
+    ]);
+    for (const [name, t] of Object.entries(TEMPLATES))
+      expect(t.id.endsWith('-720')).toBe(name.endsWith('-720'));
   });
 });

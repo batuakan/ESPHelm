@@ -1,0 +1,34 @@
+{
+  "description": "A wind rose slot is a DataItem: it needs a path and only known units",
+  "expect": [
+    {
+      "code": "MISSING_FIELD",
+      "pointer": "/pages/0/tiles/0/slots/center1/path"
+    },
+    {
+      "code": "UNKNOWN_UNIT",
+      "pointer": "/pages/0/tiles/0/slots/center2/unit"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": { "cols": 1, "rows": 1 },
+        "tiles": [
+          {
+            "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 1, "h": 1,
+            "slots": {
+              "center1": { "label": "SOG" },
+              "center2": { "path": "environment.wind.speedTrue", "unit": "furlongs" }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

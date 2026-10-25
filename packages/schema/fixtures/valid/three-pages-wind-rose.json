@@ -5,16 +5,21 @@
   "theme": "night",
   "pages": [
     {
-      "kind": "widget",
-      "widget": "wind_rose",
+      "kind": "grid",
       "id": "wind",
       "title": "Wind",
-      "config": { "showTrueWind": true },
-      "slots": {
-        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
-        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
-        "center3": { "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" }
-      }
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" }
+          }
+        }
+      ]
     },
     {
       "kind": "grid",
@@ -28,10 +33,15 @@
       ]
     },
     {
-      "kind": "widget",
-      "widget": "wind_rose",
+      "kind": "grid",
       "id": "wind-minimal",
-      "slots": {}
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-minimal-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "slots": {}
+        }
+      ]
     }
   ]
 }

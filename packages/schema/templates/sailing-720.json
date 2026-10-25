@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "template-sailing-720",
+  "name": "Sailing (large display)",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "sailing",
+      "title": "Sailing",
+      "grid": { "cols": 4, "rows": 4 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 3, "h": 3,
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" }
+          }
+        },
+        { "type": "value", "id": "sog", "x": 3, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+        { "type": "value", "id": "stw", "x": 3, "y": 1, "w": 1, "h": 1, "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 1, "label": "STW" },
+        { "type": "value", "id": "depth", "x": 3, "y": 2, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" },
+        {
+          "type": "gauge", "id": "rpm", "x": 0, "y": 3, "w": 1, "h": 1,
+          "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM",
+          "min": 0, "max": 5000,
+          "zones": [{ "from": 3500, "to": 5000, "state": "alarm" }]
+        },
+        {
+          "type": "gauge", "id": "coolant", "x": 1, "y": 3, "w": 1, "h": 1,
+          "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
+          "min": 40, "max": 120,
+          "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "oil", "x": 2, "y": 3, "w": 1, "h": 1,
+          "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil",
+          "min": 0, "max": 6, "orientation": "horizontal",
+          "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "voltage", "x": 3, "y": 3, "w": 1, "h": 1,
+          "path": "electrical.batteries.shunt.voltage", "unit": "V", "decimals": 1, "label": "Volts",
+          "min": 10, "max": 15, "orientation": "horizontal",
+          "zones": [{ "from": 10, "to": 11.8, "state": "alarm" }, { "from": 14.6, "to": 15, "state": "warn" }]
+        }
+      ]
+    }
+  ]
+}

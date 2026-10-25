@@ -29,16 +29,21 @@
       ]
     },
     {
-      "kind": "widget",
-      "widget": "wind_rose",
+      "kind": "grid",
       "id": "wind",
       "title": "Wind",
-      "config": { "showTrueWind": true },
-      "slots": {
-        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
-        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6 },
-        "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6 }
-      }
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6},
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6},
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6}
+          }
+        }
+      ]
     },
     {
       "kind": "grid",
@@ -59,6 +64,40 @@
           "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
         },
         { "type": "switch", "id": "bilge", "x": 2, "y": 1, "w": 1, "h": 1, "path": "electrical.switches.bilgePump.state", "label": "Bilge" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "helm",
+      "title": "Helm",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "helm-rose", "x": 0, "y": 0, "w": 2, "h": 2,
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6 },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6 }
+          }
+        },
+        {
+          "type": "wind_rose", "id": "mini-rose", "x": 2, "y": 0, "w": 1, "h": 1,
+          "config": { "showTrueWind": false },
+          "slots": { "center1": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6 } }
+        },
+        { "type": "value", "id": "helm-sog", "x": 2, "y": 1, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
+        {
+          "type": "gauge", "id": "helm-rpm", "x": 0, "y": 2, "w": 1, "h": 1,
+          "path": "propulsion.main.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM", "staleAfter": 6,
+          "min": 0, "max": 4000,
+          "zones": [{ "from": 3200, "to": 4000, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "helm-oil", "x": 1, "y": 2, "w": 1, "h": 1,
+          "path": "propulsion.main.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil", "staleAfter": 6,
+          "min": 0, "max": 6
+        },
+        { "type": "value", "id": "helm-volts", "x": 2, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "Volts", "staleAfter": 6 }
       ]
     }
   ]

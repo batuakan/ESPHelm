@@ -3,7 +3,7 @@
   "expect": [
     {
       "code": "UNKNOWN_SLOT",
-      "pointer": "/pages/0/slots/top"
+      "pointer": "/pages/0/tiles/0/slots/top"
     }
   ],
   "layout": {
@@ -12,14 +12,15 @@
     "theme": "day",
     "pages": [
       {
-        "kind": "widget",
-        "widget": "wind_rose",
+        "kind": "grid",
         "id": "p",
-        "slots": {
-          "top": {
-            "path": "navigation.speedOverGround"
+        "grid": { "cols": 1, "rows": 1 },
+        "tiles": [
+          {
+            "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 1, "h": 1,
+            "slots": { "top": { "path": "navigation.speedOverGround" } }
           }
-        }
+        ]
       }
     ]
   }
