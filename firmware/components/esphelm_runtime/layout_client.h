@@ -1,6 +1,6 @@
 #pragma once
-// Blocking HTTP calls (hello, layout fetch) run on a worker so the main loop and LVGL never
-// stall. The main loop submits requests and polls for responses; nothing else is shared.
+// Blocking HTTP calls (hello, layout fetch; chart tiles on a second instance) run on a worker so
+// the main loop and LVGL never stall. The main loop submits requests and polls for responses; nothing else is shared.
 // ESP-IDF: a FreeRTOS task with esp_http_client. Host (SDL): a std::thread with ix::HttpClient.
 
 #include <cstddef>
@@ -12,7 +12,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-enum class RequestKind : uint8_t { HELLO, LAYOUT };
+enum class RequestKind : uint8_t { HELLO, LAYOUT, TILE };
 
 struct HttpRequest {
   RequestKind kind;
@@ -21,6 +21,7 @@ struct HttpRequest {
   std::string body;       // POST body (hello); empty for GET
   std::string if_none_match;
   size_t max_body{16 * 1024};
+  uint32_t tag{0};        // echoed in the result (chart tiles: which tile it was)
 };
 
 struct HttpResult {
@@ -30,6 +31,7 @@ struct HttpResult {
   std::string body;
   bool truncated{false};  // body exceeded max_body and was cut (must not be parsed)
   std::string error;      // transport error, if status == 0
+  uint32_t tag{0};
 };
 
 class LayoutClient {

@@ -18,7 +18,8 @@
     "bar",
     "switch",
     "wind_rose",
-    "autopilot"
+    "autopilot",
+    "chart"
   ],
   "fonts": [
     "tiny",

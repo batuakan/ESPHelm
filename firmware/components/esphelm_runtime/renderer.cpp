@@ -159,6 +159,14 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
     this->build_footer_(layout, index, env.colors);
 
   const size_t used_before = heap_used();
+  if (page.kind == esphelm::PageKind::CHART) {
+    widgets.push_back(make_chart(area, page, env));
+    lv_obj_update_layout(this->container_);
+    widgets.back()->layout_done();
+    ESP_LOGD(TAG, "Page %u/%u \"%s\": chart, %u bytes", (unsigned) index + 1, (unsigned) layout.pages.size(),
+             page.id.c_str(), (unsigned) (heap_used() - used_before));
+    return true;
+  }
   lv_obj_set_style_pad_row(area, 8, LV_PART_MAIN);
   lv_obj_set_style_pad_column(area, 8, LV_PART_MAIN);
   this->col_dsc_.assign(page.cols, LV_GRID_FR(1));

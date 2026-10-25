@@ -14,6 +14,7 @@
 #include <ArduinoJson.h>
 
 #include "lvgl.h"
+#include "layout_client.h"
 #include "layout_model.h"
 
 namespace esphome {
@@ -54,6 +55,14 @@ struct WidgetEnv {
   std::function<void(const std::string &path, const PutValue &value)> put;
   /// Whether a PUT can be sent now (connected to SignalK). Controls are disabled otherwise.
   std::function<bool()> can_put;
+  /// Start a GET of `path` under the device API (e.g. "/tiles/<chart>/<z>/<x>/<y>") on the tile
+  /// worker; the result comes back through Widget::on_http with `tag`. False when the worker is
+  /// busy or the display isn't authorized yet (try again later). Main loop only.
+  std::function<bool(const std::string &path, uint32_t tag, size_t max_body)> fetch;
+  /// Whether the display has PSRAM (chart pages need about 3.2 MB for their tiles).
+  bool psram{false};
+  /// The layout's theme is night (charts are darkened and tinted red).
+  bool night{false};
 };
 
 class Widget {
@@ -68,6 +77,8 @@ class Widget {
   virtual void on_value(const std::string &path, ArduinoJson::JsonVariantConst value, uint32_t now) = 0;
   /// Redraw if something changed (throttled) and handle stale timeouts.
   virtual void tick(uint32_t now) = 0;
+  /// The result of a fetch() this widget started (tile worker; main loop).
+  virtual void on_http(const HttpResult &result) {}
   /// A tap from the test hook, as a touch would do it. `part` names a button for tiles that
   /// have several (autopilot: -10 -1 +1 +10 auto wind route standby); others ignore it.
   virtual void tap(const std::string &part) {}
@@ -75,6 +86,9 @@ class Widget {
 
 /// Build the widget for a grid tile inside `cell` (an empty LVGL object placed in the grid).
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+
+/// Build a chart page filling `area` (chart.cpp).
+std::unique_ptr<Widget> make_chart(lv_obj_t *area, const esphelm::Page &page, const WidgetEnv &env);
 
 /// Format a SignalK value like the editor preview: converted, fixed decimals (default 1),
 /// on/off for booleans, printable text for strings, "--" otherwise.

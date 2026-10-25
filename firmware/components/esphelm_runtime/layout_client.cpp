@@ -106,6 +106,7 @@ esp_err_t on_http_event(esp_http_client_event_t *evt) {
 HttpResult LayoutClient::perform_(const HttpRequest &request) {
   HttpResult result;
   result.kind = request.kind;
+  result.tag = request.tag;
   Capture capture;
   esp_http_client_config_t config = {};
   config.url = request.url.c_str();
@@ -165,6 +166,7 @@ HttpResult LayoutClient::perform_(const HttpRequest &request) {
 HttpResult LayoutClient::perform_(const HttpRequest &request) {
   HttpResult result;
   result.kind = request.kind;
+  result.tag = request.tag;
   ix::HttpClient http;
   ix::HttpRequestArgsPtr args = http.createRequest();
   args->connectTimeout = TIMEOUT_MS / 1000;

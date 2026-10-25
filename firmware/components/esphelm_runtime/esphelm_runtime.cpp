@@ -41,6 +41,7 @@ void EsphelmRuntime::setup() {
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
+  this->tiles_.start();
 
   this->signalk_->add_listener(this->version_path_, [this](const std::string &, ArduinoJson::JsonVariantConst v) {
     if (v.is<const char *>()) {
@@ -85,6 +86,11 @@ void EsphelmRuntime::loop() {
   HttpResult result;
   while (this->client_.poll(result))
     this->handle_result_(result);
+  // Chart tiles go back to the widgets of the visible page.
+  while (this->tiles_.poll(result)) {
+    for (auto &w : this->widgets_)
+      w->on_http(result);
+  }
 
   const bool connected = this->signalk_->is_stream_connected();
   if (connected && !this->was_connected_) {
@@ -140,9 +146,12 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
   doc["display"]["rotation"] = 0;
-  // Renderable tile types and page widgets; the plugin refuses layouts using others.
+  // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
+  // need PSRAM for their tile buffer.
   for (const char *w : {"value", "gauge", "bar", "switch", "wind_rose", "autopilot"})
     doc["widgets"].add(w);
+  if (this->psram_)
+    doc["widgets"].add("chart");
   ArduinoJson::JsonArray fonts = doc["fonts"].to<ArduinoJson::JsonArray>();
   fonts.add("value");
   fonts.add("label");
@@ -309,6 +318,20 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.default_stale_ms = this->stale_after_ms_;
   env.put = [this](const std::string &path, const PutValue &value) { this->signalk_->put_request(path, value); };
   env.can_put = [this]() { return this->signalk_->is_connected(); };
+  env.psram = this->psram_;
+  env.night = this->layout_.theme == esphelm::Theme::NIGHT;
+  env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
+    if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
+      return false;
+    HttpRequest req;
+    req.kind = RequestKind::TILE;
+    req.url = this->base_url_() + path;
+    req.token = this->signalk_->get_token();
+    req.max_body = max_body;
+    req.tag = tag;
+    this->tiles_.submit(std::move(req));
+    return true;
+  };
   if (!this->renderer_.show_page(this->layout_, index, env, this->widgets_))
     return false;
   this->page_ = index;

@@ -73,6 +73,7 @@ class EsphelmRuntime : public Component {
   Fonts fonts_;
   LayoutStore store_;
   LayoutClient client_;
+  LayoutClient tiles_;  // chart tiles, so they never delay hellos and layout fetches
 
   std::string board_;
   bool touch_{true};
