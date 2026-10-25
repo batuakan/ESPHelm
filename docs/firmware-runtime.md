@@ -2,7 +2,7 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
-**Phase 3 scope:** the **first grid page**, with **`value` tiles**. Other tile types and full-page widgets are validated but shown as a placeholder. `hello.widgets` lists only `value`, so the plugin won't assign layouts that use them.
+**Scope (Phase 5a):** every page of the layout, with `value`, `gauge`, `bar` and `switch` tiles and the `wind_rose` page. `hello.widgets` lists exactly these, so the plugin warns before assigning a layout that needs anything else (autopilot and chart/anchor come in Phases 5b/5c).
 
 ## Configuration
 
@@ -55,7 +55,8 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Approved, not adopted | "Adopt this display in ESPHelm" + device id |
 | Adopted, no layout | "No layout assigned" |
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
-| Value not updated within `staleAfter` | `--`, dimmed |
+| Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
+| Layout with more than one page | a footer: `<` and `>` buttons (disabled at the ends) and "title n/m" |
 
 **Protocol** (`docs/plugin-api.md`):
 1. After the token is approved and on every stream (re)connect, send `POST …/devices/hello`.
@@ -64,7 +65,26 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 4. If the plugin answers that the device is pending or has no layout, the screen clears.
 5. If the plugin is unreachable, the cached layout stays up.
 
-**Subscriptions** are derived from the layout (one listener per unique tile path). ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values.
+**Subscriptions** are derived from the **visible page** (one listener per unique path of its tiles, or of the wind rose's sources and slots), plus the layout version path. ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values. So a page shows the latest values as soon as it is opened.
+
+## Pages and the footer (ADR-0009)
+- **Only the visible page exists.** Changing page deletes its LVGL objects and widgets and builds the next one, so memory stays at one page's worth (matters on C3/C6 without PSRAM).
+- The footer appears only when the layout has more than one page. Its height is 2.2 × the small font's line height (52 px with the 480² fonts). Presses are applied from `loop()`, never inside the LVGL event, because rebuilding the page deletes the button that was pressed.
+- The page index survives a layout update with the same layout id (clamped if pages were removed). A new layout id starts at page 1. A reboot starts at page 1.
+- There is no swiping; the legacy apps keep theirs.
+
+## Widgets
+All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): day is the dark-blue palette, night is red on black with zones differing in brightness, not hue.
+
+| Widget | Drawn with | Notes |
+|---|---|---|
+| `value` | labels | as before |
+| `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; tick labels are hidden below 160 px |
+| `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value |
+| `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
+| `wind_rose` page | `lv_scale` 0–360 (bow at top), close-hauled sectors 20–60°, pointer lines | apparent wind pointer from `apparentAngle`; true wind pointer from `trueDirection − heading` when `showTrueWind`; "HDG x°"; slots `center1..3` stacked in the middle. Pointers cover the outer third of the radius so the slots stay readable |
+
+The PUT goes through ESPHomeSignalK `put_request`; signalk-server answers it only if a provider handles that path (e.g. a digital-switching plugin). The firmware does not read the PUT response, it trusts the value stream.
 
 **Value formatting:**
 - Numbers are converted with the shared unit table (`esphelm_units.h`, generated from `packages/schema/units.json`) and shown with `decimals` (default 1).
@@ -98,10 +118,16 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 
 | Item | Measured |
 |---|---|
-| `value` tile (LVGL objects) | **≈2.0 KB** on the 64-bit host build (24 tiles = 49,136 B, logged at DEBUG by the renderer). Not measured on ESP32; pointers are half the size there, so expect less. |
+| `value` tile (LVGL objects) | **≈1.8–2.0 KB** on the 64-bit host build (24 tiles = 49,136 B; 4 tiles = 7,136 B). |
+| `switch` tile | ≈2.6 KB (8 tiles = 20,992 B) |
+| `gauge`, `bar` tiles | ≈2–2.7 KB each (energy page: gauge + bar + value = 6,416 B; engine page: 2 gauges + bar = 6,544 B) |
+| `wind_rose` page | 4,720 B |
+| Footer | not counted above (built before the measurement starts); a few hundred bytes |
+
+All figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies |
-| P4 runtime firmware, static | RAM 93,524 B (16.2 %), flash 2.6 MB (15.7 %) |
-| C3 compile check, static | RAM 107,592 B of 321,296 B (33.5 %), flash 1.17 MB of 1.8 MB (63.7 %) |
+| P4 runtime firmware, static | RAM 93,708 B (16.3 %), flash 2.64 MB (16.0 %) |
+| C3 compile check, static | RAM 107,760 B of 321,296 B (33.5 %), flash 1.21 MB of 1.8 MB (65.9 %) |
 
 The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't been measured, because there's no C3 hardware yet.
 
@@ -115,9 +141,12 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   5. an edit is picked up via the version delta
   6. unsubscribe-all + resubscribe happens on the same socket
   7. stale values after the server stops
-  8. the cached layout appears on a reboot without a server
+  8. a three-page layout (`fixtures/valid/multi-page-widgets-480.json`: value, gauge, bar, wind rose, vertical bar, switch) renders with the footer; every page is shown through the page hook with live values
+  9. tapping the switch (tap hook) sends a PUT, which a PUT-echo test plugin (`startSignalK({ putEcho })`) answers with a delta; the server has the new value and the switch follows
+  10. stale values after the server stops
+  11. the cached multi-page layout appears on a reboot without a server
 
-  Six screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Ten screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -126,4 +155,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
 3. Adopt it and assign a layout (e.g. `packages/schema/fixtures/valid/grid-2x2-values-480.json`). The grid appears without a reboot, and the values update and are converted.
 4. Unplug the SignalK server's network. After `staleAfter` the values show `--`, and the layout stays up.
 5. Power-cycle the display with the server still unreachable. The same layout comes back immediately.
-6. Watch the log for `Grid page …: N bytes of LVGL objects`; that's the real per-tile memory on the P4.
+6. Watch the log for `Page n/m "…": k widgets, N bytes of LVGL objects`; that's the real per-page memory on the P4.
+7. Assign `packages/schema/fixtures/valid/multi-page-widgets-480.json` (or a template from the editor). The footer is at the bottom; `<` and `>` change pages, and are greyed out at the ends. Check that the buttons are easy to hit with a finger.
+8. Gauges, bars and the wind rose look right at 720×720 (label sizes, needle length, sectors at ±20–60°).
+9. A switch tile on a path with a real PUT handler toggles the device; on a path without one it reverts after 5 s with `!`.

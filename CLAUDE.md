@@ -114,10 +114,10 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 - Throttle redraws. Value updates from SignalK can be frequent; do not re-layout on value change.
 - Keep log output useful but not spammy at default level.
 
-## 7. Widget catalog (planned)
+## 7. Widget catalog
 
-First slice: `value`, `gauge`, `bar`, `switch`.
-Later (port from existing apps): `wind_rose`, `compass`, `graph`, `engine`, `energy`, and full-page widgets `chart_anchor` (ESPTiles) and `autopilot`.
+Rendered by the firmware (Phase 5a): tiles `value`, `gauge`, `bar`, `switch`; full-page widget `wind_rose`. Starter layouts porting the legacy wind, speeds, energy, engine and switchboard apps are in `packages/schema/templates/`.
+Later: full-page widgets `autopilot` (5b) and `chart_anchor` (ESPTiles, 5c); maybe `compass` and `graph`.
 Weather/clock currently come from HomeAssistant; their future source is an open question (see section 11).
 
 ## 8. Verification (you must be able to check your own work)
@@ -130,7 +130,7 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 - Dev SignalK: `PORT=3999 signalk-server -c <scratch-dir> --sample-nmea0183-data [--securityenabled]`. **Never run it without `-c`**: that uses the real `~/.signalk`.
 - TS packages (npm workspaces, from the repo root): `npm ci`, `npm run generate` (units TS/C++ + JSON Schemas; output is committed), `npm test` (includes a g++-built C++ units test), `npm run typecheck`, `npm run lint`, `npm run build`.
 - Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (symlink to `../legacy/secrets.yaml`). Reference: `docs/firmware-runtime.md`.
-- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, six golden screenshots in `firmware/test/golden/`; `UPDATE_GOLDEN=1` re-records). Needs an X display.
+- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, ten golden screenshots in `firmware/test/golden/`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
 - ESPHomeSignalK unit tests: `../ESPHomeSignalK/tools/test_cpp.sh`.
 - Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
@@ -185,5 +185,7 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - [x] **Phase 2:** Plugin skeleton: layout CRUD, device registry, hello/layout endpoints with ETag, version delta, see `docs/phase2-notes.md`
 - [ ] **Phase 3:** Firmware vertical slice: fetch, cache, render one page of `value` tiles, dynamic subscriptions. Done on SDL, pending the P4 hardware check (`docs/phase3-notes.md`)
 - [ ] **Phase 4:** Editor MVP: device list, one page, drag tiles, path picker, Save & send. Done, pending your review (`docs/phase4-notes.md`)
-- [ ] **Phase 5:** Port existing apps to widgets (wind, engine, energy, grid, then chart/anchor, autopilot, switchboard)
-- [ ] **Phase 6:** Hardening: multi-page and swipe, orientation/resolution scaling, auth, size limits, last-known-good fallback, night mode, alarms, device settings
+- [ ] **Phase 5a:** gauge/bar/switch tiles, wind-rose page, multi-page with a footer (no swipe, ADR-0009), editor support, starter layouts (wind, speeds, energy, engine, switchboard). Done on SDL, pending your review and the P4 hardware check (`docs/phase5a-notes.md`)
+- [ ] **Phase 5b:** autopilot page (PUT actions)
+- [ ] **Phase 5c:** chart/anchor page (ESPTiles)
+- [ ] **Phase 6:** Hardening: orientation/resolution scaling (multi-page moved to 5a; swipe dropped for footer buttons), auth, size limits, last-known-good fallback, night mode, alarms, device settings
