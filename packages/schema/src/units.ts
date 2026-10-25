@@ -31,3 +31,18 @@ export function fromDisplay(display: number, unit: UnitId): number {
   const u = UNITS[unit];
   return (display - u.offset) / u.factor;
 }
+
+/**
+ * Quantity (key of QUANTITIES) for a SignalK `meta.units` string, e.g. "m/s" -> "speed".
+ * Undefined for units ESPHelm has no display units for.
+ */
+export function quantityForSignalKUnits(units: string | undefined): string | undefined {
+  if (units === undefined) return undefined;
+  return Object.entries(QUANTITIES).find(([, q]) => q.signalk === units)?.[0];
+}
+
+/** Display units that fit a path with the given SignalK `meta.units` (empty if unknown). */
+export function unitsForSignalKUnits(units: string | undefined): readonly UnitId[] {
+  const quantity = quantityForSignalKUnits(units);
+  return quantity ? (QUANTITIES[quantity]?.units ?? []) : [];
+}

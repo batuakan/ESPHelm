@@ -5,7 +5,9 @@ import {
   UNIT_IDS,
   fromDisplay,
   isUnitId,
+  quantityForSignalKUnits,
   toDisplay,
+  unitsForSignalKUnits,
   validateLayout,
   type UnitId,
 } from '../src/index.js';
@@ -63,5 +65,33 @@ describe('fixtures only use known units', () => {
   it.each(validFixtures('valid'))('$name', ({ json }) => {
     // validateLayout rejects unknown units with UNKNOWN_UNIT; valid fixtures must pass it.
     expect(validateLayout(json).errors.filter((e) => e.code === 'UNKNOWN_UNIT')).toEqual([]);
+  });
+});
+
+describe('SignalK units mapping', () => {
+  it.each([
+    ['m/s', 'speed', 'kn'],
+    ['rad', 'angle', 'deg180'],
+    ['K', 'temperature', 'degC'],
+    ['ratio', 'ratio', 'pct'],
+    ['Hz', 'frequency', 'rpm'],
+    ['m', 'length', 'nmi'],
+    ['m3', 'volume', 'L'],
+    ['Pa', 'pressure', 'bar'],
+    ['V', 'voltage', 'V'],
+  ])('%s is a %s quantity offering %s', (sk, quantity, unit) => {
+    expect(quantityForSignalKUnits(sk)).toBe(quantity);
+    expect(unitsForSignalKUnits(sk)).toContain(unit);
+  });
+
+  it('has nothing to offer for unknown or missing units', () => {
+    expect(quantityForSignalKUnits('furlong/fortnight')).toBeUndefined();
+    expect(quantityForSignalKUnits(undefined)).toBeUndefined();
+    expect(unitsForSignalKUnits(undefined)).toEqual([]);
+  });
+
+  it('maps every quantity from exactly one SignalK units string', () => {
+    const sk = Object.values(QUANTITIES).map((q) => q.signalk);
+    expect(new Set(sk).size).toBe(sk.length);
   });
 });

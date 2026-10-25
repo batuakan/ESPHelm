@@ -1,8 +1,9 @@
 {
-  "$comment": "ESPHelm display units. Single source of truth for TS and firmware (run `npm run generate`). display = si * factor + offset, then wrapped into [wrap[0], wrap[1]) if wrap is set. Unit ids are globally unique ASCII identifiers; labels use only ASCII and the degree sign.",
+  "$comment": "ESPHelm display units. Single source of truth for TS and firmware (run `npm run generate`). display = si * factor + offset, then wrapped into [wrap[0], wrap[1]) if wrap is set. `signalk` is the SignalK meta.units string of the quantity. Unit ids are globally unique ASCII identifiers; labels use only ASCII and the degree sign.",
   "version": 1,
   "quantities": {
     "speed": {
+      "signalk": "m/s",
       "si": "mps",
       "units": {
         "mps": { "label": "m/s", "factor": 1 },
@@ -12,6 +13,7 @@
       }
     },
     "angle": {
+      "signalk": "rad",
       "si": "rad",
       "units": {
         "rad": { "label": "rad", "factor": 1 },
@@ -20,6 +22,7 @@
       }
     },
     "angularVelocity": {
+      "signalk": "rad/s",
       "si": "radps",
       "units": {
         "radps": { "label": "rad/s", "factor": 1 },
@@ -28,6 +31,7 @@
       }
     },
     "temperature": {
+      "signalk": "K",
       "si": "K",
       "units": {
         "K": { "label": "K", "factor": 1 },
@@ -36,6 +40,7 @@
       }
     },
     "ratio": {
+      "signalk": "ratio",
       "si": "ratio",
       "units": {
         "ratio": { "label": "", "factor": 1 },
@@ -43,6 +48,7 @@
       }
     },
     "frequency": {
+      "signalk": "Hz",
       "si": "Hz",
       "units": {
         "Hz": { "label": "Hz", "factor": 1 },
@@ -50,6 +56,7 @@
       }
     },
     "length": {
+      "signalk": "m",
       "si": "m",
       "units": {
         "m": { "label": "m", "factor": 1 },
@@ -60,6 +67,7 @@
       }
     },
     "volume": {
+      "signalk": "m3",
       "si": "m3",
       "units": {
         "m3": { "label": "m3", "factor": 1 },
@@ -68,6 +76,7 @@
       }
     },
     "flow": {
+      "signalk": "m3/s",
       "si": "m3ps",
       "units": {
         "m3ps": { "label": "m3/s", "factor": 1 },
@@ -77,6 +86,7 @@
       }
     },
     "pressure": {
+      "signalk": "Pa",
       "si": "Pa",
       "units": {
         "Pa": { "label": "Pa", "factor": 1 },
@@ -87,6 +97,7 @@
       }
     },
     "charge": {
+      "signalk": "C",
       "si": "coulomb",
       "units": {
         "coulomb": { "label": "C", "factor": 1 },
@@ -94,6 +105,7 @@
       }
     },
     "energy": {
+      "signalk": "J",
       "si": "J",
       "units": {
         "J": { "label": "J", "factor": 1 },
@@ -101,6 +113,7 @@
       }
     },
     "power": {
+      "signalk": "W",
       "si": "W",
       "units": {
         "W": { "label": "W", "factor": 1 },
@@ -108,12 +121,14 @@
       }
     },
     "voltage": {
+      "signalk": "V",
       "si": "V",
       "units": {
         "V": { "label": "V", "factor": 1 }
       }
     },
     "current": {
+      "signalk": "A",
       "si": "A",
       "units": {
         "A": { "label": "A", "factor": 1 },
@@ -121,6 +136,7 @@
       }
     },
     "time": {
+      "signalk": "s",
       "si": "s",
       "units": {
         "s": { "label": "s", "factor": 1 },

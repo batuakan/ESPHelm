@@ -60,21 +60,23 @@ export const UNITS: Readonly<Record<UnitId, UnitDef>> = {
   h: { quantity: 'time', label: "h", factor: 0.0002777777777777778, offset: 0, wrap: null },
 };
 
-export const QUANTITIES: Readonly<Record<string, { si: UnitId; units: readonly UnitId[] }>> = {
-  speed: { si: 'mps', units: ['mps', 'kn', 'kmh', 'mph'] },
-  angle: { si: 'rad', units: ['rad', 'deg', 'deg180'] },
-  angularVelocity: { si: 'radps', units: ['radps', 'degps', 'degpm'] },
-  temperature: { si: 'K', units: ['K', 'degC', 'degF'] },
-  ratio: { si: 'ratio', units: ['ratio', 'pct'] },
-  frequency: { si: 'Hz', units: ['Hz', 'rpm'] },
-  length: { si: 'm', units: ['m', 'km', 'nmi', 'ft', 'fathom'] },
-  volume: { si: 'm3', units: ['m3', 'L', 'gal'] },
-  flow: { si: 'm3ps', units: ['m3ps', 'Lpm', 'Lph', 'galph'] },
-  pressure: { si: 'Pa', units: ['Pa', 'hPa', 'mbar', 'bar', 'psi'] },
-  charge: { si: 'coulomb', units: ['coulomb', 'Ah'] },
-  energy: { si: 'J', units: ['J', 'kWh'] },
-  power: { si: 'W', units: ['W', 'kW'] },
-  voltage: { si: 'V', units: ['V'] },
-  current: { si: 'A', units: ['A', 'mA'] },
-  time: { si: 's', units: ['s', 'min', 'h'] },
+export const QUANTITIES: Readonly<
+  Record<string, { signalk: string; si: UnitId; units: readonly UnitId[] }>
+> = {
+  speed: { signalk: 'm/s', si: 'mps', units: ['mps', 'kn', 'kmh', 'mph'] },
+  angle: { signalk: 'rad', si: 'rad', units: ['rad', 'deg', 'deg180'] },
+  angularVelocity: { signalk: 'rad/s', si: 'radps', units: ['radps', 'degps', 'degpm'] },
+  temperature: { signalk: 'K', si: 'K', units: ['K', 'degC', 'degF'] },
+  ratio: { signalk: 'ratio', si: 'ratio', units: ['ratio', 'pct'] },
+  frequency: { signalk: 'Hz', si: 'Hz', units: ['Hz', 'rpm'] },
+  length: { signalk: 'm', si: 'm', units: ['m', 'km', 'nmi', 'ft', 'fathom'] },
+  volume: { signalk: 'm3', si: 'm3', units: ['m3', 'L', 'gal'] },
+  flow: { signalk: 'm3/s', si: 'm3ps', units: ['m3ps', 'Lpm', 'Lph', 'galph'] },
+  pressure: { signalk: 'Pa', si: 'Pa', units: ['Pa', 'hPa', 'mbar', 'bar', 'psi'] },
+  charge: { signalk: 'C', si: 'coulomb', units: ['coulomb', 'Ah'] },
+  energy: { signalk: 'J', si: 'J', units: ['J', 'kWh'] },
+  power: { signalk: 'W', si: 'W', units: ['W', 'kW'] },
+  voltage: { signalk: 'V', si: 'V', units: ['V'] },
+  current: { signalk: 'A', si: 'A', units: ['A', 'mA'] },
+  time: { signalk: 's', si: 's', units: ['s', 'min', 'h'] },
 };

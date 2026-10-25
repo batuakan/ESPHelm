@@ -16,7 +16,7 @@ interface UnitJson {
 }
 interface UnitsFile {
   version: number;
-  quantities: Record<string, { si: string; units: Record<string, UnitJson> }>;
+  quantities: Record<string, { signalk: string; si: string; units: Record<string, UnitJson> }>;
 }
 interface CasesFile {
   cases: { si: number; unit: string; expected: number }[];
@@ -45,8 +45,12 @@ export function loadUnits(): { units: FlatUnit[]; quantities: UnitsFile['quantit
   const file = readJson<UnitsFile>('units.json');
   const units: FlatUnit[] = [];
   const seen = new Set<string>();
+  const signalkSeen = new Set<string>();
   for (const [quantity, q] of Object.entries(file.quantities)) {
     if (!(q.si in q.units)) throw new Error(`units.json: SI unit "${q.si}" missing in ${quantity}`);
+    if (typeof q.signalk !== 'string' || signalkSeen.has(q.signalk))
+      throw new Error(`units.json: missing or duplicate SignalK units for ${quantity}`);
+    signalkSeen.add(q.signalk);
     for (const [id, u] of Object.entries(q.units)) {
       if (!ID_RE.test(id))
         throw new Error(`units.json: unit id "${id}" must be an ASCII identifier`);
@@ -103,10 +107,12 @@ function renderUnitsTs(units: FlatUnit[], quantities: UnitsFile['quantities']): 
     ),
     '};',
     '',
-    'export const QUANTITIES: Readonly<Record<string, { si: UnitId; units: readonly UnitId[] }>> = {',
+    'export const QUANTITIES: Readonly<',
+    '  Record<string, { signalk: string; si: UnitId; units: readonly UnitId[] }>',
+    '> = {',
     ...Object.entries(quantities).map(
       ([name, q]) =>
-        `  ${name}: { si: '${q.si}', units: [${Object.keys(q.units)
+        `  ${name}: { signalk: '${q.signalk}', si: '${q.si}', units: [${Object.keys(q.units)
           .map((id) => `'${id}'`)
           .join(', ')}] },`,
     ),
