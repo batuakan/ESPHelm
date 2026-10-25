@@ -24,7 +24,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-static const char *const FIRMWARE_VERSION = "0.2.0";
+static const char *const FIRMWARE_VERSION = "0.3.0";
 
 class EsphelmRuntime : public Component {
  public:

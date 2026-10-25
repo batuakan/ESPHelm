@@ -157,30 +157,26 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
     this->build_footer_(layout, index, env.colors);
 
   const size_t used_before = heap_used();
-  if (page.kind == esphelm::PageKind::WIDGET) {
-    widgets.push_back(make_wind_rose(area, page, env));
-  } else {
-    lv_obj_set_style_pad_row(area, 8, LV_PART_MAIN);
-    lv_obj_set_style_pad_column(area, 8, LV_PART_MAIN);
-    this->col_dsc_.assign(page.cols, LV_GRID_FR(1));
-    this->col_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
-    this->row_dsc_.assign(page.rows, LV_GRID_FR(1));
-    this->row_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
-    lv_obj_set_grid_dsc_array(area, this->col_dsc_.data(), this->row_dsc_.data());
-    lv_obj_set_layout(area, LV_LAYOUT_GRID);
-    for (size_t i = 0; i < page.tiles.size(); i++) {
-      if (low_memory()) {
-        ESP_LOGE(TAG, "Low memory after %u of %u tiles; not showing this page", (unsigned) i,
-                 (unsigned) page.tiles.size());
-        this->clear_(layout.theme);
-        widgets.clear();
-        return false;
-      }
-      const esphelm::Tile &tile = page.tiles[i];
-      lv_obj_t *cell = lv_obj_create(area);
-      lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, tile.x, tile.w, LV_GRID_ALIGN_STRETCH, tile.y, tile.h);
-      widgets.push_back(make_tile_widget(cell, tile, env));
+  lv_obj_set_style_pad_row(area, 8, LV_PART_MAIN);
+  lv_obj_set_style_pad_column(area, 8, LV_PART_MAIN);
+  this->col_dsc_.assign(page.cols, LV_GRID_FR(1));
+  this->col_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
+  this->row_dsc_.assign(page.rows, LV_GRID_FR(1));
+  this->row_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
+  lv_obj_set_grid_dsc_array(area, this->col_dsc_.data(), this->row_dsc_.data());
+  lv_obj_set_layout(area, LV_LAYOUT_GRID);
+  for (size_t i = 0; i < page.tiles.size(); i++) {
+    if (low_memory()) {
+      ESP_LOGE(TAG, "Low memory after %u of %u tiles; not showing this page", (unsigned) i,
+               (unsigned) page.tiles.size());
+      this->clear_(layout.theme);
+      widgets.clear();
+      return false;
     }
+    const esphelm::Tile &tile = page.tiles[i];
+    lv_obj_t *cell = lv_obj_create(area);
+    lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, tile.x, tile.w, LV_GRID_ALIGN_STRETCH, tile.y, tile.h);
+    widgets.push_back(make_tile_widget(cell, tile, env));
   }
   lv_obj_update_layout(this->container_);
   for (auto &w : widgets)

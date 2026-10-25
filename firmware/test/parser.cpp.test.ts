@@ -112,16 +112,26 @@ const mutations: { name: string; doc: unknown }[] = [
   },
   {
     name: 'wind rose with bad config and slot',
+    doc: withTileList([
+      {
+        type: 'wind_rose',
+        id: 'w',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        config: { heading: 'a.*', showTrueWind: 'yes', extra: 1 },
+        slots: { center1: { unit: 'kn' }, center2: 7, top: {} },
+      },
+    ]),
+  },
+  {
+    name: 'wind rose without slots and the old page kind',
     doc: {
       ...minimal,
       pages: [
-        {
-          kind: 'widget',
-          widget: 'wind_rose',
-          id: 'w',
-          config: { heading: 'a.*', showTrueWind: 'yes' },
-          slots: { center1: { unit: 'kn' }, center2: 7 },
-        },
+        { ...minimal.pages[0], tiles: [{ type: 'wind_rose', id: 'w', x: 0, y: 0, w: 1, h: 1 }] },
+        { kind: 'widget', widget: 'wind_rose', id: 'old', slots: {} },
       ],
     },
   },
@@ -184,7 +194,7 @@ describe.skipIf(!compiler)('firmware layout parser', () => {
 
   it('builds the model for a valid layout', () => {
     const [r] = run([readFileSync(join(FIXTURES, 'valid/legacy-port.json'), 'utf8')]);
-    expect(r).toMatchObject({ ok: true, pages: 4, tiles: 9 });
+    expect(r).toMatchObject({ ok: true, pages: 4, tiles: 10, roseSlots: 3 });
   });
 
   it('ignores unknown fields (forward compatibility within a major)', () => {

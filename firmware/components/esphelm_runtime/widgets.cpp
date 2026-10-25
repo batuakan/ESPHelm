@@ -6,6 +6,7 @@
 
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
+#include "esphelm_sizes.h"
 
 namespace esphome {
 namespace esphelm_runtime {
@@ -97,17 +98,25 @@ static uint32_t stale_ms(const esphelm::DataItem &item, const WidgetEnv &env) {
   return item.stale_after > 0 ? static_cast<uint32_t>(item.stale_after * 1000) : env.default_stale_ms;
 }
 
-/// Zone styles (scale section arcs) per alert state. LVGL keeps pointers to them, so they are
-/// static and only recoloured when a page is built.
+/// Zone styles (scale section arcs) per alert state and arc width. LVGL keeps pointers to them,
+/// so they are static and only recoloured when a page is built. Widgets on one page may use
+/// different widths (gauges and wind roses), hence one style per (state, width).
 static lv_style_t *zone_style(esphelm::ZoneState state, const Colors &colors, int32_t width) {
-  static lv_style_t styles[4];
+  static constexpr int WIDTHS = 4;
+  static lv_style_t styles[4][WIDTHS];
+  static int32_t widths[WIDTHS] = {0};
   static bool init = false;
   if (!init) {
-    for (auto &s : styles)
-      lv_style_init(&s);
+    for (auto &row : styles)
+      for (auto &s : row)
+        lv_style_init(&s);
     init = true;
   }
-  lv_style_t *s = &styles[static_cast<int>(state)];
+  int w = 0;
+  while (w < WIDTHS - 1 && widths[w] != 0 && widths[w] != width)
+    w++;
+  widths[w] = width;  // more than WIDTHS distinct widths share the last slot
+  lv_style_t *s = &styles[static_cast<int>(state)][w];
   lv_style_set_arc_color(s, colors.zone[static_cast<int>(state)]);
   lv_style_set_arc_width(s, width);
   lv_style_set_line_color(s, colors.zone[static_cast<int>(state)]);
@@ -259,6 +268,8 @@ class GaugeWidget : public Widget {
 
     caption_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
     lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
+    label_font_ = env.fonts.label;
+    small_font_ = env.fonts.small;
     // Value and unit sit in the open bottom of the 270 degree arc, clear of the needle hub.
     value_ = make_label(cell, env.fonts.label, env.colors.muted, "--");
     if (tile.data.unit != nullptr && tile.data.unit->label[0] != '\0')
@@ -272,6 +283,11 @@ class GaugeWidget : public Widget {
     const int32_t d = std::max<int32_t>(16, std::min(lv_obj_get_content_width(cell_), h));
     lv_obj_set_size(scale_, d, d);
     lv_obj_align(scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
+    // Small gauges: the label font would run into the ends of the arc; tiny ones drop the unit
+    // (the caption names the quantity).
+    lv_obj_set_style_text_font(value_, d >= 240 ? label_font_ : small_font_, LV_PART_MAIN);
+    if (d < 160)
+      suffix_.clear();
     set_text(value_, shown_, "--" + suffix_);
     lv_obj_update_layout(value_);
     lv_obj_align_to(value_, scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -311,6 +327,8 @@ class GaugeWidget : public Widget {
   lv_obj_t *needle_;
   lv_obj_t *caption_;
   lv_obj_t *value_;
+  const lv_font_t *label_font_{nullptr};
+  const lv_font_t *small_font_{nullptr};
   std::string suffix_;
   std::string shown_{"--"};
   std::string tick_text_[5];
@@ -482,19 +500,22 @@ class SwitchWidget : public Widget {
   uint32_t pending_since_{0};
 };
 
-// ---- wind rose (full page) ----
+// ---- wind rose ----
 
 static const char *ROSE_LABELS[] = {"0",   "30",  "60",  "90", "120", "150", "180",
                                           "150", "120", "90",  "60", "30",  nullptr};
 
 class WindRoseWidget : public Widget {
  public:
-  WindRoseWidget(lv_obj_t *area, const esphelm::Page &page, const WidgetEnv &env)
-      : colors_(env.colors), area_(area), show_true_(page.show_true_wind) {
+  WindRoseWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
+      : id_(tile.id), colors_(env.colors), area_(cell) {
+    static const esphelm::RoseConfig DEFAULTS;
+    const esphelm::RoseConfig &cfg = tile.rose ? *tile.rose : DEFAULTS;
+    show_true_ = cfg.show_true_wind;
     deg_ = esphelm::units::find_unit("deg");
-    apparent_.item.path = page.apparent_angle;
-    true_dir_.item.path = page.true_direction;
-    heading_.item.path = page.heading;
+    apparent_.item.path = cfg.apparent_angle;
+    true_dir_.item.path = cfg.true_direction;
+    heading_.item.path = cfg.heading;
     for (Binding *b : {&apparent_, &true_dir_, &heading_}) {
       b->item.unit = deg_;
       b->item.decimals = 0;
@@ -502,7 +523,7 @@ class WindRoseWidget : public Widget {
       b->last_value_ms = millis();
     }
 
-    rose_ = lv_scale_create(area);
+    rose_ = lv_scale_create(cell);
     lv_scale_set_mode(rose_, LV_SCALE_MODE_ROUND_INNER);
     lv_scale_set_angle_range(rose_, 360);
     lv_scale_set_rotation(rose_, 270);  // 0 (the bow) at the top
@@ -523,10 +544,10 @@ class WindRoseWidget : public Widget {
     // Close-hauled sectors: starboard green (normal), port red (alarm), like the legacy page.
     lv_scale_section_t *stbd = lv_scale_add_section(rose_);
     lv_scale_set_section_range(rose_, stbd, 20, 60);
-    lv_scale_set_section_style_main(rose_, stbd, zone_style(esphelm::ZoneState::NORMAL, env.colors, 14));
     lv_scale_section_t *port = lv_scale_add_section(rose_);
     lv_scale_set_section_range(rose_, port, 300, 340);
-    lv_scale_set_section_style_main(rose_, port, zone_style(esphelm::ZoneState::ALARM, env.colors, 14));
+    sections_[0] = stbd;
+    sections_[1] = port;
 
     true_needle_ = lv_line_create(rose_);
     lv_obj_set_style_line_width(true_needle_, 6, LV_PART_MAIN);
@@ -537,38 +558,37 @@ class WindRoseWidget : public Widget {
     lv_obj_set_style_line_rounded(apparent_needle_, true, LV_PART_MAIN);
     lv_obj_add_flag(apparent_needle_, LV_OBJ_FLAG_HIDDEN);
 
-    heading_label_ = make_label(area, env.fonts.small, env.colors.muted, "HDG --");
+    heading_label_ = make_label(cell, env.fonts.small, env.colors.muted, "HDG --");
+    fonts_ = env.fonts;
 
-    center_ = lv_obj_create(area);
+    center_ = lv_obj_create(cell);
     lv_obj_remove_style_all(center_);
     lv_obj_set_flex_flow(center_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(center_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(center_, 4, LV_PART_MAIN);
     lv_obj_set_size(center_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    for (int i = 0; i < esphelm::Page::MAX_SLOTS; i++) {
-      if (!page.has_slot[i])
+    for (int i = 0; i < esphelm::RoseConfig::MAX_SLOTS; i++) {
+      if (!cfg.has_slot[i])
         continue;
+      const esphelm::DataItem &item = cfg.slots[i];
       Slot s;
-      s.b.item = page.slots[i];
-      s.b.stale_ms = stale_ms(page.slots[i], env);
+      s.b.item = item;
+      s.b.stale_ms = stale_ms(item, env);
       s.b.last_value_ms = millis();
-      std::string caption = page.slots[i].label;
-      if (page.slots[i].unit != nullptr && page.slots[i].unit->label[0] != '\0')
-        caption += caption.empty() ? page.slots[i].unit->label : std::string(" ") + page.slots[i].unit->label;
+      std::string caption = item.label;
+      if (item.unit != nullptr && item.unit->label[0] != '\0')
+        caption += caption.empty() ? item.unit->label : std::string(" ") + item.unit->label;
       s.value = make_label(center_, env.fonts.label, env.colors.muted, "--");
-      make_label(center_, env.fonts.small, env.colors.muted, caption);
+      s.caption = make_label(center_, env.fonts.small, env.colors.muted, caption);
       slots_.push_back(std::move(s));
     }
   }
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override {
     out.push_back(apparent_.item.path);
-    if (show_true_) {
+    out.push_back(heading_.item.path);
+    if (show_true_)
       out.push_back(true_dir_.item.path);
-      out.push_back(heading_.item.path);
-    } else {
-      out.push_back(heading_.item.path);
-    }
     for (const auto &s : slots_)
       out.push_back(s.b.item.path);
   }
@@ -576,8 +596,46 @@ class WindRoseWidget : public Widget {
     const int32_t d = std::min(lv_obj_get_content_width(area_), lv_obj_get_content_height(area_));
     lv_obj_set_size(rose_, d, d);
     lv_obj_center(rose_);
-    lv_obj_align(heading_label_, LV_ALIGN_CENTER, 0, -d / 4);
-    lv_obj_align(center_, LV_ALIGN_CENTER, 0, d / 16);
+    // Size tiers (esphelm_sizes.h, shared with the editor's size hint).
+    const bool full = d >= esphelm::sizes::WIND_ROSE_FULL;
+    const bool compact = !full && d >= esphelm::sizes::WIND_ROSE_COMPACT;
+    lv_scale_set_label_show(rose_, full);
+    if (!full) {
+      lv_scale_set_total_tick_count(rose_, 13);  // every 30 degrees
+      lv_scale_set_major_tick_every(rose_, 3);
+      lv_obj_set_style_length(rose_, 5, LV_PART_ITEMS);
+      lv_obj_set_style_length(rose_, 10, LV_PART_INDICATOR);
+    }
+    const int32_t arc = full ? 14 : 8;
+    lv_scale_set_section_style_main(rose_, sections_[0], zone_style(esphelm::ZoneState::NORMAL, colors_, arc));
+    lv_scale_set_section_style_main(rose_, sections_[1], zone_style(esphelm::ZoneState::ALARM, colors_, arc));
+    lv_obj_set_style_line_width(apparent_needle_, std::max<int32_t>(3, d / 58), LV_PART_MAIN);
+    lv_obj_set_style_line_width(true_needle_, std::max<int32_t>(2, d / 77), LV_PART_MAIN);
+    if (full) {
+      lv_obj_remove_flag(heading_label_, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_align(heading_label_, LV_ALIGN_CENTER, 0, -d / 4);
+    } else {
+      lv_obj_add_flag(heading_label_, LV_OBJ_FLAG_HIDDEN);
+    }
+    // Slots go inside the pointers' inner end (0.64 r). Values use the label font if every slot
+    // fits that way, else the small font; then show as many as fit, in order.
+    const int32_t room = full ? d * 55 / 100 : d * 62 / 100;
+    const int32_t small_h = lv_font_get_line_height(fonts_.small);
+    const int32_t big_slot = lv_font_get_line_height(fonts_.label) + small_h + 4;
+    const int32_t small_slot = 2 * small_h + 4;
+    const bool big = static_cast<size_t>(room / big_slot) >= slots_.size();
+    const size_t fit = full || compact ? static_cast<size_t>(room / (big ? big_slot : small_slot)) : 0;
+    for (auto &slot : slots_)
+      lv_obj_set_style_text_font(slot.value, big ? fonts_.label : fonts_.small, LV_PART_MAIN);
+    for (size_t i = 0; i < slots_.size(); i++) {
+      for (lv_obj_t *o : {slots_[i].value, slots_[i].caption}) {
+        if (i < fit)
+          lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+        else
+          lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+      }
+    }
+    lv_obj_align(center_, LV_ALIGN_CENTER, 0, full ? d / 16 : 0);
     lv_obj_update_layout(rose_);
     cx_ = lv_obj_get_content_width(rose_) / 2.0;
     cy_ = lv_obj_get_content_height(rose_) / 2.0;
@@ -624,6 +682,7 @@ class WindRoseWidget : public Widget {
   struct Slot {
     Binding b;
     lv_obj_t *value{nullptr};
+    lv_obj_t *caption{nullptr};
     std::string shown{"--"};
   };
 
@@ -668,6 +727,8 @@ class WindRoseWidget : public Widget {
   lv_obj_t *heading_label_;
   std::string heading_shown_{"HDG --"};
   lv_obj_t *center_;
+  lv_scale_section_t *sections_[2]{};
+  Fonts fonts_;
   // Rose centre and radius in its content box; needle end points (LVGL keeps the pointers).
   double cx_{0}, cy_{0}, radius_{0};
   lv_point_precise_t apparent_pts_[2]{};
@@ -680,6 +741,8 @@ class WindRoseWidget : public Widget {
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env) {
   style_cell(cell, env.colors);
   switch (tile.type) {
+    case esphelm::TileType::WIND_ROSE:
+      return std::make_unique<WindRoseWidget>(cell, tile, env);
     case esphelm::TileType::GAUGE:
       return std::make_unique<GaugeWidget>(cell, tile, env);
     case esphelm::TileType::BAR:
@@ -690,10 +753,6 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
     default:
       return std::make_unique<ValueWidget>(cell, tile, env);
   }
-}
-
-std::unique_ptr<Widget> make_wind_rose(lv_obj_t *area, const esphelm::Page &page, const WidgetEnv &env) {
-  return std::make_unique<WindRoseWidget>(area, page, env);
 }
 
 }  // namespace esphelm_runtime

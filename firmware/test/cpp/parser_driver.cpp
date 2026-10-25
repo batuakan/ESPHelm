@@ -1,7 +1,7 @@
 // Host driver for the firmware layout parser, used by firmware/test/parser.cpp.test.ts.
 // Usage: parser_driver [--max-bytes N] [--max-string N] [--max-nesting N] file...
 // Prints one JSON line per file: {"file":..., "ok":bool, "errors":[{"code":..,"pointer":..}],
-// "pages":n, "tiles":n}.
+// "pages":n, "tiles":n, "roseSlots":n}.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -55,11 +55,17 @@ int main(int argc, char **argv) {
       o["code"] = e.code;
       o["pointer"] = e.pointer;
     }
-    size_t tiles = 0;
-    for (const auto &p : r.layout.pages)
+    size_t tiles = 0, rose_slots = 0;
+    for (const auto &p : r.layout.pages) {
       tiles += p.tiles.size();
+      for (const auto &t : p.tiles) {
+        for (int i = 0; t.rose && i < esphelm::RoseConfig::MAX_SLOTS; i++)
+          rose_slots += t.rose->has_slot[i] ? 1 : 0;
+      }
+    }
     out["pages"] = r.layout.pages.size();
     out["tiles"] = tiles;
+    out["roseSlots"] = rose_slots;
     serializeJson(out, std::cout);
     std::cout << "\n";
   }

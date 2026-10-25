@@ -48,7 +48,7 @@ struct WidgetEnv {
 class Widget {
  public:
   virtual ~Widget() = default;
-  /// Tile id (empty for page widgets).
+  /// Tile id.
   virtual const std::string &id() const = 0;
   /// SignalK paths this widget wants values for.
   virtual void paths(std::vector<std::string> &out) const = 0;
@@ -63,9 +63,6 @@ class Widget {
 
 /// Build the widget for a grid tile inside `cell` (an empty LVGL object placed in the grid).
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
-
-/// Build the wind rose filling `area`.
-std::unique_ptr<Widget> make_wind_rose(lv_obj_t *area, const esphelm::Page &page, const WidgetEnv &env);
 
 /// Format a SignalK value like the editor preview: converted, fixed decimals (default 1),
 /// on/off for booleans, printable text for strings, "--" otherwise.
