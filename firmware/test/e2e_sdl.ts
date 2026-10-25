@@ -16,6 +16,7 @@ import {
   waitFor,
   type SignalKHarness,
 } from '../../packages/plugin/scripts/sk-harness.js';
+import { cacheRecord } from './cache_record.js';
 
 const FIRMWARE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = join(FIRMWARE, '..');
@@ -25,7 +26,7 @@ const ESPHOME = process.env.ESPHOME ?? join(homedir(), 'venv/bin/esphome');
 const PYTHON = process.env.PYTHON ?? join(homedir(), 'venv/bin/python');
 const PORT = Number(process.env.ESPHELM_E2E_PORT ?? 3993);
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
-const BINARY = join(FIRMWARE, '.esphome/build/esphelm-sdl/.pioenvs/esphelm-sdl/program');
+const binary = (name: string) => join(FIRMWARE, `.esphome/build/${name}/.pioenvs/${name}/program`);
 // ESPHomeSignalK's host build uses a fixed device id (utils.h).
 const DEVICE_ID = '12345678-1234-1232-123456789012';
 
@@ -44,7 +45,10 @@ const fixture = (rel: string) =>
 class Firmware {
   private proc: ChildProcess | undefined;
   private out = '';
-  constructor(private readonly work: string) {}
+  constructor(
+    private readonly work: string,
+    private readonly program = binary('esphelm-sdl'),
+  ) {}
 
   get workDir(): string {
     return this.work;
@@ -56,7 +60,7 @@ class Firmware {
     if (this.out) writeFileSync(join(this.work, `firmware-${this.runs}.log`), this.log());
     this.runs++;
     this.out = '';
-    this.proc = spawn(BINARY, [], { cwd: this.work, stdio: ['ignore', 'pipe', 'pipe'] });
+    this.proc = spawn(this.program, [], { cwd: this.work, stdio: ['ignore', 'pipe', 'pipe'] });
     this.proc.stdout?.on('data', (d: Buffer) => (this.out += d.toString()));
     this.proc.stderr?.on('data', (d: Buffer) => (this.out += d.toString()));
   }
@@ -109,27 +113,23 @@ class Firmware {
 
 async function main(): Promise<void> {
   if (!process.env.DISPLAY) throw new Error('SDL needs an X display (DISPLAY is not set)');
-  console.log(`compiling firmware/esphelm_sdl.yaml for SignalK at 127.0.0.1:${PORT} ...`);
-  execFileSync(
-    ESPHOME,
-    [
-      '-s',
-      'signalk_host',
-      '127.0.0.1',
-      '-s',
-      'signalk_port',
-      String(PORT),
-      'compile',
-      'firmware/esphelm_sdl.yaml',
-    ],
-    { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 30 * 60 * 1000 },
-  );
+  for (const config of ['firmware/esphelm_sdl.yaml', 'firmware/esphelm_sdl_720.yaml']) {
+    console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
+    execFileSync(
+      ESPHOME,
+      ['-s', 'signalk_host', '127.0.0.1', '-s', 'signalk_port', String(PORT), 'compile', config],
+      { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 30 * 60 * 1000 },
+    );
+  }
 
   const work = mkdtempSync(join(tmpdir(), 'esphelm-fw-'));
   const shots = join(work, 'shots');
   mkdirSync(shots);
   let sk: SignalKHarness | undefined;
   const fw = new Firmware(work);
+  const work720 = join(work, '720');
+  mkdirSync(work720);
+  const fw720 = new Firmware(work720, binary('esphelm-sdl-720'));
   try {
     sk = await startSignalK({ port: PORT, putEcho: ['electrical.switches.bilgePump.state'] });
     console.log(`signalk-server ${sk.version} on ${sk.base}; firmware working dir ${work}\n`);
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'firmware renders the multi-page layout',
-      await fw.waitLog(/Showing fetched layout "multi-480" \(3 pages/),
+      await fw.waitLog(/Showing fetched layout "multi-480" \(4 pages/),
     );
     publish({
       'navigation.speedOverGround': 3.2, // 6.2 kn
@@ -265,7 +265,7 @@ async function main(): Promise<void> {
 
     const goTo = async (index: number, title: string) => {
       writeFileSync(join(fw.workDir, 'esphelm_page_request'), String(index));
-      const shown = await fw.waitLog(new RegExp(`Page ${index + 1}/3 "${title}"`));
+      const shown = await fw.waitLog(new RegExp(`Page ${index + 1}/4 "${title}"`));
       check(`page hook shows page ${index + 1} (${title})`, shown);
       await sleep(1500);
     };
@@ -295,26 +295,50 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw.screenshot('08-switch-on', shots);
 
-    // 8. Server gone: values and needles go stale instead of freezing.
+    // 8. Wind roses as tiles next to other tiles: a 2x2 rose (about 250 px: compact, two slots)
+    //    and a 1x1 rose (about 120 px: pointers only), with live values.
+    await goTo(3, 'Helm');
+    await fw.screenshot('09-multi-helm', shots);
+
+    // 9. Server gone: values and needles go stale instead of freezing.
     await sk.stop();
     sk = undefined;
     await sleep(7500); // > staleAfter (6 s) since the last value
-    await fw.screenshot('09-stale-values', shots);
+    await fw.screenshot('10-stale-values', shots);
 
-    // 9. Reboot without a server: the cached multi-page layout comes back on its first page.
+    // 10. Reboot without a server: the cached multi-page layout comes back on its first page.
     await fw.stop();
     fw.start();
     check(
       'reboot without server shows the cached multi-page layout',
-      await fw.waitLog(/Showing cached layout "multi-480" \(3 pages/),
+      await fw.waitLog(/Showing cached layout "multi-480" \(4 pages/),
     );
     await sleep(1500);
-    await fw.screenshot('10-offline-cached', shots);
+    await fw.screenshot('11-offline-cached', shots);
+    await fw.stop();
+
+    // 11. The 720x720 build (P4-86 fonts), started offline from a seeded cache: a full-size rose
+    //     with engine tiles, then a compact and a medium rose.
+    const layout720 = readFileSync(join(FIXTURES, 'valid/rose-and-engine-720.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(layout720, '"seed-720"'));
+    fw720.start();
+    check(
+      '720 build shows the seeded layout',
+      await fw720.waitLog(/Showing cached layout "rose-engine-720" \(2 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-01-helm', shots);
+    writeFileSync(join(work720, 'esphelm_page_request'), '1');
+    check('720 page hook', await fw720.waitLog(/Page 2\/2 "Small roses"/));
+    await sleep(1500);
+    await fw720.screenshot('720-02-small-roses', shots);
   } finally {
     await fw.stop();
+    await fw720.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
+      fw720.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
     } else {
       rmSync(work, { recursive: true, force: true });
