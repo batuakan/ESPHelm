@@ -2,7 +2,7 @@
  * Renders every generated artifact of @esphelm/schema in memory, keyed by path relative to the
  * package root. `generate.ts` writes them; `test/generated.test.ts` checks they are up to date.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -212,6 +212,32 @@ function renderCasesHeader(cases: CasesFile['cases']): string {
   ].join('\n');
 }
 
+/** Starter layouts (templates/*.json) as a typed module for the editor. */
+function renderTemplatesTs(): string {
+  const dir = join(PACKAGE_ROOT, 'templates');
+  const order = ['wind', 'grid', 'energy', 'engine', 'switchboard'];
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => f.slice(0, -'.json'.length))
+    .sort(
+      (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) || a.localeCompare(b),
+    );
+  const entries = files.map(
+    (name) =>
+      `  ${JSON.stringify(name)}: ${JSON.stringify(readJson<unknown>(`templates/${name}.json`))},`,
+  );
+  return [
+    `// ${GENERATED_NOTE}`,
+    "import type { Layout } from '../layout.js';",
+    '',
+    '/** Starter layouts porting the legacy static apps (packages/schema/templates). */',
+    'export const TEMPLATES: Readonly<Record<string, Layout>> = {',
+    ...entries,
+    '};',
+    '',
+  ].join('\n');
+}
+
 function renderJsonSchema(schema: object): string {
   return `${JSON.stringify(schema, null, 2)}\n`;
 }
@@ -232,6 +258,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   const { Hello } = await import('../src/hello.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
+    'src/generated/templates.ts': renderTemplatesTs(),
     'generated/esphelm_units.h': renderUnitsHeader(units),
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),

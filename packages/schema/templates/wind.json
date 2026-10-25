@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "template-wind",
+  "name": "Wind",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "widget",
+      "widget": "wind_rose",
+      "id": "wind",
+      "title": "Wind",
+      "config": { "showTrueWind": true },
+      "slots": {
+        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+        "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "template-energy",
+  "name": "Energy",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "energy",
+      "title": "Energy",
+      "grid": { "cols": 2, "rows": 3 },
+      "tiles": [
+        {
+          "type": "gauge", "id": "soc", "x": 0, "y": 0, "w": 2, "h": 2,
+          "path": "electrical.batteries.shunt.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "House SoC",
+          "min": 0, "max": 100,
+          "zones": [
+            { "from": 0, "to": 30, "state": "alarm" },
+            { "from": 30, "to": 40, "state": "warn" }
+          ]
+        },
+        {
+          "type": "bar", "id": "voltage", "x": 0, "y": 2, "w": 1, "h": 1,
+          "path": "electrical.batteries.shunt.voltage", "unit": "V", "decimals": 1, "label": "Volts",
+          "min": 10, "max": 15, "orientation": "horizontal",
+          "zones": [
+            { "from": 10, "to": 11.8, "state": "alarm" },
+            { "from": 14.6, "to": 15, "state": "warn" }
+          ]
+        },
+        { "type": "value", "id": "current", "x": 1, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.shunt.current", "unit": "A", "decimals": 1, "label": "Current" }
+      ]
+    }
+  ]
+}

@@ -5,3 +5,4 @@ export * from './layout.js';
 export * from './hello.js';
 export * from './units.js';
 export * from './validate.js';
+export { TEMPLATES } from './generated/templates.js';

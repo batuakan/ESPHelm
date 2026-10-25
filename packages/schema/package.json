@@ -20,7 +20,8 @@
     "schema",
     "generated",
     "units.json",
-    "fixtures"
+    "fixtures",
+    "templates"
   ],
   "scripts": {
     "build": "tsc -b",

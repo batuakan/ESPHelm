@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateHello, validateLayout } from '../src/index.js';
+import { TEMPLATES, validateHello, validateLayout } from '../src/index.js';
 import { invalidFixtures, validFixtures } from './fixtures.js';
 
 const byPointer = (a: { pointer: string; code: string }, b: { pointer: string; code: string }) =>
@@ -50,5 +50,15 @@ describe('validator robustness', () => {
     const result = validateLayout({ version: 1, id: 'x', theme: 'day', pages: [{ kind: 'grid' }] });
     expect(result.ok).toBe(false);
     expect(result.errors.every((e) => e.code === 'MISSING_FIELD')).toBe(true);
+  });
+});
+
+describe('starter layouts (templates)', () => {
+  it.each(Object.entries(TEMPLATES))('%s validates', (_name, layout) => {
+    expect(validateLayout(layout).errors).toEqual([]);
+  });
+
+  it('ports every legacy app planned for Phase 5a', () => {
+    expect(Object.keys(TEMPLATES)).toEqual(['wind', 'grid', 'energy', 'engine', 'switchboard']);
   });
 });

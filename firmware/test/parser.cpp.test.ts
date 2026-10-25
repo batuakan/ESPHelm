@@ -55,6 +55,10 @@ const fixtureDocs: { name: string; doc: unknown }[] = [
     name: `valid/${f}`,
     doc: JSON.parse(readFileSync(join(FIXTURES, 'valid', f), 'utf8')) as unknown,
   })),
+  ...readdirSync(join(FIXTURES, '../templates')).map((f) => ({
+    name: `templates/${f}`,
+    doc: JSON.parse(readFileSync(join(FIXTURES, '../templates', f), 'utf8')) as unknown,
+  })),
   ...readdirSync(join(FIXTURES, 'invalid')).map((f) => ({
     name: `invalid/${f}`,
     doc: (JSON.parse(readFileSync(join(FIXTURES, 'invalid', f), 'utf8')) as { layout: unknown })
