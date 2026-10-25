@@ -7,6 +7,7 @@
 // All LVGL work happens in loop(); HTTP runs on LayoutClient's worker.
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,7 +24,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-static const char *const FIRMWARE_VERSION = "0.1.0";
+static const char *const FIRMWARE_VERSION = "0.2.0";
 
 class EsphelmRuntime : public Component {
  public:
@@ -40,6 +41,11 @@ class EsphelmRuntime : public Component {
 
   void setup() override;
   void loop() override;
+
+  /// Show page `index` of the current layout (also the footer buttons' target and a test hook).
+  void show_page(size_t index);
+  /// Act as if the tile with this id was tapped (test hook; switch tiles send a PUT).
+  void tap(const std::string &tile_id);
   void dump_config() override;
   // After LVGL (setup_priority::PROCESSOR) has created the display and our container.
   float get_setup_priority() const override { return setup_priority::PROCESSOR - 10; }
@@ -47,28 +53,14 @@ class EsphelmRuntime : public Component {
  protected:
   enum class ServerState : uint8_t { UNKNOWN, PENDING, NO_LAYOUT, ADOPTED };
 
-  struct TileState {
-    size_t index;  // into renderer tiles / page tiles
-    std::string path;
-    const esphelm::units::UnitDef *unit;
-    int8_t decimals;
-    uint32_t stale_ms;
-    std::string text;
-    uint32_t last_value_ms{0};
-    uint32_t last_draw_ms{0};
-    bool has_value{false};
-    bool dirty{false};
-    bool stale_shown{false};
-  };
-
   void handle_result_(HttpResult &result);
   void handle_hello_(const HttpResult &result);
   void handle_layout_(const HttpResult &result);
   bool apply_(const std::string &body, const std::string &etag, bool persist, const char *origin);
   void clear_layout_();
-  void subscribe_tiles_(const esphelm::Page &page);
+  bool build_page_(size_t index);
+  void subscribe_page_();
   void on_value_(const std::string &path, ArduinoJson::JsonVariantConst value);
-  void update_tiles_(uint32_t now);
   void update_status_();
   void show_status_(const std::string &headline, const std::string &detail);
   void send_hello_();
@@ -94,14 +86,17 @@ class EsphelmRuntime : public Component {
 
   // What is shown
   bool has_layout_{false};
+  esphelm::Layout layout_;
+  size_t page_{0};
+  int pending_step_{0};  // footer button presses, applied in loop() (never inside LVGL events)
+  std::vector<std::unique_ptr<Widget>> widgets_;
   esphelm::Theme theme_{esphelm::Theme::NIGHT};
   std::string etag_;
   std::string body_;
   uint32_t shown_at_{0};
   bool lkg_saved_{false};
   std::string lkg_etag_;
-  std::vector<TileState> tiles_;
-  std::vector<uint32_t> tile_listeners_;
+  std::vector<uint32_t> listeners_;
   std::string status_key_;  // last status page shown, to avoid rebuilding it every loop
 
   // Protocol state

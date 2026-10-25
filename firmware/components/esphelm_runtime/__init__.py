@@ -23,8 +23,9 @@ CONF_STALE_AFTER = "stale_after"
 CONF_MAX_LAYOUT_BYTES = "max_layout_bytes"
 CONF_STORE_DIR = "store_dir"
 
-# LVGL features the renderer needs. ESPHome only compiles what the YAML uses.
-LVGL_FEATURES = ("label", "grid", "font")
+# LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
+# links against it for image needles).
+LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image")
 
 esphelm_ns = cg.esphome_ns.namespace("esphelm_runtime")
 EsphelmRuntime = esphelm_ns.class_("EsphelmRuntime", cg.Component)

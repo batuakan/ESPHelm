@@ -37,6 +37,7 @@ void EsphelmRuntime::compute_capacity_() {
 void EsphelmRuntime::setup() {
   this->compute_capacity_();
   this->renderer_.set_fonts(this->fonts_);
+  this->renderer_.set_navigation([this](int step) { this->pending_step_ += step; });
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
@@ -104,7 +105,14 @@ void EsphelmRuntime::loop() {
   }
 
   if (this->has_layout_) {
-    this->update_tiles_(now);
+    if (this->pending_step_ != 0) {
+      const int target = static_cast<int>(this->page_) + this->pending_step_;
+      this->pending_step_ = 0;
+      if (target >= 0)
+        this->show_page(static_cast<size_t>(target));
+    }
+    for (auto &w : this->widgets_)
+      w->tick(now);
     if (!this->lkg_saved_ && now - this->shown_at_ >= LKG_AFTER_MS) {
       if (this->etag_ != this->lkg_etag_ && this->store_.save(Slot::LAST_KNOWN_GOOD, {this->etag_, this->body_}))
         this->lkg_etag_ = this->etag_;
@@ -132,7 +140,9 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
   doc["display"]["rotation"] = 0;
-  doc["widgets"].add("value");  // renderable tile types; the plugin refuses layouts using others
+  // Renderable tile types and page widgets; the plugin refuses layouts using others.
+  for (const char *w : {"value", "gauge", "bar", "switch", "wind_rose"})
+    doc["widgets"].add(w);
   ArduinoJson::JsonArray fonts = doc["fonts"].to<ArduinoJson::JsonArray>();
   fonts.add("value");
   fonts.add("label");
@@ -267,138 +277,99 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
              this->layout_error_.c_str());
     return false;  // keep whatever is shown
   }
-  const esphelm::Page *page = nullptr;
-  for (const auto &p : parsed.layout.pages) {
-    if (p.kind == esphelm::PageKind::GRID) {
-      page = &p;
-      break;
-    }
-  }
-  if (page == nullptr) {
-    this->layout_error_ = "no grid page (this firmware shows the first grid page)";
-    ESP_LOGE(TAG, "%s layout rejected: %s", origin, this->layout_error_.c_str());
-    return false;
-  }
-  if (!this->renderer_.show_grid_page(*page, parsed.layout.theme)) {
+  // Stay on the same page when the same layout is updated and the page still exists.
+  const bool same_layout = this->has_layout_ && parsed.layout.id == this->layout_.id;
+  size_t page = same_layout && this->page_ < parsed.layout.pages.size() ? this->page_ : 0;
+  this->layout_ = std::move(parsed.layout);
+  if (!this->build_page_(page)) {
     this->layout_error_ = "CAPACITY_EXCEEDED (out of memory while building)";
     this->has_layout_ = false;
     this->status_key_.clear();
     return false;
   }
   this->layout_error_.clear();
-  this->theme_ = parsed.layout.theme;
+  this->theme_ = this->layout_.theme;
   this->has_layout_ = true;
   this->status_key_.clear();
   this->etag_ = etag;
   this->body_ = body;
   this->shown_at_ = millis();
   this->lkg_saved_ = false;
-  this->subscribe_tiles_(*page);
   if (persist && !this->store_.save(Slot::CURRENT, {etag, body}))
     ESP_LOGW(TAG, "Could not cache the layout; it will not survive a reboot");
-  ESP_LOGI(TAG, "Showing %s layout \"%s\" (%u tiles, %u bytes, ETag %s)", origin, parsed.layout.id.c_str(),
-           (unsigned) page->tiles.size(), (unsigned) body.size(), etag.c_str());
+  ESP_LOGI(TAG, "Showing %s layout \"%s\" (%u pages, %u bytes, ETag %s)", origin, this->layout_.id.c_str(),
+           (unsigned) this->layout_.pages.size(), (unsigned) body.size(), etag.c_str());
   return true;
 }
 
+bool EsphelmRuntime::build_page_(size_t index) {
+  WidgetEnv env;
+  env.fonts = this->fonts_;
+  env.colors = colors_for(this->layout_.theme);
+  env.default_stale_ms = this->stale_after_ms_;
+  env.put = [this](const std::string &path, bool value) { this->signalk_->put_request(path, value); };
+  if (!this->renderer_.show_page(this->layout_, index, env, this->widgets_))
+    return false;
+  this->page_ = index;
+  this->subscribe_page_();
+  const esphelm::Page &p = this->layout_.pages[index];
+  ESP_LOGI(TAG, "Page %u/%u \"%s\"", (unsigned) index + 1, (unsigned) this->layout_.pages.size(),
+           (p.title.empty() ? p.id : p.title).c_str());
+  return true;
+}
+
+void EsphelmRuntime::show_page(size_t index) {
+  if (!this->has_layout_ || index >= this->layout_.pages.size() || index == this->page_)
+    return;
+  if (!this->build_page_(index)) {
+    // Out of memory on that page: go back to the one that worked.
+    this->build_page_(this->page_);
+  }
+}
+
+void EsphelmRuntime::tap(const std::string &tile_id) {
+  for (auto &w : this->widgets_) {
+    if (w->id() == tile_id) {
+      w->tap();
+      return;
+    }
+  }
+  ESP_LOGW(TAG, "tap: no tile \"%s\" on this page", tile_id.c_str());
+}
+
 void EsphelmRuntime::clear_layout_() {
-  for (uint32_t id : this->tile_listeners_)
+  for (uint32_t id : this->listeners_)
     this->signalk_->remove_listener(id);
-  this->tile_listeners_.clear();
-  this->tiles_.clear();
+  this->listeners_.clear();
+  this->widgets_.clear();
   this->has_layout_ = false;
   this->etag_.clear();
   this->body_.clear();
 }
 
-void EsphelmRuntime::subscribe_tiles_(const esphelm::Page &page) {
-  // Listeners derive from the layout: one per unique path. SignalK batches the resulting
-  // subscription change (incremental subscribe, or unsubscribe-all + resubscribe).
-  for (uint32_t id : this->tile_listeners_)
+void EsphelmRuntime::subscribe_page_() {
+  // Listeners derive from the visible page: one per unique path. SignalK batches the change
+  // (incremental subscribe, or unsubscribe-all + resubscribe) and replays cached values.
+  for (uint32_t id : this->listeners_)
     this->signalk_->remove_listener(id);
-  this->tile_listeners_.clear();
-  this->tiles_.clear();
-
+  this->listeners_.clear();
   std::vector<std::string> paths;
-  for (size_t i = 0; i < page.tiles.size(); i++) {
-    const esphelm::Tile &t = page.tiles[i];
-    if (t.type != esphelm::TileType::VALUE)
-      continue;
-    TileState s;
-    s.index = i;
-    s.path = t.data.path;
-    s.unit = t.data.unit;
-    s.decimals = t.data.decimals;
-    s.stale_ms = t.data.stale_after > 0 ? static_cast<uint32_t>(t.data.stale_after * 1000) : this->stale_after_ms_;
-    s.last_value_ms = millis();
-    this->tiles_.push_back(s);
-    if (std::find(paths.begin(), paths.end(), t.data.path) == paths.end())
-      paths.push_back(t.data.path);
-  }
+  for (const auto &w : this->widgets_)
+    w->paths(paths);
+  std::sort(paths.begin(), paths.end());
+  paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
   for (const auto &path : paths) {
-    this->tile_listeners_.push_back(this->signalk_->add_listener(
+    if (path.empty())
+      continue;
+    this->listeners_.push_back(this->signalk_->add_listener(
         path, [this](const std::string &p, ArduinoJson::JsonVariantConst v) { this->on_value_(p, v); }));
   }
 }
 
-/// Keep only glyphs the firmware fonts contain (ASCII and the degree sign).
-static std::string printable(const char *s) {
-  std::string out;
-  for (const char *p = s; *p != '\0'; p++) {
-    auto c = static_cast<unsigned char>(*p);
-    if (c >= 0x20 && c <= 0x7E) {
-      out.push_back(static_cast<char>(c));
-    } else if (c == 0xC2 && static_cast<unsigned char>(p[1]) == 0xB0) {
-      out.append("\xC2\xB0");
-      p++;
-    } else if (c >= 0x80) {
-      out.push_back('?');
-      while ((static_cast<unsigned char>(p[1]) & 0xC0) == 0x80)
-        p++;
-    }
-  }
-  return out;
-}
-
 void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariantConst value) {
   const uint32_t now = millis();
-  for (auto &t : this->tiles_) {
-    if (t.path != path)
-      continue;
-    char buf[32];
-    if (value.is<bool>()) {
-      t.text = value.as<bool>() ? "on" : "off";
-    } else if (value.is<double>()) {
-      double v = value.as<double>();
-      if (t.unit != nullptr)
-        v = esphelm::units::to_display(v, *t.unit);
-      const int decimals = t.decimals >= 0 ? t.decimals : 1;
-      std::snprintf(buf, sizeof(buf), "%.*f", decimals, v);
-      t.text = std::isfinite(v) ? buf : "--";
-    } else if (value.is<const char *>()) {
-      t.text = printable(value.as<const char *>());
-    } else {
-      t.text = "--";  // null or an object: nothing sensible to show in a value tile
-    }
-    t.has_value = true;
-    t.dirty = true;
-    t.last_value_ms = now;
-  }
-}
-
-void EsphelmRuntime::update_tiles_(uint32_t now) {
-  for (auto &t : this->tiles_) {
-    if (t.dirty && now - t.last_draw_ms >= DRAW_INTERVAL_MS) {
-      this->renderer_.set_tile_value(t.index, t.text, false);
-      t.dirty = false;
-      t.last_draw_ms = now;
-      t.stale_shown = false;
-    } else if (!t.dirty && !t.stale_shown && now - t.last_value_ms > t.stale_ms) {
-      // No update for too long: show that the value is not live instead of freezing it.
-      this->renderer_.set_tile_value(t.index, "--", true);
-      t.stale_shown = true;
-    }
-  }
+  for (auto &w : this->widgets_)
+    w->on_value(path, value, now);
 }
 
 // ---- Status page ----
