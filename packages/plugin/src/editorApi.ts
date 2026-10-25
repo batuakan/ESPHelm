@@ -29,6 +29,7 @@ function deviceView(service: Service, device: DeviceRecord) {
 /**
  * Editor API (used by the web editor, Phase 4):
  *   GET    /plugins/esphelm/api/widgets
+ *   GET    /plugins/esphelm/api/paths
  *   GET    /plugins/esphelm/api/layouts            GET|PUT|DELETE /plugins/esphelm/api/layouts/:id
  *   GET    /plugins/esphelm/api/devices            PUT|DELETE     /plugins/esphelm/api/devices/:id
  */
@@ -42,6 +43,11 @@ export function registerEditorApi(router: IRouter, service: Service): void {
       units: UNITS,
       quantities: QUANTITIES,
     });
+  });
+
+  // SignalK paths for the editor's path picker
+  router.get(`${EDITOR_API_PREFIX}/paths`, (_req: Request, res: Response) => {
+    res.json(service.listPaths());
   });
 
   // Layouts

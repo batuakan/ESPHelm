@@ -4,6 +4,15 @@ import { Store, type DeviceRecord, type StoredLayout } from './store.js';
 
 export const PLUGIN_ID = 'esphelm';
 
+export interface PathInfo {
+  path: string;
+  /** SignalK meta.units (SI), e.g. "m/s"; null if the server has no metadata. */
+  units: string | null;
+  description: string | null;
+  value: unknown;
+  timestamp: string | null;
+}
+
 /** SignalK path a device subscribes to; its value is the ETag of the device's current layout. */
 export function versionPath(deviceId: string): string {
   return `plugins.${PLUGIN_ID}.${deviceId}.version`;
@@ -54,6 +63,26 @@ export class Service {
 
   get clock(): Date {
     return this.now();
+  }
+
+  /**
+   * Self paths the server currently has, with SignalK units/description and the latest value,
+   * for the editor's path picker.
+   */
+  listPaths(): PathInfo[] {
+    return [...this.host.streambundle.getAvailablePaths()].sort().map((path) => {
+      const meta = this.host.getMetadata(`vessels.self.${path}`) as
+        { units?: unknown; description?: unknown } | undefined;
+      const node = this.host.getSelfPath(path) as
+        { value?: unknown; timestamp?: unknown } | undefined;
+      return {
+        path,
+        units: typeof meta?.units === 'string' ? meta.units : null,
+        description: typeof meta?.description === 'string' ? meta.description : null,
+        value: node?.value ?? null,
+        timestamp: typeof node?.timestamp === 'string' ? node.timestamp : null,
+      };
+    });
   }
 
   /** The layout a device downloads: only adopted devices with an assigned, loaded layout. */

@@ -200,3 +200,31 @@ describe('widget catalog', () => {
     expect(body.units).toHaveProperty('kn.label', 'kn');
   });
 });
+
+describe('paths', () => {
+  it('lists self paths sorted, with SignalK units, description and latest value', async () => {
+    expect(await (await api('GET', '/paths')).json()).toEqual([
+      {
+        path: 'environment.depth.belowTransducer',
+        units: 'm',
+        description: null,
+        value: 12.4,
+        timestamp: '2026-10-24T12:00:01.000Z',
+      },
+      {
+        path: 'navigation.position',
+        units: null,
+        description: null,
+        value: { latitude: 60.15, longitude: 24.95 },
+        timestamp: '2026-10-24T12:00:02.000Z',
+      },
+      {
+        path: 'navigation.speedOverGround',
+        units: 'm/s',
+        description: 'Speed over ground',
+        value: 3.19,
+        timestamp: '2026-10-24T12:00:00.000Z',
+      },
+    ]);
+  });
+});

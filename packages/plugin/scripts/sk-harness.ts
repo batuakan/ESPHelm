@@ -81,9 +81,12 @@ export async function waitFor(pred: () => boolean, ms = 5000): Promise<boolean> 
 
 /**
  * Start the server. SIGNALK_SERVER=/path/to/bin/signalk-server picks an install; default: the
- * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one).
+ * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one);
+ * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...).
  */
-export async function startSignalK(opts: { port?: number } = {}): Promise<SignalKHarness> {
+export async function startSignalK(
+  opts: { port?: number; sampleData?: boolean } = {},
+): Promise<SignalKHarness> {
   if (!existsSync(join(PLUGIN_DIR, 'dist/index.js'))) throw new Error('run `npm run build` first');
   const bin = realpathSync(
     process.env.SIGNALK_SERVER ??
@@ -126,7 +129,9 @@ export async function startSignalK(opts: { port?: number } = {}): Promise<Signal
   const [nmeaPort, tcpPort] = [await freePort(), await freePort()];
   const base = `http://127.0.0.1:${port}`;
   let log = '';
-  const server: ChildProcess = spawn(bin, ['-c', config, '--securityenabled'], {
+  const args = ['-c', config, '--securityenabled'];
+  if (opts.sampleData) args.push('--sample-nmea0183-data');
+  const server: ChildProcess = spawn(bin, args, {
     env: {
       ...process.env,
       PORT: String(port),

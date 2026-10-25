@@ -55,6 +55,19 @@ export async function startHarness(opts: { dataDir?: string } = {}): Promise<Har
   const deltas: Delta[] = [];
   const errors: string[] = [];
   const security = { disabled: false };
+  // A tiny SignalK data model for /api/paths.
+  const skData: Record<string, { value: unknown; timestamp: string }> = {
+    'navigation.speedOverGround': { value: 3.19, timestamp: '2026-10-24T12:00:00.000Z' },
+    'environment.depth.belowTransducer': { value: 12.4, timestamp: '2026-10-24T12:00:01.000Z' },
+    'navigation.position': {
+      value: { latitude: 60.15, longitude: 24.95 },
+      timestamp: '2026-10-24T12:00:02.000Z',
+    },
+  };
+  const skMeta: Record<string, { units?: string; description?: string }> = {
+    'navigation.speedOverGround': { units: 'm/s', description: 'Speed over ground' },
+    'environment.depth.belowTransducer': { units: 'm' },
+  };
   const host: PluginHost = {
     getDataDirPath: () => dataDir,
     handleMessage: (_id, delta) => {
@@ -67,6 +80,9 @@ export async function startHarness(opts: { dataDir?: string } = {}): Promise<Har
     debug: Object.assign(() => {}, { enabled: false }),
     error: () => {},
     securityStrategy: { isDummy: () => security.disabled },
+    streambundle: { getAvailablePaths: () => Object.keys(skData) as never },
+    getSelfPath: (path: string) => skData[path],
+    getMetadata: (path: string) => skMeta[path.replace(/^vessels\.self\./, '')] as never,
   };
   let now = Date.parse('2026-10-24T12:00:00Z');
   const service = new Service(host, () => new Date((now += 1000)));

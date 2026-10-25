@@ -3,8 +3,17 @@ import type { ServerAPI } from '@signalk/server-api';
 /** The part of the SignalK server API this plugin uses (tests provide a fake). */
 export type PluginHost = Pick<
   ServerAPI,
-  'getDataDirPath' | 'handleMessage' | 'setPluginStatus' | 'setPluginError' | 'debug' | 'error'
+  | 'getDataDirPath'
+  | 'handleMessage'
+  | 'setPluginStatus'
+  | 'setPluginError'
+  | 'debug'
+  | 'error'
+  | 'getSelfPath'
+  | 'getMetadata'
 > & {
+  streambundle: Pick<ServerAPI['streambundle'], 'getAvailablePaths'>;
+} & {
   /**
    * Not part of @signalk/server-api's public types, but present on every server: the dummy
    * strategy (security disabled) answers `isDummy() === true`.
