@@ -144,6 +144,18 @@ const mutations: { name: string; doc: unknown }[] = [
     ]),
   },
   {
+    name: 'chart pages with odd fields',
+    doc: {
+      ...minimal,
+      pages: [
+        { kind: 'chart', id: 'a', chart: 'ok', zoom: 0, anchor: 'yes', config: [] },
+        { kind: 'chart', id: 'b', chart: '', zoom: 2.5, config: { headingPath: 7, extra: 1 } },
+        { kind: 'chart', id: 'c', chart: 5, zoom: '15', title: 'Karte ü' },
+        { kind: 'chart', id: 'a', chart: 'dup' },
+      ],
+    },
+  },
+  {
     name: 'wind rose without slots and the old page kind',
     doc: {
       ...minimal,

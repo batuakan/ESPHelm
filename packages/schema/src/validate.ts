@@ -1,7 +1,7 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
 import { Hello } from './hello.js';
 import { Layout } from './layout.js';
-import { GridPage } from './pages.js';
+import { ChartPage, GridPage } from './pages.js';
 import { TILE_TYPES } from './tiles.js';
 
 /**
@@ -84,6 +84,7 @@ function shell(schema: object, arrayProp: string): object {
 const validators = {
   layoutShell: ajv.compile(shell(Layout, 'pages')),
   gridPageShell: ajv.compile(shell(GridPage, 'tiles')),
+  chartPage: ajv.compile(ChartPage),
   tiles: Object.fromEntries(
     Object.entries(TILE_TYPES).map(([name, t]) => [name, ajv.compile(t)]),
   ) as Record<string, ValidateFunction>,
@@ -175,6 +176,9 @@ function validateStructure(input: unknown): ValidationError[] {
         }
         if (!validate(tile)) errors.push(...mapAjvErrors(validate.errors, tbase));
       });
+    } else if (page.kind === 'chart') {
+      if (!validators.chartPage(page))
+        errors.push(...mapAjvErrors(validators.chartPage.errors, base));
     } else {
       errors.push({
         pointer: `${base}/kind`,
@@ -205,6 +209,7 @@ function validateSemantics(layout: Layout): ValidationError[] {
   layout.pages.forEach((page, i) => {
     const base = `/pages/${i}`;
     claimId(page.id, `${base}/id`);
+    if (page.kind !== 'grid') return;
     const { cols, rows } = page.grid;
     const placed: { x: number; y: number; w: number; h: number; j: number }[] = [];
     page.tiles.forEach((tile, j) => {

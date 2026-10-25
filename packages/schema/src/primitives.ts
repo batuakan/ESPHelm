@@ -14,6 +14,13 @@ export const Id = Type.String({
     'Lowercase ASCII identifier: a-z, 0-9, "_" and "-", starting with a letter or digit.',
 });
 
+/** A SignalK chart identifier (resources API): URL-safe, case kept. */
+export const ChartId = Type.String({
+  pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$',
+  errorCode: 'INVALID_ID',
+  description: 'SignalK chart identifier: letters, digits, ".", "_" and "-".',
+});
+
 /** Printable ASCII plus the degree sign: the glyphs compiled into the firmware fonts. */
 export const LABEL_PATTERN = '^[\\x20-\\x7E\\u00B0]*$';
 

@@ -1,0 +1,17 @@
+{
+  "description": "Chart identifiers are URL-safe",
+  "expect": [
+    {
+      "code": "INVALID_ID",
+      "pointer": "/pages/0/chart"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      { "kind": "chart", "id": "c", "chart": "../etc/passwd" }
+    ]
+  }
+}

@@ -70,11 +70,29 @@ struct Tile {
 };
 
 /// A grid page (the only page kind in v1).
+enum class PageKind : uint8_t { GRID, CHART };
+
+/// Chart page settings (Phase 5d): which SignalK chart, zoom, and the paths it follows.
+struct ChartConfig {
+  std::string chart;
+  int zoom{15};
+  bool anchor{true};
+  std::string position_path{"navigation.position"};
+  std::string heading_path{"navigation.headingTrue"};
+  std::string anchor_position_path{"navigation.anchor.position"};
+  std::string anchor_radius_path{"navigation.anchor.maxRadius"};
+  std::string anchor_alarm_path{"notifications.navigation.anchor"};
+};
+
 struct Page {
+  PageKind kind{PageKind::GRID};
   std::string id;
   std::string title;
+  // grid pages
   uint16_t cols{0}, rows{0};
   std::vector<Tile> tiles;
+  // chart pages
+  std::shared_ptr<const ChartConfig> chart;
 };
 
 struct Layout {

@@ -73,6 +73,19 @@ bool valid_id(const char *s, size_t n) {
 }
 
 /// Printable ASCII plus U+00B0 (UTF-8 C2 B0): the glyphs compiled into the firmware fonts.
+/// SignalK chart identifier: [A-Za-z0-9][A-Za-z0-9._-]* (it ends up in a URL path).
+bool valid_chart_id(const char *s, size_t n) {
+  if (n == 0)
+    return false;
+  for (size_t i = 0; i < n; i++) {
+    char c = s[i];
+    bool alnum = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+    if (!(alnum || (i > 0 && (c == '.' || c == '_' || c == '-'))))
+      return false;
+  }
+  return true;
+}
+
 bool valid_label(const char *s, size_t n) {
   for (size_t i = 0; i < n; i++) {
     auto c = static_cast<unsigned char>(s[i]);
@@ -106,7 +119,7 @@ bool valid_path(const char *s, size_t n) {
   return !segment_empty;
 }
 
-enum class StrKind { PLAIN, ID, LABEL, PATH };
+enum class StrKind { PLAIN, ID, LABEL, PATH, CHART_ID };
 
 /// Optional/required string field. Returns true and sets `out` only if present and valid.
 bool string_field(Checker &chk, JsonObjectConst obj, const std::string &ptr, const char *key, bool required,
@@ -139,6 +152,11 @@ bool string_field(Checker &chk, JsonObjectConst obj, const std::string &ptr, con
       ok = valid_path(s.c_str(), s.size());
       if (!ok)
         chk.add(fp, "INVALID_PATH");
+      break;
+    case StrKind::CHART_ID:
+      ok = valid_chart_id(s.c_str(), s.size());
+      if (!ok)
+        chk.add(fp, "INVALID_ID");
       break;
     case StrKind::PLAIN:
       break;
@@ -439,6 +457,38 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
   }
 }
 
+void check_chart_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, Page &page) {
+  page.kind = PageKind::CHART;
+  string_field(chk, obj, ptr, "id", true, StrKind::ID, page.id);
+  string_field(chk, obj, ptr, "title", false, StrKind::LABEL, page.title);
+  auto chart = std::make_shared<ChartConfig>();
+  string_field(chk, obj, ptr, "chart", true, StrKind::CHART_ID, chart->chart);
+  long long zoom;
+  if (has(obj, "zoom") && int_field(chk, obj, ptr, "zoom", false, 1, 20, zoom))
+    chart->zoom = static_cast<int>(zoom);
+  if (has(obj, "anchor")) {
+    if (!obj["anchor"].is<bool>())
+      chk.add(ptr + "/anchor", "INVALID_TYPE");
+    else
+      chart->anchor = obj["anchor"].as<bool>();
+  }
+  if (has(obj, "config")) {
+    JsonVariantConst config = obj["config"];
+    const std::string cp = ptr + "/config";
+    if (!config.is<JsonObjectConst>()) {
+      chk.add(cp, "INVALID_TYPE");
+    } else {
+      JsonObjectConst c = config.as<JsonObjectConst>();
+      string_field(chk, c, cp, "positionPath", false, StrKind::PATH, chart->position_path);
+      string_field(chk, c, cp, "headingPath", false, StrKind::PATH, chart->heading_path);
+      string_field(chk, c, cp, "anchorPositionPath", false, StrKind::PATH, chart->anchor_position_path);
+      string_field(chk, c, cp, "anchorRadiusPath", false, StrKind::PATH, chart->anchor_radius_path);
+      string_field(chk, c, cp, "anchorAlarmPath", false, StrKind::PATH, chart->anchor_alarm_path);
+    }
+  }
+  page.chart = std::move(chart);
+}
+
 void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, Page &page) {
   string_field(chk, obj, ptr, "id", true, StrKind::ID, page.id);
   string_field(chk, obj, ptr, "title", false, StrKind::LABEL, page.title);
@@ -521,6 +571,8 @@ void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
     Page page{};
     if (kind.is<const char *>() && std::strcmp(kind.as<const char *>(), "grid") == 0) {
       check_grid_page(chk, po, pp, page);
+    } else if (kind.is<const char *>() && std::strcmp(kind.as<const char *>(), "chart") == 0) {
+      check_chart_page(chk, po, pp, page);
     } else {
       chk.add(pp + "/kind", "UNKNOWN_PAGE_KIND");
       continue;
@@ -545,6 +597,8 @@ void check_semantics(Checker &chk, const Layout &layout) {
     const Page &page = layout.pages[i];
     const std::string pp = "/pages/" + std::to_string(i);
     claim(page.id, pp + "/id");
+    if (page.kind != PageKind::GRID)
+      continue;
     std::vector<size_t> placed;
     for (size_t j = 0; j < page.tiles.size(); j++) {
       const Tile &t = page.tiles[j];
