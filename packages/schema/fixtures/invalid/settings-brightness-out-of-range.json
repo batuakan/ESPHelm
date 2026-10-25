@@ -1,0 +1,45 @@
+{
+  "description": "Day brightness is 5 to 100 %, night 1 to 100 %",
+  "expect": [
+    {
+      "code": "OUT_OF_RANGE",
+      "pointer": "/settings/brightness/day"
+    },
+    {
+      "code": "OUT_OF_RANGE",
+      "pointer": "/settings/brightness/night"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "brightness": {
+        "day": 2,
+        "night": 0
+      }
+    }
+  }
+}

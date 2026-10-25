@@ -77,6 +77,14 @@ const withTile = (patch: Record<string, unknown>) => ({
 /** Extra mutations beyond the fixtures, compared the same way (differential test). */
 const mutations: { name: string; doc: unknown }[] = [
   { name: 'integer written as 2.0', doc: withTile({ w: 1.0, decimals: 2.0 }) },
+  { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
+  {
+    name: 'settings fields of the wrong type',
+    doc: {
+      ...minimal,
+      settings: { brightness: 50, startPage: 3, autoTheme: 1, screenTimeout: 2.5 },
+    },
+  },
   { name: 'fractional integer', doc: withTile({ x: 0.5 }) },
   { name: 'null optional field', doc: withTile({ label: null }) },
   { name: 'number as label', doc: withTile({ label: 42 }) },

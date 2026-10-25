@@ -1,6 +1,6 @@
 #pragma once
 // Parsed, validated layout (schema v1). Pure C++: no ESPHome or LVGL dependencies.
-// Mirrors packages/schema/src/{layout,pages,tiles,primitives}.ts.
+// Mirrors packages/schema/src/{layout,pages,tiles,settings,primitives}.ts.
 
 #include <cstdint>
 #include <memory>
@@ -95,11 +95,24 @@ struct Page {
   std::shared_ptr<const ChartConfig> chart;
 };
 
+enum class AutoTheme : uint8_t { OFF, SUN };
+
+/// Display settings (Phase 6, ADR-0015); defaults as SETTINGS_DEFAULTS in the schema.
+struct Settings {
+  uint8_t brightness_day{100};   // %
+  uint8_t brightness_night{30};  // %
+  std::string start_page;        // empty: the first page
+  AutoTheme auto_theme{AutoTheme::OFF};
+  std::string auto_theme_path{"environment.sun"};
+  uint16_t screen_timeout{0};  // seconds; 0: never (the runtime applies at least 10)
+};
+
 struct Layout {
   std::string id;
   std::string name;
   Theme theme{Theme::DAY};
   std::vector<Page> pages;
+  Settings settings;
 };
 
 }  // namespace esphelm

@@ -30,7 +30,8 @@ Layout
 ├─ id: Id
 ├─ name?: Label
 ├─ theme: "day" | "night"
-└─ pages: Page[]            (at least 1)
+├─ pages: Page[]            (at least 1)
+└─ settings?: Settings      display settings (Phase 6, see below)
 
 Page = GridPage | ChartPage           (discriminator: kind)
 
@@ -136,6 +137,20 @@ Shows the autopilot state, target and heading, with course and mode buttons that
 
 Defaults are exported as `AUTOPILOT_DEFAULTS`. The device shows the buttons only when the tile's content box is at least `AUTOPILOT_FIT` (260×220 px, generated into `esphelm_sizes.h`); smaller tiles show status only.
 
+### Settings
+Display settings travel with the layout (one layout per display), so they're validated, cached and applied offline like the rest (ADR-0015). All fields are optional; defaults are exported as `SETTINGS_DEFAULTS`.
+
+| Field | Default | Notes |
+|---|---|---|
+| `brightness.day` | 100 | backlight in %, 5–100, while the day theme is shown |
+| `brightness.night` | 30 | backlight in %, 1–100, while the night theme is shown |
+| `startPage` | first page | page id shown at boot; must be a page of this layout (`UNKNOWN_PAGE`) |
+| `autoTheme` | `off` | `sun`: the night theme while `autoThemePath` is `dusk` or `night` (`NIGHT_SUN_STATES`), else the layout's `theme`. Without a value the layout's `theme` stays. |
+| `autoThemePath` | `environment.sun` | set by the derived-data plugin (`dawn`, `sunrise`, `day`, `sunset`, `dusk`, `night`) |
+| `screenTimeout` | 0 | seconds without a touch before the screen turns off, 0–3600; 0 = never. Displays apply at least 10 s. |
+
+Brightness needs a backlight the firmware can dim (`capabilities.backlight` in the hello); other displays ignore it.
+
 ## 3. Validation and error codes
 `validateLayout(input)` returns `{ ok, value?, errors[] }`, with each error `{ pointer, code, message }`. `pointer` is an RFC 6901 JSON Pointer into the input. It works in two stages, and the **firmware mirrors both and logs the same codes**:
 
@@ -164,6 +179,7 @@ Defaults are exported as `AUTOPILOT_DEFAULTS`. The device shows the buttons only
 | `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max` |
 | `INVALID_ZONE` | semantic | zone `from` is not below `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
+| `UNKNOWN_PAGE` | semantic | `settings.startPage` isn't a page of the layout |
 
 **Device-only codes** (firmware parser, never produced by `validateLayout`):
 
@@ -223,6 +239,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
 | `capabilities` | `touch`, `put` (the token allows PUT) |
 | `layoutEtag?` | ETag of the cached layout |
+| `recovery?` | `skippedLayoutEtag`: a layout that crashed the display; refused until a changed one is sent (ADR-0013) |
 
 ## 6. Examples
 See `packages/schema/fixtures/valid/`:
@@ -235,6 +252,7 @@ See `packages/schema/fixtures/valid/`:
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 - `chart-page.json`: a default chart page, an anchor page with every path set, and a grid page.
+- `settings.json`: every display setting, with the second page as start page.
 
 Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
 

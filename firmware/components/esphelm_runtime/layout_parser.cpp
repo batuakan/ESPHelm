@@ -529,6 +529,37 @@ void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
   }
 }
 
+const char *const AUTO_THEMES[] = {"off", "sun"};
+
+void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
+  const std::string sp = "/settings";
+  if (!v.is<JsonObjectConst>()) {
+    chk.add(sp, "INVALID_TYPE");
+    return;
+  }
+  JsonObjectConst obj = v.as<JsonObjectConst>();
+  long long n;
+  if (has(obj, "brightness")) {
+    const std::string bp = sp + "/brightness";
+    if (!obj["brightness"].is<JsonObjectConst>()) {
+      chk.add(bp, "INVALID_TYPE");
+    } else {
+      JsonObjectConst b = obj["brightness"].as<JsonObjectConst>();
+      if (int_field(chk, b, bp, "day", false, 5, 100, n))
+        settings.brightness_day = static_cast<uint8_t>(n);
+      if (int_field(chk, b, bp, "night", false, 1, 100, n))
+        settings.brightness_night = static_cast<uint8_t>(n);
+    }
+  }
+  string_field(chk, obj, sp, "startPage", false, StrKind::ID, settings.start_page);
+  int auto_theme = enum_field(chk, obj, sp, "autoTheme", false, AUTO_THEMES, 2);
+  if (auto_theme >= 0)
+    settings.auto_theme = static_cast<AutoTheme>(auto_theme);
+  string_field(chk, obj, sp, "autoThemePath", false, StrKind::PATH, settings.auto_theme_path);
+  if (int_field(chk, obj, sp, "screenTimeout", false, 0, 3600, n))
+    settings.screen_timeout = static_cast<uint16_t>(n);
+}
+
 void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
   if (!root.is<JsonObjectConst>()) {
     chk.add("", "INVALID_TYPE");
@@ -547,6 +578,8 @@ void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
   int theme = enum_field(chk, obj, "", "theme", true, THEMES, 2);
   if (theme >= 0)
     layout.theme = static_cast<Theme>(theme);
+  if (has(obj, "settings"))
+    check_settings(chk, obj["settings"], layout.settings);
 
   if (!has(obj, "pages")) {
     chk.add("/pages", "MISSING_FIELD");
@@ -632,6 +665,13 @@ void check_semantics(Checker &chk, const Layout &layout) {
         }
       }
     }
+  }
+  if (!layout.settings.start_page.empty()) {
+    bool found = false;
+    for (const Page &page : layout.pages)
+      found = found || page.id == layout.settings.start_page;
+    if (!found)
+      chk.add("/settings/startPage", "UNKNOWN_PAGE");
   }
 }
 

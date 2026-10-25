@@ -1448,6 +1448,61 @@
       },
       "minItems": 1,
       "errorCode": "NO_PAGES"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "brightness": {
+          "type": "object",
+          "properties": {
+            "day": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 100,
+              "description": "Backlight in %, day theme."
+            },
+            "night": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Backlight in %, night theme."
+            }
+          },
+          "additionalProperties": false
+        },
+        "startPage": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "errorCode": "INVALID_ID",
+          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+        },
+        "autoTheme": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "off"
+            },
+            {
+              "type": "string",
+              "const": "sun"
+            }
+          ],
+          "description": "\"sun\": night theme while autoThemePath says dusk or night, else the layout theme."
+        },
+        "autoThemePath": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+          "errorCode": "INVALID_PATH",
+          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+        },
+        "screenTimeout": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "Seconds without a touch before the screen turns off; 0 = never. Displays treat values under 10 as 10."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

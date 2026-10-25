@@ -35,6 +35,7 @@ export const SEMANTIC_CODES = [
   'INVALID_RANGE',
   'INVALID_ZONE',
   'ZONE_OUT_OF_RANGE',
+  'UNKNOWN_PAGE',
 ] as const;
 export type ErrorCode = (typeof STRUCTURAL_CODES)[number] | (typeof SEMANTIC_CODES)[number];
 
@@ -266,6 +267,14 @@ function validateSemantics(layout: Layout): ValidationError[] {
       }
     });
   });
+  const start = layout.settings?.startPage;
+  if (start !== undefined && !layout.pages.some((p) => p.id === start)) {
+    errors.push({
+      pointer: '/settings/startPage',
+      code: 'UNKNOWN_PAGE',
+      message: `start page "${start}" is not a page of this layout`,
+    });
+  }
   return errors;
 }
 

@@ -1,6 +1,7 @@
 import Type from 'typebox';
 import { Id, Label } from './primitives.js';
 import { Page } from './pages.js';
+import { Settings } from './settings.js';
 
 /** Major version of the layout format. Firmware rejects layouts with any other major. */
 export const LAYOUT_VERSION = 1;
@@ -13,6 +14,7 @@ export const Layout = Type.Object(
     name: Type.Optional(Label),
     theme: Type.Union([Type.Literal('day'), Type.Literal('night')]),
     pages: Type.Array(Page, { minItems: 1, errorCode: 'NO_PAGES' }),
+    settings: Type.Optional(Settings),
   },
   {
     additionalProperties: false,
