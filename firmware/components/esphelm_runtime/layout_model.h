@@ -34,7 +34,9 @@ struct DataItem {
 
 /// Wind rose settings (only wind_rose tiles carry them).
 struct RoseConfig {
-  static constexpr int MAX_SLOTS = 3;
+  // center1..3, then the corners topLeft, topRight, bottomLeft, bottomRight
+  static constexpr int MAX_SLOTS = 7;
+  static constexpr int CENTER_SLOTS = 3;
   bool has_slot[MAX_SLOTS]{};
   DataItem slots[MAX_SLOTS];
   std::string apparent_angle{"environment.wind.angleApparent"};

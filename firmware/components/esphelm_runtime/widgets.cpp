@@ -27,12 +27,13 @@ Colors colors_for(esphelm::Theme theme) {
                   lv_color_hex(0xFF3B30), lv_color_hex(0x7A1A12), lv_color_hex(0xE0302A), lv_color_hex(0x8A1E18),
                   lv_color_hex(0x6A2020), lv_color_hex(0x1C0606), lv_color_hex(0x9A2A22)};
   }
-  return Colors{lv_color_hex(0x10161C), lv_color_hex(0x1E2A36), lv_color_hex(0xF2F5F8), lv_color_hex(0x7A8794),
-                lv_color_hex(0x4A9EFF), lv_color_hex(0xF2C14E),
-                {lv_color_hex(0x3DBB74), lv_color_hex(0xF0B04A), lv_color_hex(0xE5484D), lv_color_hex(0xD34DD9)},
-                // The legacy wind page: red port, green starboard, orange A, purple T.
-                lv_color_hex(0xFF0000), lv_color_hex(0x00FF00), lv_color_hex(0xFF8000), lv_color_hex(0xA020F0),
-                lv_color_hex(0xAAAAAA), lv_color_hex(0x2E2E2E), lv_color_hex(0xF2F5F8)};
+  // Day: light, for sunlight. White page, light grey tiles, dark text.
+  return Colors{lv_color_hex(0xFFFFFF), lv_color_hex(0xE6EAEE), lv_color_hex(0x111820), lv_color_hex(0x5D6B78),
+                lv_color_hex(0x0A6CD6), lv_color_hex(0xB07800),
+                {lv_color_hex(0x1D8A4F), lv_color_hex(0xC77700), lv_color_hex(0xD32F2F), lv_color_hex(0x9C27B0)},
+                // The legacy wind page: red port, green starboard, orange A, purple T; a dark card.
+                lv_color_hex(0xFF0000), lv_color_hex(0x00C800), lv_color_hex(0xFF8000), lv_color_hex(0xA020F0),
+                lv_color_hex(0x555555), lv_color_hex(0x2E2E2E), lv_color_hex(0xFFFFFF)};
 }
 
 // ---- Value formatting (same rules as packages/editor/src/format.ts) ----
@@ -963,9 +964,25 @@ class WindRoseWidget : public Widget {
       std::string caption = item.label;
       if (item.unit != nullptr && item.unit->label[0] != '\0')
         caption += caption.empty() ? item.unit->label : std::string(" ") + item.unit->label;
-      s.value = make_label(center_, env.fonts.value, colors_.muted, "--");
-      s.caption = make_label(center_, env.fonts.small, colors_.text, caption);
-      slots_.push_back(std::move(s));
+      if (i < esphelm::RoseConfig::CENTER_SLOTS) {
+        s.value = make_label(center_, env.fonts.value, colors_.muted, "--");
+        s.caption = make_label(center_, env.fonts.small, colors_.text, caption);
+        slots_.push_back(std::move(s));
+        continue;
+      }
+      // Corner: a value over its caption, pushed into the tile's corner.
+      s.corner = i - esphelm::RoseConfig::CENTER_SLOTS;  // 0 TL, 1 TR, 2 BL, 3 BR
+      s.box = lv_obj_create(cell);
+      lv_obj_remove_style_all(s.box);
+      lv_obj_remove_flag(s.box, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_set_size(s.box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+      lv_obj_set_flex_flow(s.box, LV_FLEX_FLOW_COLUMN);
+      const bool right = s.corner % 2 == 1;
+      lv_obj_set_flex_align(s.box, LV_FLEX_ALIGN_START, right ? LV_FLEX_ALIGN_END : LV_FLEX_ALIGN_START,
+                            LV_FLEX_ALIGN_START);
+      s.value = make_label(s.box, env.fonts.label, colors_.muted, "--");
+      s.caption = make_label(s.box, env.fonts.small, colors_.text, caption);
+      corners_.push_back(std::move(s));
     }
   }
 
@@ -977,10 +994,13 @@ class WindRoseWidget : public Widget {
       out.push_back(true_dir_.item.path);
     for (const auto &s : slots_)
       out.push_back(s.b.item.path);
+    for (const auto &s : corners_)
+      out.push_back(s.b.item.path);
   }
 
   void layout_done() override {
     const int32_t d = std::min(lv_obj_get_content_width(area_), lv_obj_get_content_height(area_));
+    layout_corners_(d);
     // Size tiers (esphelm_sizes.h, shared with the editor's size hint).
     full_ = d >= esphelm::sizes::WIND_ROSE_FULL;
     const bool compact = !full_ && d >= esphelm::sizes::WIND_ROSE_COMPACT;
@@ -1066,9 +1086,11 @@ class WindRoseWidget : public Widget {
       if (path == b->item.path)
         b->set(v, now);
     }
-    for (auto &s : slots_) {
-      if (path == s.b.item.path)
-        s.b.set(v, now);
+    for (auto *list : {&slots_, &corners_}) {
+      for (auto &s : *list) {
+        if (path == s.b.item.path)
+          s.b.set(v, now);
+      }
     }
   }
 
@@ -1096,11 +1118,13 @@ class WindRoseWidget : public Widget {
     }
     if (markers)
       lv_obj_invalidate(markers_);
-    for (auto &s : slots_) {
-      if (!s.b.due(now, stale))
-        continue;
-      set_text(s.value, s.shown, stale ? "--" : s.b.text);
-      lv_obj_set_style_text_color(s.value, stale ? colors_.muted : colors_.text, LV_PART_MAIN);
+    for (auto *list : {&slots_, &corners_}) {
+      for (auto &s : *list) {
+        if (!s.b.due(now, stale))
+          continue;
+        set_text(s.value, s.shown, stale ? "--" : s.b.text);
+        lv_obj_set_style_text_color(s.value, stale ? colors_.muted : colors_.text, LV_PART_MAIN);
+      }
     }
   }
 
@@ -1110,7 +1134,48 @@ class WindRoseWidget : public Widget {
     lv_obj_t *value{nullptr};
     lv_obj_t *caption{nullptr};
     std::string shown{"--"};
+    int corner{-1};          // corner slots: 0 top left, 1 top right, 2 bottom left, 3 bottom right
+    lv_obj_t *box{nullptr};  // corner slots: the value and caption container
   };
+
+  /// Corner values sit outside the ring, in the tile's corners. Each shows only in the full tier
+  /// and when its box (value in the label or small font, over its caption) clears the ring.
+  void layout_corners_(int32_t d) {
+    if (corners_.empty())
+      return;
+    const int32_t w = lv_obj_get_content_width(area_), h = lv_obj_get_content_height(area_);
+    const double r = d / 2.0 + 2;
+    const bool full = d >= esphelm::sizes::WIND_ROSE_FULL;
+    const int32_t small_h = lv_font_get_line_height(fonts_.small);
+    for (auto &s : corners_) {
+      lv_obj_update_layout(s.caption);
+      const int32_t caption_w = lv_obj_get_width(s.caption);
+      bool shown = false;
+      for (const lv_font_t *f : {fonts_.label, fonts_.small}) {
+        const int32_t fh = lv_font_get_line_height(f);
+        const int32_t bw = std::max<int32_t>(fh * 12 / 5, caption_w);  // "12.5" or the caption
+        const int32_t bh = fh + small_h;
+        // The box's inner corner, relative to the rose's centre, must be outside the ring.
+        const double x = w / 2.0 - bw, y = h / 2.0 - bh;
+        if (full && x >= 0 && y >= 0 && std::hypot(x, y) >= r) {
+          lv_obj_set_style_text_font(s.value, f, LV_PART_MAIN);
+          shown = true;
+          break;
+        }
+      }
+      if (!shown) {
+        lv_obj_add_flag(s.box, LV_OBJ_FLAG_HIDDEN);
+        continue;
+      }
+      lv_obj_remove_flag(s.box, LV_OBJ_FLAG_HIDDEN);
+      static const lv_align_t ALIGN[] = {LV_ALIGN_TOP_LEFT, LV_ALIGN_TOP_RIGHT, LV_ALIGN_BOTTOM_LEFT,
+                                         LV_ALIGN_BOTTOM_RIGHT};
+      lv_obj_align(s.box, ALIGN[s.corner], 0, 0);
+      const lv_text_align_t ta = s.corner % 2 == 1 ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_LEFT;
+      lv_obj_set_style_text_align(s.value, ta, LV_PART_MAIN);
+      lv_obj_set_style_text_align(s.caption, ta, LV_PART_MAIN);
+    }
+  }
 
   /// A triangle on the ring pointing at the centre, at `deg` clockwise from the bow, with a letter.
   void draw_marker_(lv_layer_t *layer, const lv_area_t &box, double deg, lv_color_t color, const char *letter) {
@@ -1171,7 +1236,8 @@ class WindRoseWidget : public Widget {
   std::string heading_shown_;
   bool full_{false};
   int32_t marker_{12}, ring_r_{0};
-  std::vector<Slot> slots_;
+  std::vector<Slot> slots_;    // the centre stack
+  std::vector<Slot> corners_;  // corner values
 };
 
 // ---- factories ----

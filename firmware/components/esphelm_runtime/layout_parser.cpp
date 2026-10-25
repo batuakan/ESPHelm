@@ -245,7 +245,8 @@ void data_item_fields(Checker &chk, JsonObjectConst obj, const std::string &ptr,
 const char *const ZONE_STATES[] = {"normal", "warn", "alarm", "emergency"};
 const char *const ORIENTATIONS[] = {"horizontal", "vertical"};
 const char *const THEMES[] = {"day", "night"};
-const char *const SLOT_NAMES[RoseConfig::MAX_SLOTS] = {"center1", "center2", "center3"};
+const char *const SLOT_NAMES[RoseConfig::MAX_SLOTS] = {"center1",  "center2",  "center3",   "topLeft",
+                                                       "topRight", "bottomLeft", "bottomRight"};
 
 void check_wind_rose(Checker &chk, JsonObjectConst obj, const std::string &ptr, RoseConfig &rose) {
   if (has(obj, "config")) {
