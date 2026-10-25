@@ -32,7 +32,7 @@ Layout
 ├─ theme: "day" | "night"
 └─ pages: Page[]            (at least 1)
 
-Page = GridPage                       (discriminator: kind; the only kind in v1)
+Page = GridPage | ChartPage           (discriminator: kind)
 
 GridPage                              kind: "grid"
 ├─ id: Id, title?: Label
@@ -41,6 +41,13 @@ GridPage                              kind: "grid"
 
 Tile = value | gauge | bar | switch | wind_rose | autopilot   (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
+
+ChartPage                             kind: "chart"   (Phase 5d, ADR-0012)
+├─ id: Id, title?: Label
+├─ chart: ChartId            SignalK chart identifier ([A-Za-z0-9][A-Za-z0-9._-]*)
+├─ zoom?: 1..20              default 15
+├─ anchor?: boolean          default true (anchor watch overlay)
+└─ config?: { positionPath?, headingPath?, anchorPositionPath?, anchorRadiusPath?, anchorAlarmPath? }
 
 A full-screen wind rose is a 1x1 grid page with one wind_rose tile.
 ```
@@ -99,6 +106,21 @@ An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_D
 | pointers | < 150 px | ring, sectors and pointers only |
 
 The editor shows the expected tier for the selected display.
+
+### Chart pages
+A full-page map (ADR-0012): tiles of a SignalK chart centred on the vessel, north up, with the vessel, and the anchor position, alarm radius and alarm when `anchor` is on. Only displays with PSRAM render it; they list `chart` in `hello.widgets` (page kinds other than grid count as widget names), so the plugin refuses chart layouts for others. Defaults are exported as `CHART_DEFAULTS`:
+
+| Field | Default |
+|---|---|
+| `zoom` | 15 |
+| `anchor` | true |
+| `config.positionPath` | `navigation.position` |
+| `config.headingPath` | `navigation.headingTrue` |
+| `config.anchorPositionPath` | `navigation.anchor.position` (null when the anchor is up) |
+| `config.anchorRadiusPath` | `navigation.anchor.maxRadius` (metres) |
+| `config.anchorAlarmPath` | `notifications.navigation.anchor` (alarm when `state` is not `normal`/`nominal`) |
+
+A bad or missing `chart` is `INVALID_ID` / `MISSING_FIELD` at `/pages/i/chart`; `zoom` outside 1–20 is `OUT_OF_RANGE`.
 
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
@@ -212,6 +234,7 @@ See `packages/schema/fixtures/valid/`:
 - `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
+- `chart-page.json`: a default chart page, an anchor page with every path set, and a grid page.
 
 Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
 

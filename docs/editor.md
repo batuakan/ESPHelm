@@ -32,8 +32,13 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
    - a **size hint**: *course and mode buttons*, or *status only* when the tile is too small for safe controls
 
    The editor never commands the autopilot. On the display, engaging takes a second, confirming tap, STANDBY is one tap, and the course buttons work only while engaged (ADR-0011).
-7. **Problems** under the canvas list everything the display would reject (same validator as the plugin and firmware), on every page. Clicking one opens its page and selects its tile or slot. **Save & send** stays disabled until there are none.
-8. **Save & send** stores the layout, assigns it to the display, and the display picks it up within seconds through its version subscription. No reboot. Warnings, e.g. a layout larger than the display's reported capacity, are shown after sending.
+7. **Chart pages:** **+ → Chart page** (only for displays with PSRAM, which list `chart`). Tap the map for its settings:
+   - **Chart:** the charts of your SignalK charts plugin; vector or other non-raster charts are listed but can't be picked.
+   - **Zoom** (1–20, default 15), **anchor watch** on/off, and the **SignalK paths** (position, heading, anchor position, radius, alarm; empty means the standard paths).
+
+   The preview draws the chart's own tiles at the live position and zoom, with the vessel, the anchor radius and the alarm, in the display theme (red-tinted at night like the display). Until a chart is picked, the problems list says "choose a chart".
+8. **Problems** under the canvas list everything the display would reject (same validator as the plugin and firmware), on every page. Clicking one opens its page and selects its tile or slot. **Save & send** stays disabled until there are none.
+9. **Save & send** stores the layout, assigns it to the display, and the display picks it up within seconds through its version subscription. No reboot. Warnings, e.g. a layout larger than the display's reported capacity, are shown after sending.
 
 **Two different themes:**
 - **Display theme** (*Display: Day / Night* above the canvas) is part of the layout. The display draws with it after *Save & send*, and the preview shows the same palette. New layouts start at Night; starter layouts bring their own.
@@ -52,6 +57,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
     - a wind page from a template with a slot changed to depth (live pointer and value, size hint "full"), a new grid page with a gauge, a zone and a rose tile next to it, moving the wind page to the front, and that the display downloads the three pages in that order
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template
     - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
+    - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, and the display downloads the page
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer
 
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.

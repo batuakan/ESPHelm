@@ -51,6 +51,22 @@ Body: a `Hello` (`packages/schema`, `docs/layout-schema.md` §5). First contact 
 
 The ETag is the first 16 hex characters of the SHA-256 of the exact bytes served, so it changes exactly when the layout bytes do.
 
+### `GET /signalk/v1/api/esphelm/tiles/:chart/:z/:x/:y`
+A chart tile for chart pages (ADR-0012). Needs a device token like the other device routes.
+
+The plugin looks `:chart` up in the SignalK resources API, fetches its tile from the chart's `tilemapUrl` (relative URLs on this server over HTTP, port as signalk-server works it out: `PORT`, else `settings.port`, else 3000), forwarding the request's `Authorization`, and decodes it (PNG with pngjs, JPEG with jpeg-js).
+
+| Status | Meaning |
+|---|---|
+| 200 | 131,072 bytes `application/octet-stream`: 256×256 RGB565 little-endian, row by row; `ETag`, `Cache-Control: max-age=3600` |
+| 304 | `If-None-Match` matches |
+| 400 | `BAD_TILE`: z/x/y not a tile |
+| 404 | `UNKNOWN_CHART`, or `NO_TILE` (the chart has none there) |
+| 415 | `UNSUPPORTED_CHART`: not a raster PNG/JPEG chart with a tile URL (e.g. `pbf`, `webp`) |
+| 502 | `CHART_SERVER`, `BAD_TILE_IMAGE`, `BAD_TILE_SIZE` (tiles must be 256×256) |
+
+Converted tiles are kept in a 64-tile LRU (about 8 MB).
+
 ### Change notification
 On every change that alters what a device would download (layout saved with different bytes, assignment changed, adopted or un-adopted, device deleted), and once for every device on plugin start, the plugin emits:
 
@@ -67,6 +83,7 @@ The device subscribes to that path over its existing SignalK WebSocket. The serv
 | Method and path | Body | Result |
 |---|---|---|
 | `GET /plugins/esphelm/api/widgets` | | `{ tiles, tileSlots: { wind_rose: [slot names] }, units, quantities }` |
+| `GET /plugins/esphelm/api/charts` | | `[{ identifier, name, format, tilemapUrl?, bounds?, supported }]` from the resources API; `supported` = raster PNG/JPEG with a tile URL |
 | `GET /plugins/esphelm/api/paths` | | `[{ path, units, description, value, timestamp }]`: the server's self paths (`streambundle.getAvailablePaths()`), SignalK `meta.units`/description (`getMetadata`), and the latest value (`getSelfPath`), for the editor's path picker |
 | `GET /plugins/esphelm/api/layouts` | | `[{ id, name, pages, bytes, etag, devices }]` |
 | `GET /plugins/esphelm/api/layouts/:id` | | the layout (`ETag` header) |

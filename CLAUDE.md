@@ -117,7 +117,8 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 ## 7. Widget catalog
 
 Rendered by the firmware: tiles `value`, `gauge`, `bar`, `switch`, `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers) and `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
-Later: a full-page `chart_anchor` (ESPTiles, 5d); maybe `compass` and `graph`; possibly a plugin bridge to SignalK's v2 Autopilot API.
+Page kinds: `grid` and `chart` (5d, ADR-0012: SignalK chart tiles converted to RGB565 by the plugin, vessel and anchor watch, north up, PSRAM displays only).
+Later: maybe `compass` and `graph`; possibly a plugin bridge to SignalK's v2 Autopilot API; chart tiles cached on flash.
 Weather/clock currently come from HomeAssistant; their future source is an open question (see section 11).
 
 ## 8. Verification (you must be able to check your own work)
@@ -130,7 +131,7 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 - Dev SignalK: `PORT=3999 signalk-server -c <scratch-dir> --sample-nmea0183-data [--securityenabled]`. **Never run it without `-c`**: that uses the real `~/.signalk`.
 - TS packages (npm workspaces, from the repo root): `npm ci`, `npm run generate` (units TS/C++ + JSON Schemas; output is committed), `npm test` (includes a g++-built C++ units test), `npm run typecheck`, `npm run lint`, `npm run build`.
 - Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (symlink to `../legacy/secrets.yaml`). Reference: `docs/firmware-runtime.md`.
-- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 22 golden screenshots in `firmware/test/golden/`, including the autopilot flow against a stand-in plugin and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
+- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 27 golden screenshots in `firmware/test/golden/`, including the autopilot flow and a chart page against stand-in plugins and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
 - ESPHomeSignalK unit tests: `../ESPHomeSignalK/tools/test_cpp.sh`.
 - Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
@@ -188,5 +189,5 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - [ ] **Phase 5a:** gauge/bar/switch tiles, wind-rose page, multi-page with a footer (no swipe, ADR-0009), editor support, starter layouts (wind, speeds, energy, engine, switchboard). Done on SDL, pending your review and the P4 hardware check (`docs/phase5a-notes.md`)
 - [ ] **Phase 5b:** wind rose becomes a tile (page kind removed, pixel size tiers, 720 templates and SDL 720 check). Done on SDL, pending your review and the P4 hardware check (`docs/phase5b-notes.md`)
 - [ ] **Phase 5c:** autopilot tile (confirm to engage, ADR-0011). Done on SDL against a stand-in, pending your review and the hardware check (`docs/phase5c-notes.md`)
-- [ ] **Phase 5d:** chart/anchor page (ESPTiles)
+- [ ] **Phase 5d:** chart page with anchor watch (ADR-0012). Done on SDL against a charts stand-in, pending your review and the P4 hardware check (`docs/phase5d-notes.md`)
 - [ ] **Phase 6:** Hardening: orientation/resolution scaling (multi-page moved to 5a; swipe dropped for footer buttons), auth, size limits, last-known-good fallback, night mode, alarms, device settings

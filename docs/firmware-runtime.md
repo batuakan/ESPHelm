@@ -2,7 +2,7 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
-**Scope (Phase 5c):** every page of the layout, with `value`, `gauge`, `bar`, `switch`, `wind_rose` and `autopilot` tiles. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else (chart/anchor comes in Phase 5d).
+**Scope (Phase 5d):** every page of the layout: grid pages with `value`, `gauge`, `bar`, `switch`, `wind_rose` and `autopilot` tiles, and `chart` pages (PSRAM only). `hello.widgets` lists exactly these (`chart` only with PSRAM), so the plugin refuses to assign a layout that needs anything else.
 
 ## Configuration
 
@@ -103,6 +103,17 @@ Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy
 - **Size:** below `AUTOPILOT_FIT` (260×220 px of content) the tile shows status only, with no buttons. In narrow tiles TGT and HDG stack; in tiny ones HDG is dropped.
 - Disabled buttons use the theme's dark colours (LVGL's grey recolour is turned off; this applies to the footer buttons too).
 
+**Chart pages** (`chart.cpp`, ADR-0012; grid and maths ported from ESPTiles, MIT):
+- **Buffer:** a 1280×1280 RGB565 image (5×5 tiles of 256 px, 3,276,800 bytes) is allocated in PSRAM when the page is built and freed when it goes away. Without PSRAM, or if the allocation fails, the page shows a message instead.
+- **Tiles:** fetched from `GET …/esphelm/tiles/<chart>/<z>/<x>/<y>` on a second HTTP worker (so they never delay hellos and layout fetches), one at a time, nearest to the vessel first, and copied into the buffer on the main loop.
+  - A body must be exactly 131,072 bytes; anything else is dropped.
+  - 404 tiles stay blank; other failures are retried after 30 s.
+  - When the vessel crosses into another tile, the grid moves the tiles it keeps inside the buffer and fetches the rest; a zoom change starts over.
+- **View:** north up, with the vessel's position in the middle. The overlay is drawn: a vessel arrow along the heading, the anchor marker and the alarm radius (metres → pixels at the latitude and zoom), and an ANCHOR ALARM banner when the anchor notification's `state` isn't `normal`/`nominal`.
+- **Controls:** zoom + / − buttons (applied in the next tick), and a bottom label "lat lon z" that adds "position stale" when the position is older than the stale time.
+- **Night:** the chart image is darkened and tinted red.
+- **Offline:** tiles already in the buffer stay; nothing is stored on flash, so a reboot without the server shows placeholders.
+
 The PUT goes through ESPHomeSignalK `put_request`; signalk-server answers it only if a provider handles that path (e.g. a digital-switching plugin). The firmware does not read the PUT response, it trusts the value stream.
 
 **Value formatting:**
@@ -142,10 +153,11 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `gauge`, `bar` tiles | ≈2–2.7 KB each (energy page: gauge + bar + value = 6,416 B; engine page: 2 gauges + bar = 6,544 B) |
 | `wind_rose` tile | ≈6.7–6.9 KB in full (full screen: 6,720 B at 720, 6,864 B at 480); 720 page with a 2x2 rose and five tiles: 23,936 B |
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
+| `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 94,676 B (16.4 %), flash 2.66 MB (16.1 %) |
-| C3 compile check, static | RAM 108,688 B of 321,296 B (33.8 %), flash 1.23 MB of 1.8 MB (67.0 %) |
+| P4 runtime firmware, static | RAM 94,924 B (16.5 %), flash 2.68 MB (16.2 %) |
+| C3 compile check, static | RAM 108,944 B of 321,296 B (33.9 %), flash 1.25 MB of 1.8 MB (68.1 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -173,8 +185,14 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
       - an armed WIND expires after 3 s without sending
       - STANDBY is one tap
       - offline, even STANDBY is refused
+  14. **a chart page**, with the charts stand-in from `startSignalK({ chartSim: true })` (generated PNG tiles):
+      - tiles through the plugin, the anchor and its radius
+      - recentring after a 350 m move
+      - zoom in through the hook (`esphelm_tap_request chart zoom_in`)
+      - the anchor alarm
+      - a page whose chart the server doesn't have
 
-  Twenty-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Twenty-seven screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -193,3 +211,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - +10 moves the pilot's target 10° to starboard. STANDBY disengages on one tap.
     - Check that the buttons are easy to hit and that you can't engage by brushing the screen.
     - If your pilot only implements SignalK's v2 Autopilot API, nothing will respond (no bridge yet); say so and I'll add it.
+11. **Chart** (needs a SignalK charts plugin with a raster PNG/JPEG chart, e.g. MBTiles). Add a chart page in the editor, pick the chart, and Save & send.
+    - Tiles appear around the vessel within a few seconds, and the vessel arrow points along the heading.
+    - Zoom + / − refetch the map. Moving (or a changing position) recentres it without blank flashes for tiles that stay in view.
+    - With the anchor alarm plugin: the anchor and the circle match its radius, and the circle and banner turn red when it alarms.
+    - Check the log for "Chart …" warnings, and how long a full screen of tiles takes.
