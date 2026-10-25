@@ -39,7 +39,7 @@ GridPage                              kind: "grid"
 ├─ grid: { cols ≥ 1, rows ≥ 1 }
 └─ tiles: Tile[]            (at least 1)
 
-Tile = value | gauge | bar | switch | wind_rose   (discriminator: type)
+Tile = value | gauge | bar | switch | wind_rose | autopilot   (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
 
 A full-screen wind rose is a 1x1 grid page with one wind_rose tile.
@@ -77,6 +77,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
 | `wind_rose` | `config?`, `slots` | see below |
+| `autopilot` | `label?`, `modes?`, `config?` | see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
@@ -98,6 +99,20 @@ An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_D
 | pointers | < 150 px | ring, sectors and pointers only |
 
 The editor shows the expected tier for the selected display.
+
+### Autopilot tiles
+Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
+
+| Field | Notes |
+|---|---|
+| `label` | optional caption |
+| `modes` | unique, from `auto`, `wind`, `route` (shown as AUTO, WIND, TRACK), in button order; default all three. STANDBY is always offered. A duplicate or unknown entry gives `INVALID_VALUE` (at `/modes` or at the entry). |
+| `config.statePath` | default `steering.autopilot.state` (string; the mode buttons PUT their mode here, STANDBY puts `standby`) |
+| `config.targetPath` | default `steering.autopilot.target` (radians, shown in degrees) |
+| `config.adjustPath` | default `steering.autopilot.actions.adjustHeading` (PUT ±1 / ±10, degrees) |
+| `config.headingPath` | default `navigation.headingMagnetic` (shown as HDG) |
+
+Defaults are exported as `AUTOPILOT_DEFAULTS`. The device shows the buttons only when the tile's content box is at least `AUTOPILOT_FIT` (260×220 px, generated into `esphelm_sizes.h`); smaller tiles show status only.
 
 ## 3. Validation and error codes
 `validateLayout(input)` returns `{ ok, value?, errors[] }`, with each error `{ pointer, code, message }`. `pointer` is an RFC 6901 JSON Pointer into the input. It works in two stages, and the **firmware mirrors both and logs the same codes**:
@@ -196,6 +211,7 @@ See `packages/schema/fixtures/valid/`:
 - `legacy-port.json`: today's wind, grid, energy and engine apps, using their real SignalK paths.
 - `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
+- `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 
 Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
 

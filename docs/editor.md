@@ -7,7 +7,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 2. **Displays** (left column, or the drop-down on a phone): every display that has said hello. A new one is *pending*: press **Adopt**. A display only appears after its own SignalK access request was approved with read/write permission (*Security → Access Requests*).
 3. **Pages.** Each display has one layout, created on the first save. The tabs above the canvas are its pages, in the order the display shows them (its footer buttons step through them; the canvas shows a preview of that footer when there are several pages):
    - **+** adds a **grid page**, a **wind rose page** (a 1x1 grid with one wind rose tile filling the screen), or one page from a starter layout, after the current page.
-   - **Templates** replaces *all* pages (and the theme) with a starter layout: Wind, Speeds, Energy, Engine, Switchboard, or the denser *Sailing* and *Wind and engine* layouts for large displays (listed first when the display's shorter side is at least 600 px). It asks first.
+   - **Templates** replaces *all* pages (and the theme) with a starter layout: Wind, Speeds, Energy, Engine, Switchboard, Autopilot, or the denser *Sailing*, *Wind and engine* and *Helm* (rose and autopilot side by side) layouts for large displays (listed first when the display's shorter side is at least 600 px). It asks first.
    - The current page's **title** (shown in the display's footer), **← →** to reorder, **Delete** (asks first; the last page can't be deleted).
    - Pages or templates that need widgets this display's firmware lacks are struck through or disabled.
 4. **Edit a grid page:**
@@ -25,8 +25,15 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
    - Tap one of the three **centre slots** on the rose, or open it in the drawer, to choose what it shows; a slot has the same settings as a value tile.
    - *Wind and heading sources*: apparent wind angle, true wind direction, heading (empty means the standard SignalK path), and the true-wind pointer.
    - **Size hint:** the drawer says how large the rose will be on the selected display and what it will draw: *full* (tick labels, heading, centre values), *compact* (no tick labels or heading; as many centre values as fit) or *pointers only*. The preview follows the same tiers. The display decides from the cell it really gets, and the number of centre values that fit in a compact rose depends on its fonts, so the hint is a guide.
-6. **Problems** under the canvas list everything the display would reject (same validator as the plugin and firmware), on every page. Clicking one opens its page and selects its tile or slot. **Save & send** stays disabled until there are none.
-7. **Save & send** stores the layout, assigns it to the display, and the display picks it up within seconds through its version subscription. No reboot. Warnings, e.g. a layout larger than the display's reported capacity, are shown after sending.
+6. **Autopilot tiles:** add one from *Tiles* (2x2 where it fits) or with **+ → Autopilot page**. The preview shows the live state, target and heading, and draws the buttons only when the display will show them. The drawer has:
+   - **Modes it can engage** (AUTO, WIND, TRACK; STANDBY is always there)
+   - **Label**
+   - **Autopilot paths** (state, target, course adjustment, heading; empty means the classic `steering.autopilot.*` defaults)
+   - a **size hint**: *course and mode buttons*, or *status only* when the tile is too small for safe controls
+
+   The editor never commands the autopilot. On the display, engaging takes a second, confirming tap, STANDBY is one tap, and the course buttons work only while engaged (ADR-0011).
+7. **Problems** under the canvas list everything the display would reject (same validator as the plugin and firmware), on every page. Clicking one opens its page and selects its tile or slot. **Save & send** stays disabled until there are none.
+8. **Save & send** stores the layout, assigns it to the display, and the display picks it up within seconds through its version subscription. No reboot. Warnings, e.g. a layout larger than the display's reported capacity, are shown after sending.
 
 **Themes:** *Day*, *Dark* and *Night* (red on black, for the cockpit at night), remembered per browser. The default follows the system setting.
 
@@ -42,6 +49,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
     - Save & send, and that the display downloads exactly that layout and is notified
     - a wind page from a template with a slot changed to depth (live pointer and value, size hint "full"), a new grid page with a gauge, a zone and a rose tile next to it, moving the wind page to the front, and that the display downloads the three pages in that order
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template
+    - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer
 
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.
