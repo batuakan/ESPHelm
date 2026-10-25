@@ -121,6 +121,13 @@ async function main(): Promise<void> {
       { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 30 * 60 * 1000 },
     );
   }
+  // Never let a test build talk to a real SignalK server (e.g. the default :3000): check that
+  // the compiled code really uses the test port before starting any firmware.
+  for (const name of ['esphelm-sdl', 'esphelm-sdl-720']) {
+    const main = readFileSync(join(FIRMWARE, `.esphome/build/${name}/src/main.cpp`), 'utf8');
+    if (!main.includes(`set_port(${PORT});`) || !main.includes('set_host("127.0.0.1");'))
+      throw new Error(`${name} was not built for 127.0.0.1:${PORT}; refusing to run it`);
+  }
 
   const work = mkdtempSync(join(tmpdir(), 'esphelm-fw-'));
   const shots = join(work, 'shots');
