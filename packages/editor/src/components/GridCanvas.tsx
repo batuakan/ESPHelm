@@ -2,9 +2,9 @@
 // handle mouse and touch alike: drag a tile to move it, drag its corner to resize it, drag a
 // tile type from the library onto a free cell. Placement rules live in layoutOps.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { UNITS, type GridPage, type Tile, type TileType, type UnitId } from '@esphelm/schema';
+import type { GridPage, Tile, TileType } from '@esphelm/schema';
 import { fits, type Rect } from '../layoutOps';
-import { formatValue } from '../format';
+import { TilePreview } from './Previews';
 
 export interface NewTileDrag {
   type: TileType;
@@ -18,6 +18,7 @@ interface Props {
   values: Map<string, unknown>;
   selectedId: string | undefined;
   problemTileIds: Set<string>;
+  supported: Set<string>;
   newTileDrag: NewTileDrag | null;
   onSelect(id: string | undefined): void;
   onMove(id: string, x: number, y: number): void;
@@ -140,15 +141,13 @@ export function GridCanvas(props: Props) {
         data-testid="grid"
       >
         {page.tiles.map((tile) => {
-          const unit = 'unit' in tile ? (tile.unit as UnitId | undefined) : undefined;
-          const decimals = 'decimals' in tile ? (tile.decimals as number | undefined) : undefined;
-          const value = tile.path ? formatValue(values.get(tile.path), unit, decimals) : '--';
           const classes = [
             'tile',
             tile.id === selectedId ? 'selected' : '',
             problemTileIds.has(tile.id) ? 'problem' : '',
             gesture?.id === tile.id && preview ? 'dragging' : '',
-            tile.type !== 'value' ? 'unsupported' : '',
+            props.supported.has(tile.type) ? '' : 'unsupported',
+            `tile-${tile.type}`,
           ];
           return (
             <div
@@ -163,8 +162,7 @@ export function GridCanvas(props: Props) {
               data-testid={`tile-${tile.id}`}
             >
               <span className="tile-label">{tile.label || (tile.path ? '' : 'Pick a path')}</span>
-              <span className="tile-value">{tile.type === 'value' ? value : tile.type}</span>
-              <span className="tile-unit">{unit ? UNITS[unit].label : ''}</span>
+              <TilePreview tile={tile} value={tile.path ? values.get(tile.path) : undefined} />
               <span
                 className="resize-handle"
                 aria-label="Resize"

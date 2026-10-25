@@ -27,7 +27,8 @@ function fakeServer(devices: Device[]) {
     requests.push({ method, path, body });
     if (path === '/devices') return json(devices);
     if (path === '/paths') return json(paths);
-    if (path === '/widgets') return json({ tiles: ['value', 'gauge', 'bar', 'switch'], pageWidgets: {}, units: {} });
+    if (path === '/widgets')
+      return json({ tiles: ['value', 'gauge', 'bar', 'switch'], pageWidgets: { wind_rose: { slots: [] } }, units: {} });
     const dev = /^\/devices\/(.+)$/.exec(path);
     if (dev && method === 'PUT') {
       const d = devices.find((x) => x.id === decodeURIComponent(dev[1] ?? ''))!;
@@ -144,6 +145,91 @@ describe('editor', () => {
       path: `/devices/${p4.deviceId}`,
       body: { layoutId },
     });
+  });
+
+  it('adds a wind-rose page, fills a slot and saves both pages', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wind rose page' }));
+    expect(screen.getByRole('tab', { selected: true }).textContent).toMatch(/Wind/);
+    // The footer preview appears once there are two pages.
+    expect(screen.getByLabelText('Display footer').textContent).toMatch(/Wind 2\/2/);
+    // The rose subscribes to its default source paths.
+    expect(live.paths()).toEqual([
+      'environment.wind.angleApparent',
+      'environment.wind.directionTrue',
+      'navigation.headingTrue',
+    ]);
+
+    fireEvent.click(screen.getByTestId('slot-center1'));
+    const drawer = screen.getByRole('complementary', { name: 'Slot settings' });
+    fireEvent.change(within(drawer).getByLabelText('Search SignalK paths'), { target: { value: 'depth' } });
+    fireEvent.click(within(drawer).getByRole('option', { name: /belowTransducer/ }));
+    fireEvent.change(within(drawer).getByLabelText('Label'), { target: { value: 'Depth' } });
+    live.emit('environment.depth.belowTransducer', 4.25);
+    within(screen.getByTestId('slot-center1')).getByText('4.3');
+    within(screen.getByTestId('slot-center1')).getByText('Depth m');
+
+    // Rename and reorder: the rose becomes the first page.
+    fireEvent.change(screen.getByLabelText('Page title'), { target: { value: 'Sailing' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Move page left' }));
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Sailing · rose', 'Main']);
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    const saved = server.layouts.get(`display-${p4.deviceId}`)!;
+    expect(saved.pages.map((p) => [p.kind, p.id, p.title])).toEqual([
+      ['widget', 'wind-1', 'Sailing'],
+      ['grid', 'main', 'Main'],
+    ]);
+    expect(saved.pages[0]).toMatchObject({
+      slots: { center1: { path: 'environment.depth.belowTransducer', unit: 'm', label: 'Depth' } },
+    });
+  });
+
+  it('edits gauge range and zones and flags a zone outside the range', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /Gauge/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    fireEvent.change(screen.getByLabelText('Maximum'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add zone' }));
+    expect((screen.getByLabelText('Zone 1 from') as HTMLInputElement).value).toBe('9.6');
+    expect((screen.getByLabelText('Zone 1 state') as HTMLSelectElement).value).toBe('alarm');
+    await screen.findByText('No problems');
+    fireEvent.change(screen.getByLabelText('Zone 1 to'), { target: { value: '20' } });
+    await screen.findByText(/tile-1: a zone lies outside min..max/);
+    fireEvent.change(screen.getByLabelText('Zone 1 to'), { target: { value: '12' } });
+    await screen.findByText('No problems');
+    live.emit('navigation.speedOverGround', 5.0);
+    within(screen.getByTestId('tile-tile-1')).getByText(/9.7 kn/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [{ type: 'gauge', min: 0, max: 12, zones: [{ from: 9.6, to: 12, state: 'alarm' }] }],
+    });
+  });
+
+  it('starts from a template after confirming', async () => {
+    const server = fakeServer([device('adopted')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Engine' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace' }));
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Engine']);
+    await screen.findByText('No problems');
+    expect(within(screen.getByTestId('grid')).getAllByText(/RPM|Coolant|Oil/)).toHaveLength(3);
   });
 
   it('greys out tile types the display cannot render', async () => {

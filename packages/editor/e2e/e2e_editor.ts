@@ -192,6 +192,90 @@ async function main(): Promise<void> {
       5000,
     );
     check('the display is notified with the new version', gotVersion, String(etag));
+    // Pages: a wind-rose page from a template (slots prefilled), a new grid page with a gauge
+    // and a zone; then the rose moves to the front. Save & send delivers all three.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Wind page' }).click();
+    await page.getByTestId('slot-center3').click();
+    const slotDrawer = page.getByRole('complementary', { name: 'Slot settings' });
+    await slotDrawer.getByRole('button', { name: /SignalK path:/ }).click();
+    await slotDrawer.getByLabel('Search SignalK paths').fill('belowTransducer');
+    await slotDrawer.getByRole('option', { name: /environment\.depth\.belowTransducer/ }).click();
+    await slotDrawer.getByLabel('Label').fill('Depth');
+    let roseLive = false;
+    for (let i = 0; i < 40 && !roseLive; i++) {
+      roseLive =
+        (await page.locator('.pointer.apparent').count()) > 0 &&
+        /^\d+\.\d$/.test(
+          (await page.getByTestId('slot-center3').locator('.slot-value').textContent()) ?? '',
+        );
+      if (!roseLive) await page.waitForTimeout(250);
+    }
+    check('wind-rose page shows the live apparent wind and slot values', roseLive);
+    await shot(page, '04-desktop-night-wind-rose');
+
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page' }).click();
+    await page.getByLabel('Page title').fill('Gauges');
+    await page
+      .getByRole('region', { name: 'Tiles' })
+      .getByRole('button', { name: /Gauge/ })
+      .click();
+    await page.getByLabel('Search SignalK paths').fill('speedOverGround');
+    await page.getByRole('option', { name: /navigation\.speedOverGround/ }).click();
+    await page.getByLabel('Label').fill('SOG');
+    await page.getByLabel('Maximum').fill('12');
+    await page.getByRole('button', { name: 'Add zone' }).click();
+    await page.getByLabel('Zone 1 state').selectOption('warn');
+    await page.getByText('No problems').waitFor();
+    await shot(page, '05-desktop-night-gauge-zones');
+
+    await page.getByRole('tab', { name: /Wind/ }).click();
+    await page.getByRole('button', { name: 'Move page left' }).click();
+    const tabs = await page.getByRole('tab').allTextContents();
+    check('pages can be reordered', tabs.join('|') === 'Wind · rose|Main|Gauges', tabs.join('|'));
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
+    const multi = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const pages = (multi.body.pages ?? []) as Record<string, unknown>[];
+    const gauge = (pages[2]?.tiles as Record<string, unknown>[] | undefined)?.[0];
+    check(
+      'the display gets the three pages in the edited order',
+      JSON.stringify(pages.map((p) => [p.kind, p.title])) ===
+        JSON.stringify([
+          ['widget', 'Wind'],
+          ['grid', 'Main'],
+          ['grid', 'Gauges'],
+        ]) &&
+        JSON.stringify((pages[0]?.slots as Record<string, unknown>)?.center3) ===
+          JSON.stringify({
+            path: 'environment.depth.belowTransducer',
+            unit: 'm',
+            decimals: 1,
+            label: 'Depth',
+          }) &&
+        JSON.stringify(gauge) ===
+          JSON.stringify({
+            type: 'gauge',
+            id: 'tile-3',
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            path: 'navigation.speedOverGround',
+            min: 0,
+            max: 12,
+            unit: 'kn',
+            label: 'SOG',
+            zones: [{ from: 9.6, to: 12, state: 'warn' }],
+          }),
+      JSON.stringify(pages),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,
@@ -207,6 +291,8 @@ async function main(): Promise<void> {
     await phone.addCookies([{ name: 'JAUTHENTICATION', value: sk.admin, url: sk.base }]);
     const mobile = await phone.newPage();
     await mobile.goto(editorUrl);
+    await mobile.getByTestId('wind-rose').waitFor();
+    await mobile.getByRole('tab', { name: 'Main' }).tap();
     await mobile.getByTestId('tile-tile-1').waitFor();
     await mobile.getByRole('button', { name: 'dark theme' }).click();
     await mobile.getByTestId('tile-tile-1').tap();
@@ -214,6 +300,13 @@ async function main(): Promise<void> {
     await mobile.waitForTimeout(500);
     await shot(mobile, '03-phone-dark-drawer');
     check('phone layout opens the tile drawer', true);
+    await mobile.getByRole('button', { name: 'Close settings' }).tap();
+    await mobile.getByRole('tab', { name: /Wind/ }).tap();
+    await mobile.getByTestId('slot-center1').tap();
+    await mobile.getByRole('complementary', { name: 'Slot settings' }).waitFor();
+    await mobile.waitForTimeout(500);
+    await shot(mobile, '06-phone-dark-wind-slot');
+    check('phone layout opens the slot drawer', true);
     await phone.close();
   } finally {
     await browser.close();
