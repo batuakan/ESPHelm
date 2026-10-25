@@ -22,11 +22,17 @@ Colors colors_for(esphelm::Theme theme) {
     // Red on black keeps night vision; zones differ in brightness, not hue.
     return Colors{lv_color_hex(0x000000), lv_color_hex(0x140404), lv_color_hex(0xE0302A), lv_color_hex(0x6A2020),
                   lv_color_hex(0xE0302A), lv_color_hex(0x9A2A22),
-                  {lv_color_hex(0x6A2020), lv_color_hex(0xB0401A), lv_color_hex(0xFF3B30), lv_color_hex(0xFF6060)}};
+                  {lv_color_hex(0x6A2020), lv_color_hex(0xB0401A), lv_color_hex(0xFF3B30), lv_color_hex(0xFF6060)},
+                  // port bright, starboard dim; apparent bright, true dim
+                  lv_color_hex(0xFF3B30), lv_color_hex(0x7A1A12), lv_color_hex(0xE0302A), lv_color_hex(0x8A1E18),
+                  lv_color_hex(0x6A2020), lv_color_hex(0x1C0606), lv_color_hex(0x9A2A22)};
   }
   return Colors{lv_color_hex(0x10161C), lv_color_hex(0x1E2A36), lv_color_hex(0xF2F5F8), lv_color_hex(0x7A8794),
                 lv_color_hex(0x4A9EFF), lv_color_hex(0xF2C14E),
-                {lv_color_hex(0x3DBB74), lv_color_hex(0xF0B04A), lv_color_hex(0xE5484D), lv_color_hex(0xD34DD9)}};
+                {lv_color_hex(0x3DBB74), lv_color_hex(0xF0B04A), lv_color_hex(0xE5484D), lv_color_hex(0xD34DD9)},
+                // The legacy wind page: red port, green starboard, orange A, purple T.
+                lv_color_hex(0xFF0000), lv_color_hex(0x00FF00), lv_color_hex(0xFF8000), lv_color_hex(0xA020F0),
+                lv_color_hex(0xAAAAAA), lv_color_hex(0x2E2E2E), lv_color_hex(0xF2F5F8)};
 }
 
 // ---- Value formatting (same rules as packages/editor/src/format.ts) ----
@@ -843,71 +849,109 @@ class AutopilotWidget : public Widget {
 
 // ---- wind rose ----
 
-static const char *ROSE_LABELS[] = {"0",   "30",  "60",  "90", "120", "150", "180",
-                                          "150", "120", "90",  "60", "30",  nullptr};
+// Compass card letters, one per major tick (17 ticks from 0 to 360; the last one sits on N).
+static const char *CARD_POINTS[] = {"N",  "NNE", "NE", "ENE", "E",  "ESE", "SE", "SSE", "S",
+                                    "SSW", "SW", "WSW", "W",  "WNW", "NW", "NNW", "", nullptr};
+static const char *CARD_CARDINALS[] = {"N", "", "", "", "E", "", "", "", "S",
+                                       "", "", "", "W", "", "", "", "", nullptr};
 
+/// Arc style for the close-hauled sectors (static: LVGL keeps the pointer). One per side.
+static lv_style_t *sector_style(int side, lv_color_t color, int32_t width) {
+  static lv_style_t styles[2];
+  static bool init = false;
+  if (!init) {
+    for (auto &s : styles)
+      lv_style_init(&s);
+    init = true;
+  }
+  lv_style_t *s = &styles[side];
+  lv_style_set_arc_color(s, color);
+  lv_style_set_arc_opa(s, LV_OPA_COVER);
+  lv_style_set_arc_width(s, width);
+  lv_style_set_arc_rounded(s, false);
+  return s;
+}
+
+/**
+ * The legacy wind page as a tile: a fixed ring relative to the bow (ticks every 5 and 30
+ * degrees, wide red/green close-hauled sectors), a compass card inside it turning with the
+ * heading, triangle markers for apparent (A) and true (T) wind on the ring, the heading at the
+ * top and up to three big values in the middle. Everything is drawn to the tile's size.
+ */
 class WindRoseWidget : public Widget {
  public:
   WindRoseWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
-      : id_(tile.id), colors_(env.colors), area_(cell) {
+      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), area_(cell) {
     static const esphelm::RoseConfig DEFAULTS;
     const esphelm::RoseConfig &cfg = tile.rose ? *tile.rose : DEFAULTS;
     show_true_ = cfg.show_true_wind;
-    deg_ = esphelm::units::find_unit("deg");
+    const esphelm::units::UnitDef *deg = esphelm::units::find_unit("deg");
     apparent_.item.path = cfg.apparent_angle;
     true_dir_.item.path = cfg.true_direction;
     heading_.item.path = cfg.heading;
     for (Binding *b : {&apparent_, &true_dir_, &heading_}) {
-      b->item.unit = deg_;
+      b->item.unit = deg;
       b->item.decimals = 0;
       b->stale_ms = env.default_stale_ms;
       b->last_value_ms = millis();
     }
+    // "12°T" for headingTrue, "12°M" for headingMagnetic.
+    const std::string &hp = cfg.heading;
+    heading_suffix_ = hp.find("Magnetic") != std::string::npos ? "M" : hp.find("True") != std::string::npos ? "T" : "";
 
-    rose_ = lv_scale_create(cell);
-    lv_scale_set_mode(rose_, LV_SCALE_MODE_ROUND_INNER);
-    lv_scale_set_angle_range(rose_, 360);
-    lv_scale_set_rotation(rose_, 270);  // 0 (the bow) at the top
-    lv_scale_set_range(rose_, 0, 360);
-    lv_scale_set_total_tick_count(rose_, 37);
-    lv_scale_set_major_tick_every(rose_, 3);
-    lv_scale_set_label_show(rose_, true);
-    lv_scale_set_text_src(rose_, ROSE_LABELS);
-    lv_obj_set_style_text_font(rose_, env.fonts.small, LV_PART_INDICATOR);
-    lv_obj_set_style_pad_radial(rose_, 10, LV_PART_INDICATOR);
-    lv_obj_set_style_text_color(rose_, env.colors.muted, LV_PART_INDICATOR);
-    lv_obj_set_style_line_color(rose_, env.colors.muted, LV_PART_ITEMS);
-    lv_obj_set_style_line_color(rose_, env.colors.muted, LV_PART_INDICATOR);
-    lv_obj_set_style_length(rose_, 8, LV_PART_ITEMS);
-    lv_obj_set_style_length(rose_, 16, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(rose_, env.colors.muted, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(rose_, 2, LV_PART_MAIN);
-    // Close-hauled sectors: starboard green (normal), port red (alarm), like the legacy page.
-    lv_scale_section_t *stbd = lv_scale_add_section(rose_);
-    lv_scale_set_section_range(rose_, stbd, 20, 60);
-    lv_scale_section_t *port = lv_scale_add_section(rose_);
-    lv_scale_set_section_range(rose_, port, 300, 340);
-    sections_[0] = stbd;
-    sections_[1] = port;
+    // Outer ring, fixed to the bow (0 at the top). Ticks are drawn over the sectors.
+    ring_ = lv_scale_create(cell);
+    lv_scale_set_mode(ring_, LV_SCALE_MODE_ROUND_INNER);
+    lv_scale_set_angle_range(ring_, 360);
+    lv_scale_set_rotation(ring_, 270);
+    lv_scale_set_range(ring_, 0, 360);
+    lv_scale_set_label_show(ring_, false);
+    lv_scale_set_draw_ticks_on_top(ring_, true);
+    lv_obj_set_style_arc_opa(ring_, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_line_color(ring_, colors_.ring, LV_PART_ITEMS);
+    lv_obj_set_style_line_color(ring_, colors_.ring, LV_PART_INDICATOR);
+    sections_[0] = lv_scale_add_section(ring_);
+    lv_scale_set_section_range(ring_, sections_[0], 20, 60);  // starboard
+    sections_[1] = lv_scale_add_section(ring_);
+    lv_scale_set_section_range(ring_, sections_[1], 300, 340);  // port
 
-    true_needle_ = lv_line_create(rose_);
-    lv_obj_set_style_line_width(true_needle_, 6, LV_PART_MAIN);
-    lv_obj_set_style_line_rounded(true_needle_, true, LV_PART_MAIN);
-    lv_obj_add_flag(true_needle_, LV_OBJ_FLAG_HIDDEN);
-    apparent_needle_ = lv_line_create(rose_);
-    lv_obj_set_style_line_width(apparent_needle_, 8, LV_PART_MAIN);
-    lv_obj_set_style_line_rounded(apparent_needle_, true, LV_PART_MAIN);
-    lv_obj_add_flag(apparent_needle_, LV_OBJ_FLAG_HIDDEN);
+    // Compass card: a dark band with the compass points along it, turned by the heading.
+    card_ = lv_scale_create(cell);
+    lv_scale_set_mode(card_, LV_SCALE_MODE_ROUND_INNER);
+    lv_scale_set_angle_range(card_, 360);
+    lv_scale_set_rotation(card_, 270);
+    lv_scale_set_range(card_, 0, 360);
+    lv_scale_set_total_tick_count(card_, 17);
+    lv_scale_set_major_tick_every(card_, 1);
+    lv_scale_set_label_show(card_, true);
+    lv_scale_set_text_src(card_, CARD_POINTS);
+    lv_obj_set_style_length(card_, 0, LV_PART_ITEMS);
+    lv_obj_set_style_length(card_, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_line_width(card_, 0, LV_PART_ITEMS);
+    lv_obj_set_style_line_width(card_, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(card_, colors_.card, LV_PART_MAIN);
+    lv_scale_set_draw_ticks_on_top(card_, true);  // letters over the band
+    lv_obj_set_style_text_font(card_, env.fonts.small, LV_PART_INDICATOR);
+    lv_obj_set_style_text_color(card_, colors_.card_text, LV_PART_INDICATOR);
+    // Letters along the ring (a quarter turn from the tick direction), as on the legacy card.
+    lv_obj_set_style_transform_rotation(card_, LV_SCALE_LABEL_ROTATE_MATCH_TICKS | 900, LV_PART_INDICATOR);
 
-    heading_label_ = make_label(cell, env.fonts.small, env.colors.muted, "HDG --");
-    fonts_ = env.fonts;
+    // Markers are drawn on a transparent overlay covering the rose.
+    markers_ = lv_obj_create(cell);
+    lv_obj_remove_style_all(markers_);
+    lv_obj_remove_flag(markers_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(
+        markers_, [](lv_event_t *e) { static_cast<WindRoseWidget *>(lv_event_get_user_data(e))->draw_markers_(e); },
+        LV_EVENT_DRAW_MAIN, this);
 
     center_ = lv_obj_create(cell);
     lv_obj_remove_style_all(center_);
     lv_obj_set_flex_flow(center_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(center_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(center_, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(center_, 0, LV_PART_MAIN);
     lv_obj_set_size(center_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    heading_label_ = make_label(center_, env.fonts.small, colors_.text, "--\xC2\xB0" + heading_suffix_);
+    lv_obj_set_style_pad_bottom(heading_label_, 4, LV_PART_MAIN);
     for (int i = 0; i < esphelm::RoseConfig::MAX_SLOTS; i++) {
       if (!cfg.has_slot[i])
         continue;
@@ -919,11 +963,12 @@ class WindRoseWidget : public Widget {
       std::string caption = item.label;
       if (item.unit != nullptr && item.unit->label[0] != '\0')
         caption += caption.empty() ? item.unit->label : std::string(" ") + item.unit->label;
-      s.value = make_label(center_, env.fonts.label, env.colors.muted, "--");
-      s.caption = make_label(center_, env.fonts.small, env.colors.muted, caption);
+      s.value = make_label(center_, env.fonts.value, colors_.muted, "--");
+      s.caption = make_label(center_, env.fonts.small, colors_.text, caption);
       slots_.push_back(std::move(s));
     }
   }
+
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override {
     out.push_back(apparent_.item.path);
@@ -933,42 +978,79 @@ class WindRoseWidget : public Widget {
     for (const auto &s : slots_)
       out.push_back(s.b.item.path);
   }
+
   void layout_done() override {
     const int32_t d = std::min(lv_obj_get_content_width(area_), lv_obj_get_content_height(area_));
-    lv_obj_set_size(rose_, d, d);
-    lv_obj_center(rose_);
     // Size tiers (esphelm_sizes.h, shared with the editor's size hint).
-    const bool full = d >= esphelm::sizes::WIND_ROSE_FULL;
-    const bool compact = !full && d >= esphelm::sizes::WIND_ROSE_COMPACT;
-    lv_scale_set_label_show(rose_, full);
-    if (!full) {
-      lv_scale_set_total_tick_count(rose_, 13);  // every 30 degrees
-      lv_scale_set_major_tick_every(rose_, 3);
-      lv_obj_set_style_length(rose_, 5, LV_PART_ITEMS);
-      lv_obj_set_style_length(rose_, 10, LV_PART_INDICATOR);
+    full_ = d >= esphelm::sizes::WIND_ROSE_FULL;
+    const bool compact = !full_ && d >= esphelm::sizes::WIND_ROSE_COMPACT;
+    const int32_t ring_w = std::max<int32_t>(6, d / (full_ ? 15 : 13));  // legacy: size / 15
+
+    lv_obj_set_size(ring_, d, d);
+    lv_obj_center(ring_);
+    lv_scale_set_total_tick_count(ring_, full_ ? 73 : 13);  // every 5 degrees, or every 30
+    lv_scale_set_major_tick_every(ring_, full_ ? 6 : 1);
+    lv_obj_set_style_length(ring_, ring_w, LV_PART_INDICATOR);
+    lv_obj_set_style_length(ring_, ring_w * 3 / 4, LV_PART_ITEMS);
+    lv_obj_set_style_line_width(ring_, std::max<int32_t>(2, d / 90), LV_PART_INDICATOR);
+    lv_obj_set_style_line_width(ring_, std::max<int32_t>(1, d / 360), LV_PART_ITEMS);
+    lv_scale_set_section_style_main(ring_, sections_[0], sector_style(0, colors_.starboard, ring_w));
+    lv_scale_set_section_style_main(ring_, sections_[1], sector_style(1, colors_.port, ring_w));
+
+    // The card sits inside the ring with a small gap; its letters are centred in the band.
+    const int32_t gap = std::max<int32_t>(2, d / 60);
+    const int32_t card_d = d - 2 * (ring_w + gap);
+    const int32_t band = std::max<int32_t>(4, ring_w * 9 / 10);
+    lv_obj_set_size(card_, card_d, card_d);
+    lv_obj_center(card_);
+    lv_obj_set_style_arc_width(card_, band, LV_PART_MAIN);
+    lv_scale_set_text_src(card_, full_ ? CARD_POINTS : CARD_CARDINALS);
+    const int32_t text_h = lv_font_get_line_height(fonts_.small);
+    // Label centres sit at edge - (15 + pad_radial): put them in the middle of the band.
+    lv_obj_set_style_pad_radial(card_, band / 2 - 15, LV_PART_INDICATOR);
+    lv_scale_set_label_show(card_, full_ || compact);
+    if (!(full_ || compact))
+      lv_obj_add_flag(card_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_set_size(markers_, d, d);
+    lv_obj_center(markers_);
+    marker_ = std::max<int32_t>(8, ring_w * 6 / 5);
+    ring_r_ = d / 2;
+
+    // The values go inside the card band; the font steps down until every slot fits.
+    const int32_t inner = card_d / 2 - band;
+    // The stack is narrow, so it can use most of the disc's height (as the legacy page does).
+    const int32_t room_h = inner * 19 / 10;
+    const int32_t room_w = inner * 3 / 2;
+    const int32_t small_h = text_h;
+    const int32_t head_h = full_ ? small_h + 4 : 0;
+    const lv_font_t *fonts[] = {fonts_.value, fonts_.label, fonts_.small};
+    const lv_font_t *font = fonts_.small;
+    size_t fit = 0;
+    // Values are digits only, so their lines are tightened by a quarter (negative margins).
+    const auto tight = [](int32_t fh) { return fh * 3 / 4; };
+    for (const lv_font_t *f : fonts) {
+      const int32_t fh = lv_font_get_line_height(f);
+      const size_t n = static_cast<size_t>(std::max<int32_t>(0, room_h - head_h) / (tight(fh) + small_h));
+      // "13.6" is about 2.4 line heights wide in these fonts.
+      if (fh * 12 / 5 > room_w)
+        continue;
+      font = f;
+      fit = n;
+      if (n >= slots_.size())
+        break;
     }
-    const int32_t arc = full ? 14 : 8;
-    lv_scale_set_section_style_main(rose_, sections_[0], zone_style(esphelm::ZoneState::NORMAL, colors_, arc));
-    lv_scale_set_section_style_main(rose_, sections_[1], zone_style(esphelm::ZoneState::ALARM, colors_, arc));
-    lv_obj_set_style_line_width(apparent_needle_, std::max<int32_t>(3, d / 58), LV_PART_MAIN);
-    lv_obj_set_style_line_width(true_needle_, std::max<int32_t>(2, d / 77), LV_PART_MAIN);
-    if (full) {
+    if (!(full_ || compact))
+      fit = 0;
+    if (full_)
       lv_obj_remove_flag(heading_label_, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_align(heading_label_, LV_ALIGN_CENTER, 0, -d / 4);
-    } else {
+    else
       lv_obj_add_flag(heading_label_, LV_OBJ_FLAG_HIDDEN);
-    }
-    // Slots go inside the pointers' inner end (0.64 r). Values use the label font if every slot
-    // fits that way, else the small font; then show as many as fit, in order.
-    const int32_t room = full ? d * 55 / 100 : d * 62 / 100;
-    const int32_t small_h = lv_font_get_line_height(fonts_.small);
-    const int32_t big_slot = lv_font_get_line_height(fonts_.label) + small_h + 4;
-    const int32_t small_slot = 2 * small_h + 4;
-    const bool big = static_cast<size_t>(room / big_slot) >= slots_.size();
-    const size_t fit = full || compact ? static_cast<size_t>(room / (big ? big_slot : small_slot)) : 0;
-    for (auto &slot : slots_)
-      lv_obj_set_style_text_font(slot.value, big ? fonts_.label : fonts_.small, LV_PART_MAIN);
+    const int32_t fh = lv_font_get_line_height(font);
     for (size_t i = 0; i < slots_.size(); i++) {
+      lv_obj_set_style_text_font(slots_[i].value, font, LV_PART_MAIN);
+      lv_obj_set_style_margin_top(slots_[i].value, -(fh - tight(fh)) / 2, LV_PART_MAIN);
+      lv_obj_set_style_margin_bottom(slots_[i].value, -(fh - tight(fh)) / 2, LV_PART_MAIN);
       for (lv_obj_t *o : {slots_[i].value, slots_[i].caption}) {
         if (i < fit)
           lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -976,12 +1058,9 @@ class WindRoseWidget : public Widget {
           lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
       }
     }
-    lv_obj_align(center_, LV_ALIGN_CENTER, 0, full ? d / 16 : 0);
-    lv_obj_update_layout(rose_);
-    cx_ = lv_obj_get_content_width(rose_) / 2.0;
-    cy_ = lv_obj_get_content_height(rose_) / 2.0;
-    radius_ = std::min(cx_, cy_);
+    lv_obj_center(center_);
   }
+
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
     for (Binding *b : {&apparent_, &true_dir_, &heading_}) {
       if (path == b->item.path)
@@ -992,25 +1071,31 @@ class WindRoseWidget : public Widget {
         s.b.set(v, now);
     }
   }
+
   void tick(uint32_t now) override {
     bool stale;
-    bool needles = false;
+    bool markers = false;
     if (apparent_.due(now, stale)) {
-      needles = true;
+      markers = true;
       apparent_stale_ = stale;
     }
     if (true_dir_.due(now, stale)) {
-      needles = true;
+      markers = true;
       true_stale_ = stale;
     }
     if (heading_.due(now, stale)) {
-      needles = true;
+      markers = true;
       heading_stale_ = stale;
-      set_text(heading_label_, heading_shown_,
-               stale || !heading_.has_number ? "HDG --" : "HDG " + heading_.text + "\xC2\xB0");
+      const bool known = !stale && heading_.has_number;
+      set_text(heading_label_, heading_shown_, (known ? heading_.text : "--") + "\xC2\xB0" + heading_suffix_);
+      // The card turns so that the boat's heading is at the top.
+      if (known) {
+        const int32_t h = static_cast<int32_t>(std::lround(heading_.number)) % 360;
+        lv_scale_set_rotation(card_, (270 - h + 360) % 360);
+      }
     }
-    if (needles)
-      this->draw_needles_();
+    if (markers)
+      lv_obj_invalidate(markers_);
     for (auto &s : slots_) {
       if (!s.b.due(now, stale))
         continue;
@@ -1027,53 +1112,65 @@ class WindRoseWidget : public Widget {
     std::string shown{"--"};
   };
 
-  /// Point a needle at `deg` (clockwise from the bow) as a segment of the outer ring, from
-  /// `inner` to `outer` times the radius, so the centre slots stay readable.
-  void point_(lv_obj_t *needle, lv_point_precise_t *pts, double deg, double inner, double outer) {
+  /// A triangle on the ring pointing at the centre, at `deg` clockwise from the bow, with a letter.
+  void draw_marker_(lv_layer_t *layer, const lv_area_t &box, double deg, lv_color_t color, const char *letter) {
     const double a = deg * M_PI / 180.0;
-    const double sx = std::sin(a), cy = -std::cos(a);
-    pts[0] = {static_cast<lv_value_precise_t>(cx_ + radius_ * inner * sx),
-              static_cast<lv_value_precise_t>(cy_ + radius_ * inner * cy)};
-    pts[1] = {static_cast<lv_value_precise_t>(cx_ + radius_ * outer * sx),
-              static_cast<lv_value_precise_t>(cy_ + radius_ * outer * cy)};
-    lv_line_set_points(needle, pts, 2);
+    const double ux = std::sin(a), uy = -std::cos(a);  // outwards
+    const double px = -uy, py = ux;                    // along the ring
+    const double cx = (box.x1 + box.x2) / 2.0, cy = (box.y1 + box.y2) / 2.0;
+    const double outer = ring_r_ - 1, tip = outer - marker_ * 1.3, half = marker_ * 0.62;
+    lv_draw_triangle_dsc_t tri;
+    lv_draw_triangle_dsc_init(&tri);
+    tri.color = color;
+    tri.opa = LV_OPA_COVER;
+    tri.p[0] = {static_cast<lv_value_precise_t>(cx + ux * outer + px * half),
+                static_cast<lv_value_precise_t>(cy + uy * outer + py * half)};
+    tri.p[1] = {static_cast<lv_value_precise_t>(cx + ux * outer - px * half),
+                static_cast<lv_value_precise_t>(cy + uy * outer - py * half)};
+    tri.p[2] = {static_cast<lv_value_precise_t>(cx + ux * tip), static_cast<lv_value_precise_t>(cy + uy * tip)};
+    lv_draw_triangle(layer, &tri);
+    if (!full_)
+      return;
+    // The letter sits in the wide part of the triangle.
+    const double lr = outer - marker_ * 0.5;
+    const int32_t lx = static_cast<int32_t>(cx + ux * lr), ly = static_cast<int32_t>(cy + uy * lr);
+    const int32_t fh = lv_font_get_line_height(fonts_.small);
+    lv_draw_label_dsc_t label;
+    lv_draw_label_dsc_init(&label);
+    label.text = letter;
+    label.font = fonts_.small;
+    label.color = colors_.background;
+    label.align = LV_TEXT_ALIGN_CENTER;
+    lv_area_t area{lx - fh, ly - fh / 2, lx + fh, ly + fh / 2};
+    lv_draw_label(layer, &label, &area);
   }
 
-  void draw_needles_() {
-    if (apparent_.has_number) {
-      lv_obj_remove_flag(apparent_needle_, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_set_style_line_color(apparent_needle_, apparent_stale_ ? colors_.muted : colors_.accent, LV_PART_MAIN);
-      point_(apparent_needle_, apparent_pts_, apparent_.number, 0.64, 0.97);
-    }
+  void draw_markers_(lv_event_t *e) {
+    lv_layer_t *layer = lv_event_get_layer(e);
+    lv_area_t box;
+    lv_obj_get_coords(markers_, &box);
     if (show_true_ && true_dir_.has_number && heading_.has_number) {
-      // True wind relative to the bow: direction minus heading, 0..360.
-      double rel = std::fmod(true_dir_.number - heading_.number + 720.0, 360.0);
-      lv_obj_remove_flag(true_needle_, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_set_style_line_color(true_needle_, true_stale_ || heading_stale_ ? colors_.muted : colors_.second,
-                                  LV_PART_MAIN);
-      point_(true_needle_, true_pts_, rel, 0.64, 0.86);
+      // True wind relative to the bow: direction minus heading.
+      const double rel = std::fmod(true_dir_.number - heading_.number + 720.0, 360.0);
+      draw_marker_(layer, box, rel, true_stale_ || heading_stale_ ? colors_.muted : colors_.true_wind, "T");
     }
+    if (apparent_.has_number)
+      draw_marker_(layer, box, apparent_.number, apparent_stale_ ? colors_.muted : colors_.apparent, "A");
   }
 
   std::string id_;
   Colors colors_;
+  Fonts fonts_;
   lv_obj_t *area_;
-  bool show_true_;
-  const esphelm::units::UnitDef *deg_;
+  bool show_true_{true};
   Binding apparent_, true_dir_, heading_;
   bool apparent_stale_{true}, true_stale_{true}, heading_stale_{true};
-  lv_obj_t *rose_;
-  lv_obj_t *apparent_needle_;
-  lv_obj_t *true_needle_;
-  lv_obj_t *heading_label_;
-  std::string heading_shown_{"HDG --"};
-  lv_obj_t *center_;
+  std::string heading_suffix_;
+  lv_obj_t *ring_, *card_, *markers_, *center_, *heading_label_;
   lv_scale_section_t *sections_[2]{};
-  Fonts fonts_;
-  // Rose centre and radius in its content box; needle end points (LVGL keeps the pointers).
-  double cx_{0}, cy_{0}, radius_{0};
-  lv_point_precise_t apparent_pts_[2]{};
-  lv_point_precise_t true_pts_[2]{};
+  std::string heading_shown_;
+  bool full_{false};
+  int32_t marker_{12}, ring_r_{0};
   std::vector<Slot> slots_;
 };
 
@@ -1083,6 +1180,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
   style_cell(cell, env.colors);
   switch (tile.type) {
     case esphelm::TileType::WIND_ROSE:
+      // The rose sits on the page background, as on the legacy wind page.
+      lv_obj_set_style_bg_color(cell, env.colors.background, LV_PART_MAIN);
       return std::make_unique<WindRoseWidget>(cell, tile, env);
     case esphelm::TileType::AUTOPILOT:
       return std::make_unique<AutopilotWidget>(cell, tile, env);

@@ -33,6 +33,11 @@ struct Colors {
   lv_color_t accent;  // apparent wind needle, switch on
   lv_color_t second;  // true wind needle
   lv_color_t zone[4];  // normal, warn, alarm, emergency
+  // Wind rose (the legacy wind page's colours by day, reds only at night)
+  lv_color_t port, starboard;   // close-hauled sectors
+  lv_color_t apparent, true_wind;  // A and T markers
+  lv_color_t ring;              // outer ring ticks
+  lv_color_t card, card_text;   // compass card band and its letters
 };
 
 Colors colors_for(esphelm::Theme theme);
