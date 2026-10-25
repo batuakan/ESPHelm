@@ -296,6 +296,62 @@ void check_wind_rose(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
   }
 }
 
+const char *const AUTOPILOT_MODES[] = {"auto", "wind", "route"};
+
+void check_autopilot(Checker &chk, JsonObjectConst obj, const std::string &ptr, AutopilotConfig &ap) {
+  if (has(obj, "modes")) {
+    const std::string mp = ptr + "/modes";
+    JsonVariantConst modes = obj["modes"];
+    if (!modes.is<JsonArrayConst>()) {
+      chk.add(mp, "INVALID_TYPE");
+    } else {
+      ap.modes.clear();
+      std::vector<std::string> seen;
+      bool duplicate = false;
+      size_t k = 0;
+      for (JsonVariantConst m : modes.as<JsonArrayConst>()) {
+        const std::string ip = mp + "/" + std::to_string(k++);
+        // uniqueItems compares whole values, whatever their type.
+        std::string text;
+        serializeJson(m, text);
+        for (const auto &t : seen)
+          duplicate = duplicate || t == text;
+        seen.push_back(text);
+        if (!m.is<const char *>()) {
+          // Ajv reports the per-branch type failure and the anyOf failure.
+          chk.add(ip, "INVALID_TYPE");
+          chk.add(ip, "INVALID_VALUE");
+          continue;
+        }
+        int found = -1;
+        for (int i = 0; i < 3; i++) {
+          if (std::strcmp(m.as<const char *>(), AUTOPILOT_MODES[i]) == 0)
+            found = i;
+        }
+        if (found < 0)
+          chk.add(ip, "INVALID_VALUE");
+        else
+          ap.modes.push_back(static_cast<AutopilotMode>(found));
+      }
+      if (duplicate)
+        chk.add(mp, "INVALID_VALUE");
+    }
+  }
+  if (has(obj, "config")) {
+    JsonVariantConst config = obj["config"];
+    const std::string cp = ptr + "/config";
+    if (!config.is<JsonObjectConst>()) {
+      chk.add(cp, "INVALID_TYPE");
+    } else {
+      JsonObjectConst c = config.as<JsonObjectConst>();
+      string_field(chk, c, cp, "statePath", false, StrKind::PATH, ap.state_path);
+      string_field(chk, c, cp, "targetPath", false, StrKind::PATH, ap.target_path);
+      string_field(chk, c, cp, "adjustPath", false, StrKind::PATH, ap.adjust_path);
+      string_field(chk, c, cp, "headingPath", false, StrKind::PATH, ap.heading_path);
+    }
+  }
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -309,6 +365,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::SWITCH;
   } else if (t != nullptr && std::strcmp(t, "wind_rose") == 0) {
     tile.type = TileType::WIND_ROSE;
+  } else if (t != nullptr && std::strcmp(t, "autopilot") == 0) {
+    tile.type = TileType::AUTOPILOT;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -326,6 +384,13 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
   if (int_field(chk, obj, ptr, "h", true, 1, big, v))
     tile.h = static_cast<uint16_t>(v);
 
+  if (tile.type == TileType::AUTOPILOT) {
+    string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
+    auto ap = std::make_shared<AutopilotConfig>();
+    check_autopilot(chk, obj, ptr, *ap);
+    tile.autopilot = std::move(ap);
+    return;
+  }
   if (tile.type == TileType::WIND_ROSE) {
     auto rose = std::make_shared<RoseConfig>();
     check_wind_rose(chk, obj, ptr, *rose);

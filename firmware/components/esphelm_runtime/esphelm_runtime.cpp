@@ -141,7 +141,7 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
   doc["display"]["rotation"] = 0;
   // Renderable tile types and page widgets; the plugin refuses layouts using others.
-  for (const char *w : {"value", "gauge", "bar", "switch", "wind_rose"})
+  for (const char *w : {"value", "gauge", "bar", "switch", "wind_rose", "autopilot"})
     doc["widgets"].add(w);
   ArduinoJson::JsonArray fonts = doc["fonts"].to<ArduinoJson::JsonArray>();
   fonts.add("value");
@@ -307,7 +307,8 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.fonts = this->fonts_;
   env.colors = colors_for(this->layout_.theme);
   env.default_stale_ms = this->stale_after_ms_;
-  env.put = [this](const std::string &path, bool value) { this->signalk_->put_request(path, value); };
+  env.put = [this](const std::string &path, const PutValue &value) { this->signalk_->put_request(path, value); };
+  env.can_put = [this]() { return this->signalk_->is_connected(); };
   if (!this->renderer_.show_page(this->layout_, index, env, this->widgets_))
     return false;
   this->page_ = index;
@@ -327,10 +328,10 @@ void EsphelmRuntime::show_page(size_t index) {
   }
 }
 
-void EsphelmRuntime::tap(const std::string &tile_id) {
+void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
   for (auto &w : this->widgets_) {
     if (w->id() == tile_id) {
-      w->tap();
+      w->tap(part);
       return;
     }
   }

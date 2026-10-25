@@ -12,7 +12,8 @@
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE };
+enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT };
+enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class ZoneState : uint8_t { NORMAL, WARN, ALARM, EMERGENCY };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
 
@@ -42,6 +43,15 @@ struct RoseConfig {
   bool show_true_wind{true};
 };
 
+/// Autopilot settings (only autopilot tiles carry them).
+struct AutopilotConfig {
+  std::vector<AutopilotMode> modes{AutopilotMode::AUTO, AutopilotMode::WIND, AutopilotMode::ROUTE};
+  std::string state_path{"steering.autopilot.state"};
+  std::string target_path{"steering.autopilot.target"};
+  std::string adjust_path{"steering.autopilot.actions.adjustHeading"};
+  std::string heading_path{"navigation.headingMagnetic"};
+};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -53,6 +63,8 @@ struct Tile {
   Orientation orientation{Orientation::HORIZONTAL};
   // wind_rose; shared so that copying a layout stays cheap and other tiles stay small
   std::shared_ptr<const RoseConfig> rose;
+  // autopilot (data.label is its caption)
+  std::shared_ptr<const AutopilotConfig> autopilot;
 };
 
 /// A grid page (the only page kind in v1).

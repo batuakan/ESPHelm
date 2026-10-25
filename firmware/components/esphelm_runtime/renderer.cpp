@@ -108,6 +108,8 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(btn, 10, LV_PART_MAIN);
     lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+    // The default theme recolours disabled buttons grey, far too bright at night.
+    lv_obj_set_style_recolor_opa(btn, LV_OPA_TRANSP, LV_STATE_DISABLED);
     lv_obj_t *label = make_label(btn, this->fonts_.label, enabled ? c.text : c.muted, text);
     lv_obj_center(label);
     if (!enabled) {

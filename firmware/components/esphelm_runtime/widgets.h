@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <ArduinoJson.h>
@@ -36,13 +37,18 @@ struct Colors {
 
 Colors colors_for(esphelm::Theme theme);
 
+/// A PUT value (same alternatives as ESPHomeSignalK put_request).
+using PutValue = std::variant<double, std::string, bool>;
+
 /// What every widget gets when it is built.
 struct WidgetEnv {
   Fonts fonts;
   Colors colors;
   uint32_t default_stale_ms;
-  /// Send a PUT (switch tiles). Main loop only.
-  std::function<void(const std::string &path, bool value)> put;
+  /// Send a PUT (switch and autopilot tiles). Main loop only.
+  std::function<void(const std::string &path, const PutValue &value)> put;
+  /// Whether a PUT can be sent now (connected to SignalK). Controls are disabled otherwise.
+  std::function<bool()> can_put;
 };
 
 class Widget {
@@ -57,8 +63,9 @@ class Widget {
   virtual void on_value(const std::string &path, ArduinoJson::JsonVariantConst value, uint32_t now) = 0;
   /// Redraw if something changed (throttled) and handle stale timeouts.
   virtual void tick(uint32_t now) = 0;
-  /// A tap from the test hook (switch tiles act on it).
-  virtual void tap() {}
+  /// A tap from the test hook, as a touch would do it. `part` names a button for tiles that
+  /// have several (autopilot: -10 -1 +1 +10 auto wind route standby); others ignore it.
+  virtual void tap(const std::string &part) {}
 };
 
 /// Build the widget for a grid tile inside `cell` (an empty LVGL object placed in the grid).

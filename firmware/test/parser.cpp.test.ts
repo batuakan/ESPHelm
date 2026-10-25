@@ -126,6 +126,24 @@ const mutations: { name: string; doc: unknown }[] = [
     ]),
   },
   {
+    name: 'autopilot with odd modes and config',
+    doc: withTileList([
+      { type: 'autopilot', id: 'a', x: 0, y: 0, w: 1, h: 1, modes: [1, 1, 'wind', 'wind', null] },
+      {
+        type: 'autopilot',
+        id: 'b',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        modes: 'auto',
+        config: { statePath: 3, extra: 'x' },
+        label: 'Pilot ä',
+      },
+      { type: 'autopilot', id: 'c', x: 0, y: 0, w: 1, h: 1, config: [] },
+    ]),
+  },
+  {
     name: 'wind rose without slots and the old page kind',
     doc: {
       ...minimal,

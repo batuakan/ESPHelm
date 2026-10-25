@@ -48,7 +48,8 @@ esphelm_runtime:
 # Test hooks for firmware/test/e2e_sdl.ts (files in the working directory):
 #   esphelm_shot_request  <path>     save a screenshot there
 #   esphelm_page_request  <index>    show that page (same as the footer buttons)
-#   esphelm_tap_request   <tile id>  tap a tile (switches send a PUT)
+#   esphelm_tap_request   <tile id> [button]  tap a tile (switches send a PUT; autopilot
+#                                    buttons: -10 -1 +1 +10 auto wind route standby)
 #   esphelm_exit_request             exit cleanly
 interval:
   - interval: 250ms
@@ -75,10 +76,9 @@ interval:
           FILE *tp = fopen("esphelm_tap_request", "r");
           if (tp != nullptr) {
             char tile[64] = {0};
-            if (fgets(tile, sizeof(tile), tp) != nullptr) {
-              tile[strcspn(tile, "\r\n")] = 0;
-              id(esphelm_rt)->tap(std::string(tile));
-            }
+            char part[16] = {0};
+            if (fscanf(tp, "%63s %15s", tile, part) >= 1)
+              id(esphelm_rt)->tap(std::string(tile), std::string(part));
             fclose(tp);
             remove("esphelm_tap_request");
           }

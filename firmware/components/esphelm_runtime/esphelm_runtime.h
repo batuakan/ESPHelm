@@ -24,7 +24,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-static const char *const FIRMWARE_VERSION = "0.3.0";
+static const char *const FIRMWARE_VERSION = "0.4.0";
 
 class EsphelmRuntime : public Component {
  public:
@@ -44,8 +44,8 @@ class EsphelmRuntime : public Component {
 
   /// Show page `index` of the current layout (also the footer buttons' target and a test hook).
   void show_page(size_t index);
-  /// Act as if the tile with this id was tapped (test hook; switch tiles send a PUT).
-  void tap(const std::string &tile_id);
+  /// Act as if the tile with this id (and its button `part`, if any) was tapped (test hook).
+  void tap(const std::string &tile_id, const std::string &part = "");
   void dump_config() override;
   // After LVGL (setup_priority::PROCESSOR) has created the display and our container.
   float get_setup_priority() const override { return setup_priority::PROCESSOR - 10; }
