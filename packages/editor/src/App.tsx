@@ -288,6 +288,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           </select>
         </label>
         <div className="themes" role="group" aria-label="Editor theme" title="Colours of this editor (this browser only)">
+          <span className="themes-label">Editor</span>
           {(['light', 'dark', 'night'] as Theme[]).map((t) => (
             <button
               key={t}
@@ -399,8 +400,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     aria-label="Rows"
                   />
                 </label>
-                <div className="display-theme" role="group" aria-label="Display theme">
-                  <span>Display</span>
+                <div
+                  className="display-theme"
+                  role="group"
+                  aria-label="Display theme"
+                  title="The display's colours; sent to the display with Save & send"
+                >
+                  <span>Display theme</span>
                   {(['day', 'night'] as const).map((t) => (
                     <button
                       key={t}

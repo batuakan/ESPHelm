@@ -145,6 +145,12 @@ select {
 .themes button {
   padding: 4px 9px;
 }
+.themes-label {
+  align-self: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin-right: 2px;
+}
 .themes button.on {
   border-color: var(--accent);
   color: var(--accent);
@@ -855,6 +861,9 @@ select.zone-emergency {
 
 /* Phone: canvas first, devices via the top select, library as a strip, drawer as a sheet. */
 @media (max-width: 899px) {
+  .themes-label {
+    display: none;
+  }
   .app {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto 1fr;
