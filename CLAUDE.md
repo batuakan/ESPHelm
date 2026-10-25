@@ -117,6 +117,7 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 ## 7. Widget catalog
 
 Rendered by the firmware: tiles `value`, `gauge`, `bar`, `switch`, `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers) and `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
+Every display also shows SignalK alarms (`notifications.*`) in a banner above the page (ADR-0014).
 Page kinds: `grid` and `chart` (5d, ADR-0012: SignalK chart tiles converted to RGB565 by the plugin, vessel and anchor watch, north up, PSRAM displays only).
 Later: maybe `compass` and `graph`; possibly a plugin bridge to SignalK's v2 Autopilot API; chart tiles cached on flash.
 Weather/clock currently come from HomeAssistant; their future source is an open question (see section 11).
@@ -190,4 +191,4 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - [ ] **Phase 5b:** wind rose becomes a tile (page kind removed, pixel size tiers, 720 templates and SDL 720 check). Done on SDL, pending your review and the P4 hardware check (`docs/phase5b-notes.md`)
 - [ ] **Phase 5c:** autopilot tile (confirm to engage, ADR-0011). Done on SDL against a stand-in, pending your review and the hardware check (`docs/phase5c-notes.md`)
 - [ ] **Phase 5d:** chart page with anchor watch (ADR-0012). Done on SDL against a charts stand-in, pending your review and the P4 hardware check (`docs/phase5d-notes.md`)
-- [ ] **Phase 6:** Hardening: orientation/resolution scaling (multi-page moved to 5a; swipe dropped for footer buttons), auth, size limits, last-known-good fallback, night mode, alarms, device settings
+- [ ] **Phase 6:** Hardening. This round: boot guard (ADR-0013), alarm banner with acknowledge through the plugin (ADR-0014), display settings in the layout (brightness, start page, auto day/night, screen timeout; ADR-0015). Done on SDL, pending your review and the P4 hardware check (`docs/phase6-notes.md`). Still open: orientation/resolution scaling, auth/recovery tooling
