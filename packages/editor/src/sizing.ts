@@ -22,8 +22,8 @@ export function tilePixels(
   tile: Pick<Tile, 'w' | 'h'>,
 ): { width: number; height: number } {
   const page = layout.pages[pageIndex];
-  const cols = page?.grid.cols ?? 1;
-  const rows = page?.grid.rows ?? 1;
+  const cols = page?.kind === 'grid' ? page.grid.cols : 1;
+  const rows = page?.kind === 'grid' ? page.grid.rows : 1;
   const height = display.height * (layout.pages.length > 1 ? 1 - FOOTER_SHARE : 1);
   const cellW = (display.width - 2 * AREA_PAD - GAP * (cols - 1)) / cols;
   const cellH = (height - 2 * AREA_PAD - GAP * (rows - 1)) / rows;

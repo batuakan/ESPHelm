@@ -23,6 +23,17 @@ export interface PathInfo {
   timestamp: string | null;
 }
 
+/** A chart of the boat's SignalK charts plugin (GET /api/charts). */
+export interface ChartInfo {
+  identifier: string;
+  name: string;
+  format: string;
+  tilemapUrl?: string;
+  bounds?: [[number, number], [number, number]];
+  /** Raster PNG/JPEG with a tile URL: displays can show it. */
+  supported: boolean;
+}
+
 export interface WidgetCatalog {
   tiles: string[];
   pageWidgets: Record<string, { slots: string[] }>;
@@ -115,6 +126,7 @@ export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init)
       ),
     paths: () => call<PathInfo[]>('GET', '/paths'),
     widgets: () => call<WidgetCatalog>('GET', '/widgets'),
+    charts: () => call<ChartInfo[]>('GET', '/charts'),
   };
 }
 

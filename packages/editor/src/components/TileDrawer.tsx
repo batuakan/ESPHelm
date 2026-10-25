@@ -5,6 +5,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   AUTOPILOT_DEFAULTS,
+  CHART_DEFAULTS,
   LABEL_PATTERN,
   UNIT_IDS,
   UNITS,
@@ -13,13 +14,14 @@ import {
   unitsForSignalKUnits,
   type AutopilotMode,
   type AutopilotTile,
+  type ChartPage,
   type DataItem,
   type Tile,
   type UnitId,
   type WindRoseTile,
   type Zone,
 } from '@esphelm/schema';
-import type { PathInfo } from '../api';
+import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
 
@@ -496,6 +498,93 @@ function AutopilotFields(
         ))}
       </details>
     </>
+  );
+}
+
+const CHART_PATHS: { key: keyof Omit<typeof CHART_DEFAULTS, 'zoom' | 'anchor'>; label: string; anchor?: boolean }[] =
+  [
+    { key: 'positionPath', label: 'Position' },
+    { key: 'headingPath', label: 'Heading' },
+    { key: 'anchorPositionPath', label: 'Anchor position', anchor: true },
+    { key: 'anchorRadiusPath', label: 'Anchor alarm radius (m)', anchor: true },
+    { key: 'anchorAlarmPath', label: 'Anchor alarm notification', anchor: true },
+  ];
+
+/** Chart page settings: which chart, zoom, anchor watch, and the paths it follows. */
+export function ChartDrawer(
+  props: Common & {
+    page: ChartPage;
+    charts: ChartInfo[];
+    supported: boolean;
+    onChange(patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Patch }): void;
+  },
+) {
+  const { page, charts } = props;
+  const config = page.config ?? {};
+  const anchor = page.anchor ?? CHART_DEFAULTS.anchor;
+  const known = charts.some((c) => c.identifier === page.chart);
+  return (
+    <Drawer title={page.title ?? page.id} label="Chart settings" onClose={props.onClose}>
+      {!props.supported && <p className="warn">This display can't show charts (it needs PSRAM).</p>}
+      <label className="field">
+        <span>Chart</span>
+        <select
+          value={page.chart}
+          onChange={(e) => props.onChange({ chart: e.target.value })}
+          aria-label="Chart"
+        >
+          <option value="" disabled>
+            {charts.length === 0 ? 'No charts on this SignalK server' : 'Choose a chart'}
+          </option>
+          {!known && page.chart && <option value={page.chart}>{page.chart} (not on this server)</option>}
+          {charts.map((c) => (
+            <option key={c.identifier} value={c.identifier} disabled={!c.supported}>
+              {c.name}
+              {c.supported ? '' : ` (${c.format || 'unknown format'}, not supported)`}
+            </option>
+          ))}
+        </select>
+        {charts.length === 0 && (
+          <small className="hint">Install a SignalK charts plugin with raster (PNG/JPEG) charts.</small>
+        )}
+      </label>
+      <label className="field">
+        <span>Zoom (1 to 20)</span>
+        <input
+          type="number"
+          min={1}
+          max={20}
+          placeholder={String(CHART_DEFAULTS.zoom)}
+          value={page.zoom !== undefined ? String(page.zoom) : ''}
+          onChange={(e) => props.onChange({ zoom: e.target.value === '' ? undefined : Number(e.target.value) })}
+          aria-label="Zoom"
+        />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={anchor} onChange={(e) => props.onChange({ anchor: e.target.checked })} />
+        Anchor watch (anchor position, alarm radius, alarm)
+      </label>
+      <details className="slot-section">
+        <summary>SignalK paths</summary>
+        {CHART_PATHS.filter((p) => anchor || !p.anchor).map(({ key, label }) => (
+          <div key={key}>
+            <PathPicker
+              path={config[key] ?? ''}
+              paths={props.paths}
+              values={props.values}
+              label={label}
+              placeholder={`default: ${CHART_DEFAULTS[key]}`}
+              onPick={(path) => props.onChange({ config: { [key]: path || undefined } })}
+            />
+            {config[key] && (
+              <button className="link" onClick={() => props.onChange({ config: { [key]: undefined } })}>
+                use the default ({CHART_DEFAULTS[key]})
+              </button>
+            )}
+          </div>
+        ))}
+      </details>
+    </Drawer>
   );
 }
 

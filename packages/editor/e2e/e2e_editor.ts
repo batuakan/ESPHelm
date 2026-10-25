@@ -36,7 +36,7 @@ async function cellCenter(page: Page, x: number, y: number, cols: number, rows: 
 async function main(): Promise<void> {
   if (!existsSync(join(PLUGIN_DIR, 'public/index.html')))
     throw new Error('run `npm run build` first');
-  const sk = await startSignalK({ sampleData: true });
+  const sk = await startSignalK({ sampleData: true, chartSim: true });
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chrome' }),
@@ -359,6 +359,50 @@ async function main(): Promise<void> {
         }),
       JSON.stringify(ap),
     );
+
+    // A chart page (ADR-0012): the test chart from the charts stand-in, previewed with its real
+    // tiles at the sample data's position.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Chart page', exact: true }).click();
+    const chartDrawer = page.getByRole('complementary', { name: 'Chart settings' });
+    await chartDrawer.getByLabel('Chart').selectOption('test-chart');
+    await chartDrawer.getByLabel('Zoom').fill('14');
+    let chartTiles = 0;
+    for (let i = 0; i < 40 && chartTiles === 0; i++) {
+      chartTiles = await page.locator('[data-testid^="chart-"] image').count();
+      if (chartTiles === 0) await page.waitForTimeout(250);
+    }
+    check(
+      'the chart preview shows tiles around the live position',
+      chartTiles > 0,
+      `${chartTiles} tiles`,
+    );
+    await page.waitForTimeout(1500); // tile images load
+    await shot(page, '07c-desktop-night-chart');
+    await page.getByText('No problems').waitFor();
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
+    const withChart = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const chartPageServed = (withChart.body.pages as Record<string, unknown>[] | undefined)?.find(
+      (p) => p.kind === 'chart',
+    );
+    check(
+      'the display gets the chart page',
+      JSON.stringify(chartPageServed) ===
+        JSON.stringify({
+          kind: 'chart',
+          id: 'chart-1',
+          title: 'Chart',
+          chart: 'test-chart',
+          zoom: 14,
+        }),
+      JSON.stringify(chartPageServed),
+    );
+    await page.getByRole('tab', { name: 'Helm' }).click();
 
     // The display theme is part of the layout (the editor's own theme is not).
     await page

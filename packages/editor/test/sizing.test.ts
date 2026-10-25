@@ -1,5 +1,6 @@
 import { AUTOPILOT_FIT, TEMPLATES, WIND_ROSE_FIT, type Layout } from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
+import { pageTiles } from '../src/layoutOps';
 import { autopilotTier, roseTier, tilePixels } from '../src/sizing';
 
 const onePage = (cols: number, rows: number, pages = 1): Layout => ({
@@ -49,7 +50,7 @@ describe('roseTier', () => {
 
   it('draws the large-display templates in full on 720x720', () => {
     for (const t of Object.values(TEMPLATES).filter((x) => x.id.endsWith('-720'))) {
-      const rose = t.pages[0]!.tiles.find((x) => x.type === 'wind_rose')!;
+      const rose = pageTiles(t.pages[0]).find((x) => x.type === 'wind_rose')!;
       const px = tilePixels({ width: 720, height: 720 }, t, 0, rose);
       expect(roseTier(Math.min(px.width, px.height))).toBe('full');
     }
@@ -67,7 +68,7 @@ describe('autopilotTier', () => {
   it('the autopilot and helm templates get controls on their display sizes', () => {
     const at = (key: string, size: number) => {
       const t = TEMPLATES[key]!;
-      const ap = t.pages[0]!.tiles.find((x) => x.type === 'autopilot')!;
+      const ap = pageTiles(t.pages[0]).find((x) => x.type === 'autopilot')!;
       return autopilotTier(tilePixels({ width: size, height: size }, t, 0, ap));
     };
     expect(at('autopilot', 480)).toBe('controls');

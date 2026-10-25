@@ -6,6 +6,7 @@ import type { Hello, Layout } from '@esphelm/schema';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { createApi, type Device, type PathInfo } from '../src/api';
+import { pageTiles } from '../src/layoutOps';
 import type { LiveSource, ValueListener } from '../src/live';
 
 const FIXTURES = join(__dirname, '../../schema/fixtures');
@@ -27,6 +28,11 @@ function fakeServer(devices: Device[]) {
     requests.push({ method, path, body });
     if (path === '/devices') return json(devices);
     if (path === '/paths') return json(paths);
+    if (path === '/charts')
+      return json([
+        { identifier: 'sea', name: 'Sea chart', format: 'png', tilemapUrl: '/tiles/sea/{z}/{x}/{y}.png', supported: true },
+        { identifier: 'vec', name: 'Vector chart', format: 'pbf', tilemapUrl: '/v/{z}/{x}/{y}', supported: false },
+      ]);
     if (path === '/widgets')
       return json({
         tiles: ['value', 'gauge', 'bar', 'switch', 'wind_rose', 'autopilot'],
@@ -195,11 +201,11 @@ describe('editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
     const saved = server.layouts.get(`display-${p4.deviceId}`)!;
-    expect(saved.pages.map((p) => [p.id, p.title, p.tiles.map((t) => t.type)])).toEqual([
+    expect(saved.pages.map((p) => [p.id, p.title, pageTiles(p).map((t) => t.type)])).toEqual([
       ['wind-1', 'Sailing', ['wind_rose']],
       ['main', 'Main', ['value']],
     ]);
-    expect(saved.pages[0]!.tiles[0]).toMatchObject({
+    expect(pageTiles(saved.pages[0])[0]).toMatchObject({
       slots: { center1: { path: 'environment.depth.belowTransducer', unit: 'm', label: 'Depth' } },
     });
   });
@@ -226,7 +232,7 @@ describe('editor', () => {
     await screen.findByText('No problems');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
-    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[1]!.tiles[0]).toMatchObject({
+    expect(pageTiles(server.layouts.get(`display-${p4.deviceId}`)!.pages[1])[0]).toMatchObject({
       slots: { topLeft: { path: 'environment.depth.belowTransducer', unit: 'm' } },
     });
   });
@@ -313,7 +319,7 @@ describe('editor', () => {
     await screen.findByText('No problems');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
-    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]!.tiles).toEqual([
+    expect(pageTiles(server.layouts.get(`display-${p4.deviceId}`)!.pages[0])).toEqual([
       { type: 'autopilot', id: 'pilot-1', x: 0, y: 0, w: 2, h: 2, modes: ['auto', 'route'] },
     ]);
 
@@ -344,6 +350,50 @@ describe('editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
     expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('day');
+  });
+
+  it('adds a chart page, picks a chart and previews it at the position', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chart page' }));
+    await screen.findByText(/Chart: choose a chart/);
+    const drawer = screen.getByRole('complementary', { name: 'Chart settings' });
+    const select = within(drawer).getByLabelText('Chart') as HTMLSelectElement;
+    expect([...select.options].map((o) => [o.value, o.disabled])).toEqual([
+      ['', true],
+      ['sea', false],
+      ['vec', true],
+    ]);
+    fireEvent.change(select, { target: { value: 'sea' } });
+    fireEvent.change(within(drawer).getByLabelText('Zoom'), { target: { value: '12' } });
+    expect(live.paths()).toEqual([
+      'navigation.position',
+      'navigation.headingTrue',
+      'navigation.anchor.position',
+      'navigation.anchor.maxRadius',
+      'notifications.navigation.anchor',
+    ]);
+    live.emit('navigation.position', { latitude: 60.15, longitude: 24.95 });
+    const preview = screen.getByTestId('chart-chart-1');
+    const hrefs = [...preview.querySelectorAll('image')].map((i) => i.getAttribute('href'));
+    // z12 at 60.15N 24.95E is tile 2331/1186.
+    expect(hrefs).toContain('/tiles/sea/12/2331/1186.png');
+    expect(preview.textContent).toMatch(/60\.1500 N\s+24\.9500 E\s+z12/);
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[1]).toEqual({
+      kind: 'chart',
+      id: 'chart-1',
+      title: 'Chart',
+      chart: 'sea',
+      zoom: 12,
+    });
   });
 
   it('greys out tile types the display cannot render', async () => {

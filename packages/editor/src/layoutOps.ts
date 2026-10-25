@@ -54,17 +54,27 @@ export function newLayoutFor(device: DeviceRef): Layout {
   };
 }
 
-/** Page `index` (every page is a grid page in v1). */
+/** Page `index` if it is a grid page. */
 export function gridPage(layout: Layout, index: number): GridPage | undefined {
-  return layout.pages[index];
+  const p = layout.pages[index];
+  return p?.kind === 'grid' ? p : undefined;
 }
 
-function withGrid(layout: Layout, index: number, update: (page: GridPage) => GridPage): Layout {
+function withPage(layout: Layout, index: number, update: (page: Page) => Page): Layout {
   const p = layout.pages[index];
   if (!p) return layout;
   const pages = [...layout.pages];
   pages[index] = update(p);
   return { ...layout, pages };
+}
+
+function withGrid(layout: Layout, index: number, update: (page: GridPage) => GridPage): Layout {
+  return withPage(layout, index, (p) => (p.kind === 'grid' ? update(p) : p));
+}
+
+/** Tiles of a page (none for chart pages). */
+export function pageTiles(page: Page | undefined): Tile[] {
+  return page?.kind === 'grid' ? page.tiles : [];
 }
 
 /** Apply `update` to wind-rose tile `id` on page `index`; other tiles are left alone. */
@@ -116,7 +126,7 @@ export function firstFreeCell(page: GridPage): { x: number; y: number } | null {
 }
 
 function usedIds(layout: Layout): Set<string> {
-  return new Set(layout.pages.flatMap((p) => [p.id, ...p.tiles.map((t) => t.id)]));
+  return new Set(layout.pages.flatMap((p) => [p.id, ...pageTiles(p).map((t) => t.id)]));
 }
 
 function nextId(used: Set<string>, prefix: string): string {
@@ -232,7 +242,7 @@ export function setGrid(layout: Layout, index: number, cols: number, rows: numbe
 
 // ---- pages ----
 
-export type NewPageKind = 'grid' | 'wind_rose' | 'autopilot';
+export type NewPageKind = 'grid' | 'wind_rose' | 'autopilot' | 'chart';
 
 /**
  * Insert a new page after `after` (default: at the end). Returns the new page's index.
@@ -244,6 +254,11 @@ export function addPage(
   after = layout.pages.length - 1,
 ): { layout: Layout; index: number } {
   const used = usedIds(layout);
+  if (kind === 'chart') {
+    // The chart starts unset: the validator asks for one until it is picked.
+    const page: Page = { kind: 'chart', id: nextId(used, 'chart'), title: 'Chart', chart: '' };
+    return insertPages(layout, [page], after);
+  }
   if (kind === 'grid') {
     const page: Page = {
       kind: 'grid',
@@ -300,11 +315,11 @@ export function addTemplatePages(
     used.add(free);
     return free;
   };
-  const pages = template.pages.map((p): Page => ({
-    ...p,
-    id: claim(p.id),
-    tiles: p.tiles.map((t) => ({ ...t, id: claim(t.id) })),
-  }));
+  const pages = template.pages.map((p): Page =>
+    p.kind === 'grid'
+      ? { ...p, id: claim(p.id), tiles: p.tiles.map((t) => ({ ...t, id: claim(t.id) })) }
+      : { ...p, id: claim(p.id) },
+  );
   return insertPages(layout, pages, after);
 }
 
@@ -331,7 +346,29 @@ export function movePage(layout: Layout, index: number, delta: number): Layout |
 
 /** Set the title shown in the display's footer; empty removes it (the id is shown). */
 export function renamePage(layout: Layout, index: number, title: string): Layout {
-  return withGrid(layout, index, (p) => merge(p, { title: title || undefined }));
+  return withPage(layout, index, (p) => merge(p, { title: title || undefined }));
+}
+
+/**
+ * Change a chart page: `chart`, `zoom` and `anchor` at the top, path overrides under `config`.
+ * Undefined values fall back to the defaults; an empty config is removed.
+ */
+export function updateChartPage(
+  layout: Layout,
+  index: number,
+  patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Record<string, unknown> },
+): Layout {
+  return withPage(layout, index, (p) => {
+    if (p.kind !== 'chart') return p;
+    const { config, ...top } = patch;
+    let next = merge(p, top);
+    if (config) {
+      const c = merge<Record<string, unknown>>(next.config ?? {}, config);
+      next =
+        Object.keys(c).length > 0 ? { ...next, config: c } : merge(next, { config: undefined });
+    }
+    return next;
+  });
 }
 
 /** Merge into a slot of wind-rose tile `id`; `null` empties the slot. New slots start without a path. */
@@ -386,7 +423,7 @@ export function targetForPointer(layout: Layout, pointer: string): ProblemTarget
   const page = layout.pages[index];
   if (!page) return undefined;
   if (m[2] === undefined) return { page: index };
-  const tileId = page.tiles[Number(m[2])]?.id;
+  const tileId = pageTiles(page)[Number(m[2])]?.id;
   const slot = (WIND_ROSE_SLOTS as readonly string[]).includes(m[3] ?? '')
     ? (m[3] as SlotName)
     : undefined;

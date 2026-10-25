@@ -3,15 +3,17 @@
 // on first save).
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
+  CHART_DEFAULTS,
   TEMPLATES,
   TILE_TYPES,
   validateLayout,
   type Layout,
   type Page,
+  type ChartPage,
   type Tile,
   type TileType,
 } from '@esphelm/schema';
-import { ApiError, createApi, type Api, type Device, type PathInfo } from './api';
+import { ApiError, createApi, type Api, type ChartInfo, type Device, type PathInfo } from './api';
 import { createLiveSource, type LiveSource } from './live';
 import {
   addPage,
@@ -29,6 +31,8 @@ import {
   setTileConfig,
   targetForPointer,
   tilePaths,
+  pageTiles,
+  updateChartPage,
   updateSlot,
   updateTile,
   type SlotName,
@@ -37,7 +41,8 @@ import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
 import { PageTabs } from './components/PageTabs';
 import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
-import { SLOT_TITLES, TileDrawer } from './components/TileDrawer';
+import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
+import { ChartPreview } from './components/ChartPreview';
 import {
   AUTOPILOT_TIER_TEXT,
   ROSE_TIER_TEXT,
@@ -56,7 +61,13 @@ interface Selection {
 
 /** SignalK paths a page shows (what the live preview subscribes to). */
 function pagePaths(page: Page | undefined): string[] {
-  return page ? page.tiles.flatMap(tilePaths).filter(Boolean) : [];
+  if (!page) return [];
+  if (page.kind === 'chart') {
+    const c = { ...CHART_DEFAULTS, ...page.config };
+    const anchor = page.anchor ?? CHART_DEFAULTS.anchor;
+    return [c.positionPath, c.headingPath, ...(anchor ? [c.anchorPositionPath, c.anchorRadiusPath, c.anchorAlarmPath] : [])];
+  }
+  return page.tiles.flatMap(tilePaths).filter(Boolean);
 }
 
 interface Status {
@@ -82,6 +93,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [paths, setPaths] = useState<PathInfo[]>([]);
   const [catalog, setCatalog] = useState<string[]>(Object.keys(TILE_TYPES));
+  const [charts, setCharts] = useState<ChartInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>();
   const [layout, setLayout] = useState<Layout | null>(null);
   const [savedJson, setSavedJson] = useState<string>('');
@@ -118,6 +130,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
       if (list.length > 0) setDeviceId((cur) => cur ?? list.find((d) => d.state === 'adopted')?.id ?? list[0]?.id);
     });
     api.widgets().then((w) => setCatalog(w.tiles), () => undefined);
+    api.charts().then(setCharts, () => undefined);
     const loadPaths = () => api.paths().then(setPaths, () => undefined);
     void loadPaths();
     const timer = setInterval(loadPaths, 15000);
@@ -165,7 +178,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   }, [props.live]);
   const index = layout ? Math.min(pageIndex, layout.pages.length - 1) : 0;
   const page = layout?.pages[index];
-  const grid = page;
+  const grid = page?.kind === 'grid' ? page : undefined;
+  const chartPage: ChartPage | undefined = page?.kind === 'chart' ? page : undefined;
   useEffect(() => {
     live?.setPaths(pagePaths(page));
   }, [live, page]);
@@ -262,7 +276,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   };
 
   const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
-  const drawerOpen = !!tile;
+  const chartSelected = !!chartPage && selection?.id === chartPage.id;
+  const drawerOpen = !!tile || chartSelected;
   const display = device?.hello.display ?? { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
   const tileBox = (t: Tile) => (layout ? tilePixels(display, layout, index, t) : { width: 0, height: 0 });
@@ -346,7 +361,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
               onAdd={(kind) => {
                 const r = addPage(layout, kind, index);
                 edit(r.layout);
-                const first = r.layout.pages[r.index]?.tiles[0];
+                const added = r.layout.pages[r.index];
+                const first = added?.kind === 'chart' ? added : pageTiles(added)[0];
                 showPage(r.index, first ? { id: first.id } : undefined);
               }}
               onAddTemplate={(id) => {
@@ -378,8 +394,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 }
               }}
             />
-            {grid && (
+            {
               <div className="page-bar">
+                {grid && (
                 <label>
                   grid{' '}
                   <input
@@ -400,6 +417,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     aria-label="Rows"
                   />
                 </label>
+                )}
                 <div
                   className="display-theme"
                   role="group"
@@ -422,7 +440,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   {device?.hello.display.width}×{device?.hello.display.height}
                 </span>
               </div>
-            )}
+            }
             <div className="display-frame" data-theme-preview={layout.theme}>
               {grid && (
                 <GridCanvas
@@ -442,6 +460,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   onResize={(id, w, h) => edit(resizeTile(layout, index, id, w, h), 'Not enough room to grow there.')}
                   onDropNew={(type, cell) => add(type, cell)}
                   onDragNewEnd={() => setNewTileDrag(null)}
+                />
+              )}
+              {chartPage && (
+                <ChartPreview
+                  page={chartPage}
+                  chart={charts.find((c) => c.identifier === chartPage.chart)}
+                  values={shownValues}
+                  width={display.width}
+                  height={Math.round(display.height * (layout.pages.length > 1 ? 0.89 : 1))}
+                  night={layout.theme === 'night'}
+                  onSelect={() => setSelection({ id: chartPage.id })}
                 />
               )}
               <FooterPreview layout={layout} index={index} />
@@ -476,6 +505,18 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         )}
       </main>
 
+      {chartPage && chartSelected && layout && (
+        <ChartDrawer
+          key={chartPage.id}
+          page={chartPage}
+          charts={charts}
+          supported={supported.has('chart')}
+          paths={paths}
+          values={shownValues}
+          onChange={(patch) => edit(updateChartPage(layout, index, patch))}
+          onClose={() => setSelection(undefined)}
+        />
+      )}
       {tile && layout && (
         <TileDrawer
           key={tile.id}
@@ -542,7 +583,9 @@ function describeProblem(
   pointer: string,
   target: ReturnType<typeof targetForPointer>,
 ): string {
-  const text = PROBLEM_TEXT[code] ?? `${code} at ${pointer}`;
+  const text = /^\/pages\/\d+\/chart$/.test(pointer)
+    ? 'choose a chart'
+    : (PROBLEM_TEXT[code] ?? `${code} at ${pointer}`);
   const page = target ? layout.pages[target.page] : undefined;
   const where = [
     layout.pages.length > 1 && page ? (page.title ?? page.id) : undefined,

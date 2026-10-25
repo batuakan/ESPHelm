@@ -1,6 +1,8 @@
 import { TEMPLATES, validateLayout, type GridPage, type Layout } from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
 import {
+  pageTiles,
+  updateChartPage,
   addPage,
   addTemplatePages,
   addTile,
@@ -248,7 +250,7 @@ describe('pages', () => {
   it('edits wind-rose slots and config on the tile', () => {
     let l = addPage(base(), 'wind_rose').layout;
     const id = 'wind-1-rose';
-    const rose = () => l.pages[1]!.tiles[0] as Record<string, unknown>;
+    const rose = () => pageTiles(l.pages[1])[0] as Record<string, unknown>;
     l = updateSlot(l, 1, id, 'center1', { label: 'SOG' });
     expect(ok(l)).toEqual([
       expect.objectContaining({
@@ -280,6 +282,48 @@ describe('pages', () => {
     expect(ok(l)).toEqual([]);
     // Slot and config edits leave other tiles alone.
     expect(updateSlot(l, 0, 'tile-1', 'center1', { path: 'x.y' })).toEqual(l);
+  });
+});
+
+describe('chart pages', () => {
+  it('adds a chart page that asks for its chart, then edits it', () => {
+    let l = withTiles(1);
+    l = updateTile(l, 0, 'tile-1', { path: 'navigation.speedOverGround' });
+    const r = addPage(l, 'chart');
+    l = r.layout;
+    expect(l.pages[r.index]).toEqual({ kind: 'chart', id: 'chart-1', title: 'Chart', chart: '' });
+    expect(validateLayout(l).errors.map((e) => [e.code, e.pointer])).toEqual([
+      ['INVALID_ID', '/pages/1/chart'],
+    ]);
+    expect(targetForPointer(l, '/pages/1/chart')).toEqual({ page: 1 });
+    l = updateChartPage(l, 1, {
+      chart: 'sea',
+      zoom: 13,
+      anchor: false,
+      config: { headingPath: 'navigation.headingMagnetic' },
+    });
+    expect(l.pages[1]).toEqual({
+      kind: 'chart',
+      id: 'chart-1',
+      title: 'Chart',
+      chart: 'sea',
+      zoom: 13,
+      anchor: false,
+      config: { headingPath: 'navigation.headingMagnetic' },
+    });
+    l = updateChartPage(l, 1, { zoom: undefined, config: { headingPath: undefined } });
+    expect(l.pages[1]).toEqual({
+      kind: 'chart',
+      id: 'chart-1',
+      title: 'Chart',
+      chart: 'sea',
+      anchor: false,
+    });
+    expect(validateLayout(l).errors).toEqual([]);
+    // Tile operations leave chart pages alone; chart edits leave grid pages alone.
+    expect(addTile(l, 1, 'value')).toBeNull();
+    expect(updateChartPage(l, 0, { chart: 'x' })).toEqual(l);
+    expect(pageTiles(l.pages[1])).toEqual([]);
   });
 });
 

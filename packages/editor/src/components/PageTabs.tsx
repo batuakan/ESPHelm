@@ -9,7 +9,7 @@ const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 
 /** Widgets a page needs from the display's firmware. */
 export function pageWidgets(page: Layout['pages'][number]): string[] {
-  return [...new Set(page.tiles.map((t) => t.type))];
+  return page.kind === 'grid' ? [...new Set(page.tiles.map((t) => t.type))] : [page.kind];
 }
 
 /** Starter layouts, the denser "-720" ones first on large displays (shorter side >= 600 px). */
@@ -109,6 +109,14 @@ export function PageTabs(props: Props) {
             onClick={() => (props.onAdd('autopilot'), close())}
           >
             Autopilot page{!supported.has('autopilot') && ' (not supported)'}
+          </button>
+          <button
+            role="menuitem"
+            disabled={!supported.has('chart')}
+            title={supported.has('chart') ? undefined : 'Charts need a display with PSRAM'}
+            onClick={() => (props.onAdd('chart'), close())}
+          >
+            Chart page{!supported.has('chart') && ' (not supported)'}
           </button>
           {templates.map((t) => (
             <button
