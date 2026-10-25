@@ -1,0 +1,35 @@
+{
+  "description": "a position has no display unit",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/pages/0/tiles/0/unit"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "position",
+            "id": "pos",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "unit": "deg"
+          }
+        ]
+      }
+    ]
+  }
+}

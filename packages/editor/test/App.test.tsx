@@ -35,7 +35,7 @@ function fakeServer(devices: Device[]) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'wind_rose', 'autopilot'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -395,6 +395,33 @@ describe('editor', { timeout: 20000 }, () => {
       title: 'Chart',
       chart: 'sea',
       zoom: 12,
+    });
+  });
+
+  it('adds a position tile, previews the live position in each format and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Position/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect(live.paths()).toEqual(['navigation.position']);
+    live.emit('navigation.position', { latitude: 60.15, longitude: 24.95 });
+    const preview = screen.getByTestId('position-pos-1');
+    expect(preview.textContent).toBe("60° 09.000' N024° 57.000' E");
+    // Every format shows an example from the live value.
+    within(drawer).getByText(/60\.15000° N\s+24\.95000° E/);
+    fireEvent.click(within(drawer).getByLabelText('Degrees, minutes and seconds'));
+    expect(preview.textContent).toBe('60° 09\' 00.0" N024° 57\' 00.0" E');
+    fireEvent.change(within(drawer).getByLabelText('Decimals'), { target: { value: '2' } });
+    expect(preview.textContent).toBe('60° 09\' 00.00" N024° 57\' 00.00" E');
+    live.emit('navigation.position', { latitude: 'nowhere' });
+    expect(preview.textContent).toBe('--');
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [{ type: 'position', id: 'pos-1', w: 2, h: 1, label: 'Position', format: 'dms', decimals: 2 }],
     });
   });
 

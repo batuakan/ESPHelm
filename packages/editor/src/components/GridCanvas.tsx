@@ -171,7 +171,7 @@ export function GridCanvas(props: Props) {
               <span className="tile-label">
                 {tile.type === 'wind_rose'
                   ? ''
-                  : tile.type === 'autopilot'
+                  : tile.type === 'autopilot' || tile.type === 'position'
                     ? (tile.label ?? '')
                     : tile.label || (tile.path ? '' : 'Pick a path')}
               </span>

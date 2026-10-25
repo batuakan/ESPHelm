@@ -14,7 +14,7 @@ export interface InvalidFixture {
   document: unknown;
 }
 
-const FIXTURES = join(PACKAGE_ROOT, 'fixtures');
+export const FIXTURES = join(PACKAGE_ROOT, 'fixtures');
 
 function readDir(rel: string): { name: string; json: unknown }[] {
   const dir = join(FIXTURES, rel);

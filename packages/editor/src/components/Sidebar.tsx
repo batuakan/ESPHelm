@@ -29,6 +29,12 @@ const ICONS: Record<string, JSX.Element> = {
       <circle cx="14" cy="10" r="2.5" className="fill" />
     </svg>
   ),
+  position: (
+    <svg viewBox="0 0 20 20">
+      <path d="M10 18s-5.5-5.4-5.5-9.5a5.5 5.5 0 0 1 11 0C15.5 12.6 10 18 10 18z" />
+      <circle cx="10" cy="8.5" r="2" className="fill" />
+    </svg>
+  ),
   autopilot: (
     <svg viewBox="0 0 20 20">
       <circle cx="10" cy="10" r="7.5" />
@@ -50,6 +56,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   gauge: { title: 'Gauge' },
   bar: { title: 'Bar' },
   switch: { title: 'Switch' },
+  position: { title: 'Position' },
   wind_rose: { title: 'Wind rose' },
   autopilot: { title: 'Autopilot' },
 };

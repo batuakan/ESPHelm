@@ -263,6 +263,8 @@ void data_item_fields(Checker &chk, JsonObjectConst obj, const std::string &ptr,
 const char *const ZONE_STATES[] = {"normal", "warn", "alarm", "emergency"};
 const char *const ORIENTATIONS[] = {"horizontal", "vertical"};
 const char *const THEMES[] = {"day", "night"};
+// Same order as position::Format.
+const char *const POSITION_FORMATS[] = {"ddm", "dms", "dd", "decimal"};
 const char *const SLOT_NAMES[RoseConfig::MAX_SLOTS] = {"center1",  "center2",  "center3",   "topLeft",
                                                        "topRight", "bottomLeft", "bottomRight"};
 
@@ -386,6 +388,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::WIND_ROSE;
   } else if (t != nullptr && std::strcmp(t, "autopilot") == 0) {
     tile.type = TileType::AUTOPILOT;
+  } else if (t != nullptr && std::strcmp(t, "position") == 0) {
+    tile.type = TileType::POSITION;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -414,6 +418,25 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     auto rose = std::make_shared<RoseConfig>();
     check_wind_rose(chk, obj, ptr, *rose);
     tile.rose = std::move(rose);
+    return;
+  }
+  if (tile.type == TileType::POSITION) {
+    tile.data.path = "navigation.position";
+    string_field(chk, obj, ptr, "path", false, StrKind::PATH, tile.data.path);
+    string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
+    int f = enum_field(chk, obj, ptr, "format", false, POSITION_FORMATS, 4);
+    if (f >= 0)
+      tile.position_format = static_cast<position::Format>(f);
+    long long d;
+    if (int_field(chk, obj, ptr, "decimals", false, 0, 6, d))
+      tile.data.decimals = static_cast<int8_t>(d);
+    double stale;
+    if (number_field(chk, obj, ptr, "staleAfter", false, stale)) {
+      if (!(stale > 0))
+        chk.add(ptr + "/staleAfter", "OUT_OF_RANGE");
+      else
+        tile.data.stale_after = static_cast<float>(stale);
+    }
     return;
   }
   if (tile.type == TileType::SWITCH) {

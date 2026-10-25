@@ -40,7 +40,7 @@ GridPage                              kind: "grid"
 ├─ grid: { cols ≥ 1, rows ≥ 1 }
 └─ tiles: Tile[]            (at least 1)
 
-Tile = value | gauge | bar | switch | wind_rose | autopilot   (discriminator: type)
+Tile = value | gauge | bar | switch | position | wind_rose | autopilot   (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
 
 ChartPage                             kind: "chart"   (Phase 5d, ADR-0012)
@@ -122,6 +122,31 @@ A full-page map (ADR-0012): tiles of a SignalK chart centred on the vessel, nort
 | `config.anchorAlarmPath` | `notifications.navigation.anchor` (alarm when `state` is not `normal`/`nominal`) |
 
 A bad or missing `chart` is `INVALID_ID` / `MISSING_FIELD` at `/pages/i/chart`; `zoom` outside 1–20 is `OUT_OF_RANGE`.
+
+### Position tiles
+GPS position as text: latitude over longitude. The display picks the largest font that fits the tile.
+
+| Field | Notes |
+|---|---|
+| `path` | default `navigation.position` (an object with `latitude` and `longitude` in degrees) |
+| `label` | optional caption |
+| `format` | `ddm` (default), `dms`, `dd` or `decimal`, see below |
+| `decimals` | 0–6, of the last part (minutes, seconds or degrees); default per format |
+| `staleAfter` | seconds, as for other tiles |
+
+| `format` | Example | Default decimals |
+|---|---|---|
+| `ddm` | `60° 09.000' N` / `024° 57.000' E` | 3 |
+| `dms` | `60° 09' 00.0" N` / `024° 57' 00.0" E` | 1 |
+| `dd` | `60.15000° N` / `24.95000° E` | 5 |
+| `decimal` | `60.150000` / `24.950000` (negative south and west) | 6 |
+
+- In `ddm` and `dms`, latitude degrees have 2 digits and longitude 3, as on charts.
+- Rounding carries into the next unit: `59° 59.9999'` at 3 decimals is `60° 00.000'`.
+- A value that isn't a position (latitude outside −90…90, longitude outside −180…180, or not numbers) shows `--`.
+- `formatPosition()` in `@esphelm/schema` defines the text. The firmware's `esphelm_position.h` mirrors it, and both are checked against `fixtures/position.cases.json`.
+
+There's no `unit` (`UNKNOWN_FIELD`); `POSITION_DEFAULTS` has the defaults.
 
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
@@ -253,6 +278,7 @@ See `packages/schema/fixtures/valid/`:
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 - `chart-page.json`: a default chart page, an anchor page with every path set, and a grid page.
 - `settings.json`: every display setting, with the second page as start page.
+- `position.json`: the four position formats, one with custom decimals.
 
 Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
 

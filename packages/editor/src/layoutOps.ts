@@ -4,6 +4,7 @@
 // (pages and tiles share one namespace, like the validator's DUPLICATE_ID check).
 import {
   AUTOPILOT_DEFAULTS,
+  POSITION_DEFAULTS,
   WIND_ROSE_DEFAULTS,
   type DataItem,
   type GridPage,
@@ -98,6 +99,7 @@ export function tilePaths(tile: Tile): string[] {
     const cfg = { ...AUTOPILOT_DEFAULTS, ...tile.config };
     return [cfg.statePath, cfg.targetPath, cfg.headingPath];
   }
+  if (tile.type === 'position') return [tile.path ?? POSITION_DEFAULTS.path];
   if (tile.type !== 'wind_rose') return [tile.path];
   const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   return [
@@ -144,6 +146,9 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, path: '', min: 0, max: 100 };
     case 'switch':
       return { type, ...place, path: '' };
+    case 'position':
+      // navigation.position by default, so it shows the boat's position at once.
+      return { type, ...place, label: 'Position' };
     case 'wind_rose':
       return { type, ...place, slots: {} };
     case 'autopilot':
@@ -167,13 +172,22 @@ export function addTile(
   if (!page) return null;
   const cell = at && fits(page, { ...at, w: 1, h: 1 }) ? at : at ? null : firstFreeCell(page);
   if (!cell) return null;
-  const prefix = type === 'wind_rose' ? 'rose' : type === 'autopilot' ? 'pilot' : 'tile';
+  const prefix =
+    type === 'wind_rose'
+      ? 'rose'
+      : type === 'autopilot'
+        ? 'pilot'
+        : type === 'position'
+          ? 'pos'
+          : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
   const big = type === 'wind_rose' || type === 'autopilot';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
+  } else if (type === 'position' && fits(page, { ...cell, w: 2, h: 1 })) {
+    tile.w = 2; // two text lines read better wide
   }
   return {
     id,

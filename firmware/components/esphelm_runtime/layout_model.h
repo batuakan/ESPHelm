@@ -7,12 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "esphelm_position.h"
 #include "esphelm_units.h"
 
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT };
+enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class ZoneState : uint8_t { NORMAL, WARN, ALARM, EMERGENCY };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
@@ -63,6 +64,8 @@ struct Tile {
   double min{0}, max{0};
   std::vector<Zone> zones;
   Orientation orientation{Orientation::HORIZONTAL};
+  // position (data.path defaults to navigation.position; data.decimals -1 = the format's default)
+  position::Format position_format{position::Format::DDM};
   // wind_rose; shared so that copying a layout stays cheap and other tiles stay small
   std::shared_ptr<const RoseConfig> rose;
   // autopilot (data.label is its caption)

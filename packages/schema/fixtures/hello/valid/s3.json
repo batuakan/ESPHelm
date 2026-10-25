@@ -17,6 +17,7 @@
     "gauge",
     "bar",
     "switch",
+    "position",
     "wind_rose"
   ],
   "fonts": [

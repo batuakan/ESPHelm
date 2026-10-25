@@ -7,6 +7,11 @@ import {
   AUTOPILOT_DEFAULTS,
   CHART_DEFAULTS,
   LABEL_PATTERN,
+  POSITION_DEFAULT_DECIMALS,
+  POSITION_DEFAULTS,
+  POSITION_FORMAT_NAMES,
+  POSITION_FORMATS,
+  formatPosition,
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
@@ -16,6 +21,8 @@ import {
   type AutopilotTile,
   type ChartPage,
   type DataItem,
+  type PositionFormat,
+  type PositionTile,
   type Tile,
   type UnitId,
   type WindRoseTile,
@@ -42,14 +49,21 @@ function numberOrUndefined(text: string): number | undefined {
   return text === '' ? undefined : Number(text);
 }
 
-/** Searchable SignalK path field. `preferBoolean` lists on/off paths first (switches). */
+/** A latitude/longitude object, as navigation.position has. */
+const isPosition = (v: unknown) =>
+  typeof v === 'object' && v !== null && 'latitude' in v && 'longitude' in v;
+
+/**
+ * Searchable SignalK path field. `prefer` lists matching paths first: on/off values (switches)
+ * or positions (position tiles).
+ */
 export function PathPicker(props: {
   path: string;
   paths: PathInfo[];
   values: Map<string, unknown>;
   label?: string;
   placeholder?: string;
-  preferBoolean?: boolean;
+  prefer?: 'boolean' | 'position';
   onPick(path: string, info: PathInfo | undefined): void;
 }) {
   const { path, paths, values } = props;
@@ -63,12 +77,15 @@ export function PathPicker(props: {
     const found = paths.filter(
       (p) => !q || p.path.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q),
     );
-    if (props.preferBoolean)
-      found.sort(
-        (a, b) => Number(typeof b.value === 'boolean') - Number(typeof a.value === 'boolean'),
-      );
+    const preferred =
+      props.prefer === 'boolean'
+        ? (v: unknown) => typeof v === 'boolean'
+        : props.prefer === 'position'
+          ? isPosition
+          : undefined;
+    if (preferred) found.sort((a, b) => Number(preferred(b.value)) - Number(preferred(a.value)));
     return found.slice(0, 40);
-  }, [paths, query, props.preferBoolean]);
+  }, [paths, query, props.prefer]);
 
   const pick = (p: PathInfo | undefined, text: string) => {
     props.onPick(text, p);
@@ -143,7 +160,7 @@ function DataItemFields(props: {
   paths: PathInfo[];
   values: Map<string, unknown>;
   showFormat: boolean;
-  preferBoolean?: boolean;
+  prefer?: 'boolean';
   onChange(patch: Patch): void;
 }) {
   const { item, paths, onChange } = props;
@@ -165,7 +182,7 @@ function DataItemFields(props: {
         path={item.path}
         paths={paths}
         values={props.values}
-        preferBoolean={props.preferBoolean}
+        prefer={props.prefer}
         onPick={pick}
       />
       {props.showFormat && (
@@ -199,32 +216,117 @@ function DataItemFields(props: {
           </label>
         </>
       )}
-      <label className="field">
-        <span>Label</span>
-        <input
-          value={label}
-          placeholder="e.g. SOG"
-          onChange={(e) => onChange({ label: e.target.value || undefined })}
-          aria-label="Label"
-          aria-invalid={!LABEL_RE.test(label)}
-        />
-        {!LABEL_RE.test(label) && (
-          <small className="error">Only letters A-Z, digits, punctuation and ° can be shown.</small>
-        )}
-      </label>
-      {props.showFormat && (
-        <label className="field">
-          <span>Stale after (s)</span>
-          <input
-            type="number"
-            min={1}
-            placeholder="15"
-            value={item.staleAfter !== undefined ? String(item.staleAfter) : ''}
-            onChange={(e) => onChange({ staleAfter: numberOrUndefined(e.target.value) })}
-            aria-label="Stale after seconds"
-          />
-        </label>
+      <LabelField label={label} placeholder="e.g. SOG" onChange={onChange} />
+      {props.showFormat && <StaleField staleAfter={item.staleAfter} onChange={onChange} />}
+    </>
+  );
+}
+
+function LabelField(props: { label: string; placeholder: string; onChange(patch: Patch): void }) {
+  const { label } = props;
+  return (
+    <label className="field">
+      <span>Label</span>
+      <input
+        value={label}
+        placeholder={props.placeholder}
+        onChange={(e) => props.onChange({ label: e.target.value || undefined })}
+        aria-label="Label"
+        aria-invalid={!LABEL_RE.test(label)}
+      />
+      {!LABEL_RE.test(label) && (
+        <small className="error">Only letters A-Z, digits, punctuation and ° can be shown.</small>
       )}
+    </label>
+  );
+}
+
+function StaleField(props: { staleAfter: number | undefined; onChange(patch: Patch): void }) {
+  return (
+    <label className="field">
+      <span>Stale after (s)</span>
+      <input
+        type="number"
+        min={1}
+        placeholder="15"
+        value={props.staleAfter !== undefined ? String(props.staleAfter) : ''}
+        onChange={(e) => props.onChange({ staleAfter: numberOrUndefined(e.target.value) })}
+        aria-label="Stale after seconds"
+      />
+    </label>
+  );
+}
+
+/** Shown in the format choices until the path has a value. */
+const SAMPLE_POSITION = { latitude: 60.15, longitude: 24.95 };
+
+/** Path, text format (each with an example from the live value), decimals, label, stale time. */
+function PositionFields(props: Common & { tile: PositionTile; onChange(patch: Patch): void }) {
+  const { tile, onChange } = props;
+  const path = tile.path ?? POSITION_DEFAULTS.path;
+  const format: PositionFormat = tile.format ?? POSITION_DEFAULTS.format;
+  const live = props.values.get(path);
+  const example = (f: PositionFormat) => {
+    const decimals = f === format ? tile.decimals : undefined;
+    return formatPosition(live, f, decimals) ?? formatPosition(SAMPLE_POSITION, f, decimals)!;
+  };
+  return (
+    <>
+      <PathPicker
+        path={path}
+        paths={props.paths}
+        values={props.values}
+        prefer="position"
+        onPick={(p) => onChange({ path: p && p !== POSITION_DEFAULTS.path ? p : undefined })}
+      />
+      <fieldset className="settings-group" role="radiogroup" aria-label="Format">
+        <legend>Format</legend>
+        {POSITION_FORMATS.map((f) => {
+          const ex = example(f);
+          return (
+            <label key={f} className="check format-choice">
+              <input
+                type="radio"
+                name={`format-${tile.id}`}
+                checked={format === f}
+                onChange={() =>
+                  onChange({
+                    format: f === POSITION_DEFAULTS.format ? undefined : f,
+                    // decimals belong to a format: the new one starts at its default
+                    decimals: undefined,
+                  })
+                }
+                aria-label={POSITION_FORMAT_NAMES[f]}
+              />
+              <span>
+                {POSITION_FORMAT_NAMES[f]}
+                <small className="format-example">
+                  {ex.lat}
+                  {'  '}
+                  {ex.lon}
+                </small>
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
+      <label className="field">
+        <span>Decimals</span>
+        <input
+          type="number"
+          min={0}
+          max={6}
+          placeholder={String(POSITION_DEFAULT_DECIMALS[format])}
+          value={tile.decimals !== undefined ? String(tile.decimals) : ''}
+          onChange={(e) => onChange({ decimals: numberOrUndefined(e.target.value) })}
+          aria-label="Decimals"
+        />
+        <small className="hint">
+          Of the {format === 'ddm' ? 'minutes' : format === 'dms' ? 'seconds' : 'degrees'}.
+        </small>
+      </label>
+      <LabelField label={tile.label ?? ''} placeholder="e.g. Position" onChange={onChange} />
+      <StaleField staleAfter={tile.staleAfter} onChange={onChange} />
     </>
   );
 }
@@ -603,7 +705,11 @@ export function TileDrawer(
 ) {
   const { tile, onChange } = props;
   const title =
-    tile.type === 'wind_rose' ? 'Wind rose' : tile.type === 'autopilot' ? 'Autopilot' : tile.label || tile.id;
+    tile.type === 'wind_rose'
+      ? 'Wind rose'
+      : tile.type === 'autopilot'
+        ? 'Autopilot'
+        : tile.label || (tile.type === 'position' ? 'Position' : tile.id);
   return (
     <Drawer title={title} label="Tile settings" onClose={props.onClose}>
       {!props.supported && (
@@ -621,6 +727,14 @@ export function TileDrawer(
             onClose={props.onClose}
           />
         </>
+      ) : tile.type === 'position' ? (
+        <PositionFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          onChange={onChange}
+          onClose={props.onClose}
+        />
       ) : tile.type === 'wind_rose' ? (
         <>
           {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
@@ -641,7 +755,7 @@ export function TileDrawer(
             paths={props.paths}
             values={props.values}
             showFormat={tile.type !== 'switch'}
-            preferBoolean={tile.type === 'switch'}
+            prefer={tile.type === 'switch' ? 'boolean' : undefined}
             onChange={onChange}
           />
           {(tile.type === 'gauge' || tile.type === 'bar') && (

@@ -3,7 +3,10 @@
 // firmware does.
 import {
   AUTOPILOT_DEFAULTS,
+  POSITION_DEFAULTS,
   UNITS,
+  formatPosition,
+  type PositionTile,
   WIND_ROSE_DEFAULTS,
   toDisplay,
   type DataItem,
@@ -174,6 +177,7 @@ export function TilePreview(props: {
         onSelectSlot={props.onSelectSlot}
       />
     );
+  if (tile.type === 'position') return <PositionPreview tile={tile} values={values} />;
   const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':
@@ -192,6 +196,28 @@ export function TilePreview(props: {
         </>
       );
   }
+}
+
+/** Latitude over longitude, in the tile's format (the same text the display shows). */
+export function PositionPreview(props: { tile: PositionTile; values: Map<string, unknown> }) {
+  const { tile } = props;
+  const text = formatPosition(
+    props.values.get(tile.path ?? POSITION_DEFAULTS.path),
+    tile.format ?? POSITION_DEFAULTS.format,
+    tile.decimals,
+  );
+  return (
+    <span className="tile-position" data-testid={`position-${tile.id}`}>
+      {text ? (
+        <>
+          <span>{text.lat}</span>
+          <span>{text.lon}</span>
+        </>
+      ) : (
+        '--'
+      )}
+    </span>
+  );
 }
 
 const RAD = 180 / Math.PI;

@@ -78,6 +78,11 @@ const withTile = (patch: Record<string, unknown>) => ({
 const mutations: { name: string; doc: unknown }[] = [
   { name: 'integer written as 2.0', doc: withTile({ w: 1.0, decimals: 2.0 }) },
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
+  { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },
+  {
+    name: 'position with a zero stale time and fractional decimals',
+    doc: withTile({ type: 'position', staleAfter: 0, decimals: 1.5 }),
+  },
   {
     name: 'settings fields of the wrong type',
     doc: {

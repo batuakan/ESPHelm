@@ -1178,3 +1178,24 @@ fieldset.modes {
   gap: 4px;
   padding-left: 26px;
 }
+
+/* Position tile (latitude over longitude, like the display) */
+.tile-position {
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: clamp(13px, 3.4vmin, 30px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.format-choice span {
+  display: grid;
+  gap: 2px;
+}
+.format-example {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}

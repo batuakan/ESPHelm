@@ -396,3 +396,29 @@ describe('display settings', () => {
     });
   });
 });
+
+describe('position tiles', () => {
+  it('start 2x1 with the default path and a label, and subscribe to navigation.position', () => {
+    const r = addTile(newLayoutFor(device), 0, 'position')!;
+    const tile = page(r.layout).tiles[0]!;
+    expect(tile).toEqual({
+      type: 'position',
+      id: 'pos-1',
+      x: 0,
+      y: 0,
+      w: 2,
+      h: 1,
+      label: 'Position',
+    });
+    expect(tilePaths(tile)).toEqual(['navigation.position']);
+    expect(validateLayout(r.layout).ok).toBe(true);
+  });
+
+  it('take one cell when only one is free', () => {
+    let l = newLayoutFor(device);
+    l = setGrid(l, 0, 2, 1);
+    l = addTile(l, 0, 'value', { x: 1, y: 0 })!.layout;
+    const r = addTile(l, 0, 'position', { x: 0, y: 0 })!;
+    expect(page(r.layout).tiles.find((t) => t.type === 'position')).toMatchObject({ w: 1, h: 1 });
+  });
+});

@@ -115,6 +115,23 @@ describe('devices', () => {
     });
   });
 
+  it('refuses a position layout for firmware without the position tile', async () => {
+    const older: Hello = { ...p4, widgets: p4.widgets.filter((w) => w !== 'position') };
+    await register(older);
+    await api('PUT', '/layouts/position', fixture<Layout>('valid/position.json'));
+    const res = await api('PUT', `/devices/${p4.deviceId}`, { layoutId: 'position' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      devices: [
+        { errors: [{ code: 'UNSUPPORTED_WIDGET', message: 'device cannot render: position' }] },
+      ],
+    });
+    await register(p4); // current firmware lists it
+    expect((await api('PUT', `/devices/${p4.deviceId}`, { layoutId: 'position' })).status).toBe(
+      200,
+    );
+  });
+
   it('refuses a layout edit that would break a device using it', async () => {
     await register(c3);
     const valueOnly: Layout = { ...minimal, id: 'c3' };
@@ -195,7 +212,15 @@ describe('devices', () => {
 describe('widget catalog', () => {
   it('lists tiles, their slots, and units', async () => {
     const body = (await (await api('GET', '/widgets')).json()) as Record<string, unknown>;
-    expect(body.tiles).toEqual(['value', 'gauge', 'bar', 'switch', 'wind_rose', 'autopilot']);
+    expect(body.tiles).toEqual([
+      'value',
+      'gauge',
+      'bar',
+      'switch',
+      'position',
+      'wind_rose',
+      'autopilot',
+    ]);
     expect(body.tileSlots).toEqual({
       wind_rose: [
         'center1',

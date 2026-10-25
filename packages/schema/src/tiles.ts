@@ -1,5 +1,5 @@
 import Type from 'typebox';
-import { DataItem, Id, Label, SkPath } from './primitives.js';
+import { DataItem, Decimals, Id, Label, SkPath } from './primitives.js';
 
 /** Placement of a tile on its page grid, in cells (0-based; a tile may span several cells). */
 const Placement = {
@@ -78,6 +78,37 @@ export const SwitchTile = Type.Object(
   },
   { additionalProperties: false },
 );
+
+/**
+ * GPS position: latitude over longitude, as text in one of the POSITION_FORMATS (position.ts
+ * defines the text; the firmware mirrors it). The device picks the largest font that fits.
+ */
+export const PositionTile = Type.Object(
+  {
+    type: Type.Literal('position'),
+    ...Placement,
+    path: Type.Optional(SkPath),
+    label: Type.Optional(Label),
+    format: Type.Optional(
+      Type.Union(
+        [Type.Literal('ddm'), Type.Literal('dms'), Type.Literal('dd'), Type.Literal('decimal')],
+        {
+          description:
+            "ddm: 60° 09.000' N; dms: 60° 09' 00.0\" N; dd: 60.15000° N; decimal: 60.150000 (signed).",
+        },
+      ),
+    ),
+    decimals: Type.Optional(Decimals),
+    staleAfter: DataItem.properties.staleAfter,
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted position tile fields (decimals: POSITION_DEFAULT_DECIMALS per format). */
+export const POSITION_DEFAULTS = {
+  path: 'navigation.position',
+  format: 'ddm',
+} as const;
 
 /**
  * Wind rose: apparent and true wind pointers relative to the bow, heading, and named slots at
@@ -195,6 +226,7 @@ export const TILE_TYPES = {
   gauge: GaugeTile,
   bar: BarTile,
   switch: SwitchTile,
+  position: PositionTile,
   wind_rose: WindRoseTile,
   autopilot: AutopilotTile,
 } as const;
@@ -210,6 +242,7 @@ export const Tile = Type.Union([
   GaugeTile,
   BarTile,
   SwitchTile,
+  PositionTile,
   WindRoseTile,
   AutopilotTile,
 ]);
@@ -217,6 +250,7 @@ export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
 export type BarTile = Type.Static<typeof BarTile>;
 export type SwitchTile = Type.Static<typeof SwitchTile>;
+export type PositionTile = Type.Static<typeof PositionTile>;
 export type WindRoseTile = Type.Static<typeof WindRoseTile>;
 export type AutopilotTile = Type.Static<typeof AutopilotTile>;
 export type Tile = Type.Static<typeof Tile>;
