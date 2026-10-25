@@ -9,6 +9,7 @@ import { registerDeviceApi } from '../src/deviceApi.js';
 import { registerEditorApi } from '../src/editorApi.js';
 import type { PluginHost } from '../src/host.js';
 import { Service } from '../src/service.js';
+import type { ChartSource } from '../src/tiles.js';
 
 const SCHEMA_FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '../../schema/fixtures');
 
@@ -50,7 +51,9 @@ export interface Harness {
  * The real routers in an Express app shaped like signalk-server's: JSON body parsing,
  * device API under /signalk/v1/api, editor API under /plugins/esphelm, plus a fake host.
  */
-export async function startHarness(opts: { dataDir?: string } = {}): Promise<Harness> {
+export async function startHarness(
+  opts: { dataDir?: string; charts?: ChartSource } = {},
+): Promise<Harness> {
   const dataDir = opts.dataDir ?? mkdtempSync(join(tmpdir(), 'esphelm-plugin-'));
   const deltas: Delta[] = [];
   const errors: string[] = [];
@@ -85,7 +88,7 @@ export async function startHarness(opts: { dataDir?: string } = {}): Promise<Har
     getMetadata: (path: string) => skMeta[path.replace(/^vessels\.self\./, '')] as never,
   };
   let now = Date.parse('2026-10-24T12:00:00Z');
-  const service = new Service(host, () => new Date((now += 1000)));
+  const service = new Service(host, () => new Date((now += 1000)), opts.charts);
   service.start();
 
   const app = express();

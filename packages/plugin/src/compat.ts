@@ -8,9 +8,13 @@ export interface Compatibility {
   warnings: { code: 'LAYOUT_TOO_LARGE'; message: string }[];
 }
 
-/** Tile types a layout uses (what a device must list in `hello.widgets`). */
+/** Tile types and page kinds (other than grid) a layout uses: what a device must list in `hello.widgets`. */
 export function usedWidgets(layout: Layout): Set<string> {
-  return new Set(layout.pages.flatMap((page) => page.tiles.map((t) => t.type)));
+  return new Set(
+    layout.pages.flatMap((page) =>
+      page.kind === 'grid' ? page.tiles.map((t) => t.type) : [page.kind],
+    ),
+  );
 }
 
 export function checkCompatibility(entry: StoredLayout, device: DeviceRecord): Compatibility {

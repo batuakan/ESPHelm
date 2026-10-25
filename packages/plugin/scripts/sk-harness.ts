@@ -139,14 +139,72 @@ module.exports = (app) => {
 `;
 
 /**
+ * A stand-in for a SignalK charts plugin: a resources-API provider with one PNG chart
+ * ("test-chart") whose tiles are generated: a checkerboard tinted per tile with a dark border,
+ * so stitching and offsets show in screenshots. Tiles are served where real chart plugins put
+ * them (/signalk/chart-tiles/...), readable with any read token. PNGs are written with the
+ * plugin package's own pngjs.
+ */
+const CHART_SIM_PLUGIN = (pngjsPath: string) => `
+const { PNG } = require(${JSON.stringify(pngjsPath)});
+const CHART = {
+  identifier: 'test-chart', name: 'Test chart', description: 'generated tiles',
+  chartFormat: 'png', tilemapUrl: '/signalk/chart-tiles/test-chart/{z}/{x}/{y}.png',
+  bounds: [[-180, -85], [180, 85]],
+};
+function tile(z, x, y) {
+  const png = new PNG({ width: 256, height: 256 });
+  const hue = ((x * 7 + y * 13 + z * 3) % 6);
+  const tints = [[200, 230, 255], [210, 245, 210], [255, 240, 200], [235, 215, 250], [255, 220, 220], [215, 240, 240]];
+  const [tr, tg, tb] = tints[hue];
+  for (let py = 0; py < 256; py++)
+    for (let px = 0; px < 256; px++) {
+      const i = (py * 256 + px) * 4;
+      const border = px < 3 || py < 3 || px > 252 || py > 252;
+      const dark = ((px >> 5) + (py >> 5)) % 2 === 1;
+      const f = border ? 0.25 : dark ? 0.85 : 1;
+      png.data[i] = tr * f; png.data[i + 1] = tg * f; png.data[i + 2] = tb * f; png.data[i + 3] = 255;
+    }
+  return PNG.sync.write(png);
+}
+module.exports = (app) => ({
+  id: 'esphelm-chart-sim',
+  name: 'ESPHelm e2e chart stand-in',
+  schema: {},
+  start() {
+    app.registerResourceProvider({
+      type: 'charts',
+      methods: {
+        listResources: async () => ({ 'test-chart': CHART }),
+        getResource: async (id) => { if (id !== 'test-chart') throw new Error('not found'); return CHART; },
+        setResource: async () => { throw new Error('read only'); },
+        deleteResource: async () => { throw new Error('read only'); },
+      },
+    });
+    app.get('/signalk/chart-tiles/test-chart/:z/:x/:y.png', (req, res) => {
+      app.tileRequests = (app.tileRequests || 0) + 1;
+      res.type('image/png').send(tile(Number(req.params.z), Number(req.params.x), Number(req.params.y)));
+    });
+  },
+  stop() {},
+});
+`;
+
+/**
  * Start the server. SIGNALK_SERVER=/path/to/bin/signalk-server picks an install; default: the
  * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one);
  * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...);
  * `putEcho` lists paths whose PUTs are accepted and echoed back as deltas; `autopilotSim`
- * installs the autopilot stand-in above.
+ * installs the autopilot stand-in above; `chartSim` the charts stand-in.
  */
 export async function startSignalK(
-  opts: { port?: number; sampleData?: boolean; putEcho?: string[]; autopilotSim?: boolean } = {},
+  opts: {
+    port?: number;
+    sampleData?: boolean;
+    putEcho?: string[];
+    autopilotSim?: boolean;
+    chartSim?: boolean;
+  } = {},
 ): Promise<SignalKHarness> {
   if (!existsSync(join(PLUGIN_DIR, 'dist/index.js'))) throw new Error('run `npm run build` first');
   const bin = realpathSync(
@@ -203,6 +261,26 @@ export async function startSignalK(
       JSON.stringify({ enabled: true, configuration: {} }),
     );
     dependencies['esphelm-autopilot-sim'] = '*';
+  }
+  if (opts.chartSim) {
+    const sim = join(config, 'node_modules', 'esphelm-chart-sim');
+    mkdirSync(sim);
+    writeFileSync(
+      join(sim, 'package.json'),
+      JSON.stringify({
+        name: 'esphelm-chart-sim',
+        version: '1.0.0',
+        main: 'index.js',
+        keywords: ['signalk-node-server-plugin'],
+      }),
+    );
+    const pngjs = createRequire(join(PLUGIN_DIR, 'package.json')).resolve('pngjs');
+    writeFileSync(join(sim, 'index.js'), CHART_SIM_PLUGIN(pngjs));
+    writeFileSync(
+      join(config, 'plugin-config-data', 'esphelm-chart-sim.json'),
+      JSON.stringify({ enabled: true, configuration: {} }),
+    );
+    dependencies['esphelm-chart-sim'] = '*';
   }
   writeFileSync(
     join(config, 'package.json'),

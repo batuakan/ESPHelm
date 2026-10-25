@@ -20,11 +20,14 @@
     "e2e": "tsx scripts/e2e.ts"
   },
   "dependencies": {
-    "@esphelm/schema": "1.0.0"
+    "@esphelm/schema": "1.0.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@signalk/server-api": "2.33.0",
     "@types/express": "4.17.25",
+    "@types/pngjs": "^6.0.5",
     "express": "4.22.3"
   },
   "signalk": {

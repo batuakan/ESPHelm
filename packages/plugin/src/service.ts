@@ -1,6 +1,7 @@
 import type { Path } from '@signalk/server-api';
-import { securityMode, type PluginHost, type SecurityMode } from './host.js';
+import { httpPort, securityMode, type PluginHost, type SecurityMode } from './host.js';
 import { Store, type DeviceRecord, type StoredLayout } from './store.js';
+import { resourcesChartSource, TileService, type ChartSource } from './tiles.js';
 
 export const PLUGIN_ID = 'esphelm';
 
@@ -24,11 +25,16 @@ export function versionPath(deviceId: string): string {
  */
 export class Service {
   private store: Store | undefined;
+  /** RGB565 chart tiles for displays (ADR-0012). */
+  readonly tiles: TileService;
 
   constructor(
     private readonly host: PluginHost,
     private readonly now: () => Date = () => new Date(),
-  ) {}
+    charts: ChartSource = resourcesChartSource(host.resourcesApi, () => httpPort(host)),
+  ) {
+    this.tiles = new TileService(charts);
+  }
 
   start(): void {
     const store = new Store(

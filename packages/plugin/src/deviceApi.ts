@@ -18,6 +18,7 @@ function requireStore(service: Service, res: Response): Store | undefined {
  * Device-facing API (read/write device token required, ADR-0003):
  *   POST /signalk/v1/api/esphelm/devices/hello
  *   GET  /signalk/v1/api/esphelm/devices/:id/layout   (ETag / If-None-Match -> 304)
+ *   GET  /signalk/v1/api/esphelm/tiles/:chart/:z/:x/:y  (raw RGB565 chart tile, ADR-0012)
  */
 export function registerDeviceApi(router: IRouter, service: Service): IRouter {
   router.post(`${DEVICE_API_PREFIX}/devices/hello`, (req: Request, res: Response) => {
@@ -79,6 +80,35 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       return;
     }
     res.status(200).type('application/json').send(served.bytes);
+  });
+
+  router.get(`${DEVICE_API_PREFIX}/tiles/:chart/:z/:x/:y`, async (req: Request, res: Response) => {
+    const auth = authorizeDevice(req, service.security);
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error, message: auth.message });
+      return;
+    }
+    const [z, x, y] = [req.params.z, req.params.x, req.params.y].map((v) =>
+      /^\d{1,8}$/.test(String(v)) ? Number(v) : NaN,
+    );
+    const tile = await service.tiles.rgb565(
+      String(req.params.chart),
+      z!,
+      x!,
+      y!,
+      req.header('Authorization'),
+    );
+    if (!tile.ok) {
+      res.status(tile.status).json({ error: tile.error, message: tile.message });
+      return;
+    }
+    res.setHeader('ETag', tile.etag);
+    res.setHeader('Cache-Control', 'max-age=3600');
+    if (ifNoneMatchHits(req.header('If-None-Match'), tile.etag)) {
+      res.status(304).end();
+      return;
+    }
+    res.status(200).type('application/octet-stream').send(tile.body);
   });
 
   return router;

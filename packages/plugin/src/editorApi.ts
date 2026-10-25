@@ -30,6 +30,7 @@ function deviceView(service: Service, device: DeviceRecord) {
  * Editor API (used by the web editor, Phase 4):
  *   GET    /plugins/esphelm/api/widgets
  *   GET    /plugins/esphelm/api/paths
+ *   GET    /plugins/esphelm/api/charts
  *   GET    /plugins/esphelm/api/layouts            GET|PUT|DELETE /plugins/esphelm/api/layouts/:id
  *   GET    /plugins/esphelm/api/devices            PUT|DELETE     /plugins/esphelm/api/devices/:id
  */
@@ -41,6 +42,11 @@ export function registerEditorApi(router: IRouter, service: Service): void {
       units: UNITS,
       quantities: QUANTITIES,
     });
+  });
+
+  // Charts the boat's SignalK charts plugin offers, for chart pages (ADR-0012)
+  router.get(`${EDITOR_API_PREFIX}/charts`, async (_req: Request, res: Response) => {
+    res.json(await service.tiles.listCharts());
   });
 
   // SignalK paths for the editor's path picker

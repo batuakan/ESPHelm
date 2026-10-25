@@ -11,15 +11,23 @@ export type PluginHost = Pick<
   | 'error'
   | 'getSelfPath'
   | 'getMetadata'
-> & {
-  streambundle: Pick<ServerAPI['streambundle'], 'getAvailablePaths'>;
-} & {
-  /**
-   * Not part of @signalk/server-api's public types, but present on every server: the dummy
-   * strategy (security disabled) answers `isDummy() === true`.
-   */
-  securityStrategy?: { isDummy?: () => boolean };
-};
+> &
+  Partial<Pick<ServerAPI, 'resourcesApi'>> & {
+    streambundle: Pick<ServerAPI['streambundle'], 'getAvailablePaths'>;
+  } & {
+    /**
+     * Not part of @signalk/server-api's public types, but present on every server: the dummy
+     * strategy (security disabled) answers `isDummy() === true`.
+     */
+    securityStrategy?: { isDummy?: () => boolean };
+    /** Not in the public types either; used to reach this server's own chart tiles. */
+    config?: { settings?: { port?: number } };
+  };
+
+/** This server's HTTP port, as signalk-server itself works it out (src/ports.ts). */
+export function httpPort(host: PluginHost): number {
+  return Number(process.env.PORT) || host.config?.settings?.port || 3000;
+}
 
 export type SecurityMode = 'enabled' | 'disabled';
 

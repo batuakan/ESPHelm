@@ -23,7 +23,7 @@ const fixture = (rel: string): Record<string, unknown> =>
   JSON.parse(readFileSync(join(SCHEMA_FIXTURES, rel), 'utf8')) as Record<string, unknown>;
 
 async function main(): Promise<void> {
-  const sk = await startSignalK();
+  const sk = await startSignalK({ chartSim: true });
   try {
     console.log(`signalk-server ${sk.version} (${sk.bin}) on ${sk.base}\n`);
     const { json, admin } = sk;
@@ -144,6 +144,36 @@ async function main(): Promise<void> {
       r.status === 200 && typeof r.body === 'object',
       String(r.status),
     );
+
+    // Chart tiles (ADR-0012): the charts stand-in serves PNG tiles; displays get RGB565.
+    r = await json('GET', '/plugins/esphelm/api/charts', admin);
+    check(
+      'the editor lists the charts of the charts plugin',
+      Array.isArray(r.body) &&
+        (r.body as unknown as { identifier: string; supported: boolean }[]).some(
+          (c) => c.identifier === 'test-chart' && c.supported,
+        ),
+      JSON.stringify(r.body),
+    );
+    const tilePath = '/signalk/v1/api/esphelm/tiles/test-chart/12/2200/1300';
+    const tile = await fetch(sk.base + tilePath, { headers: { Authorization: `Bearer ${rw}` } });
+    const bytes = Buffer.from(await tile.arrayBuffer());
+    check(
+      'a device gets a 256x256 RGB565 tile',
+      tile.status === 200 && bytes.length === 256 * 256 * 2,
+      `${tile.status} ${bytes.length} bytes`,
+    );
+    const tileEtag = tile.headers.get('etag') ?? '';
+    const again = await fetch(sk.base + tilePath, {
+      headers: { Authorization: `Bearer ${rw}`, 'If-None-Match': tileEtag },
+    });
+    check('the same tile again with its ETag is 304', again.status === 304, String(again.status));
+    const anon = await fetch(sk.base + tilePath);
+    check('tiles need a device token', anon.status === 401, String(anon.status));
+    const unknown = await fetch(sk.base + '/signalk/v1/api/esphelm/tiles/nope/1/0/0', {
+      headers: { Authorization: `Bearer ${rw}` },
+    });
+    check('an unknown chart is 404', unknown.status === 404, String(unknown.status));
   } finally {
     await sk.stop();
   }
