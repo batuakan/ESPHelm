@@ -33,7 +33,10 @@ esphelm_runtime:
   stale_after: 15s                # default when a tile sets no staleAfter
   # max_layout_bytes: 65536       # override the computed capacity
   # store_dir: "."                # host build only: where the cache files go
+  # backlight: display_backlight  # a dimmable light: layout brightness and screen timeout
 ```
+
+`backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
 
 Ready-made configs:
 
@@ -59,6 +62,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Layout with more than one page | a footer: `<` and `>` buttons (disabled at the ends) and "title n/m" |
 | An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
+| Layout `settings` (ADR-0015) | the start page at boot and when the start page changes; the night theme while `environment.sun` is dusk or night (`autoTheme: sun`, the page is rebuilt); day/night brightness; after `screenTimeout` s without a touch (at least 10) the backlight goes off under a black cover that swallows the waking touch. An `alarm`/`emergency` switches it back on |
 | A layout crashed the display (boot guard, ADR-0013) | the last known good layout (else the status page); the crashing layout is refused until a changed one is sent |
 
 **Protocol** (`docs/plugin-api.md`):
@@ -160,8 +164,8 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 94,924 B (16.5 %), flash 2.68 MB (16.2 %) |
-| C3 compile check, static | RAM 108,944 B of 321,296 B (33.9 %), flash 1.25 MB of 1.8 MB (68.1 %) |
+| P4 runtime firmware, static | RAM 95,262 B (16.5 %), flash 2.69 MB (16.3 %) |
+| C3 compile check, static | RAM 109,208 B of 321,296 B (34.0 %), flash 1.26 MB of 1.8 MB (68.8 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -200,7 +204,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
       - offline, a cached layout that crashes is tried twice, then the last known good layout is shown, also after a normal restart
   16. **alarms**: a depth alarm and a battery warning show in the banner (worst first, "+1"); tapping shows the next; ACK goes to the plugin, which silences the alarm on the server; both acknowledged give the strip; an escalation to `emergency` shows the full banner again; back to `normal` clears it
 
-  Thirty-one screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`)
+
+  Thirty-four screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -229,3 +235,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - ACK is easy to hit. After ACK, apps that play sounds (e.g. the SignalK admin's notification sound, or KIP) go quiet, and the banner shrinks to a strip.
     - Make the alarm worse (`alarm` → `emergency`): the full banner comes back.
     - At night, the banner is dark with red text, with no bright area.
+13. **Display settings.** In the editor's display settings, set day brightness 100 %, night 10 %, a 30 s screen timeout and *Auto day/night*. Save & send.
+    - Without touching, the backlight turns off after 30 s. One tap turns it on again **without** pressing anything under your finger (try it over a switch tile).
+    - A new alarm turns the screen on.
+    - Switch the display theme (or wait for dusk with the derived-data plugin's `environment.sun`): night is clearly dimmer, and day goes back to full brightness. Check that 10 % is still readable in the dark and that the backlight doesn't flicker at low brightness (the LEDC runs at 100 Hz).

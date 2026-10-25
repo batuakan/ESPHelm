@@ -237,7 +237,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `widgets` | tile types this firmware renders |
 | `fonts?` | semantic font sizes available |
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
-| `capabilities` | `touch`, `put` (the token allows PUT) |
+| `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight) |
 | `layoutEtag?` | ETag of the cached layout |
 | `recovery?` | `skippedLayoutEtag`: a layout that crashed the display; refused until a changed one is sent (ADR-0013) |
 

@@ -34,6 +34,9 @@ signalk:
   host: !secret signalk_host
 
 lvgl:
+  # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015), so the
+  # hardware package's fixed idle timeout is removed.
+  on_idle: !remove
   pages:
     - id: esphelm_page
       widgets:
@@ -49,4 +52,5 @@ esphelm_runtime:
     label: esphelm_font_label
     small: esphelm_font_small
   board: waveshare-esp32-p4-86
+  backlight: display_backlight
   touch: true

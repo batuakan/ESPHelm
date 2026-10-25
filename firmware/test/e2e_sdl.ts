@@ -574,6 +574,63 @@ async function main(): Promise<void> {
       'alarms: back to normal, the banner goes away',
       (await fw.waitLog(/belowTransducer cleared/)) && (await fw.waitLog(/house\.voltage cleared/)),
     );
+
+    // 9c. Display settings (ADR-0015): the start page, day/night by environment.sun, and the
+    //     screen switching off without a touch (woken by an alarm and by a touch). The SDL
+    //     build has no backlight, so brightness is only logged.
+    const settings = fixture('valid/settings.json');
+    settings.theme = 'day';
+    settings.settings = {
+      brightness: { day: 90, night: 12 },
+      startPage: 'second',
+      autoTheme: 'sun',
+      screenTimeout: 10,
+    };
+    publish({ 'environment.sun': 'day' });
+    await json('PUT', '/plugins/esphelm/api/layouts/settings', admin, settings);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'settings' });
+    check(
+      'settings: the layout opens on its start page',
+      (await fw.waitLog(/Showing fetched layout "settings"/)) &&
+        (await fw.waitLog(/Page 2\/2 "Second"/)),
+    );
+    publish({ 'navigation.speedThroughWater': 2.4 });
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    await sleep(1500);
+    await fw.screenshot('25-settings-day-alarm', shots);
+    publish({ 'environment.sun': 'dusk' });
+    check(
+      'settings: dusk switches to the night theme',
+      await fw.waitLog(/Sun: dusk, switching to the night theme/),
+    );
+    publish({ 'navigation.speedThroughWater': 2.4 });
+    await sleep(1500);
+    await fw.screenshot('26-settings-night-alarm', shots);
+    check(
+      'settings: night brightness is applied',
+      fw.count(/Brightness 12 % \(no backlight configured\)/) >= 1,
+    );
+    notify(DEPTH, 'normal', '', []);
+    check(
+      'settings: the screen switches off after 10 s without a touch',
+      await fw.waitLog(/Screen off after 10 s without a touch/, 20000),
+    );
+    await sleep(500);
+    await fw.screenshot('27-settings-screen-off', shots);
+    notify(DEPTH, 'alarm', 'Shallow water: 2.0 m');
+    check('settings: an alarm switches the screen on', await fw.waitLog(/Screen on \(alarm\)/));
+    notify(DEPTH, 'normal', '', []);
+    check(
+      'settings: off again without a touch',
+      await fw.waitLog(/Screen off after 10 s without a touch/, 20000, 2),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
+    check('settings: a touch switches it on', await fw.waitLog(/Screen on \(touch\)/));
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
+    check(
+      'settings: back to the multi-page layout (no settings: its first page, never off)',
+      await fw.waitLog(/Showing fetched layout "multi-480"/, 15000, 1),
+    );
     writeFileSync(join(fw.workDir, 'esphelm_page_request'), '4');
     await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 2);
     await sleep(1500);

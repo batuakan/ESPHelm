@@ -15,6 +15,10 @@
 #include "esphome/components/font/font.h"
 #include "esphome/components/signalk/signalk.h"
 #include "esphome/core/component.h"
+#include "esphome/core/defines.h"
+#ifdef USE_ESPHELM_BACKLIGHT
+#include "esphome/components/light/light_state.h"
+#endif
 
 #include "alarms.h"
 #include "layout_client.h"
@@ -40,6 +44,9 @@ class EsphelmRuntime : public Component {
   void set_stale_after(uint32_t ms) { this->stale_after_ms_ = ms; }
   void set_max_layout_bytes(size_t bytes) { this->max_layout_bytes_ = bytes; }
   void set_store_dir(const std::string &dir) { this->store_.set_dir(dir); }
+#ifdef USE_ESPHELM_BACKLIGHT
+  void set_backlight(light::LightState *backlight) { this->backlight_ = backlight; }
+#endif
 
   void setup() override;
   void loop() override;
@@ -73,6 +80,16 @@ class EsphelmRuntime : public Component {
   void compute_capacity_();
   void check_boot_record_(const std::string &cached_etag);
   void save_boot_record_();
+  // Display settings (ADR-0015)
+  esphelm::Theme effective_theme_() const;
+  void watch_sun_();
+  void on_sun_(ArduinoJson::JsonVariantConst value);
+  void apply_brightness_();
+  void set_backlight_(bool on, int percent);
+  void sleep_();
+  void wake_(const char *why);
+  void check_sleep_(uint32_t now);
+  bool has_backlight_() const;
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
@@ -112,6 +129,21 @@ class EsphelmRuntime : public Component {
   std::string boot_etag_;
   unsigned boot_attempts_{0};
   std::string bad_etag_;
+
+  // Display settings (ADR-0015): the layout's own theme, what environment.sun says, the
+  // brightness last applied, and the screen timeout's state.
+  esphelm::Theme base_theme_{esphelm::Theme::DAY};
+  int8_t sun_night_{-1};  // -1 unknown, 0 not night, 1 dusk or night
+  std::string sun_path_;
+  uint32_t sun_listener_{0};
+  int applied_brightness_{-1};
+  bool asleep_{false};
+  bool wake_wanted_{false};  // set by a touch on the sleep cover (inside an LVGL event)
+  lv_obj_t *sleep_cover_{nullptr};
+  uint32_t next_sleep_check_ms_{0};
+#ifdef USE_ESPHELM_BACKLIGHT
+  light::LightState *backlight_{nullptr};
+#endif
 
   // Protocol state
   ServerState server_state_{ServerState::UNKNOWN};

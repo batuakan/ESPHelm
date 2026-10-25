@@ -133,6 +133,10 @@
         },
         "put": {
           "type": "boolean"
+        },
+        "backlight": {
+          "type": "boolean",
+          "description": "The firmware can dim the backlight (settings.brightness)."
         }
       },
       "additionalProperties": false

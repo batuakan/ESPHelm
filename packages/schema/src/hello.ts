@@ -46,7 +46,15 @@ export const Hello = Type.Object(
       },
     ),
     capabilities: Type.Object(
-      { touch: Type.Boolean(), put: Type.Boolean() },
+      {
+        touch: Type.Boolean(),
+        put: Type.Boolean(),
+        backlight: Type.Optional(
+          Type.Boolean({
+            description: 'The firmware can dim the backlight (settings.brightness).',
+          }),
+        ),
+      },
       { additionalProperties: false },
     ),
     layoutEtag: Type.Optional(Type.String({ description: 'ETag of the cached layout, if any.' })),

@@ -184,6 +184,13 @@ void EsphelmRuntime::loop() {
   } else {
     this->update_status_();
   }
+  if (this->alarms_.take_wake())
+    this->wake_("alarm");
+  if (this->wake_wanted_) {
+    this->wake_wanted_ = false;
+    this->wake_("touch");
+  }
+  this->check_sleep_(now);
   this->alarms_.tick(this->theme_, connected,
                      authorized && connected && this->server_state_ != ServerState::UNKNOWN);
   // The banner pushes the page down instead of covering it, so no control hides under it.
@@ -227,6 +234,7 @@ void EsphelmRuntime::send_hello_() {
 #endif
   doc["capabilities"]["touch"] = this->touch_;
   doc["capabilities"]["put"] = true;
+  doc["capabilities"]["backlight"] = this->has_backlight_();
   if (!this->etag_.empty())
     doc["layoutEtag"] = this->etag_;
   if (!this->bad_etag_.empty())
@@ -360,10 +368,25 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
              this->layout_error_.c_str());
     return false;  // keep whatever is shown
   }
-  // Stay on the same page when the same layout is updated and the page still exists.
-  const bool same_layout = this->has_layout_ && parsed.layout.id == this->layout_.id;
-  size_t page = same_layout && this->page_ < parsed.layout.pages.size() ? this->page_ : 0;
+  // Stay on the same page when the same layout is updated (with the same start page) and the
+  // page still exists; otherwise start at the start page (settings.startPage, else the first).
+  const bool same_layout = this->has_layout_ && parsed.layout.id == this->layout_.id &&
+                           parsed.layout.settings.start_page == this->layout_.settings.start_page;
+  size_t page = 0;
+  if (same_layout && this->page_ < parsed.layout.pages.size()) {
+    page = this->page_;
+  } else {
+    for (size_t i = 0; i < parsed.layout.pages.size(); i++) {
+      if (parsed.layout.pages[i].id == parsed.layout.settings.start_page)
+        page = i;
+    }
+  }
   this->layout_ = std::move(parsed.layout);
+  // The theme the page is built with: the layout's, or night by environment.sun (autoTheme).
+  this->base_theme_ = this->layout_.theme;
+  if (this->layout_.settings.auto_theme_path != this->sun_path_)
+    this->sun_night_ = -1;  // a different source: unknown until its value arrives
+  this->layout_.theme = this->effective_theme_();
   // Count the attempt before building: if building or showing it crashes the display, the next
   // boot knows which layout it was.
   this->boot_attempts_ = etag == this->boot_etag_ ? this->boot_attempts_ + 1 : 1;
@@ -380,6 +403,10 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->layout_error_.clear();
   this->theme_ = this->layout_.theme;
   this->has_layout_ = true;
+  this->watch_sun_();
+  if (this->asleep_)
+    this->wake_("new layout");
+  this->apply_brightness_();
   this->status_key_.clear();
   this->etag_ = etag;
   this->body_ = body;
@@ -390,6 +417,140 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   ESP_LOGI(TAG, "Showing %s layout \"%s\" (%u pages, %u bytes, ETag %s)", origin, this->layout_.id.c_str(),
            (unsigned) this->layout_.pages.size(), (unsigned) body.size(), etag.c_str());
   return true;
+}
+
+// ---- Display settings (ADR-0015) ----
+
+bool EsphelmRuntime::has_backlight_() const {
+#ifdef USE_ESPHELM_BACKLIGHT
+  return this->backlight_ != nullptr;
+#else
+  return false;
+#endif
+}
+
+esphelm::Theme EsphelmRuntime::effective_theme_() const {
+  if (this->layout_.settings.auto_theme == esphelm::AutoTheme::SUN && this->sun_night_ == 1)
+    return esphelm::Theme::NIGHT;
+  return this->base_theme_;
+}
+
+void EsphelmRuntime::watch_sun_() {
+  const bool wanted = this->layout_.settings.auto_theme == esphelm::AutoTheme::SUN;
+  const std::string &path = this->layout_.settings.auto_theme_path;
+  if (wanted && path == this->sun_path_)
+    return;
+  if (!this->sun_path_.empty())
+    this->signalk_->remove_listener(this->sun_listener_);
+  this->sun_path_.clear();
+  if (!wanted)
+    return;
+  this->sun_path_ = path;
+  this->sun_listener_ = this->signalk_->add_listener(
+      path, [this](const std::string &, ArduinoJson::JsonVariantConst v) { this->on_sun_(v); });
+}
+
+void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
+  if (!value.is<const char *>())
+    return;
+  const char *sun = value.as<const char *>();
+  const int8_t night = std::strcmp(sun, "dusk") == 0 || std::strcmp(sun, "night") == 0 ? 1 : 0;
+  if (night == this->sun_night_)
+    return;
+  this->sun_night_ = night;
+  if (!this->has_layout_)
+    return;
+  const esphelm::Theme theme = this->effective_theme_();
+  if (theme == this->layout_.theme)
+    return;
+  ESP_LOGI(TAG, "Sun: %s, switching to the %s theme", sun, theme == esphelm::Theme::NIGHT ? "night" : "day");
+  this->layout_.theme = theme;
+  this->theme_ = theme;
+  this->build_page_(this->page_);  // a theme change rebuilds the page (twice a day)
+  this->apply_brightness_();
+}
+
+void EsphelmRuntime::apply_brightness_() {
+  if (this->asleep_)
+    return;
+  const esphelm::Settings &s = this->layout_.settings;
+  const int percent = this->theme_ == esphelm::Theme::NIGHT ? s.brightness_night : s.brightness_day;
+  if (percent == this->applied_brightness_)
+    return;
+  this->applied_brightness_ = percent;
+  if (this->has_backlight_())
+    ESP_LOGI(TAG, "Brightness %d %%", percent);
+  else
+    ESP_LOGD(TAG, "Brightness %d %% (no backlight configured)", percent);
+  this->set_backlight_(true, percent);
+}
+
+void EsphelmRuntime::set_backlight_(bool on, int percent) {
+#ifdef USE_ESPHELM_BACKLIGHT
+  if (this->backlight_ == nullptr)
+    return;
+  if (on) {
+    auto call = this->backlight_->turn_on();
+    call.set_brightness(percent / 100.0f);
+    call.set_transition_length(400);
+    call.perform();
+  } else {
+    this->backlight_->turn_off().perform();
+  }
+#endif
+}
+
+void EsphelmRuntime::check_sleep_(uint32_t now) {
+  if (now < this->next_sleep_check_ms_)
+    return;
+  this->next_sleep_check_ms_ = now + 500;
+#ifdef USE_ESPHELM_BACKLIGHT
+  // A touch while asleep may be handled by the board's YAML (it resumes LVGL and turns the light
+  // on); that touch never reached LVGL, so nothing on the page was pressed.
+  if (this->asleep_ && this->backlight_ != nullptr && this->backlight_->remote_values.is_on()) {
+    this->wake_("touch");
+    return;
+  }
+#endif
+  const uint32_t timeout = this->layout_.settings.screen_timeout;
+  if (this->asleep_ || !this->has_layout_ || timeout == 0)
+    return;
+  const uint32_t after_ms = std::max<uint32_t>(timeout, 10) * 1000;
+  if (lv_display_get_inactive_time(nullptr) >= after_ms)
+    this->sleep_();
+}
+
+void EsphelmRuntime::sleep_() {
+  ESP_LOGI(TAG, "Screen off after %u s without a touch", (unsigned) std::max<uint32_t>(this->layout_.settings.screen_timeout, 10));
+  this->asleep_ = true;
+  // A black cover on the system layer (above the alarm banner) catches the first touch, so
+  // waking the screen never presses a button underneath.
+  if (this->sleep_cover_ == nullptr) {
+    this->sleep_cover_ = lv_obj_create(lv_layer_sys());
+    lv_obj_remove_style_all(this->sleep_cover_);
+    lv_obj_set_size(this->sleep_cover_, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(this->sleep_cover_, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(this->sleep_cover_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_add_flag(this->sleep_cover_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(
+        this->sleep_cover_,
+        [](lv_event_t *e) { static_cast<EsphelmRuntime *>(lv_event_get_user_data(e))->wake_wanted_ = true; },
+        LV_EVENT_PRESSED, this);
+  }
+  lv_obj_remove_flag(this->sleep_cover_, LV_OBJ_FLAG_HIDDEN);
+  this->set_backlight_(false, 0);
+}
+
+void EsphelmRuntime::wake_(const char *why) {
+  lv_display_trigger_activity(nullptr);
+  if (!this->asleep_)
+    return;
+  ESP_LOGI(TAG, "Screen on (%s)", why);
+  this->asleep_ = false;
+  if (this->sleep_cover_ != nullptr)
+    lv_obj_add_flag(this->sleep_cover_, LV_OBJ_FLAG_HIDDEN);
+  this->applied_brightness_ = -1;
+  this->apply_brightness_();
 }
 
 // ---- Boot guard (ADR-0013) ----
@@ -473,6 +634,13 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
     this->alarms_.tap(part);
     return;
   }
+  if (tile_id == "@screen") {  // a touch on the switched-off screen
+    if (this->asleep_)
+      this->wake_wanted_ = true;
+    else
+      lv_display_trigger_activity(nullptr);
+    return;
+  }
   for (auto &w : this->widgets_) {
     if (w->id() == tile_id) {
       w->tap(part);
@@ -486,6 +654,12 @@ void EsphelmRuntime::clear_layout_() {
   for (uint32_t id : this->listeners_)
     this->signalk_->remove_listener(id);
   this->listeners_.clear();
+  if (!this->sun_path_.empty()) {
+    this->signalk_->remove_listener(this->sun_listener_);
+    this->sun_path_.clear();
+  }
+  if (this->asleep_)
+    this->wake_("no layout");
   this->widgets_.clear();
   this->has_layout_ = false;
   this->etag_.clear();

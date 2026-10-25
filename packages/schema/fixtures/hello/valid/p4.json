@@ -37,7 +37,8 @@
   },
   "capabilities": {
     "touch": true,
-    "put": true
+    "put": true,
+    "backlight": true
   },
   "layoutEtag": "\"7f3a9c\""
 }
