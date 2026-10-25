@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Hello, Layout } from '@esphelm/schema';
@@ -75,6 +75,51 @@ describe('Store', () => {
       firstSeen: '2026-10-24T10:00:00.000Z',
       lastSeen: '2026-10-24T11:00:00.000Z',
     });
+  });
+
+  it('migrates a stored layout with the old wind-rose page kind, once', () => {
+    mkdirSync(join(dir, 'layouts'), { recursive: true });
+    const old = {
+      ...minimal,
+      id: 'old',
+      pages: [
+        ...minimal.pages,
+        {
+          kind: 'widget',
+          widget: 'wind_rose',
+          id: 'wind',
+          config: { showTrueWind: false },
+          slots: {},
+        },
+      ],
+    };
+    writeFileSync(join(dir, 'layouts', 'old.json'), JSON.stringify(old));
+    const logs: string[] = [];
+    const s = new Store(
+      dir,
+      (m) => problems.push(m),
+      (m) => logs.push(m),
+    );
+    s.load();
+    expect(problems).toEqual([]);
+    expect(logs).toEqual([expect.stringContaining('old.json: wind-rose pages migrated')]);
+    const page = s.getLayout('old')?.layout.pages[1];
+    expect(page).toMatchObject({
+      kind: 'grid',
+      id: 'wind',
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'wind_rose', id: 'wind-rose', config: { showTrueWind: false }, slots: {} }],
+    });
+    // Rewritten on disk with the bytes that are served, so the next load has nothing to do.
+    const onDisk = readFileSync(join(dir, 'layouts', 'old.json'));
+    expect(onDisk.equals(s.getLayout('old')!.bytes)).toBe(true);
+    logs.length = 0;
+    new Store(
+      dir,
+      (m) => problems.push(m),
+      (m) => logs.push(m),
+    ).load();
+    expect(logs).toEqual([]);
   });
 
   it('skips and reports invalid files instead of serving them', () => {

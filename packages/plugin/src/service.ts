@@ -31,10 +31,14 @@ export class Service {
   ) {}
 
   start(): void {
-    const store = new Store(this.host.getDataDirPath(), (msg) => {
-      this.host.error(msg);
-      this.host.setPluginError(msg);
-    });
+    const store = new Store(
+      this.host.getDataDirPath(),
+      (msg) => {
+        this.host.error(msg);
+        this.host.setPluginError(msg);
+      },
+      (msg) => this.host.debug(msg),
+    );
     store.load();
     this.store = store;
     // Publish every device's current version so a subscribing device gets it replayed.

@@ -1,6 +1,6 @@
 import {
   LABEL_PATTERN,
-  PAGE_WIDGETS,
+  TILE_SLOTS,
   QUANTITIES,
   TILE_TYPES,
   UNITS,
@@ -37,9 +37,7 @@ export function registerEditorApi(router: IRouter, service: Service): void {
   router.get(`${EDITOR_API_PREFIX}/widgets`, (_req: Request, res: Response) => {
     res.json({
       tiles: Object.keys(TILE_TYPES),
-      pageWidgets: Object.fromEntries(
-        Object.entries(PAGE_WIDGETS).map(([name, w]) => [name, { slots: w.slots }]),
-      ),
+      tileSlots: TILE_SLOTS,
       units: UNITS,
       quantities: QUANTITIES,
     });

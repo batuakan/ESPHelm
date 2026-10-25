@@ -1,6 +1,12 @@
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateHello, validateLayout, type Hello, type Layout } from '@esphelm/schema';
+import {
+  migrateLayout,
+  validateHello,
+  validateLayout,
+  type Hello,
+  type Layout,
+} from '@esphelm/schema';
 import { etagOf, serializeLayout } from './etag.js';
 
 export type DeviceState = 'pending' | 'adopted';
@@ -34,6 +40,8 @@ function writeAtomic(file: string, content: string | Buffer): void {
  *   layouts/<layoutId>.json   one validated layout per file
  *   devices.json              device registry
  * Everything read from disk is validated again; invalid entries are skipped and reported.
+ * Layouts in an older shape (the wind-rose page kind before Phase 5b) are migrated and
+ * rewritten once.
  */
 export class Store {
   private readonly layoutsDir: string;
@@ -44,6 +52,7 @@ export class Store {
   constructor(
     dataDir: string,
     private readonly reportProblem: (message: string) => void,
+    private readonly log: (message: string) => void = () => undefined,
   ) {
     this.layoutsDir = join(dataDir, 'layouts');
     this.devicesFile = join(dataDir, 'devices.json');
@@ -55,9 +64,10 @@ export class Store {
     for (const file of readdirSync(this.layoutsDir).filter((f) => f.endsWith('.json'))) {
       const id = file.slice(0, -'.json'.length);
       try {
-        const result = validateLayout(
+        const migrated = migrateLayout(
           JSON.parse(readFileSync(join(this.layoutsDir, file), 'utf8')),
         );
+        const result = validateLayout(migrated.layout);
         if (!result.ok) {
           this.reportProblem(
             `layout ${file} is invalid (${result.errors.map((e) => e.code).join(', ')}); not served`,
@@ -65,7 +75,12 @@ export class Store {
         } else if (result.value.id !== id) {
           this.reportProblem(`layout ${file} has id "${result.value.id}"; not served`);
         } else {
-          this.layouts.set(id, stored(result.value));
+          const entry = stored(result.value);
+          if (migrated.changed) {
+            writeAtomic(join(this.layoutsDir, file), entry.bytes);
+            this.log(`layout ${file}: wind-rose pages migrated to wind_rose tiles (ADR-0010)`);
+          }
+          this.layouts.set(id, entry);
         }
       } catch (e) {
         this.reportProblem(`layout ${file} could not be read: ${(e as Error).message}`);

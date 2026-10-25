@@ -193,10 +193,11 @@ describe('devices', () => {
 });
 
 describe('widget catalog', () => {
-  it('lists tiles, page widgets with slots, and units', async () => {
+  it('lists tiles, their slots, and units', async () => {
     const body = (await (await api('GET', '/widgets')).json()) as Record<string, unknown>;
-    expect(body.tiles).toEqual(['value', 'gauge', 'bar', 'switch']);
-    expect(body.pageWidgets).toEqual({ wind_rose: { slots: ['center1', 'center2', 'center3'] } });
+    expect(body.tiles).toEqual(['value', 'gauge', 'bar', 'switch', 'wind_rose']);
+    expect(body.tileSlots).toEqual({ wind_rose: ['center1', 'center2', 'center3'] });
+    expect(body).not.toHaveProperty('pageWidgets');
     expect(body.units).toHaveProperty('kn.label', 'kn');
   });
 });

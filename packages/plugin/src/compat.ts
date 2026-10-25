@@ -8,14 +8,9 @@ export interface Compatibility {
   warnings: { code: 'LAYOUT_TOO_LARGE'; message: string }[];
 }
 
-/** Tile types and full-page widgets a layout uses. */
+/** Tile types a layout uses (what a device must list in `hello.widgets`). */
 export function usedWidgets(layout: Layout): Set<string> {
-  const used = new Set<string>();
-  for (const page of layout.pages) {
-    if (page.kind === 'grid') page.tiles.forEach((t) => used.add(t.type));
-    else used.add(page.widget);
-  }
-  return used;
+  return new Set(layout.pages.flatMap((page) => page.tiles.map((t) => t.type)));
 }
 
 export function checkCompatibility(entry: StoredLayout, device: DeviceRecord): Compatibility {
