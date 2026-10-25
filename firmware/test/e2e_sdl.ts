@@ -1,0 +1,265 @@
+/**
+ * End-to-end test of the runtime firmware (SDL host build) against a real signalk-server with
+ * the signalk-esphelm plugin:
+ *   npm run build && npm run e2e:sdl            (UPDATE_GOLDEN=1 to regenerate golden images)
+ * Needs: signalk-server (SIGNALK_SERVER=...), the ESPHome CLI (ESPHOME=..., default
+ * ~/venv/bin/esphome), an X display for SDL, and Python with Pillow (PYTHON=..., default
+ * ~/venv/bin/python). Uses throwaway directories; never touches ~/.signalk.
+ */
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  startSignalK,
+  waitFor,
+  type SignalKHarness,
+} from '../../packages/plugin/scripts/sk-harness.js';
+
+const FIRMWARE = join(dirname(fileURLToPath(import.meta.url)), '..');
+const REPO = join(FIRMWARE, '..');
+const GOLDEN = join(FIRMWARE, 'test/golden');
+const FIXTURES = join(REPO, 'packages/schema/fixtures');
+const ESPHOME = process.env.ESPHOME ?? join(homedir(), 'venv/bin/esphome');
+const PYTHON = process.env.PYTHON ?? join(homedir(), 'venv/bin/python');
+const PORT = Number(process.env.ESPHELM_E2E_PORT ?? 3993);
+const UPDATE = process.env.UPDATE_GOLDEN === '1';
+const BINARY = join(FIRMWARE, '.esphome/build/esphelm-sdl/.pioenvs/esphelm-sdl/program');
+// ESPHomeSignalK's host build uses a fixed device id (utils.h).
+const DEVICE_ID = '12345678-1234-1232-123456789012';
+
+let failures = 0;
+function check(label: string, ok: boolean, detail = ''): void {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
+  if (!ok) failures++;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const fixture = (rel: string) =>
+  JSON.parse(readFileSync(join(FIXTURES, rel), 'utf8')) as Record<string, unknown> & {
+    pages: { tiles: Record<string, unknown>[] }[];
+  };
+
+class Firmware {
+  private proc: ChildProcess | undefined;
+  private out = '';
+  constructor(private readonly work: string) {}
+
+  private runs = 0;
+
+  start(): void {
+    if (this.out) writeFileSync(join(this.work, `firmware-${this.runs}.log`), this.log());
+    this.runs++;
+    this.out = '';
+    this.proc = spawn(BINARY, [], { cwd: this.work, stdio: ['ignore', 'pipe', 'pipe'] });
+    this.proc.stdout?.on('data', (d: Buffer) => (this.out += d.toString()));
+    this.proc.stderr?.on('data', (d: Buffer) => (this.out += d.toString()));
+  }
+
+  log(): string {
+    // Strip ANSI colour codes from the ESPHome logger.
+    return this.out.replace(/\x1b\[[0-9;]*m/g, '');
+  }
+
+  count(re: RegExp): number {
+    return (this.log().match(new RegExp(re.source, 'g')) ?? []).length;
+  }
+
+  async waitLog(re: RegExp, ms = 15000, atLeast = 1): Promise<boolean> {
+    return waitFor(() => this.count(re) >= atLeast, ms);
+  }
+
+  async screenshot(name: string, outDir: string): Promise<void> {
+    const bmp = join(outDir, `${name}.bmp`);
+    writeFileSync(join(this.work, 'esphelm_shot_request'), bmp);
+    const taken = await waitFor(() => existsSync(bmp), 5000);
+    if (!taken) {
+      check(`screenshot ${name}`, false, 'not taken');
+      return;
+    }
+    await sleep(200);
+    const args = ['-I', join(FIRMWARE, 'test/compare_images.py'), bmp, join(GOLDEN, `${name}.png`)];
+    if (UPDATE) args.push('--update');
+    let result: string;
+    try {
+      result = execFileSync(PYTHON, args, { encoding: 'utf8' }).trim();
+    } catch (e) {
+      result = String((e as { stdout?: string }).stdout ?? e).trim();
+    }
+    const status = (JSON.parse(result) as { status: string }).status;
+    check(`screenshot ${name} matches golden`, status === 'match' || status === 'created', result);
+  }
+
+  saveLog(): void {
+    writeFileSync(join(this.work, `firmware-${this.runs}.log`), this.log());
+  }
+
+  async stop(): Promise<void> {
+    if (!this.proc || this.proc.exitCode !== null) return;
+    writeFileSync(join(this.work, 'esphelm_exit_request'), '');
+    const exited = await waitFor(() => this.proc?.exitCode !== null, 5000);
+    if (!exited) this.proc.kill('SIGKILL');
+  }
+}
+
+async function main(): Promise<void> {
+  if (!process.env.DISPLAY) throw new Error('SDL needs an X display (DISPLAY is not set)');
+  console.log(`compiling firmware/esphelm_sdl.yaml for SignalK at 127.0.0.1:${PORT} ...`);
+  execFileSync(
+    ESPHOME,
+    [
+      '-s',
+      'signalk_host',
+      '127.0.0.1',
+      '-s',
+      'signalk_port',
+      String(PORT),
+      'compile',
+      'firmware/esphelm_sdl.yaml',
+    ],
+    { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 30 * 60 * 1000 },
+  );
+
+  const work = mkdtempSync(join(tmpdir(), 'esphelm-fw-'));
+  const shots = join(work, 'shots');
+  mkdirSync(shots);
+  let sk: SignalKHarness | undefined;
+  const fw = new Firmware(work);
+  try {
+    sk = await startSignalK({ port: PORT });
+    console.log(`signalk-server ${sk.version} on ${sk.base}; firmware working dir ${work}\n`);
+    const { json, admin } = sk;
+
+    // 1. First boot: the firmware asks SignalK for access (read/write) and says so on screen.
+    fw.start();
+    const requested = await waitFor(
+      () => fw.count(/Access request is pending approval/) > 0,
+      20000,
+    );
+    const requests = await json('GET', '/skServer/security/access/requests', admin);
+    const mine = (
+      requests.body as unknown as { accessIdentifier: string; permissions: string }[]
+    ).find((r) => r.accessIdentifier === DEVICE_ID);
+    check(
+      'firmware sends an access request asking for read/write',
+      requested && mine?.permissions === 'readwrite',
+      JSON.stringify(mine),
+    );
+    await sleep(1500);
+    await fw.screenshot('01-waiting-for-approval', shots);
+
+    // 2. Approve it: the firmware gets its token, says hello and waits for adoption.
+    await sk.approve(DEVICE_ID, 'readwrite');
+    check(
+      'firmware registers as pending after approval',
+      await fw.waitLog(/pending adoption/, 20000),
+    );
+    await sleep(700);
+    await fw.screenshot('02-adopt-this-display', shots);
+
+    // 3. Adopt and assign a layout: the version delta makes the firmware fetch and render it.
+    const layout = fixture('valid/grid-2x2-values-480.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(layout.id)}`, admin, layout);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      state: 'adopted',
+      layoutId: layout.id,
+    });
+    check(
+      'firmware fetches and renders the assigned layout',
+      await fw.waitLog(/Showing fetched layout "grid-480" \(4 tiles/),
+    );
+
+    // 4. Live values (SI) arrive via the layout-derived subscription and are shown converted.
+    const { ws } = await sk.stream(admin);
+    const publish = (values: Record<string, number>) =>
+      ws.send(
+        JSON.stringify({
+          context: 'vessels.self',
+          updates: [{ values: Object.entries(values).map(([path, value]) => ({ path, value })) }],
+        }),
+      );
+    await sleep(1000);
+    publish({
+      'navigation.speedOverGround': 5.0, // 9.7 kn
+      'environment.wind.speedApparent': 7.2, // 14.0 kn
+      'environment.wind.speedTrue': 6.0, // 11.7 kn
+      'navigation.speedThroughWater': 4.8, // 9.3 kn
+    });
+    await sleep(1500);
+    await fw.screenshot('03-live-values', shots);
+
+    // 5. Edit the layout (drop STW, relabel, short staleAfter): the path set shrinks, so the
+    //    firmware must resubscribe (unsubscribe-all + full subscribe) and keep its socket.
+    const tiles = layout.pages[0]?.tiles ?? [];
+    const edited = {
+      ...layout,
+      pages: [
+        {
+          ...layout.pages[0],
+          tiles: [
+            { ...tiles[0], label: 'Speed', staleAfter: 6, w: 2 },
+            { ...tiles[1], x: 0, y: 1, staleAfter: 6 },
+            { ...tiles[2], x: 1, y: 1, staleAfter: 6 },
+          ],
+        },
+      ],
+    };
+    const saved = await json(
+      'PUT',
+      `/plugins/esphelm/api/layouts/${String(layout.id)}`,
+      admin,
+      edited,
+    );
+    check(
+      'edited layout is accepted by the plugin',
+      saved.status === 200,
+      JSON.stringify(saved.body),
+    );
+    check(
+      'firmware picks up the edit',
+      await fw.waitLog(/Showing fetched layout "grid-480" \(3 tiles/),
+    );
+    // 3 tile paths plus the layout version path.
+    check(
+      'firmware resubscribes when paths are removed',
+      await fw.waitLog(/Resubscribing to 4 paths/),
+    );
+    check(
+      'the SignalK socket stays connected',
+      fw.count(/Connected to SignalK stream/) === 1,
+      `${fw.count(/Connected to SignalK stream/)} connects`,
+    );
+    await sleep(1500);
+    await fw.screenshot('04-edited-layout', shots);
+
+    // 6. Server gone: values go stale instead of freezing.
+    await sk.stop();
+    sk = undefined;
+    await sleep(7500); // > staleAfter (6 s) since the last value
+    await fw.screenshot('05-stale-values', shots);
+
+    // 7. Reboot without a server: the cached layout comes back (offline first).
+    await fw.stop();
+    fw.start();
+    check(
+      'reboot without server shows the cached layout',
+      await fw.waitLog(/Showing cached layout "grid-480" \(3 tiles/),
+    );
+    await sleep(1500);
+    await fw.screenshot('06-offline-cached', shots);
+  } finally {
+    await fw.stop();
+    if (sk) await sk.stop();
+    if (failures > 0) {
+      fw.saveLog();
+      console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
+    } else {
+      rmSync(work, { recursive: true, force: true });
+    }
+  }
+  console.log(failures > 0 ? `\n${failures} check(s) failed` : '\nall checks passed');
+  if (failures > 0) process.exitCode = 1;
+}
+
+await main();

@@ -16,7 +16,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write . && eslint --fix .",
-    "build": "tsc -b packages/*"
+    "build": "tsc -b packages/*",
+    "e2e:sdl": "tsx firmware/test/e2e_sdl.ts"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
