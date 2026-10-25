@@ -1,0 +1,20 @@
+# Fonts for the runtime firmware. Default glyph set (GF_Latin_Kernel): ASCII and the degree sign,
+# which is what layouts may contain. Sizes via substitutions so 480 and 720 screens can differ.
+substitutions:
+  font_value_size: "64"
+  font_label_size: "32"
+  font_small_size: "22"
+
+font:
+  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+    id: esphelm_font_value
+    size: ${font_value_size}
+    bpp: 4
+  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+    id: esphelm_font_label
+    size: ${font_label_size}
+    bpp: 4
+  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+    id: esphelm_font_small
+    size: ${font_small_size}
+    bpp: 4

@@ -1,6 +1,8 @@
 # 2.8" Round Display Development Board, 480×480
 # waveshare-esp32-s3-touch-lcd-2.1c
 substitutions:
+  # esp32_hosted coprocessor firmware, relative to the top-level config dir
+  esp32_hosted_firmware: network_adapter_esp32c6.bin
   # Screen Size
   screen_height: 720
   screen_width: 720
@@ -65,7 +67,7 @@ update:
   - platform: esp32_hosted
     id: esp32_hosted_update
     type: embedded
-    path: network_adapter_esp32c6.bin
+    path: ${esp32_hosted_firmware}
     sha256: 7868ed3949bcf5c0d64f212ab375919fe8c1d4424ca1f16074316294578fed83
 
 preferences:

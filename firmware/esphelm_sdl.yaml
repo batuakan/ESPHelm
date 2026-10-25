@@ -1,0 +1,68 @@
+# Runtime firmware on the desktop (SDL host build), 480x480.
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl.yaml
+# The SignalK token and the cached layout are stored in the working directory of the binary.
+substitutions:
+  screen_width: "480"
+  screen_height: "480"
+  signalk_host: "127.0.0.1"
+  signalk_port: "3000"
+
+packages:
+  hardware: !include ../legacy/modules/hardware/sdl.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-sdl
+
+external_components:
+  # ESPHomeSignalK checkout next to this repository (see CLAUDE.md §3).
+  - source:
+      type: local
+      path: ../../ESPHomeSignalK/components
+    components: [signalk]
+
+signalk:
+  host: ${signalk_host}
+  port: ${signalk_port}
+
+lvgl:
+  id: lvgl_component
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+esphelm_runtime:
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+  board: sdl-480
+  touch: true
+
+# Test hooks for firmware/test/e2e_sdl.ts: a file named esphelm_shot_request containing a path
+# makes the binary save a screenshot there; esphelm_exit_request makes it exit cleanly.
+interval:
+  - interval: 250ms
+    then:
+      - lambda: |-
+          FILE *f = fopen("esphelm_shot_request", "r");
+          if (f != nullptr) {
+            char path[256] = {0};
+            if (fgets(path, sizeof(path), f) != nullptr) {
+              path[strcspn(path, "\r\n")] = 0;
+              id(my_screenshot)->take_screenshot(std::string(path));
+            }
+            fclose(f);
+            remove("esphelm_shot_request");
+          }
+          FILE *x = fopen("esphelm_exit_request", "r");
+          if (x != nullptr) {
+            fclose(x);
+            remove("esphelm_exit_request");
+            exit(0);
+          }

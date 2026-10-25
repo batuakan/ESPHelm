@@ -18,6 +18,11 @@ namespace esphome
 
         void Screenshot::take_screenshot()
         {
+            take_screenshot(generate_filename());
+        }
+
+        void Screenshot::take_screenshot(const std::string &filename)
+        {
             const Uint32 format = SDL_PIXELFORMAT_ARGB8888;
 
             SDL_Window *window = SDL_GetWindowFromID(1);
@@ -36,7 +41,6 @@ namespace esphome
 
             SDL_RenderReadPixels(renderer, NULL, format, surface->pixels, surface->pitch);
 
-            std::string filename = generate_filename();
             SDL_SaveBMP(surface, filename.c_str());
             SDL_FreeSurface(surface);
 
