@@ -14,6 +14,8 @@
     "packages/*/scripts/**/*.ts",
     "packages/*/test/**/*.ts",
     "vitest.config.ts",
-    "firmware/test/**/*.ts"
-  ]
+    "firmware/test/**/*.ts",
+    "packages/*/e2e/**/*.ts"
+  ],
+  "exclude": ["packages/editor/src/**", "packages/editor/test/**"]
 }

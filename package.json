@@ -13,11 +13,12 @@
   "scripts": {
     "generate": "npm run generate --workspaces --if-present",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/editor",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write . && eslint --fix .",
-    "build": "tsc -b packages/*",
-    "e2e:sdl": "tsx firmware/test/e2e_sdl.ts"
+    "build": "tsc -b packages/schema packages/plugin && npm run build -w @esphelm/editor",
+    "e2e:sdl": "tsx firmware/test/e2e_sdl.ts",
+    "e2e:editor": "tsx packages/editor/e2e/e2e_editor.ts"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
@@ -26,6 +27,7 @@
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "playwright-core": "1.64.0"
   }
 }

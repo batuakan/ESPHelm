@@ -2,7 +2,13 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/.esphome/**', 'packages/*/generated/**'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.esphome/**',
+      'packages/*/generated/**',
+      'packages/plugin/public/**',
+    ],
   },
   ...tseslint.configs.recommended,
   {

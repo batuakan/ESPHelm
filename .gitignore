@@ -18,3 +18,5 @@ __pycache__/
 node_modules/
 dist/
 *.tsbuildinfo
+# Editor build output (npm run build)
+packages/plugin/public/
