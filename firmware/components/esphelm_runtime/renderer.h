@@ -35,11 +35,17 @@ class Renderer {
 
   const Fonts &fonts() const { return this->fonts_; }
 
+  /// Keep the top `px` of the screen free (the alarm banner), so nothing on the page sits under
+  /// it. The page is laid out again, not rebuilt; true if the inset changed (the widgets then
+  /// need layout_done() again).
+  bool set_top_inset(int32_t px);
+
  protected:
   void clear_(esphelm::Theme theme);
   void build_footer_(const esphelm::Layout &layout, size_t index, const Colors &colors);
 
   lv_obj_t *container_{nullptr};
+  int32_t top_inset_{0};
   Fonts fonts_;
   std::function<void(int)> navigate_;
   // LVGL keeps pointers to the grid descriptors, so they must outlive the page.

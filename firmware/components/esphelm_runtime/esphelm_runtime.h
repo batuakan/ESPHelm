@@ -16,6 +16,7 @@
 #include "esphome/components/signalk/signalk.h"
 #include "esphome/core/component.h"
 
+#include "alarms.h"
 #include "layout_client.h"
 #include "layout_model.h"
 #include "layout_parser.h"
@@ -75,6 +76,7 @@ class EsphelmRuntime : public Component {
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
+  AlarmBanner alarms_;
   Fonts fonts_;
   LayoutStore store_;
   LayoutClient client_;

@@ -38,7 +38,7 @@ Colors colors_for(esphelm::Theme theme) {
 
 // ---- Value formatting (same rules as packages/editor/src/format.ts) ----
 
-static std::string printable(const char *s) {
+std::string printable(const char *s) {
   std::string out;
   for (const char *p = s; *p != '\0'; p++) {
     auto c = static_cast<unsigned char>(*p);
@@ -281,7 +281,7 @@ class GaugeWidget : public Widget {
     // Value and unit sit in the open bottom of the 270 degree arc, clear of the needle hub.
     value_ = make_label(cell, env.fonts.label, env.colors.muted, "--");
     if (tile.data.unit != nullptr && tile.data.unit->label[0] != '\0')
-      suffix_ = std::string(" ") + tile.data.unit->label;
+      unit_suffix_ = std::string(" ") + tile.data.unit->label;
   }
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override { out.push_back(b_.item.path); }
@@ -294,17 +294,18 @@ class GaugeWidget : public Widget {
     // Small gauges: the label font would run into the ends of the arc; tiny ones drop the unit
     // (the caption names the quantity).
     lv_obj_set_style_text_font(value_, d >= 240 ? label_font_ : small_font_, LV_PART_MAIN);
-    if (d < 160)
-      suffix_.clear();
+    // Runs again when the page is laid out anew (alarm banner), so every choice is undone too.
+    const bool small = d < 160;
+    suffix_ = small ? "" : unit_suffix_;
     set_text(value_, shown_, "--" + suffix_);
     lv_obj_update_layout(value_);
     lv_obj_align_to(value_, scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
-    if (d < 160) {
-      // Small gauge: tick labels would collide with the caption and value; keep the ticks.
-      lv_scale_set_label_show(scale_, false);
-      lv_scale_set_total_tick_count(scale_, 11);
-    }
-    lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), 0);
+    // Small gauge: tick labels would collide with the caption and value; keep the ticks.
+    lv_scale_set_label_show(scale_, !small);
+    lv_scale_set_total_tick_count(scale_, small ? 11 : 21);
+    lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), b_.has_number ? to_steps(b_.number, min_, max_) : 0);
+    if (!b_.stale_shown)
+      b_.dirty = true;  // show the value (and needle) again at the new size
   }
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
     if (path == b_.item.path)
@@ -337,6 +338,7 @@ class GaugeWidget : public Widget {
   lv_obj_t *value_;
   const lv_font_t *label_font_{nullptr};
   const lv_font_t *small_font_{nullptr};
+  std::string unit_suffix_;
   std::string suffix_;
   std::string shown_{"--"};
   std::string tick_text_[5];
@@ -638,6 +640,7 @@ class AutopilotWidget : public Widget {
         row = 1, n = static_cast<int32_t>(standby_row ? modes : modes + 1), k = static_cast<int32_t>(i - 4);
       }
       const int32_t bw = (w - gap * (n - 1)) / n;
+      lv_obj_remove_flag(buttons_[i].obj, LV_OBJ_FLAG_HIDDEN);  // hidden if the tile was small before
       lv_obj_set_size(buttons_[i].obj, bw, btn_h);
       lv_obj_align(buttons_[i].obj, LV_ALIGN_BOTTOM_LEFT, k * (bw + gap), -(rows - 1 - row) * (btn_h + gap));
     }

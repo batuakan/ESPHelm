@@ -248,10 +248,10 @@ async function main(): Promise<void> {
       'firmware picks up the edit',
       await fw.waitLog(/Showing fetched layout "grid-480"/, 15000, 2),
     );
-    // 3 tile paths plus the layout version path.
+    // 3 tile paths, the layout version path and notifications.* (the alarm banner).
     check(
       'firmware resubscribes when paths are removed',
-      await fw.waitLog(/Resubscribing to 4 paths/),
+      await fw.waitLog(/Resubscribing to 5 paths/),
     );
     check(
       'the SignalK socket stays connected',
@@ -369,6 +369,12 @@ async function main(): Promise<void> {
     check(
       'the plugin answered the unknown chart with 404 (no tiles drawn, no crash)',
       fw.count(/tile .* failed/) === 0,
+    );
+    // The anchor alarm also raised the alarm banner (ADR-0014); clear it for the next steps.
+    publish({ 'notifications.navigation.anchor': { state: 'normal', message: 'Anchor watch' } });
+    check(
+      'the anchor alarm clears the banner',
+      await fw.waitLog(/notifications\.navigation\.anchor cleared/),
     );
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
@@ -499,6 +505,78 @@ async function main(): Promise<void> {
       (await fw.waitLog(/pilot-ap: PUT steering\.autopilot\.state = standby/)) &&
         (await waitState('standby')),
     );
+
+    // 9b. Alarms (ADR-0014): notifications from any source show in a banner above the page,
+    //     worst first; ACK silences them through the plugin and they shrink to a strip; an
+    //     escalation shows the full banner again.
+    const DEPTH = 'notifications.environment.depth.belowTransducer';
+    const BATTERY = 'notifications.electrical.batteries.house.voltage';
+    const banner = (part = '') =>
+      writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `@alarm ${part}`.trim());
+    const notify = (path: string, state: string, message: string, method = ['visual', 'sound']) =>
+      publish({ [path]: { state, method, message } });
+    await goTo(0, 'Mixed');
+    notify(BATTERY, 'warn', 'House battery low', ['visual']);
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    check(
+      'alarms: both notifications reach the display',
+      (await fw.waitLog(/ALARM notifications\.environment\.depth\.belowTransducer/)) &&
+        (await fw.waitLog(/WARN notifications\.electrical\.batteries\.house\.voltage/)),
+    );
+    await sleep(1000);
+    await fw.screenshot('21-alarm-banner', shots);
+    banner(); // show the next one (the battery warning)
+    await sleep(800);
+    await fw.screenshot('22-alarm-next', shots);
+    banner(); // back to the depth alarm
+    await sleep(500);
+    banner('ack');
+    check(
+      'alarms: ACK goes to the plugin',
+      await fw.waitLog(/Acknowledging notifications\.environment\.depth\.belowTransducer/),
+    );
+    const methodOf = async (path: string) =>
+      (
+        (await json('GET', `/signalk/v1/api/vessels/self/${path.replace(/\./g, '/')}`, admin))
+          .body as { value?: { method?: string[] } } | undefined
+      )?.value?.method;
+    let silenced = false;
+    for (let i = 0; i < 20 && !silenced; i++) {
+      silenced = JSON.stringify(await methodOf(DEPTH)) === '["visual"]';
+      if (!silenced) await sleep(250);
+    }
+    check('alarms: the plugin silenced the depth alarm', silenced);
+    banner('ack'); // the battery warning is shown now
+    check(
+      'alarms: the second alarm is acknowledged too',
+      await fw.waitLog(/Acknowledging notifications\.electrical\.batteries\.house\.voltage/),
+    );
+    const live = () =>
+      publish({
+        'navigation.speedOverGround': 3.2,
+        'electrical.batteries.house.capacity.stateOfCharge': 0.82,
+        'electrical.batteries.house.voltage': 12.6,
+      });
+    live();
+    await sleep(1200);
+    await fw.screenshot('23-alarm-acknowledged', shots);
+    notify(DEPTH, 'emergency', 'Aground?');
+    check(
+      'alarms: an escalation shows the full banner again',
+      await fw.waitLog(/EMERGENCY notifications\.environment\.depth\.belowTransducer/),
+    );
+    live();
+    await sleep(1000);
+    await fw.screenshot('24-alarm-escalated', shots);
+    notify(DEPTH, 'normal', '', []);
+    notify(BATTERY, 'normal', '', []);
+    check(
+      'alarms: back to normal, the banner goes away',
+      (await fw.waitLog(/belowTransducer cleared/)) && (await fw.waitLog(/house\.voltage cleared/)),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '4');
+    await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 2);
+    await sleep(1500);
 
     // 10. Server gone: values and needles go stale, and the autopilot shows "offline" with
     //     every button disabled.

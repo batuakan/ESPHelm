@@ -62,7 +62,19 @@ void Renderer::clear_(esphelm::Theme theme) {
   lv_obj_set_style_border_width(this->container_, 0, LV_PART_MAIN);
   lv_obj_set_style_radius(this->container_, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(this->container_, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_top(this->container_, this->top_inset_, LV_PART_MAIN);
   lv_obj_set_style_pad_row(this->container_, 0, LV_PART_MAIN);
+}
+
+bool Renderer::set_top_inset(int32_t px) {
+  if (px == this->top_inset_)
+    return false;
+  this->top_inset_ = px;
+  if (this->container_ != nullptr) {
+    lv_obj_set_style_pad_top(this->container_, px, LV_PART_MAIN);
+    lv_obj_update_layout(this->container_);
+  }
+  return true;
 }
 
 void Renderer::show_status(const std::string &headline, const std::string &detail, const std::string &footer,

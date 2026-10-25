@@ -94,6 +94,9 @@ std::unique_ptr<Widget> make_chart(lv_obj_t *area, const esphelm::Page &page, co
 /// on/off for booleans, printable text for strings, "--" otherwise.
 std::string format_value(ArduinoJson::JsonVariantConst value, const esphelm::units::UnitDef *unit, int decimals);
 
+/// Text the fonts can draw: printable ASCII and the degree sign; other characters become "?".
+std::string printable(const char *s);
+
 /// Display-unit number from a SignalK value; false if it is not a finite number.
 bool display_number(ArduinoJson::JsonVariantConst value, const esphelm::units::UnitDef *unit, double &out);
 

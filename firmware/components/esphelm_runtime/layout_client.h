@@ -12,13 +12,13 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-enum class RequestKind : uint8_t { HELLO, LAYOUT, TILE };
+enum class RequestKind : uint8_t { HELLO, LAYOUT, TILE, ACK };
 
 struct HttpRequest {
   RequestKind kind;
   std::string url;
   std::string token;      // bearer token; empty when SignalK security is off
-  std::string body;       // POST body (hello); empty for GET
+  std::string body;       // POST body (hello, alarm acknowledge); empty for GET
   std::string if_none_match;
   size_t max_body{16 * 1024};
   uint32_t tag{0};        // echoed in the result (chart tiles: which tile it was)

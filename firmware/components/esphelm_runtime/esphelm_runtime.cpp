@@ -68,6 +68,27 @@ void EsphelmRuntime::setup() {
   this->client_.start();
   this->tiles_.start();
 
+  // Alarms (ADR-0014): every notification, whatever the layout shows.
+  this->alarms_.set_fonts(this->fonts_);
+  this->alarms_.set_capacity(this->psram_ ? 16 : 8);
+  this->alarms_.set_ack_sender([this](const std::string &path) {
+    if (this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
+      return false;
+    ArduinoJson::JsonDocument doc;
+    doc["path"] = path;
+    HttpRequest req;
+    req.kind = RequestKind::ACK;
+    req.url = this->base_url_() + "/notifications/ack";
+    req.token = this->signalk_->get_token();
+    serializeJson(doc, req.body);
+    req.max_body = 1024;
+    this->client_.submit(std::move(req));
+    return true;
+  });
+  this->signalk_->add_listener("notifications.*", [this](const std::string &path, ArduinoJson::JsonVariantConst v) {
+    this->alarms_.on_value(path, v);
+  });
+
   this->signalk_->add_listener(this->version_path_, [this](const std::string &, ArduinoJson::JsonVariantConst v) {
     if (v.is<const char *>()) {
       if (this->etag_ != v.as<const char *>()) {
@@ -163,6 +184,13 @@ void EsphelmRuntime::loop() {
   } else {
     this->update_status_();
   }
+  this->alarms_.tick(this->theme_, connected,
+                     authorized && connected && this->server_state_ != ServerState::UNKNOWN);
+  // The banner pushes the page down instead of covering it, so no control hides under it.
+  if (this->renderer_.set_top_inset(this->alarms_.height())) {
+    for (auto &w : this->widgets_)
+      w->layout_done();
+  }
 }
 
 // ---- Network ----
@@ -230,13 +258,16 @@ void EsphelmRuntime::send_fetch_() {
 void EsphelmRuntime::handle_result_(HttpResult &result) {
   if (result.status == 0) {
     this->transport_error_ = result.error;
-    ESP_LOGW(TAG, "%s request failed: %s", result.kind == RequestKind::HELLO ? "hello" : "layout",
+    ESP_LOGW(TAG, "%s request failed: %s",
+             result.kind == RequestKind::HELLO ? "hello" : result.kind == RequestKind::ACK ? "acknowledge" : "layout",
              result.error.c_str());
   } else {
     this->transport_error_.clear();
   }
   if (result.kind == RequestKind::HELLO)
     this->handle_hello_(result);
+  else if (result.kind == RequestKind::ACK)
+    this->alarms_.ack_result(result.status);
   else
     this->handle_layout_(result);
 }
@@ -438,6 +469,10 @@ void EsphelmRuntime::show_page(size_t index) {
 }
 
 void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
+  if (tile_id == "@alarm") {  // not a tile id (ids can't contain "@"): the alarm banner
+    this->alarms_.tap(part);
+    return;
+  }
   for (auto &w : this->widgets_) {
     if (w->id() == tile_id) {
       w->tap(part);

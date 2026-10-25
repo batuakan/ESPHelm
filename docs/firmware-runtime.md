@@ -58,6 +58,8 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Layout with more than one page | a footer: `<` and `>` buttons (disabled at the ends) and "title n/m" |
+| An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
+| A layout crashed the display (boot guard, ADR-0013) | the last known good layout (else the status page); the crashing layout is refused until a changed one is sent |
 
 **Protocol** (`docs/plugin-api.md`):
 1. After the token is approved and on every stream (re)connect, send `POST …/devices/hello`.
@@ -66,7 +68,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 4. If the plugin answers that the device is pending or has no layout, the screen clears.
 5. If the plugin is unreachable, the cached layout stays up.
 
-**Subscriptions** are derived from the **visible page** (one listener per unique path of its tiles, including each wind rose's sources and slots), plus the layout version path. ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values. So a page shows the latest values as soon as it is opened.
+**Subscriptions** are derived from the **visible page** (one listener per unique path of its tiles, including each wind rose's sources and slots), plus the layout version path and `notifications.*` for the alarm banner. ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values. So a page shows the latest values as soon as it is opened.
 
 ## Pages and the footer (ADR-0009)
 - **Only the visible page exists.** Changing page deletes its LVGL objects and widgets and builds the next one, so memory stays at one page's worth (matters on C3/C6 without PSRAM).
@@ -138,6 +140,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 **Persistence** (ADR-0002):
 - **Storage:** NVS namespace `esphelm`, blobs `cur` and `lkg` on ESP-IDF. On the host: `esphelm_cur.bin` and `esphelm_lkg.bin` in `store_dir`.
 - **Record format:** `magic | body_len | crc32 | etag_len | etag | body`. A torn or corrupted record is detected and ignored.
+- **Boot guard** (ADR-0013): a third record, `boot` (`esphelm_boot.bin` on the host), holds the etag being shown, the crash count and a skipped etag. It's written before a layout is built and cleared after 30 s on screen. After a crash reset (panic or watchdog; on the host, any exit but a clean one), a fetched layout that never got cached is skipped at once, and a cached one after its second crash. The hello reports it as `recovery.skippedLayoutEtag`.
 
 ## Threading
 - LVGL, SignalK callbacks and all runtime state live on the ESPHome main loop.
@@ -154,6 +157,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `wind_rose` tile | ≈6.7–6.9 KB in full (full screen: 6,720 B at 720, 6,864 B at 480); 720 page with a 2x2 rose and five tiles: 23,936 B |
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
 | `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
+| Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
 | P4 runtime firmware, static | RAM 94,924 B (16.5 %), flash 2.68 MB (16.2 %) |
@@ -191,8 +195,12 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
       - zoom in through the hook (`esphelm_tap_request chart zoom_in`)
       - the anchor alarm
       - a page whose chart the server doesn't have
+  15. **the boot guard** (`ESPHELM_TEST_CRASH_ON=<tile id>` makes the host build abort while building that tile):
+      - a fetched layout that crashes the display is skipped after one crash, refused when fetched again, and reported in the hello
+      - offline, a cached layout that crashes is tried twice, then the last known good layout is shown, also after a normal restart
+  16. **alarms**: a depth alarm and a battery warning show in the banner (worst first, "+1"); tapping shows the next; ACK goes to the plugin, which silences the alarm on the server; both acknowledged give the strip; an escalation to `emergency` shows the full banner again; back to `normal` clears it
 
-  Twenty-seven screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Thirty-one screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -216,3 +224,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - Zoom + / − refetch the map. Moving (or a changing position) recentres it without blank flashes for tiles that stay in view.
     - With the anchor alarm plugin: the anchor and the circle match its radius, and the circle and banner turn red when it alarms.
     - Check the log for "Chart …" warnings, and how long a full screen of tiles takes.
+12. **Alarms.** Raise a notification, e.g. set a shallow-depth alarm in the zones of `environment.depth.belowTransducer`, or use the anchor alarm plugin with a small radius.
+    - The banner appears at the top within a second and pushes the page down; nothing on the page is hidden under it.
+    - ACK is easy to hit. After ACK, apps that play sounds (e.g. the SignalK admin's notification sound, or KIP) go quiet, and the banner shrinks to a strip.
+    - Make the alarm worse (`alarm` → `emergency`): the full banner comes back.
+    - At night, the banner is dark with red text, with no bright area.
