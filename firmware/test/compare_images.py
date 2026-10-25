@@ -31,7 +31,10 @@ def main() -> int:
         print(json.dumps({"status": "differs", "reason": f"size {actual.size} != {golden.size}"}))
         return 1
     diff = ImageChops.difference(actual, golden)
-    changed = sum(1 for px in diff.getdata() if max(px) > TOLERANCE)
+    # Largest channel difference per pixel, then count pixels above the tolerance.
+    r, g, b = diff.split()
+    worst = ImageChops.lighter(ImageChops.lighter(r, g), b)
+    changed = sum(worst.histogram()[TOLERANCE + 1 :])
     fraction = changed / (actual.size[0] * actual.size[1])
     ok = fraction <= MAX_CHANGED_FRACTION
     print(json.dumps({"status": "match" if ok else "differs", "changed": round(fraction, 5), "actual": str(png)}))

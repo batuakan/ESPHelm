@@ -46,6 +46,10 @@ class Firmware {
   private out = '';
   constructor(private readonly work: string) {}
 
+  get workDir(): string {
+    return this.work;
+  }
+
   private runs = 0;
 
   start(): void {
@@ -127,7 +131,7 @@ async function main(): Promise<void> {
   let sk: SignalKHarness | undefined;
   const fw = new Firmware(work);
   try {
-    sk = await startSignalK({ port: PORT });
+    sk = await startSignalK({ port: PORT, putEcho: ['electrical.switches.bilgePump.state'] });
     console.log(`signalk-server ${sk.version} on ${sk.base}; firmware working dir ${work}\n`);
     const { json, admin } = sk;
 
@@ -167,12 +171,12 @@ async function main(): Promise<void> {
     });
     check(
       'firmware fetches and renders the assigned layout',
-      await fw.waitLog(/Showing fetched layout "grid-480" \(4 tiles/),
+      await fw.waitLog(/Showing fetched layout "grid-480" \(1 pages/),
     );
 
     // 4. Live values (SI) arrive via the layout-derived subscription and are shown converted.
     const { ws } = await sk.stream(admin);
-    const publish = (values: Record<string, number>) =>
+    const publish = (values: Record<string, number | boolean>) =>
       ws.send(
         JSON.stringify({
           context: 'vessels.self',
@@ -218,7 +222,7 @@ async function main(): Promise<void> {
     );
     check(
       'firmware picks up the edit',
-      await fw.waitLog(/Showing fetched layout "grid-480" \(3 tiles/),
+      await fw.waitLog(/Showing fetched layout "grid-480"/, 15000, 2),
     );
     // 3 tile paths plus the layout version path.
     check(
@@ -233,21 +237,79 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw.screenshot('04-edited-layout', shots);
 
-    // 6. Server gone: values go stale instead of freezing.
+    // 6. A layout with several pages and every widget: a footer appears, only the visible page
+    //    is built, and changing page resubscribes to that page's paths (the server replays the
+    //    cached values, so the new page shows them at once).
+    const multi = fixture('valid/multi-page-widgets-480.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(multi.id)}`, admin, multi);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
+    check(
+      'firmware renders the multi-page layout',
+      await fw.waitLog(/Showing fetched layout "multi-480" \(3 pages/),
+    );
+    publish({
+      'navigation.speedOverGround': 3.2, // 6.2 kn
+      'electrical.batteries.house.capacity.stateOfCharge': 0.82, // 82 %
+      'electrical.batteries.house.voltage': 12.6,
+      'environment.wind.angleApparent': -0.6, // 34 deg to port
+      'environment.wind.speedApparent': 7.0, // 13.6 kn
+      'environment.wind.speedTrue': 5.0, // 9.7 kn
+      'environment.wind.directionTrue': 0.4,
+      'navigation.headingTrue': 1.2, // 69 deg; true wind 46 deg to port
+      'propulsion.main.revolutions': 40, // 2400 rpm
+      'propulsion.main.oilPressure': 350000, // 3.5 bar
+      'electrical.switches.bilgePump.state': false,
+    });
+    await sleep(1500);
+    await fw.screenshot('05-multi-mixed', shots);
+
+    const goTo = async (index: number, title: string) => {
+      writeFileSync(join(fw.workDir, 'esphelm_page_request'), String(index));
+      const shown = await fw.waitLog(new RegExp(`Page ${index + 1}/3 "${title}"`));
+      check(`page hook shows page ${index + 1} (${title})`, shown);
+      await sleep(1500);
+    };
+    await goTo(1, 'Wind');
+    await fw.screenshot('06-multi-wind', shots);
+    await goTo(2, 'Engine');
+    await fw.screenshot('07-multi-engine', shots);
+
+    // 7. Tapping the switch sends a PUT; the echo plugin answers with a delta and the switch
+    //    follows the path's value.
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'bilge');
+    check(
+      'switch tap sends a PUT',
+      await fw.waitLog(/Put request: .*electrical\.switches\.bilgePump\.state.*true/),
+    );
+    let switched = false;
+    for (let i = 0; i < 20 && !switched; i++) {
+      const got = await json(
+        'GET',
+        '/signalk/v1/api/vessels/self/electrical/switches/bilgePump/state',
+        admin,
+      );
+      switched = got.body?.value === true;
+      if (!switched) await sleep(250);
+    }
+    check('the server has the new switch value', switched);
+    await sleep(1500);
+    await fw.screenshot('08-switch-on', shots);
+
+    // 8. Server gone: values and needles go stale instead of freezing.
     await sk.stop();
     sk = undefined;
     await sleep(7500); // > staleAfter (6 s) since the last value
-    await fw.screenshot('05-stale-values', shots);
+    await fw.screenshot('09-stale-values', shots);
 
-    // 7. Reboot without a server: the cached layout comes back (offline first).
+    // 9. Reboot without a server: the cached multi-page layout comes back on its first page.
     await fw.stop();
     fw.start();
     check(
-      'reboot without server shows the cached layout',
-      await fw.waitLog(/Showing cached layout "grid-480" \(3 tiles/),
+      'reboot without server shows the cached multi-page layout',
+      await fw.waitLog(/Showing cached layout "multi-480" \(3 pages/),
     );
     await sleep(1500);
-    await fw.screenshot('06-offline-cached', shots);
+    await fw.screenshot('10-offline-cached', shots);
   } finally {
     await fw.stop();
     if (sk) await sk.stop();

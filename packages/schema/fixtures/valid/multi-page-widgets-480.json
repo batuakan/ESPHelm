@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "id": "multi-480",
+  "name": "Every widget (480x480)",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "mixed",
+      "title": "Mixed",
+      "grid": { "cols": 2, "rows": 2 },
+      "tiles": [
+        { "type": "value", "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
+        {
+          "type": "gauge", "id": "soc", "x": 1, "y": 0, "w": 1, "h": 2,
+          "path": "electrical.batteries.house.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "SoC", "staleAfter": 6,
+          "min": 0, "max": 100,
+          "zones": [
+            { "from": 0, "to": 30, "state": "alarm" },
+            { "from": 30, "to": 40, "state": "warn" }
+          ]
+        },
+        {
+          "type": "bar", "id": "volts", "x": 0, "y": 1, "w": 1, "h": 1,
+          "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "Volts", "staleAfter": 6,
+          "min": 10, "max": 15, "orientation": "horizontal",
+          "zones": [{ "from": 10, "to": 11.8, "state": "alarm" }]
+        }
+      ]
+    },
+    {
+      "kind": "widget",
+      "widget": "wind_rose",
+      "id": "wind",
+      "title": "Wind",
+      "config": { "showTrueWind": true },
+      "slots": {
+        "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
+        "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6 },
+        "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6 }
+      }
+    },
+    {
+      "kind": "grid",
+      "id": "engine",
+      "title": "Engine",
+      "grid": { "cols": 3, "rows": 2 },
+      "tiles": [
+        {
+          "type": "gauge", "id": "rpm", "x": 0, "y": 0, "w": 2, "h": 2,
+          "path": "propulsion.main.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM", "staleAfter": 6,
+          "min": 0, "max": 4000,
+          "zones": [{ "from": 3200, "to": 4000, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "oil", "x": 2, "y": 0, "w": 1, "h": 1,
+          "path": "propulsion.main.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil", "staleAfter": 6,
+          "min": 0, "max": 6, "orientation": "vertical",
+          "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
+        },
+        { "type": "switch", "id": "bilge", "x": 2, "y": 1, "w": 1, "h": 1, "path": "electrical.switches.bilgePump.state", "label": "Bilge" }
+      ]
+    }
+  ]
+}

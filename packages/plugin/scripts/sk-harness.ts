@@ -80,12 +80,34 @@ export async function waitFor(pred: () => boolean, ms = 5000): Promise<boolean> 
 }
 
 /**
+ * A tiny plugin that accepts PUTs on the given paths and echoes each value back as a delta,
+ * standing in for real switching hardware.
+ */
+const PUT_ECHO_PLUGIN = `
+module.exports = (app) => ({
+  id: 'esphelm-put-echo',
+  name: 'ESPHelm e2e PUT echo',
+  schema: {},
+  start(config) {
+    for (const path of config.paths || []) {
+      app.registerPutHandler('vessels.self', path, (context, p, value) => {
+        app.handleMessage('esphelm-put-echo', { updates: [{ values: [{ path: p, value }] }] });
+        return { state: 'COMPLETED', statusCode: 200 };
+      });
+    }
+  },
+  stop() {},
+});
+`;
+
+/**
  * Start the server. SIGNALK_SERVER=/path/to/bin/signalk-server picks an install; default: the
  * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one);
- * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...).
+ * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...);
+ * `putEcho` lists paths whose PUTs are accepted and echoed back as deltas.
  */
 export async function startSignalK(
-  opts: { port?: number; sampleData?: boolean } = {},
+  opts: { port?: number; sampleData?: boolean; putEcho?: string[] } = {},
 ): Promise<SignalKHarness> {
   if (!existsSync(join(PLUGIN_DIR, 'dist/index.js'))) throw new Error('run `npm run build` first');
   const bin = realpathSync(
@@ -104,9 +126,29 @@ export async function startSignalK(
   mkdirSync(join(config, 'node_modules'));
   mkdirSync(join(config, 'plugin-config-data'));
   symlinkSync(PLUGIN_DIR, join(config, 'node_modules', 'signalk-esphelm'));
+  const dependencies: Record<string, string> = { 'signalk-esphelm': '*' };
+  if (opts.putEcho) {
+    const echo = join(config, 'node_modules', 'esphelm-put-echo');
+    mkdirSync(echo);
+    writeFileSync(
+      join(echo, 'package.json'),
+      JSON.stringify({
+        name: 'esphelm-put-echo',
+        version: '1.0.0',
+        main: 'index.js',
+        keywords: ['signalk-node-server-plugin'],
+      }),
+    );
+    writeFileSync(join(echo, 'index.js'), PUT_ECHO_PLUGIN);
+    writeFileSync(
+      join(config, 'plugin-config-data', 'esphelm-put-echo.json'),
+      JSON.stringify({ enabled: true, configuration: { paths: opts.putEcho } }),
+    );
+    dependencies['esphelm-put-echo'] = '*';
+  }
   writeFileSync(
     join(config, 'package.json'),
-    JSON.stringify({ name: 'e2e', private: true, dependencies: { 'signalk-esphelm': '*' } }),
+    JSON.stringify({ name: 'e2e', private: true, dependencies }),
   );
   writeFileSync(
     join(config, 'plugin-config-data', 'esphelm.json'),
