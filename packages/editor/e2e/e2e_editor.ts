@@ -8,6 +8,7 @@
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { TEMPLATES } from '@esphelm/schema';
 import { chromium, type Page } from 'playwright-core';
 import { PLUGIN_DIR, startSignalK, waitFor } from '../../plugin/scripts/sk-harness.js';
 
@@ -192,66 +193,76 @@ async function main(): Promise<void> {
       5000,
     );
     check('the display is notified with the new version', gotVersion, String(etag));
-    // Pages: a wind-rose page from a template (slots prefilled), a new grid page with a gauge
-    // and a zone; then the rose moves to the front. Save & send delivers all three.
+    // Pages: a wind page from a template (a 1x1 grid with a rose tile, slots prefilled), a new
+    // grid page with a gauge, a zone and a small rose tile next to it; then the wind page moves
+    // to the front. Save & send delivers all three.
     await page.getByRole('button', { name: 'Add page' }).click();
     await page.getByRole('menuitem', { name: 'Wind page' }).click();
-    await page.getByTestId('slot-center3').click();
-    const slotDrawer = page.getByRole('complementary', { name: 'Slot settings' });
-    await slotDrawer.getByRole('button', { name: /SignalK path:/ }).click();
-    await slotDrawer.getByLabel('Search SignalK paths').fill('belowTransducer');
-    await slotDrawer.getByRole('option', { name: /environment\.depth\.belowTransducer/ }).click();
-    await slotDrawer.getByLabel('Label').fill('Depth');
+    await page.getByTestId('slot-wind-rose-center3').click();
+    const drawer = page.getByRole('complementary', { name: 'Tile settings' });
+    const center3 = drawer.getByTestId('slot-section-center3');
+    await center3.getByRole('button', { name: /SignalK path:/ }).click();
+    await center3.getByLabel('Search SignalK paths').fill('belowTransducer');
+    await center3.getByRole('option', { name: /environment\.depth\.belowTransducer/ }).click();
+    await center3.getByLabel('Label').fill('Depth');
+    check(
+      'a full-screen rose on the 720 display is drawn in full',
+      /: full/.test((await drawer.locator('.size-hint').textContent()) ?? ''),
+      (await drawer.locator('.size-hint').textContent()) ?? '',
+    );
     let roseLive = false;
     for (let i = 0; i < 40 && !roseLive; i++) {
       roseLive =
         (await page.locator('.pointer.apparent').count()) > 0 &&
         /^\d+\.\d$/.test(
-          (await page.getByTestId('slot-center3').locator('.slot-value').textContent()) ?? '',
+          (await page.getByTestId('slot-wind-rose-center3').locator('.slot-value').textContent()) ??
+            '',
         );
       if (!roseLive) await page.waitForTimeout(250);
     }
-    check('wind-rose page shows the live apparent wind and slot values', roseLive);
+    check('wind rose tile shows the live apparent wind and slot values', roseLive);
     await shot(page, '04-desktop-night-wind-rose');
 
     await page.getByRole('button', { name: 'Add page' }).click();
     await page.getByRole('menuitem', { name: 'Grid page' }).click();
     await page.getByLabel('Page title').fill('Gauges');
-    await page
-      .getByRole('region', { name: 'Tiles' })
-      .getByRole('button', { name: /Gauge/ })
-      .click();
+    const library = page.getByRole('region', { name: 'Tiles' });
+    await library.getByRole('button', { name: /Gauge/ }).click();
     await page.getByLabel('Search SignalK paths').fill('speedOverGround');
     await page.getByRole('option', { name: /navigation\.speedOverGround/ }).click();
     await page.getByLabel('Label').fill('SOG');
     await page.getByLabel('Maximum').fill('12');
     await page.getByRole('button', { name: 'Add zone' }).click();
     await page.getByLabel('Zone 1 state').selectOption('warn');
+    await library.getByRole('button', { name: /Wind rose/ }).click();
+    const hint = (await drawer.locator('.size-hint').textContent()) ?? '';
+    check('one cell of a 2x2 grid on 720 still gets a full rose', /: full/.test(hint), hint);
     await page.getByText('No problems').waitFor();
-    await shot(page, '05-desktop-night-gauge-zones');
+    await shot(page, '05-desktop-night-gauge-and-rose');
 
     await page.getByRole('tab', { name: /Wind/ }).click();
     await page.getByRole('button', { name: 'Move page left' }).click();
     const tabs = await page.getByRole('tab').allTextContents();
-    check('pages can be reordered', tabs.join('|') === 'Wind · rose|Main|Gauges', tabs.join('|'));
+    check('pages can be reordered', tabs.join('|') === 'Wind|Main|Gauges', tabs.join('|'));
     await save.click();
     await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
-    const multi = await sk.json(
+    const served3 = await sk.json(
       'GET',
       `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
       deviceToken,
     );
-    const pages = (multi.body.pages ?? []) as Record<string, unknown>[];
-    const gauge = (pages[2]?.tiles as Record<string, unknown>[] | undefined)?.[0];
+    type ServedPage = { title?: string; tiles: Record<string, unknown>[] };
+    const pages = (served3.body.pages ?? []) as ServedPage[];
+    const [gauge, rose] = pages[2]?.tiles ?? [];
     check(
       'the display gets the three pages in the edited order',
-      JSON.stringify(pages.map((p) => [p.kind, p.title])) ===
+      JSON.stringify(pages.map((p) => [p.title, p.tiles.map((t) => t.type)])) ===
         JSON.stringify([
-          ['widget', 'Wind'],
-          ['grid', 'Main'],
-          ['grid', 'Gauges'],
+          ['Wind', ['wind_rose']],
+          ['Main', ['value', 'value']],
+          ['Gauges', ['gauge', 'wind_rose']],
         ]) &&
-        JSON.stringify((pages[0]?.slots as Record<string, unknown>)?.center3) ===
+        JSON.stringify((pages[0]?.tiles[0]?.slots as Record<string, unknown>)?.center3) ===
           JSON.stringify({
             path: 'environment.depth.belowTransducer',
             unit: 'm',
@@ -272,8 +283,39 @@ async function main(): Promise<void> {
             unit: 'kn',
             label: 'SOG',
             zones: [{ from: 9.6, to: 12, state: 'warn' }],
-          }),
+          }) &&
+        JSON.stringify(rose) ===
+          JSON.stringify({ type: 'wind_rose', id: 'rose-1', x: 1, y: 0, w: 1, h: 1, slots: {} }),
       JSON.stringify(pages),
+    );
+
+    // Start over from the large-display template: listed first for this 720x720 display.
+    await page.getByRole('button', { name: 'Templates' }).click();
+    const first = await page
+      .getByRole('menu', { name: 'Start from template' })
+      .getByRole('menuitem')
+      .first()
+      .textContent();
+    check(
+      'large-display templates come first on a 720 display',
+      /large display/.test(first ?? ''),
+      first ?? '',
+    );
+    await page.getByRole('menuitem', { name: 'Sailing (large display)' }).click();
+    await page.getByRole('button', { name: 'Replace' }).click();
+    await page.getByText('No problems').waitFor();
+    await page.waitForTimeout(1500); // live values
+    await shot(page, '06-desktop-night-sailing-720');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
+    const sailing = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    check(
+      'the display gets the Sailing template as it is',
+      JSON.stringify(sailing.body.pages) === JSON.stringify(TEMPLATES['sailing-720']?.pages),
     );
 
     check(
@@ -291,22 +333,22 @@ async function main(): Promise<void> {
     await phone.addCookies([{ name: 'JAUTHENTICATION', value: sk.admin, url: sk.base }]);
     const mobile = await phone.newPage();
     await mobile.goto(editorUrl);
-    await mobile.getByTestId('wind-rose').waitFor();
-    await mobile.getByRole('tab', { name: 'Main' }).tap();
-    await mobile.getByTestId('tile-tile-1').waitFor();
+    await mobile.getByTestId('tile-sog').waitFor();
     await mobile.getByRole('button', { name: 'dark theme' }).click();
-    await mobile.getByTestId('tile-tile-1').tap();
+    await mobile.getByTestId('tile-sog').tap();
     await mobile.getByRole('complementary', { name: 'Tile settings' }).waitFor();
     await mobile.waitForTimeout(500);
     await shot(mobile, '03-phone-dark-drawer');
     check('phone layout opens the tile drawer', true);
     await mobile.getByRole('button', { name: 'Close settings' }).tap();
-    await mobile.getByRole('tab', { name: /Wind/ }).tap();
-    await mobile.getByTestId('slot-center1').tap();
-    await mobile.getByRole('complementary', { name: 'Slot settings' }).waitFor();
+    await mobile.getByTestId('slot-rose-center1').tap();
+    const open = await mobile
+      .getByRole('complementary', { name: 'Tile settings' })
+      .getByTestId('slot-section-center1')
+      .evaluate((el) => el.hasAttribute('open'));
     await mobile.waitForTimeout(500);
-    await shot(mobile, '06-phone-dark-wind-slot');
-    check('phone layout opens the slot drawer', true);
+    await shot(mobile, '07-phone-dark-rose-slot');
+    check('phone: tapping a rose slot opens it in the tile drawer', open);
     await phone.close();
   } finally {
     await browser.close();

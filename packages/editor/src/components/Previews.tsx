@@ -8,11 +8,12 @@ import {
   type DataItem,
   type Layout,
   type Tile,
-  type WindRosePage,
+  type WindRoseTile,
   type Zone,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import type { RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
@@ -93,7 +94,25 @@ function SwitchPreview({ value }: { value: unknown }) {
   );
 }
 
-export function TilePreview({ tile, value }: { tile: Tile; value: unknown }) {
+export function TilePreview(props: {
+  tile: Tile;
+  values: Map<string, unknown>;
+  roseTier?: RoseTier;
+  selectedSlot?: SlotName;
+  onSelectSlot?(slot: SlotName): void;
+}) {
+  const { tile, values } = props;
+  if (tile.type === 'wind_rose')
+    return (
+      <WindRosePreview
+        tile={tile}
+        values={values}
+        tier={props.roseTier ?? 'full'}
+        selectedSlot={props.selectedSlot}
+        onSelectSlot={props.onSelectSlot}
+      />
+    );
+  const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':
       return <GaugePreview tile={tile} value={value} />;
@@ -116,16 +135,20 @@ export function TilePreview({ tile, value }: { tile: Tile; value: unknown }) {
 const RAD = 180 / Math.PI;
 const ROSE_LABELS = [0, 30, 60, 90, 120, 150, 180, 150, 120, 90, 60, 30];
 
-/** The wind-rose page: live pointers and three clickable centre slots. */
+/**
+ * A wind rose tile: live pointers, heading and clickable centre slots, drawn for the tier the
+ * display will use at this tile's size (sizing.ts). Slot counts in compact roses depend on the
+ * display's fonts, so the preview shows every slot and the size hint says what may be dropped.
+ */
 export function WindRosePreview(props: {
-  page: WindRosePage;
+  tile: WindRoseTile;
   values: Map<string, unknown>;
-  selectedSlot: SlotName | undefined;
-  onSelectSlot(slot: SlotName): void;
-  onSelectRose(): void;
+  tier: RoseTier;
+  selectedSlot?: SlotName;
+  onSelectSlot?(slot: SlotName): void;
 }) {
-  const { page, values } = props;
-  const cfg = { ...WIND_ROSE_DEFAULTS, ...page.config };
+  const { tile, values, tier } = props;
+  const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   const num = (path: string) => {
     const v = values.get(path);
     return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
@@ -138,67 +161,76 @@ export function WindRosePreview(props: {
     const [x2, y2] = polar(0, 0, 90 * outer, deg);
     return { x1, y1, x2, y2 };
   };
+  const full = tier === 'full';
   return (
-    <div className="rose" data-testid="wind-rose">
-      <svg
-        viewBox="-100 -100 200 200"
-        onClick={props.onSelectRose}
-        role="button"
-        aria-label="Wind rose settings"
-      >
+    <span className={`tile-graphic rose rose-${tier}`} data-testid={`rose-${tile.id}`}>
+      <svg viewBox="-100 -100 200 200" aria-hidden>
         <circle r={90} className="rose-ring" />
-        <path className="zone zone-normal" d={arc(0, 0, 90, 20, 60)} />
-        <path className="zone zone-alarm" d={arc(0, 0, 90, 300, 340)} />
-        {Array.from({ length: 36 }, (_, i) => {
-          const [x1, y1] = polar(0, 0, 90, i * 10);
-          const [x2, y2] = polar(0, 0, i % 3 === 0 ? 82 : 86, i * 10);
+        <path className={`zone zone-normal ${full ? '' : 'thin'}`} d={arc(0, 0, 90, 20, 60)} />
+        <path className={`zone zone-alarm ${full ? '' : 'thin'}`} d={arc(0, 0, 90, 300, 340)} />
+        {Array.from({ length: full ? 36 : 12 }, (_, i) => {
+          const deg = i * (full ? 10 : 30);
+          const [x1, y1] = polar(0, 0, 90, deg);
+          const [x2, y2] = polar(0, 0, deg % 30 === 0 ? 82 : 86, deg);
           return <line key={i} className="rose-tick" x1={x1} y1={y1} x2={x2} y2={y2} />;
         })}
-        {ROSE_LABELS.map((label, i) => {
-          const [x, y] = polar(0, 0, 72, i * 30);
-          return (
-            <text key={i} x={x} y={y + 3} className="rose-label">
-              {label}
-            </text>
-          );
-        })}
+        {full &&
+          ROSE_LABELS.map((label, i) => {
+            const [x, y] = polar(0, 0, 72, i * 30);
+            return (
+              <text key={i} x={x} y={y + 3} className="rose-label">
+                {label}
+              </text>
+            );
+          })}
         {cfg.showTrueWind && twd !== undefined && hdg !== undefined && (
           <line className="pointer true" {...pointer((twd - hdg) * RAD, 0.64, 0.86)} />
         )}
-        {awa !== undefined && <line className="pointer apparent" {...pointer(awa * RAD, 0.64, 0.97)} />}
-        <text y={-46} className="rose-heading">
-          HDG {hdg === undefined ? '--' : `${Math.round((((hdg * RAD) % 360) + 360) % 360)}°`}
-        </text>
+        {awa !== undefined && (
+          <line className="pointer apparent" {...pointer(awa * RAD, 0.64, 0.97)} />
+        )}
+        {full && (
+          <text y={-46} className="rose-heading">
+            HDG {hdg === undefined ? '--' : `${Math.round((((hdg * RAD) % 360) + 360) % 360)}°`}
+          </text>
+        )}
       </svg>
-      <div className="rose-slots">
-        {WIND_ROSE_SLOTS.map((slot) => {
-          const item = page.slots[slot];
-          return (
-            <button
-              key={slot}
-              className={`rose-slot ${props.selectedSlot === slot ? 'selected' : ''} ${item ? '' : 'empty'}`}
-              onClick={() => props.onSelectSlot(slot)}
-              aria-label={`Slot ${slot}`}
-              data-testid={`slot-${slot}`}
-            >
-              {item ? (
-                <>
-                  <span className="slot-value">
-                    {item.path ? formatValue(values.get(item.path), item.unit, item.decimals) : '--'}
-                  </span>
-                  <span className="slot-label">
-                    {[item.label, item.unit ? UNITS[item.unit].label : ''].filter(Boolean).join(' ') ||
-                      'Pick a path'}
-                  </span>
-                </>
-              ) : (
-                <span className="slot-label">+ choose</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+      {tier !== 'pointers' && (
+        <span className="rose-slots">
+          {WIND_ROSE_SLOTS.map((slot) => {
+            const item = tile.slots[slot];
+            return (
+              <button
+                key={slot}
+                className={`rose-slot ${props.selectedSlot === slot ? 'selected' : ''} ${item ? '' : 'empty'}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onSelectSlot?.(slot);
+                }}
+                aria-label={`Slot ${slot}`}
+                data-testid={`slot-${tile.id}-${slot}`}
+              >
+                {item ? (
+                  <>
+                    <span className="slot-value">
+                      {item.path ? formatValue(values.get(item.path), item.unit, item.decimals) : '--'}
+                    </span>
+                    <span className="slot-label">
+                      {[item.label, item.unit ? UNITS[item.unit].label : '']
+                        .filter(Boolean)
+                        .join(' ') || 'Pick a path'}
+                    </span>
+                  </>
+                ) : (
+                  <span className="slot-label">+</span>
+                )}
+              </button>
+            );
+          })}
+        </span>
+      )}
+    </span>
   );
 }
 

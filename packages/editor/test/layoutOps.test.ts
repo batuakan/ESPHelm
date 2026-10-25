@@ -9,7 +9,8 @@ import {
   movePage,
   removePage,
   renamePage,
-  setPageConfig,
+  setTileConfig,
+  tilePaths,
   targetForPointer,
   updateSlot,
   gridPage,
@@ -132,11 +133,15 @@ describe('targetForPointer', () => {
     expect(targetForPointer(l, '/pages/0/tiles/1/label')).toEqual({ page: 0, tileId: 'tile-2' });
     expect(targetForPointer(l, '/pages/0/tiles/1')).toEqual({ page: 0, tileId: 'tile-2' });
     expect(targetForPointer(l, '/pages/0/tiles')).toEqual({ page: 0 });
-    expect(targetForPointer(l, '/pages/1/slots/center2/path')).toEqual({
+    expect(targetForPointer(l, '/pages/1/tiles/0/slots/center2/path')).toEqual({
       page: 1,
+      tileId: 'wind-1-rose',
       slot: 'center2',
     });
-    expect(targetForPointer(l, '/pages/1/slots/elsewhere')).toEqual({ page: 1 });
+    expect(targetForPointer(l, '/pages/1/tiles/0/slots/elsewhere')).toEqual({
+      page: 1,
+      tileId: 'wind-1-rose',
+    });
     expect(targetForPointer(l, '/pages/7')).toBeUndefined();
     expect(targetForPointer(l, '/theme')).toBeUndefined();
   });
@@ -156,11 +161,12 @@ describe('pages', () => {
     const rose = addPage(l, 'wind_rose', 0);
     expect(rose.index).toBe(1);
     l = rose.layout;
+    // A wind rose page is a 1x1 grid holding one rose tile.
     expect(l.pages[1]).toMatchObject({
-      kind: 'widget',
-      widget: 'wind_rose',
+      kind: 'grid',
       id: 'wind-1',
-      slots: {},
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'wind_rose', id: 'wind-1-rose', x: 0, y: 0, w: 1, h: 1, slots: {} }],
     });
     expect(ok(l)).toEqual([]); // an empty rose is valid (slots are optional)
     const grid = addPage(l, 'grid', 0);
@@ -192,33 +198,51 @@ describe('pages', () => {
     expect(removePage(l, 0)).toBeNull();
   });
 
-  it('edits wind-rose slots and config', () => {
+  it('places wind rose tiles 2x2 where that fits, else 1x1', () => {
+    let l = base(); // tile-1 at (0,0) of 2x2
+    l = setGrid(l, 0, 3, 3);
+    const big = addTile(l, 0, 'wind_rose', { x: 1, y: 0 })!;
+    expect(gridPage(big.layout, 0)!.tiles[1]).toMatchObject({ id: 'rose-1', w: 2, h: 2 });
+    const small = addTile(big.layout, 0, 'wind_rose', { x: 0, y: 2 })!;
+    expect(gridPage(small.layout, 0)!.tiles[2]).toMatchObject({ id: 'rose-2', w: 1, h: 1 });
+    expect(ok(small.layout)).toEqual([]);
+  });
+
+  it('edits wind-rose slots and config on the tile', () => {
     let l = addPage(base(), 'wind_rose').layout;
-    l = updateSlot(l, 1, 'center1', { label: 'SOG' });
+    const id = 'wind-1-rose';
+    const rose = () => l.pages[1]!.tiles[0] as Record<string, unknown>;
+    l = updateSlot(l, 1, id, 'center1', { label: 'SOG' });
     expect(ok(l)).toEqual([
-      expect.objectContaining({ code: 'INVALID_PATH', pointer: '/pages/1/slots/center1/path' }),
+      expect.objectContaining({
+        code: 'INVALID_PATH',
+        pointer: '/pages/1/tiles/0/slots/center1/path',
+      }),
     ]);
-    l = updateSlot(l, 1, 'center1', { path: 'navigation.speedOverGround', unit: 'kn' });
+    l = updateSlot(l, 1, id, 'center1', { path: 'navigation.speedOverGround', unit: 'kn' });
     expect(ok(l)).toEqual([]);
-    expect(l.pages[1]).toMatchObject({
+    expect(rose()).toMatchObject({
       slots: { center1: { path: 'navigation.speedOverGround', unit: 'kn', label: 'SOG' } },
     });
-    l = updateSlot(l, 1, 'center1', { unit: undefined });
-    expect((l.pages[1] as { slots: Record<string, object> }).slots.center1).not.toHaveProperty(
-      'unit',
-    );
-    l = updateSlot(l, 1, 'center1', null);
-    expect(l.pages[1]).toMatchObject({ slots: {} });
+    l = updateSlot(l, 1, id, 'center1', { unit: undefined });
+    expect((rose().slots as Record<string, object>).center1).not.toHaveProperty('unit');
+    l = updateSlot(l, 1, id, 'center1', null);
+    expect(rose()).toMatchObject({ slots: {} });
 
-    l = setPageConfig(l, 1, { heading: 'navigation.headingMagnetic', showTrueWind: false });
-    expect(l.pages[1]).toMatchObject({
+    l = setTileConfig(l, 1, id, { heading: 'navigation.headingMagnetic', showTrueWind: false });
+    expect(rose()).toMatchObject({
       config: { heading: 'navigation.headingMagnetic', showTrueWind: false },
     });
-    l = setPageConfig(l, 1, { heading: undefined });
-    expect((l.pages[1] as { config: object }).config).toEqual({ showTrueWind: false });
+    expect(tilePaths(rose() as never)).toEqual([
+      'environment.wind.angleApparent',
+      'environment.wind.directionTrue',
+      'navigation.headingMagnetic',
+    ]);
+    l = setTileConfig(l, 1, id, { heading: undefined, showTrueWind: undefined });
+    expect(rose()).not.toHaveProperty('config');
     expect(ok(l)).toEqual([]);
-    // Slot and config edits leave grid pages alone.
-    expect(updateSlot(l, 0, 'center1', { path: 'x.y' })).toEqual(l);
+    // Slot and config edits leave other tiles alone.
+    expect(updateSlot(l, 0, 'tile-1', 'center1', { path: 'x.y' })).toEqual(l);
   });
 });
 

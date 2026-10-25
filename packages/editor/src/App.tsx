@@ -1,14 +1,14 @@
-// ESPHelm editor: pick a display, edit the pages of its layout with live values (grid pages
-// of tiles, wind-rose pages with centre slots), Save & send. One layout per display (created
+// ESPHelm editor: pick a display, edit the pages of its layout with live values (grids of
+// tiles; wind roses are tiles with centre slots), Save & send. One layout per display (created
 // on first save).
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   TEMPLATES,
   TILE_TYPES,
-  WIND_ROSE_DEFAULTS,
   validateLayout,
   type Layout,
   type Page,
+  type Tile,
   type TileType,
 } from '@esphelm/schema';
 import { ApiError, createApi, type Api, type Device, type PathInfo } from './api';
@@ -26,33 +26,31 @@ import {
   renamePage,
   resizeTile,
   setGrid,
-  setPageConfig,
+  setTileConfig,
   targetForPointer,
+  tilePaths,
   updateSlot,
   updateTile,
   type SlotName,
 } from './layoutOps';
 import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
 import { PageTabs } from './components/PageTabs';
-import { FooterPreview, WindRosePreview } from './components/Previews';
+import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
-import { RoseDrawer, SLOT_TITLES, SlotDrawer, TileDrawer } from './components/TileDrawer';
+import { SLOT_TITLES, TileDrawer } from './components/TileDrawer';
+import { ROSE_TIER_TEXT, roseTier, tilePixels } from './sizing';
 
 export type Theme = 'light' | 'dark' | 'night';
 
-type Selection = { kind: 'tile'; id: string } | { kind: 'slot'; slot: SlotName } | { kind: 'rose' };
+/** The selected tile, and for a wind rose optionally one of its slots. */
+interface Selection {
+  id: string;
+  slot?: SlotName;
+}
 
 /** SignalK paths a page shows (what the live preview subscribes to). */
 function pagePaths(page: Page | undefined): string[] {
-  if (!page) return [];
-  if (page.kind === 'grid') return page.tiles.map((t) => t.path).filter(Boolean);
-  const cfg = { ...WIND_ROSE_DEFAULTS, ...page.config };
-  return [
-    cfg.apparentAngle,
-    cfg.trueDirection,
-    cfg.heading,
-    ...Object.values(page.slots).map((s) => s.path),
-  ].filter(Boolean);
+  return page ? page.tiles.flatMap(tilePaths).filter(Boolean) : [];
 }
 
 interface Status {
@@ -161,8 +159,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   }, [props.live]);
   const index = layout ? Math.min(pageIndex, layout.pages.length - 1) : 0;
   const page = layout?.pages[index];
-  const grid = page?.kind === 'grid' ? page : undefined;
-  const rose = page?.kind === 'widget' ? page : undefined;
+  const grid = page;
   useEffect(() => {
     live?.setPaths(pagePaths(page));
   }, [live, page]);
@@ -209,11 +206,10 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 
   const add = (type: TileType, at?: { x: number; y: number }) => {
     if (!layout) return;
-    if (!grid) return edit(null, 'Tiles go on grid pages. Pick or add a grid page first.');
     const r = addTile(layout, index, type, at);
     if (!r) return edit(null, 'No free cell there. Make the grid bigger or move a tile.');
     edit(r.layout);
-    setSelection({ kind: 'tile', id: r.id });
+    setSelection({ id: r.id });
   };
 
   const showPage = (i: number, sel?: Selection) => {
@@ -259,9 +255,15 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     }
   };
 
-  const tile = selection?.kind === 'tile' ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
-  const slot = selection?.kind === 'slot' && rose ? selection.slot : undefined;
-  const drawerOpen = !!tile || !!slot || (selection?.kind === 'rose' && !!rose);
+  const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
+  const drawerOpen = !!tile;
+  const display = device?.hello.display ?? { width: 480, height: 480 };
+  const largeDisplay = Math.min(display.width, display.height) >= 600;
+  const tilePx = (t: Tile) => {
+    if (!layout) return 0;
+    const { width, height } = tilePixels(display, layout, index, t);
+    return Math.min(width, height);
+  };
   const canSave = !!layout && device?.state === 'adopted' && problems.length === 0 && !saving;
 
   return (
@@ -311,7 +313,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         <DeviceList devices={devices} selectedId={deviceId} onSelect={setDeviceId} onAdopt={(id) => void adopt(id)} />
         <TileLibrary
           types={catalog}
-          supported={rose ? new Set() : supported}
+          supported={supported}
           onAdd={(t) => add(t)}
           onDragStart={(type, e: ReactPointerEvent) => setNewTileDrag({ type, startX: e.clientX, startY: e.clientY })}
         />
@@ -332,11 +334,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
               layout={layout}
               index={index}
               supported={supported}
+              largeDisplay={largeDisplay}
               onSelect={(i) => showPage(i)}
               onAdd={(kind) => {
                 const r = addPage(layout, kind, index);
                 edit(r.layout);
-                showPage(r.index, kind === 'wind_rose' ? { kind: 'rose' } : undefined);
+                const first = r.layout.pages[r.index]?.tiles[0];
+                showPage(r.index, first ? { id: first.id } : undefined);
               }}
               onAddTemplate={(id) => {
                 const t = template(id);
@@ -401,26 +405,18 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   aspect={aspectFor(device, layout)}
                   values={shownValues}
                   selectedId={tile?.id}
+                  selectedSlot={selection?.slot}
+                  roseTier={(t) => roseTier(tilePx(t))}
                   problemTileIds={problemTileIds}
                   supported={supported}
                   newTileDrag={newTileDrag}
-                  onSelect={(id) => setSelection(id ? { kind: 'tile', id } : undefined)}
+                  onSelect={(id) => setSelection(id ? { id } : undefined)}
+                  onSelectSlot={(id, slot) => setSelection({ id, slot })}
                   onMove={(id, x, y) => edit(moveTile(layout, index, id, x, y), 'That spot is taken.')}
                   onResize={(id, w, h) => edit(resizeTile(layout, index, id, w, h), 'Not enough room to grow there.')}
                   onDropNew={(type, cell) => add(type, cell)}
                   onDragNewEnd={() => setNewTileDrag(null)}
                 />
-              )}
-              {rose && (
-                <div className="canvas-frame" style={{ aspectRatio: String(aspectFor(device, layout)) }}>
-                  <WindRosePreview
-                    page={rose}
-                    values={shownValues}
-                    selectedSlot={slot}
-                    onSelectSlot={(s) => setSelection({ kind: 'slot', slot: s })}
-                    onSelectRose={() => setSelection({ kind: 'rose' })}
-                  />
-                </div>
               )}
               <FooterPreview layout={layout} index={index} />
             </div>
@@ -437,11 +433,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                           if (!target) return;
                           showPage(
                             target.page,
-                            target.tileId
-                              ? { kind: 'tile', id: target.tileId }
-                              : target.slot
-                                ? { kind: 'slot', slot: target.slot }
-                                : undefined,
+                            target.tileId ? { id: target.tileId, slot: target.slot } : undefined,
                           );
                         }}
                       >
@@ -465,7 +457,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           paths={paths}
           values={shownValues}
           supported={supported.has(tile.type)}
+          sizeHint={tile.type === 'wind_rose' ? sizeHint(tilePx(tile), !!device) : undefined}
+          openSlot={selection?.slot}
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}
+          onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
+          onSlot={(slot, patch) => edit(updateSlot(layout, index, tile.id, slot, patch))}
           onDelete={() => {
             edit(removeTile(layout, index, tile.id));
             setSelection(undefined);
@@ -473,29 +469,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           onClose={() => setSelection(undefined)}
         />
       )}
-      {slot && rose && layout && (
-        <SlotDrawer
-          key={`${rose.id}/${slot}`}
-          slot={slot}
-          item={rose.slots[slot]}
-          paths={paths}
-          values={shownValues}
-          onChange={(patch) => edit(updateSlot(layout, index, slot, patch))}
-          onClose={() => setSelection(undefined)}
-        />
-      )}
-      {selection?.kind === 'rose' && rose && layout && (
-        <RoseDrawer
-          key={rose.id}
-          page={rose}
-          paths={paths}
-          values={shownValues}
-          onChange={(patch) => edit(setPageConfig(layout, index, patch))}
-          onClose={() => setSelection(undefined)}
-        />
-      )}
     </div>
   );
+}
+
+function sizeHint(px: number, known: boolean): string {
+  const where = known ? 'on this display' : 'on a 480×480 display';
+  return `About ${px} px ${where}: ${ROSE_TIER_TEXT[roseTier(px)]}.`;
 }
 
 function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined, layout: Layout) {

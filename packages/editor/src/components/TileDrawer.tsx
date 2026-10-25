@@ -1,7 +1,7 @@
-// Settings drawers. A DataItem (tile or wind-rose slot) gets: SignalK path (searchable, with
-// live value and SI units), display unit (only units that fit the path's quantity), decimals,
-// label, stale timeout. Gauges and bars add range, zones and orientation; the wind-rose page
-// has its source paths and the true-wind toggle.
+// Tile settings drawer. A DataItem (a tile or a wind-rose slot) gets: SignalK path (searchable,
+// with live value and SI units), display unit (only units that fit the path's quantity),
+// decimals, label, stale timeout. Gauges and bars add range, zones and orientation; wind roses
+// have three slots, their source paths and the true-wind toggle.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   LABEL_PATTERN,
@@ -13,12 +13,12 @@ import {
   type DataItem,
   type Tile,
   type UnitId,
-  type WindRosePage,
+  type WindRoseTile,
   type Zone,
 } from '@esphelm/schema';
 import type { PathInfo } from '../api';
 import { preferredUnit } from '../format';
-import type { SlotName } from '../layoutOps';
+import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
 
 const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 const ZONE_STATES: Zone['state'][] = ['normal', 'warn', 'alarm', 'emergency'];
@@ -336,72 +336,11 @@ interface Common {
   onClose(): void;
 }
 
-export function TileDrawer(
-  props: Common & {
-    tile: Tile;
-    supported: boolean;
-    onChange(patch: Patch): void;
-    onDelete(): void;
-  },
-) {
-  const { tile, onChange } = props;
-  return (
-    <Drawer title={tile.label || tile.id} label="Tile settings" onClose={props.onClose}>
-      {!props.supported && (
-        <p className="warn">This display's firmware cannot show {tile.type} tiles yet.</p>
-      )}
-      <DataItemFields
-        item={tile}
-        paths={props.paths}
-        values={props.values}
-        showFormat={tile.type !== 'switch'}
-        preferBoolean={tile.type === 'switch'}
-        onChange={onChange}
-      />
-      {(tile.type === 'gauge' || tile.type === 'bar') && (
-        <RangeFields tile={tile} onChange={onChange} />
-      )}
-      <button className="danger" onClick={props.onDelete}>
-        Delete tile
-      </button>
-    </Drawer>
-  );
-}
-
 export const SLOT_TITLES: Record<SlotName, string> = {
   center1: 'Centre, top',
   center2: 'Centre, middle',
   center3: 'Centre, bottom',
 };
-
-export function SlotDrawer(
-  props: Common & {
-    slot: SlotName;
-    item: DataItem | undefined;
-    onChange(patch: Patch | null): void;
-  },
-) {
-  return (
-    <Drawer
-      title={`${SLOT_TITLES[props.slot]}${props.item?.label ? `: ${props.item.label}` : ''}`}
-      label="Slot settings"
-      onClose={props.onClose}
-    >
-      <DataItemFields
-        item={props.item ?? { path: '' }}
-        paths={props.paths}
-        values={props.values}
-        showFormat
-        onChange={props.onChange}
-      />
-      {props.item && (
-        <button className="danger" onClick={() => props.onChange(null)}>
-          Empty this slot
-        </button>
-      )}
-    </Drawer>
-  );
-}
 
 const ROSE_PATHS: { key: 'apparentAngle' | 'trueDirection' | 'heading'; label: string }[] = [
   { key: 'apparentAngle', label: 'Apparent wind angle' },
@@ -409,39 +348,131 @@ const ROSE_PATHS: { key: 'apparentAngle' | 'trueDirection' | 'heading'; label: s
   { key: 'heading', label: 'Heading' },
 ];
 
-export function RoseDrawer(
-  props: Common & { page: WindRosePage; onChange(patch: Patch): void },
+/** Wind rose tile: source paths, true-wind pointer, and the three centre slots. */
+function RoseFields(
+  props: Common & {
+    tile: WindRoseTile;
+    openSlot: SlotName | undefined;
+    onConfig(patch: Patch): void;
+    onSlot(slot: SlotName, patch: Patch | null): void;
+  },
 ) {
-  const config = props.page.config ?? {};
+  const { tile } = props;
+  const config = tile.config ?? {};
   const showTrue = config.showTrueWind ?? WIND_ROSE_DEFAULTS.showTrueWind;
   return (
-    <Drawer title={props.page.title ?? props.page.id} label="Wind rose settings" onClose={props.onClose}>
-      <p className="hint">Tap a centre slot on the rose to choose what it shows.</p>
-      {ROSE_PATHS.map(({ key, label }) => (
-        <div key={key}>
-          <PathPicker
-            path={config[key] ?? ''}
-            paths={props.paths}
-            values={props.values}
-            label={label}
-            placeholder={`default: ${WIND_ROSE_DEFAULTS[key]}`}
-            onPick={(path) => props.onChange({ [key]: path || undefined })}
-          />
-          {config[key] && (
-            <button className="link" onClick={() => props.onChange({ [key]: undefined })}>
-              use the default ({WIND_ROSE_DEFAULTS[key]})
-            </button>
-          )}
-        </div>
-      ))}
+    <>
+      {WIND_ROSE_SLOTS.map((slot) => {
+        const item = tile.slots[slot];
+        return (
+          <details
+            key={slot}
+            className="slot-section"
+            open={slot === props.openSlot}
+            data-testid={`slot-section-${slot}`}
+          >
+            <summary>
+              {SLOT_TITLES[slot]}
+              <span className="now">{item ? item.label || item.path || 'no path yet' : 'empty'}</span>
+            </summary>
+            <DataItemFields
+              item={item ?? { path: '' }}
+              paths={props.paths}
+              values={props.values}
+              showFormat
+              onChange={(patch) => props.onSlot(slot, patch)}
+            />
+            {item && (
+              <button className="small" onClick={() => props.onSlot(slot, null)}>
+                Empty this slot
+              </button>
+            )}
+          </details>
+        );
+      })}
+      <details className="slot-section">
+        <summary>Wind and heading sources</summary>
+        {ROSE_PATHS.map(({ key, label }) => (
+          <div key={key}>
+            <PathPicker
+              path={config[key] ?? ''}
+              paths={props.paths}
+              values={props.values}
+              label={label}
+              placeholder={`default: ${WIND_ROSE_DEFAULTS[key]}`}
+              onPick={(path) => props.onConfig({ [key]: path || undefined })}
+            />
+            {config[key] && (
+              <button className="link" onClick={() => props.onConfig({ [key]: undefined })}>
+                use the default ({WIND_ROSE_DEFAULTS[key]})
+              </button>
+            )}
+          </div>
+        ))}
+      </details>
       <label className="check">
         <input
           type="checkbox"
           checked={showTrue}
-          onChange={(e) => props.onChange({ showTrueWind: e.target.checked })}
+          onChange={(e) => props.onConfig({ showTrueWind: e.target.checked })}
         />
         Show the true wind pointer
       </label>
+    </>
+  );
+}
+
+export function TileDrawer(
+  props: Common & {
+    tile: Tile;
+    supported: boolean;
+    /** Wind rose only: how the display will draw it at this size. */
+    sizeHint?: string;
+    openSlot?: SlotName;
+    onChange(patch: Patch): void;
+    onConfig(patch: Patch): void;
+    onSlot(slot: SlotName, patch: Patch | null): void;
+    onDelete(): void;
+  },
+) {
+  const { tile, onChange } = props;
+  const title = tile.type === 'wind_rose' ? 'Wind rose' : tile.label || tile.id;
+  return (
+    <Drawer title={title} label="Tile settings" onClose={props.onClose}>
+      {!props.supported && (
+        <p className="warn">This display's firmware cannot show {tile.type} tiles yet.</p>
+      )}
+      {tile.type === 'wind_rose' ? (
+        <>
+          {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
+          <RoseFields
+            tile={tile}
+            paths={props.paths}
+            values={props.values}
+            openSlot={props.openSlot}
+            onConfig={props.onConfig}
+            onSlot={props.onSlot}
+            onClose={props.onClose}
+          />
+        </>
+      ) : (
+        <>
+          <DataItemFields
+            item={tile}
+            paths={props.paths}
+            values={props.values}
+            showFormat={tile.type !== 'switch'}
+            preferBoolean={tile.type === 'switch'}
+            onChange={onChange}
+          />
+          {(tile.type === 'gauge' || tile.type === 'bar') && (
+            <RangeFields tile={tile} onChange={onChange} />
+          )}
+        </>
+      )}
+      <button className="danger" onClick={props.onDelete}>
+        Delete tile
+      </button>
     </Drawer>
   );
 }

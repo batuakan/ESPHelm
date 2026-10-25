@@ -697,18 +697,22 @@ select.zone-emergency {
   color: var(--tile-muted);
 }
 
-/* Wind rose page */
-.rose {
+/* Wind rose tile */
+.tile-type-wind_rose {
+  grid-template-rows: 0 1fr; /* no caption line: the rose uses the whole tile */
+  padding: 6px;
+}
+.tile-graphic.rose {
   position: relative;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 0;
 }
 .rose svg {
   height: 100%;
   max-width: 100%;
-  cursor: pointer;
+}
+.rose .zone.thin {
+  stroke-width: 3;
 }
 .rose-ring,
 .rose-tick {
@@ -739,22 +743,28 @@ select.zone-emergency {
 }
 .rose-slots {
   position: absolute;
-  top: 38%;
-  left: 50%;
-  transform: translate(-50%, -20%);
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  pointer-events: none;
+}
+.rose-full .rose-slots {
+  padding-top: 8%;
 }
 .rose-slot {
+  pointer-events: auto;
   background: transparent;
   border: 2px dashed transparent;
   color: var(--tile-text);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 10px;
-  min-width: 110px;
+  padding: 0 8px;
+  min-width: min(110px, 40%);
+  line-height: 1.15;
 }
 .rose-slot:hover,
 .rose-slot.empty {
@@ -874,4 +884,11 @@ select.zone-emergency {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 10;
   }
+}
+.slot-section summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.slot-section summary .now {
+  margin-left: 8px;
 }

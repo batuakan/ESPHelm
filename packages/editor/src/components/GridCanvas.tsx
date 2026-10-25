@@ -3,7 +3,8 @@
 // tile type from the library onto a free cell. Placement rules live in layoutOps.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GridPage, Tile, TileType } from '@esphelm/schema';
-import { fits, type Rect } from '../layoutOps';
+import { fits, type Rect, type SlotName } from '../layoutOps';
+import type { RoseTier } from '../sizing';
 import { TilePreview } from './Previews';
 
 export interface NewTileDrag {
@@ -17,10 +18,14 @@ interface Props {
   aspect: number; // display width / height
   values: Map<string, unknown>;
   selectedId: string | undefined;
+  selectedSlot?: SlotName;
+  /** Size tier the display will draw a wind rose tile with. */
+  roseTier(tile: Tile): RoseTier;
   problemTileIds: Set<string>;
   supported: Set<string>;
   newTileDrag: NewTileDrag | null;
   onSelect(id: string | undefined): void;
+  onSelectSlot(id: string, slot: SlotName): void;
   onMove(id: string, x: number, y: number): void;
   onResize(id: string, w: number, h: number): void;
   onDropNew(type: TileType, cell: { x: number; y: number }): void;
@@ -130,8 +135,8 @@ export function GridCanvas(props: Props) {
         ref={gridRef}
         className="grid"
         style={{
-          gridTemplateColumns: `repeat(${page.grid.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${page.grid.rows}, 1fr)`,
+          gridTemplateColumns: `repeat(${page.grid.cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${page.grid.rows}, minmax(0, 1fr))`,
         }}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -147,7 +152,7 @@ export function GridCanvas(props: Props) {
             problemTileIds.has(tile.id) ? 'problem' : '',
             gesture?.id === tile.id && preview ? 'dragging' : '',
             props.supported.has(tile.type) ? '' : 'unsupported',
-            `tile-${tile.type}`,
+            `tile-type-${tile.type}`,
           ];
           return (
             <div
@@ -161,8 +166,16 @@ export function GridCanvas(props: Props) {
               onClick={() => props.onSelect(tile.id)}
               data-testid={`tile-${tile.id}`}
             >
-              <span className="tile-label">{tile.label || (tile.path ? '' : 'Pick a path')}</span>
-              <TilePreview tile={tile} value={tile.path ? values.get(tile.path) : undefined} />
+              <span className="tile-label">
+                {tile.type === 'wind_rose' ? '' : tile.label || (tile.path ? '' : 'Pick a path')}
+              </span>
+              <TilePreview
+                tile={tile}
+                values={values}
+                roseTier={tile.type === 'wind_rose' ? props.roseTier(tile) : undefined}
+                selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
+                onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
+              />
               <span
                 className="resize-handle"
                 aria-label="Resize"

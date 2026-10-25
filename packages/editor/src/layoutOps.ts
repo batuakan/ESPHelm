@@ -10,7 +10,7 @@ import {
   type Page,
   type Tile,
   type TileType,
-  type WindRosePage,
+  type WindRoseTile,
 } from '@esphelm/schema';
 
 export interface Rect {
@@ -25,7 +25,7 @@ export interface DeviceRef {
   name?: string;
 }
 
-export type SlotName = keyof WindRosePage['slots'];
+export type SlotName = keyof WindRoseTile['slots'];
 export const WIND_ROSE_SLOTS: readonly SlotName[] = ['center1', 'center2', 'center3'];
 
 /** Layout id for a display's own layout (one layout per display). */
@@ -44,13 +44,12 @@ export function newLayoutFor(device: DeviceRef): Layout {
   };
 }
 
-/** Page `index` if it is a grid page. */
+/** Page `index` (every page is a grid page in v1). */
 export function gridPage(layout: Layout, index: number): GridPage | undefined {
-  const p = layout.pages[index];
-  return p?.kind === 'grid' ? p : undefined;
+  return layout.pages[index];
 }
 
-function withPage(layout: Layout, index: number, update: (page: Page) => Page): Layout {
+function withGrid(layout: Layout, index: number, update: (page: GridPage) => GridPage): Layout {
   const p = layout.pages[index];
   if (!p) return layout;
   const pages = [...layout.pages];
@@ -58,16 +57,29 @@ function withPage(layout: Layout, index: number, update: (page: Page) => Page): 
   return { ...layout, pages };
 }
 
-function withGrid(layout: Layout, index: number, update: (page: GridPage) => GridPage): Layout {
-  return withPage(layout, index, (p) => (p.kind === 'grid' ? update(p) : p));
-}
-
+/** Apply `update` to wind-rose tile `id` on page `index`; other tiles are left alone. */
 function withRose(
   layout: Layout,
   index: number,
-  update: (page: WindRosePage) => WindRosePage,
+  id: string,
+  update: (tile: WindRoseTile) => WindRoseTile,
 ): Layout {
-  return withPage(layout, index, (p) => (p.kind === 'widget' ? update(p) : p));
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => (t.id === id && t.type === 'wind_rose' ? update(t) : t)),
+  }));
+}
+
+/** SignalK paths a tile shows (what the live preview subscribes to). */
+export function tilePaths(tile: Tile): string[] {
+  if (tile.type !== 'wind_rose') return [tile.path];
+  const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
+  return [
+    cfg.apparentAngle,
+    cfg.trueDirection,
+    cfg.heading,
+    ...Object.values(tile.slots).map((s) => s.path),
+  ];
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -89,9 +101,7 @@ export function firstFreeCell(page: GridPage): { x: number; y: number } | null {
 }
 
 function usedIds(layout: Layout): Set<string> {
-  return new Set(
-    layout.pages.flatMap((p) => [p.id, ...(p.kind === 'grid' ? p.tiles.map((t) => t.id) : [])]),
-  );
+  return new Set(layout.pages.flatMap((p) => [p.id, ...p.tiles.map((t) => t.id)]));
 }
 
 function nextId(used: Set<string>, prefix: string): string {
@@ -108,12 +118,17 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, path: '', min: 0, max: 100 };
     case 'switch':
       return { type, ...place, path: '' };
+    case 'wind_rose':
+      return { type, ...place, slots: {} };
     default:
       return { type: 'value', ...place, path: '' };
   }
 }
 
-/** Add a 1x1 tile to grid page `index` at `at` (or the first free cell). */
+/**
+ * Add a tile to page `index` at `at` (or the first free cell). Tiles are 1x1, except wind
+ * roses, which take 2x2 when that fits there.
+ */
 export function addTile(
   layout: Layout,
   index: number,
@@ -124,13 +139,15 @@ export function addTile(
   if (!page) return null;
   const cell = at && fits(page, { ...at, w: 1, h: 1 }) ? at : at ? null : firstFreeCell(page);
   if (!cell) return null;
-  const id = nextId(usedIds(layout), 'tile');
+  const id = nextId(usedIds(layout), type === 'wind_rose' ? 'rose' : 'tile');
+  const tile = newTile(type, id, cell);
+  if (type === 'wind_rose' && fits(page, { ...cell, w: 2, h: 2 })) {
+    tile.w = 2;
+    tile.h = 2;
+  }
   return {
     id,
-    layout: withGrid(layout, index, (p) => ({
-      ...p,
-      tiles: [...p.tiles, newTile(type, id, cell)],
-    })),
+    layout: withGrid(layout, index, (p) => ({ ...p, tiles: [...p.tiles, tile] })),
   };
 }
 
@@ -198,30 +215,46 @@ export function setGrid(layout: Layout, index: number, cols: number, rows: numbe
 
 export type NewPageKind = 'grid' | 'wind_rose';
 
-/** Insert a new page after `after` (default: at the end). Returns the new page's index. */
+/**
+ * Insert a new page after `after` (default: at the end). Returns the new page's index.
+ * A wind rose page is a 1x1 grid with one wind rose tile filling the screen.
+ */
 export function addPage(
   layout: Layout,
   kind: NewPageKind,
   after = layout.pages.length - 1,
 ): { layout: Layout; index: number } {
   const used = usedIds(layout);
-  const page: Page =
-    kind === 'grid'
-      ? {
-          kind: 'grid',
-          id: nextId(used, 'page'),
-          title: 'Page',
-          grid: { cols: 2, rows: 2 },
-          tiles: [],
-        }
-      : {
-          kind: 'widget',
-          widget: 'wind_rose',
-          id: nextId(used, 'wind'),
-          title: 'Wind',
-          config: { showTrueWind: true },
-          slots: {},
-        };
+  if (kind === 'grid') {
+    const page: Page = {
+      kind: 'grid',
+      id: nextId(used, 'page'),
+      title: 'Page',
+      grid: { cols: 2, rows: 2 },
+      tiles: [],
+    };
+    return insertPages(layout, [page], after);
+  }
+  const id = nextId(used, 'wind');
+  used.add(id);
+  const page: Page = {
+    kind: 'grid',
+    id,
+    title: 'Wind',
+    grid: { cols: 1, rows: 1 },
+    tiles: [
+      {
+        type: 'wind_rose',
+        id: used.has(`${id}-rose`) ? nextId(used, `${id}-rose`) : `${id}-rose`,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        config: { showTrueWind: true },
+        slots: {},
+      },
+    ],
+  };
   return insertPages(layout, [page], after);
 }
 
@@ -251,11 +284,11 @@ export function addTemplatePages(
     used.add(free);
     return free;
   };
-  const pages = template.pages.map((p): Page => {
-    const id = claim(p.id);
-    if (p.kind !== 'grid') return { ...p, id };
-    return { ...p, id, tiles: p.tiles.map((t) => ({ ...t, id: claim(t.id) })) };
-  });
+  const pages = template.pages.map((p): Page => ({
+    ...p,
+    id: claim(p.id),
+    tiles: p.tiles.map((t) => ({ ...t, id: claim(t.id) })),
+  }));
   return insertPages(layout, pages, after);
 }
 
@@ -282,31 +315,36 @@ export function movePage(layout: Layout, index: number, delta: number): Layout |
 
 /** Set the title shown in the display's footer; empty removes it (the id is shown). */
 export function renamePage(layout: Layout, index: number, title: string): Layout {
-  return withPage(layout, index, (p) => merge(p, { title: title || undefined }));
+  return withGrid(layout, index, (p) => merge(p, { title: title || undefined }));
 }
 
-/** Merge into a wind-rose slot; `null` empties the slot. A new slot starts without a path. */
+/** Merge into a slot of wind-rose tile `id`; `null` empties the slot. New slots start without a path. */
 export function updateSlot(
   layout: Layout,
   index: number,
+  id: string,
   slot: SlotName,
   patch: Record<string, unknown> | null,
 ): Layout {
-  return withRose(layout, index, (p) => {
-    const slots = { ...p.slots };
+  return withRose(layout, index, id, (t) => {
+    const slots = { ...t.slots };
     if (patch === null) delete slots[slot];
     else slots[slot] = merge<DataItem>(slots[slot] ?? { path: '' }, patch);
-    return { ...p, slots };
+    return { ...t, slots };
   });
 }
 
-/** Merge into a wind-rose page's config; undefined values fall back to the defaults. */
-export function setPageConfig(
+/** Merge into a wind-rose tile's config; undefined values fall back to the defaults. */
+export function setTileConfig(
   layout: Layout,
   index: number,
+  id: string,
   patch: Partial<Record<keyof typeof WIND_ROSE_DEFAULTS, unknown>>,
 ): Layout {
-  return withRose(layout, index, (p) => ({ ...p, config: merge(p.config ?? {}, patch) }));
+  return withRose(layout, index, id, (t) => {
+    const config = merge(t.config ?? {}, patch);
+    return Object.keys(config).length > 0 ? { ...t, config } : merge(t, { config: undefined });
+  });
 }
 
 /** What a validation error points at (e.g. "/pages/0/tiles/2/label"). */
@@ -317,14 +355,15 @@ export interface ProblemTarget {
 }
 
 export function targetForPointer(layout: Layout, pointer: string): ProblemTarget | undefined {
-  const m = /^\/pages\/(\d+)(?:\/(tiles|slots)\/([^/]+))?(\/|$)/.exec(pointer);
+  const m = /^\/pages\/(\d+)(?:\/tiles\/(\d+)(?:\/slots\/([^/]+))?)?(\/|$)/.exec(pointer);
   if (!m) return undefined;
   const index = Number(m[1]);
   const page = layout.pages[index];
   if (!page) return undefined;
-  if (m[2] === 'tiles' && page.kind === 'grid')
-    return { page: index, tileId: page.tiles[Number(m[3])]?.id };
-  if (m[2] === 'slots' && (WIND_ROSE_SLOTS as readonly string[]).includes(m[3] ?? ''))
-    return { page: index, slot: m[3] as SlotName };
-  return { page: index };
+  if (m[2] === undefined) return { page: index };
+  const tileId = page.tiles[Number(m[2])]?.id;
+  const slot = (WIND_ROSE_SLOTS as readonly string[]).includes(m[3] ?? '')
+    ? (m[3] as SlotName)
+    : undefined;
+  return { page: index, tileId, ...(slot ? { slot } : {}) };
 }

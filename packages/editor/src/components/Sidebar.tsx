@@ -29,6 +29,13 @@ const ICONS: Record<string, JSX.Element> = {
       <circle cx="14" cy="10" r="2.5" className="fill" />
     </svg>
   ),
+  wind_rose: (
+    <svg viewBox="0 0 20 20">
+      <circle cx="10" cy="10" r="7.5" />
+      <path d="M10 10l-3.5-5.5" />
+      <path d="M10 2.5v2M17.5 10h-2M10 17.5v-2M2.5 10h2" />
+    </svg>
+  ),
 };
 
 const TILE_INFO: Record<string, { title: string }> = {
@@ -36,6 +43,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   gauge: { title: 'Gauge' },
   bar: { title: 'Bar' },
   switch: { title: 'Switch' },
+  wind_rose: { title: 'Wind rose' },
 };
 
 export function DeviceList(props: {

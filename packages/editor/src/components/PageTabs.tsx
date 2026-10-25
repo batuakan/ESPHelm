@@ -9,7 +9,15 @@ const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 
 /** Widgets a page needs from the display's firmware. */
 export function pageWidgets(page: Layout['pages'][number]): string[] {
-  return page.kind === 'grid' ? [...new Set(page.tiles.map((t) => t.type))] : [page.widget];
+  return [...new Set(page.tiles.map((t) => t.type))];
+}
+
+/** Starter layouts, the denser "-720" ones first on large displays (shorter side >= 600 px). */
+export function orderedTemplates(largeDisplay: boolean): Layout[] {
+  const all = Object.values(TEMPLATES);
+  const large = all.filter((t) => t.id.endsWith('-720'));
+  const small = all.filter((t) => !t.id.endsWith('-720'));
+  return largeDisplay ? [...large, ...small] : [...small, ...large];
 }
 
 export function templateSupported(template: Layout, supported: Set<string>): boolean {
@@ -20,6 +28,8 @@ interface Props {
   layout: Layout;
   index: number;
   supported: Set<string>;
+  /** The display's shorter side is at least 600 px. */
+  largeDisplay: boolean;
   onSelect(index: number): void;
   onAdd(kind: NewPageKind): void;
   onAddTemplate(id: string): void;
@@ -36,7 +46,7 @@ export function PageTabs(props: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const page = layout.pages[index];
   const title = page?.title ?? '';
-  const templates = Object.values(TEMPLATES);
+  const templates = orderedTemplates(props.largeDisplay);
 
   const close = () => {
     setMenu(null);
@@ -61,7 +71,6 @@ export function PageTabs(props: Props) {
               }}
             >
               {p.title ?? p.id}
-              {p.kind === 'widget' && <span className="tab-kind"> · rose</span>}
             </button>
           );
         })}

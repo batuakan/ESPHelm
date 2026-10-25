@@ -28,7 +28,11 @@ function fakeServer(devices: Device[]) {
     if (path === '/devices') return json(devices);
     if (path === '/paths') return json(paths);
     if (path === '/widgets')
-      return json({ tiles: ['value', 'gauge', 'bar', 'switch'], pageWidgets: { wind_rose: { slots: [] } }, units: {} });
+      return json({
+        tiles: ['value', 'gauge', 'bar', 'switch', 'wind_rose'],
+        tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
+        units: {},
+      });
     const dev = /^\/devices\/(.+)$/.exec(path);
     if (dev && method === 'PUT') {
       const d = devices.find((x) => x.id === decodeURIComponent(dev[1] ?? ''))!;
@@ -99,7 +103,7 @@ describe('editor', () => {
     await screen.findByText('Add at least one tile.');
     expect((save as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: /Value/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
     await screen.findByText(/tile-1: pick a SignalK path/);
 
     // Pick a path: the unit defaults to knots for a speed.
@@ -152,46 +156,72 @@ describe('editor', () => {
     const live = fakeLive();
     render(<App api={server.api} live={live.factory} />);
     await screen.findByText('Add at least one tile.');
-    fireEvent.click(screen.getByRole('button', { name: /Value/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
     fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
 
+    // A wind rose page is a 1x1 grid with one rose tile, selected right away.
     fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Wind rose page' }));
-    expect(screen.getByRole('tab', { selected: true }).textContent).toMatch(/Wind/);
-    // The footer preview appears once there are two pages.
+    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Wind');
     expect(screen.getByLabelText('Display footer').textContent).toMatch(/Wind 2\/2/);
-    // The rose subscribes to its default source paths.
     expect(live.paths()).toEqual([
       'environment.wind.angleApparent',
       'environment.wind.directionTrue',
       'navigation.headingTrue',
     ]);
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    // 720x720 display, 1x1 grid, footer: a full-size rose.
+    expect(within(drawer).getByText(/^About \d+ px on this display: full/)).toBeTruthy();
 
-    fireEvent.click(screen.getByTestId('slot-center1'));
-    const drawer = screen.getByRole('complementary', { name: 'Slot settings' });
-    fireEvent.change(within(drawer).getByLabelText('Search SignalK paths'), { target: { value: 'depth' } });
-    fireEvent.click(within(drawer).getByRole('option', { name: /belowTransducer/ }));
-    fireEvent.change(within(drawer).getByLabelText('Label'), { target: { value: 'Depth' } });
+    // Tapping a slot on the rose opens that slot's section in the drawer.
+    fireEvent.click(screen.getByTestId('slot-wind-1-rose-center1'));
+    const section = within(drawer).getByTestId('slot-section-center1');
+    expect((section as HTMLDetailsElement).open).toBe(true);
+    fireEvent.change(within(section).getByLabelText('Search SignalK paths'), {
+      target: { value: 'depth' },
+    });
+    fireEvent.click(within(section).getByRole('option', { name: /belowTransducer/ }));
+    fireEvent.change(within(section).getByLabelText('Label'), { target: { value: 'Depth' } });
     live.emit('environment.depth.belowTransducer', 4.25);
-    within(screen.getByTestId('slot-center1')).getByText('4.3');
-    within(screen.getByTestId('slot-center1')).getByText('Depth m');
+    within(screen.getByTestId('slot-wind-1-rose-center1')).getByText('4.3');
+    within(screen.getByTestId('slot-wind-1-rose-center1')).getByText('Depth m');
 
-    // Rename and reorder: the rose becomes the first page.
+    // Rename and reorder: the rose page becomes the first page.
     fireEvent.change(screen.getByLabelText('Page title'), { target: { value: 'Sailing' } });
     fireEvent.click(screen.getByRole('button', { name: 'Move page left' }));
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Sailing · rose', 'Main']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Sailing', 'Main']);
 
     await screen.findByText('No problems');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
     const saved = server.layouts.get(`display-${p4.deviceId}`)!;
-    expect(saved.pages.map((p) => [p.kind, p.id, p.title])).toEqual([
-      ['widget', 'wind-1', 'Sailing'],
-      ['grid', 'main', 'Main'],
+    expect(saved.pages.map((p) => [p.id, p.title, p.tiles.map((t) => t.type)])).toEqual([
+      ['wind-1', 'Sailing', ['wind_rose']],
+      ['main', 'Main', ['value']],
     ]);
-    expect(saved.pages[0]).toMatchObject({
+    expect(saved.pages[0]!.tiles[0]).toMatchObject({
       slots: { center1: { path: 'environment.depth.belowTransducer', unit: 'm', label: 'Depth' } },
     });
+  });
+
+  it('adds a wind rose tile next to other tiles and warns when it is small', async () => {
+    const server = fakeServer([device('adopted')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.change(screen.getByLabelText('Columns'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: /Wind rose/ }));
+    let drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    // 2x2 of a 4x4 grid at 720: about 330 px, full.
+    expect(within(drawer).getByText(/full/)).toBeTruthy();
+    const resize = within(screen.getByTestId('tile-rose-1')).getByLabelText('Resize');
+    expect(resize).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Wind rose/ }));
+    drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    // The second rose only gets 1x1 (about 150 px): compact or pointers only.
+    expect(within(drawer).getByText(/compact|pointers only/)).toBeTruthy();
+    expect(within(screen.getByTestId('grid')).getAllByTestId(/^rose-rose-/)).toHaveLength(2);
   });
 
   it('edits gauge range and zones and flags a zone outside the range', async () => {
