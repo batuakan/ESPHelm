@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "template-autopilot",
+  "name": "Autopilot",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "autopilot",
+      "title": "Autopilot",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [{ "type": "autopilot", "id": "autopilot-ap", "x": 0, "y": 0, "w": 1, "h": 1 }]
+    }
+  ]
+}

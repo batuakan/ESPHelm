@@ -1,0 +1,24 @@
+{
+  "description": "Autopilot modes are auto, wind and route (standby is always there)",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/pages/0/tiles/0/modes/1"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": { "cols": 1, "rows": 1 },
+        "tiles": [
+          { "type": "autopilot", "id": "ap", "x": 0, "y": 0, "w": 1, "h": 1, "modes": ["auto", "standby"] }
+        ]
+      }
+    ]
+  }
+}

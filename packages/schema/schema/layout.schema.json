@@ -924,6 +924,102 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "id",
+                    "x",
+                    "y",
+                    "w",
+                    "h"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "autopilot"
+                    },
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                      "errorCode": "INVALID_ID",
+                      "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                    },
+                    "x": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "w": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "h": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "label": {
+                      "type": "string",
+                      "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                      "errorCode": "INVALID_LABEL",
+                      "description": "Printable ASCII plus the degree sign (U+00B0)."
+                    },
+                    "modes": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "string",
+                            "const": "wind"
+                          },
+                          {
+                            "type": "string",
+                            "const": "route"
+                          }
+                        ]
+                      },
+                      "uniqueItems": true
+                    },
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "statePath": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "targetPath": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "adjustPath": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        },
+                        "headingPath": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                          "errorCode": "INVALID_PATH",
+                          "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
                 }
               ]
             },

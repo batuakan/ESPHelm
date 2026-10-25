@@ -97,8 +97,15 @@
           "path": "propulsion.main.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil", "staleAfter": 6,
           "min": 0, "max": 6
         },
-        { "type": "value", "id": "helm-volts", "x": 2, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "Volts", "staleAfter": 6 }
+        { "type": "autopilot", "id": "helm-ap", "x": 2, "y": 2, "w": 1, "h": 1 }
       ]
+    },
+    {
+      "kind": "grid",
+      "id": "pilot",
+      "title": "Pilot",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [{ "type": "autopilot", "id": "pilot-ap", "x": 0, "y": 0, "w": 1, "h": 1 }]
     }
   ]
 }

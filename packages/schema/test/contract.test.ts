@@ -65,8 +65,10 @@ describe('starter layouts (templates)', () => {
       'energy',
       'engine',
       'switchboard',
+      'autopilot',
       'sailing-720',
       'wind-engine-720',
+      'helm-720',
     ]);
     for (const [name, t] of Object.entries(TEMPLATES))
       expect(t.id.endsWith('-720')).toBe(name.endsWith('-720'));

@@ -187,10 +187,13 @@ function renderUnitsHeader(units: FlatUnit[]): string {
   ].join('\n');
 }
 
-function renderSizesHeader(fit: { full: number; compact: number }): string {
+function renderSizesHeader(
+  fit: { full: number; compact: number },
+  ap: { controlsWidth: number; controlsHeight: number },
+): string {
   return [
     `// ${GENERATED_NOTE}`,
-    '// Widget size tiers shared with the TS schema package (WIND_ROSE_FIT in src/tiles.ts).',
+    '// Widget size tiers shared with the TS schema package (*_FIT in src/tiles.ts).',
     '#pragma once',
     '',
     'namespace esphelm {',
@@ -200,6 +203,10 @@ function renderSizesHeader(fit: { full: number; compact: number }): string {
     '// compact: slots as far as they fit; below compact: pointers only.',
     `inline constexpr int WIND_ROSE_FULL = ${fit.full};`,
     `inline constexpr int WIND_ROSE_COMPACT = ${fit.compact};`,
+    '',
+    '// Autopilot: content box in pixels from which the buttons are shown (else status only).',
+    `inline constexpr int AUTOPILOT_CONTROLS_WIDTH = ${ap.controlsWidth};`,
+    `inline constexpr int AUTOPILOT_CONTROLS_HEIGHT = ${ap.controlsHeight};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',
@@ -241,8 +248,10 @@ function renderTemplatesTs(): string {
     'energy',
     'engine',
     'switchboard',
+    'autopilot',
     'sailing-720',
     'wind-engine-720',
+    'helm-720',
   ];
   const files = readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
@@ -287,7 +296,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT } = await import('../src/tiles.js');
+  const { WIND_ROSE_FIT, AUTOPILOT_FIT } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -295,8 +304,11 @@ export async function renderAll(): Promise<Record<string, string>> {
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
-    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT),
-    '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT),
+    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT),
+    '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
+      WIND_ROSE_FIT,
+      AUTOPILOT_FIT,
+    ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),
   };

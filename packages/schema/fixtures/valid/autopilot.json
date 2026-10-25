@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "autopilot",
+  "name": "Autopilot tiles",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "pilot",
+      "title": "Pilot",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [{ "type": "autopilot", "id": "pilot-ap", "x": 0, "y": 0, "w": 1, "h": 1 }]
+    },
+    {
+      "kind": "grid",
+      "id": "helm",
+      "title": "Helm",
+      "grid": { "cols": 4, "rows": 2 },
+      "tiles": [
+        { "type": "wind_rose", "id": "helm-rose", "x": 0, "y": 0, "w": 2, "h": 2, "slots": {} },
+        { "type": "autopilot", "id": "helm-ap", "x": 2, "y": 0, "w": 2, "h": 2, "modes": ["auto", "route"] }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "status",
+      "title": "Status",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        {
+          "type": "autopilot", "id": "mini-ap", "x": 0, "y": 0, "w": 1, "h": 1, "label": "Pilot",
+          "modes": [],
+          "config": {
+            "statePath": "steering.autopilot.state",
+            "targetPath": "steering.autopilot.target.headingMagnetic",
+            "adjustPath": "steering.autopilot.actions.adjustHeading",
+            "headingPath": "navigation.headingTrue"
+          }
+        },
+        { "type": "value", "id": "sog", "x": 1, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "label": "SOG" }
+      ]
+    }
+  ]
+}

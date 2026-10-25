@@ -132,6 +132,57 @@ export const WIND_ROSE_FIT = {
   compact: 150,
 } as const;
 
+/** Autopilot modes the tile can engage (steering.autopilot.state values); `standby` is always there. */
+export const AutopilotMode = Type.Union([
+  Type.Literal('auto'),
+  Type.Literal('wind'),
+  Type.Literal('route'),
+]);
+export type AutopilotMode = Type.Static<typeof AutopilotMode>;
+
+/**
+ * Autopilot: state, target and heading, plus course and mode buttons that send PUTs (classic
+ * SignalK autopilot paths, as the legacy app). Safety rules (ADR-0011): engaging needs a tap and a
+ * confirming tap, standby is one tap, course changes only while engaged, no controls when the
+ * cell is too small (AUTOPILOT_FIT) or the display is offline.
+ */
+export const AutopilotTile = Type.Object(
+  {
+    type: Type.Literal('autopilot'),
+    ...Placement,
+    label: Type.Optional(Label),
+    modes: Type.Optional(Type.Array(AutopilotMode, { uniqueItems: true })),
+    config: Type.Optional(
+      Type.Object(
+        {
+          statePath: Type.Optional(SkPath),
+          targetPath: Type.Optional(SkPath),
+          adjustPath: Type.Optional(SkPath),
+          headingPath: Type.Optional(SkPath),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted autopilot fields (the paths the legacy autopilot app uses). */
+export const AUTOPILOT_DEFAULTS = {
+  modes: ['auto', 'wind', 'route'] as readonly AutopilotMode[],
+  statePath: 'steering.autopilot.state',
+  targetPath: 'steering.autopilot.target',
+  adjustPath: 'steering.autopilot.actions.adjustHeading',
+  headingPath: 'navigation.headingMagnetic',
+} as const;
+
+/**
+ * Smallest content box (device pixels) in which an autopilot tile shows its buttons (about
+ * 56 px each, a finger-sized target). Smaller tiles show status only. Generated into
+ * esphelm_sizes.h; the editor uses the same numbers for its size hint.
+ */
+export const AUTOPILOT_FIT = { controlsWidth: 260, controlsHeight: 220 } as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,
@@ -139,6 +190,7 @@ export const TILE_TYPES = {
   bar: BarTile,
   switch: SwitchTile,
   wind_rose: WindRoseTile,
+  autopilot: AutopilotTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -147,10 +199,18 @@ export const TILE_SLOTS = {
   wind_rose: Object.keys(WindRoseSlots.properties) as ('center1' | 'center2' | 'center3')[],
 } as const;
 
-export const Tile = Type.Union([ValueTile, GaugeTile, BarTile, SwitchTile, WindRoseTile]);
+export const Tile = Type.Union([
+  ValueTile,
+  GaugeTile,
+  BarTile,
+  SwitchTile,
+  WindRoseTile,
+  AutopilotTile,
+]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
 export type BarTile = Type.Static<typeof BarTile>;
 export type SwitchTile = Type.Static<typeof SwitchTile>;
 export type WindRoseTile = Type.Static<typeof WindRoseTile>;
+export type AutopilotTile = Type.Static<typeof AutopilotTile>;
 export type Tile = Type.Static<typeof Tile>;

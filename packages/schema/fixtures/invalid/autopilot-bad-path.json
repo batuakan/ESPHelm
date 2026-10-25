@@ -1,0 +1,24 @@
+{
+  "description": "Autopilot config paths are SignalK paths",
+  "expect": [
+    {
+      "code": "INVALID_PATH",
+      "pointer": "/pages/0/tiles/0/config/adjustPath"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": { "cols": 1, "rows": 1 },
+        "tiles": [
+          { "type": "autopilot", "id": "ap", "x": 0, "y": 0, "w": 1, "h": 1, "config": { "adjustPath": "steering.*" } }
+        ]
+      }
+    ]
+  }
+}
