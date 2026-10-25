@@ -9,6 +9,6 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts'],
+    include: ['packages/*/test/**/*.test.ts', 'firmware/test/**/*.test.ts'],
   },
 });

@@ -13,6 +13,7 @@
     "packages/*/src/**/*.ts",
     "packages/*/scripts/**/*.ts",
     "packages/*/test/**/*.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "firmware/test/**/*.ts"
   ]
 }

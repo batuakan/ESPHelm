@@ -5,6 +5,9 @@
 !packages/**/*.ts
 !packages/**/*.json
 !*.json
+!firmware/
+!firmware/test/
+!firmware/test/*.ts
 !*.js
 package-lock.json
 packages/*/generated/

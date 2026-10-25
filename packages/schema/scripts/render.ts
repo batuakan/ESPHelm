@@ -227,6 +227,8 @@ export async function renderAll(): Promise<Record<string, string>> {
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'generated/esphelm_units.h': renderUnitsHeader(units),
+    // Firmware copy of the same header (the ESPHome component cannot reach packages/).
+    '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),
