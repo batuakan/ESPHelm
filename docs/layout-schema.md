@@ -156,7 +156,9 @@ Angles have two display units: **`deg` wraps to 0..360** (headings, true wind di
 | current | `A` | `A`, `mA` |
 | time | `s` | `s`, `min`, `h` |
 
-v1 doesn't check that a tile's unit matches the path's quantity (e.g. `kn` on a temperature path). That needs the path's SignalK `meta.units`, which the editor will check in Phase 4 using the server's metadata.
+Each quantity in `units.json` also names the SignalK `meta.units` string it corresponds to (`signalk`: `m/s`, `rad`, `K`, `ratio`, `Hz`, `m`, `m3`, `m3/s`, `Pa`, `C`, `J`, `W`, `V`, `A`, `s`, `rad/s`). `quantityForSignalKUnits()` and `unitsForSignalKUnits()` use it, so the editor offers only the display units that fit a path.
+
+v1 doesn't check that a tile's unit matches the path's quantity (e.g. `kn` on a temperature path). That needs the path's SignalK `meta.units`. The editor (Phase 4) only offers fitting units, but the validator itself doesn't enforce it.
 
 ## 5. Device `hello`
 Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator `validateHello()`.

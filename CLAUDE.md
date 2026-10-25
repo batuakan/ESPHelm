@@ -132,6 +132,7 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 - Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (symlink to `../legacy/secrets.yaml`). Reference: `docs/firmware-runtime.md`.
 - Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, six golden screenshots in `firmware/test/golden/`; `UPDATE_GOLDEN=1` re-records). Needs an X display.
 - ESPHomeSignalK unit tests: `../ESPHomeSignalK/tools/test_cpp.sh`.
+- Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
 
 - **Schema/plugin/editor:** unit tests (vitest or jest), type-check, lint, plus contract tests that load every fixture in `packages/schema/fixtures`.
@@ -183,6 +184,6 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - [x] **Phase 1:** Contract: schema v1, fixtures, contract tests (`value`, `gauge`, `bar`, `switch`), see `docs/phase1-notes.md`
 - [x] **Phase 2:** Plugin skeleton: layout CRUD, device registry, hello/layout endpoints with ETag, version delta, see `docs/phase2-notes.md`
 - [ ] **Phase 3:** Firmware vertical slice: fetch, cache, render one page of `value` tiles, dynamic subscriptions. Done on SDL, pending the P4 hardware check (`docs/phase3-notes.md`)
-- [ ] **Phase 4:** Editor MVP: device list, one page, drag tiles, path picker, Save & send
+- [ ] **Phase 4:** Editor MVP: device list, one page, drag tiles, path picker, Save & send. Done, pending your review (`docs/phase4-notes.md`)
 - [ ] **Phase 5:** Port existing apps to widgets (wind, engine, energy, grid, then chart/anchor, autopilot, switchboard)
 - [ ] **Phase 6:** Hardening: multi-page and swipe, orientation/resolution scaling, auth, size limits, last-known-good fallback, night mode, alarms, device settings
