@@ -44,6 +44,16 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 - **Display theme** (*Display: Day / Night* above the canvas) is part of the layout. The display draws with it after *Save & send*, and the preview shows the same palette. New layouts start at Night; starter layouts bring their own.
 - **Editor theme** (*Day*, *Dark*, *Night* in the top bar) only changes this editor's colours, is remembered per browser, and follows the system setting by default. It never changes the display.
 
+**Display settings** (the *Display settings* button next to the display theme, ADR-0015) are part of the layout too, sent with *Save & send*:
+- brightness for the day and the night theme (disabled when the display reports it can't dim its backlight)
+- the start page
+- *Auto day/night*: the night theme while `environment.sun` (derived-data plugin) says dusk or night; the drawer shows its current value
+- *Screen off without a touch*: Never, or 30 s to 1 hour
+
+Removing the start page, or replacing the pages with a starter layout, resets it to the first page.
+
+A display that skipped a layout because it crashed while showing it (boot guard, ADR-0013) is marked in the display list until you send a changed layout.
+
 ## Developing
 - `npm run dev -w @esphelm/editor`: Vite dev server with hot reload. API and stream requests are proxied to `ESPHELM_SIGNALK` (default `http://localhost:3000`), which must run the plugin. Log in to that server in the same browser first (the cookie is per host, so open the admin UI through the dev server: `http://localhost:5173/admin/`).
 - `npm run build`: builds schema, plugin and editor; the editor goes into `packages/plugin/public/` (gitignored).
@@ -63,7 +73,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.
 
 ## Not covered yet
-- Autopilot and chart/anchor pages (Phases 5b/5c).
+- A list of the boat's active alarms (the display shows them; the editor doesn't yet).
 - Copying tiles between pages, undo.
 - Preview is an HTML approximation of the display (open question 7); SDL-rendered previews could come later.
 - Tested in Chrome (desktop and emulated phone with touch) only; Safari/Firefox and real phones are unverified.

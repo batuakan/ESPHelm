@@ -87,7 +87,9 @@ const device = (state: 'pending' | 'adopted'): Device => ({
 
 afterEach(cleanup);
 
-describe('editor', () => {
+// jsdom renders of the whole editor take 1-2 s each, and more while the C++ contract tests compile
+// in parallel; the 5 s default made the longest ones flaky.
+describe('editor', { timeout: 20000 }, () => {
   it('adopts a pending display', async () => {
     const server = fakeServer([device('pending')]);
     render(<App api={server.api} live={fakeLive().factory} />);
@@ -394,6 +396,45 @@ describe('editor', () => {
       chart: 'sea',
       zoom: 12,
     });
+  });
+
+  it('edits the display settings and sends them with the layout', async () => {
+    const d = { ...device('adopted'), layoutId: `display-${p4.deviceId}` };
+    const server = fakeServer([d]);
+    const { settings: _s, ...twoPages } = JSON.parse(
+      readFileSync(join(FIXTURES, 'valid/settings.json'), 'utf8'),
+    ) as Layout;
+    void _s;
+    server.layouts.set(d.layoutId, { ...twoPages, id: d.layoutId });
+    render(<App api={server.api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Display settings' }));
+    const drawer = screen.getByRole('complementary', { name: 'Display settings' });
+    // The P4 can dim its backlight: no warning, sliders enabled.
+    expect(within(drawer).queryByText(/can't dim its backlight/)).toBeNull();
+    fireEvent.change(within(drawer).getByLabelText('Day brightness'), { target: { value: '80' } });
+    fireEvent.change(within(drawer).getByLabelText('Night brightness'), { target: { value: '10' } });
+    fireEvent.change(within(drawer).getByLabelText('Start page'), { target: { value: 'second' } });
+    fireEvent.click(within(drawer).getByLabelText('Auto day/night'));
+    fireEvent.change(within(drawer).getByLabelText('Screen timeout'), { target: { value: '120' } });
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(d.layoutId)!.settings).toEqual({
+      brightness: { day: 80, night: 10 },
+      startPage: 'second',
+      autoTheme: 'sun',
+      screenTimeout: 120,
+    });
+  });
+
+  it('says when a display cannot dim its backlight', async () => {
+    const d = device('adopted');
+    d.hello = { ...p4, capabilities: { touch: true, put: true } };
+    render(<App api={fakeServer([d]).api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Display settings' }));
+    const drawer = screen.getByRole('complementary', { name: 'Display settings' });
+    within(drawer).getByText(/can't dim its backlight/);
+    expect((within(drawer).getByLabelText('Day brightness') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('greys out tile types the display cannot render', async () => {

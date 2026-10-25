@@ -9,6 +9,7 @@ import {
   type GridPage,
   type Layout,
   type Page,
+  type Settings,
   type Tile,
   type TileType,
   type WindRoseTile,
@@ -325,13 +326,46 @@ export function addTemplatePages(
 
 /** Replace all pages (and the theme) with the template's; the layout keeps its id and name. */
 export function applyTemplate(layout: Layout, template: Layout): Layout {
-  return { ...layout, theme: template.theme, pages: structuredClone(template.pages) };
+  return withValidStartPage({
+    ...layout,
+    theme: template.theme,
+    pages: structuredClone(template.pages),
+  });
 }
 
 /** Remove a page; the last page cannot be removed (a layout needs one). */
 export function removePage(layout: Layout, index: number): Layout | null {
   if (layout.pages.length <= 1 || !layout.pages[index]) return null;
-  return { ...layout, pages: layout.pages.filter((_, i) => i !== index) };
+  return withValidStartPage({ ...layout, pages: layout.pages.filter((_, i) => i !== index) });
+}
+
+/**
+ * Change display settings (ADR-0015). `undefined` removes a field (the display's default
+ * applies); a settings block with nothing left is removed, so the layout stays as it was.
+ */
+export function updateSettings(
+  layout: Layout,
+  patch: Omit<Partial<Settings>, 'brightness'> & {
+    brightness?: Partial<NonNullable<Settings['brightness']>>;
+  },
+): Layout {
+  const merged: Record<string, unknown> = { ...layout.settings, ...patch };
+  if (patch.brightness) {
+    const b: Record<string, unknown> = { ...layout.settings?.brightness, ...patch.brightness };
+    for (const k of Object.keys(b)) if (b[k] === undefined) delete b[k];
+    merged.brightness = Object.keys(b).length > 0 ? b : undefined;
+  }
+  for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
+  const { settings: _old, ...rest } = layout;
+  void _old;
+  return Object.keys(merged).length > 0 ? { ...rest, settings: merged as Settings } : rest;
+}
+
+/** Drop a start page that is no longer a page of the layout (it would be UNKNOWN_PAGE). */
+export function withValidStartPage(layout: Layout): Layout {
+  const start = layout.settings?.startPage;
+  if (start === undefined || layout.pages.some((p) => p.id === start)) return layout;
+  return updateSettings(layout, { startPage: undefined });
 }
 
 /** Move a page by `delta` places; null at either end. */

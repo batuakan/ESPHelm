@@ -33,10 +33,12 @@ import {
   tilePaths,
   pageTiles,
   updateChartPage,
+  updateSettings,
   updateSlot,
   updateTile,
   type SlotName,
 } from './layoutOps';
+import { SettingsDrawer } from './components/SettingsDrawer';
 import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
 import { PageTabs } from './components/PageTabs';
 import { FooterPreview } from './components/Previews';
@@ -99,6 +101,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const [savedJson, setSavedJson] = useState<string>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [selection, setSelection] = useState<Selection | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // One drawer at a time: selecting a tile or page closes the display settings.
+  useEffect(() => {
+    if (selection) setSettingsOpen(false);
+  }, [selection]);
   const [values, setValues] = useState<Map<string, unknown>>(new Map());
   const [status, setStatus] = useState<Status | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
@@ -436,6 +443,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     </button>
                   ))}
                 </div>
+                <button
+                  className={`small ${settingsOpen ? 'on' : ''}`}
+                  aria-pressed={settingsOpen}
+                  onClick={() => {
+                    setSelection(undefined);
+                    setSettingsOpen((open) => !open);
+                  }}
+                  title="Brightness, start page, auto day/night, screen timeout"
+                >
+                  Display settings
+                </button>
                 <span className="device-size">
                   {device?.hello.display.width}×{device?.hello.display.height}
                 </span>
@@ -505,6 +523,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         )}
       </main>
 
+      {settingsOpen && layout && (
+        <SettingsDrawer
+          layout={layout}
+          backlight={device?.hello.capabilities.backlight === true}
+          paths={paths}
+          values={shownValues}
+          onChange={(patch) => edit(updateSettings(layout, patch))}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {chartPage && chartSelected && layout && (
         <ChartDrawer
           key={chartPage.id}

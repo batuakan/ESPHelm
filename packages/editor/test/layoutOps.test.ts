@@ -22,6 +22,7 @@ import {
   removeTile,
   resizeTile,
   setGrid,
+  updateSettings,
   updateTile,
 } from '../src/layoutOps';
 
@@ -345,5 +346,53 @@ describe('templates', () => {
     expect(l.pages).toEqual(TEMPLATES.energy!.pages);
     expect(l.pages).not.toBe(TEMPLATES.energy!.pages);
     expect(ok(l)).toEqual([]);
+  });
+});
+
+describe('display settings', () => {
+  const twoPages = (): Layout => ({
+    version: 1,
+    id: 'l',
+    theme: 'day',
+    pages: [
+      {
+        kind: 'grid',
+        id: 'a',
+        grid: { cols: 1, rows: 1 },
+        tiles: [
+          { type: 'value', id: 't1', x: 0, y: 0, w: 1, h: 1, path: 'navigation.speedOverGround' },
+        ],
+      },
+      {
+        kind: 'grid',
+        id: 'b',
+        grid: { cols: 1, rows: 1 },
+        tiles: [
+          { type: 'value', id: 't2', x: 0, y: 0, w: 1, h: 1, path: 'navigation.speedThroughWater' },
+        ],
+      },
+    ],
+  });
+
+  it('merges brightness and drops fields set to undefined', () => {
+    let l = updateSettings(twoPages(), { brightness: { day: 80 }, screenTimeout: 60 });
+    l = updateSettings(l, { brightness: { night: 10 } });
+    expect(l.settings).toEqual({ brightness: { day: 80, night: 10 }, screenTimeout: 60 });
+    l = updateSettings(l, {
+      brightness: { day: undefined, night: undefined },
+      screenTimeout: undefined,
+    });
+    expect(l).not.toHaveProperty('settings');
+    expect(validateLayout(l).ok).toBe(true);
+  });
+
+  it('forgets the start page when that page is removed or the pages are replaced', () => {
+    const l = updateSettings(twoPages(), { startPage: 'b', autoTheme: 'sun' });
+    expect(removePage(l, 1)!.settings).toEqual({ autoTheme: 'sun' });
+    expect(validateLayout(removePage(l, 1)!).ok).toBe(true);
+    expect(removePage(l, 0)!.settings?.startPage).toBe('b');
+    expect(applyTemplate(l, { ...twoPages(), pages: [twoPages().pages[0]!] }).settings).toEqual({
+      autoTheme: 'sun',
+    });
   });
 });

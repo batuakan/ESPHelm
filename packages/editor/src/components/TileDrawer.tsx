@@ -321,7 +321,7 @@ function RangeFields(props: { tile: Tile & { min: number; max: number }; onChang
   );
 }
 
-function Drawer(props: { title: string; label: string; onClose(): void; children: ReactNode }) {
+export function Drawer(props: { title: string; label: string; onClose(): void; children: ReactNode }) {
   return (
     <aside className="drawer" aria-label={props.label}>
       <header className="drawer-head">

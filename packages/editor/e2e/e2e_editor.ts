@@ -424,6 +424,40 @@ async function main(): Promise<void> {
       String(dayLayout.body.theme),
     );
 
+    // Display settings (ADR-0015) travel with the layout too.
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    const settingsDrawer = page.getByRole('complementary', { name: 'Display settings' });
+    const startSelect = settingsDrawer.getByLabel('Start page');
+    const helmId = await startSelect
+      .locator('option')
+      .filter({ hasText: /\. Helm$/ })
+      .first()
+      .getAttribute('value');
+    await startSelect.selectOption(helmId ?? '');
+    await settingsDrawer.getByLabel('Auto day/night').check();
+    await settingsDrawer.getByLabel('Screen timeout').selectOption({ label: '5 min' });
+    await settingsDrawer.getByLabel('Night brightness').fill('15');
+    await page.waitForTimeout(500);
+    await shot(page, '09-desktop-display-settings');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withSettings = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    check(
+      'the display gets its settings',
+      JSON.stringify(withSettings.body.settings) ===
+        JSON.stringify({
+          startPage: helmId,
+          autoTheme: 'sun',
+          screenTimeout: 300,
+          brightness: { night: 15 },
+        }),
+      JSON.stringify(withSettings.body.settings),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,
