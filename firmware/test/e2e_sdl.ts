@@ -142,6 +142,7 @@ async function main(): Promise<void> {
       port: PORT,
       putEcho: ['electrical.switches.bilgePump.state'],
       autopilotSim: true,
+      chartSim: true,
     });
     console.log(`signalk-server ${sk.version} on ${sk.base}; firmware working dir ${work}\n`);
     const { json, admin } = sk;
@@ -187,7 +188,7 @@ async function main(): Promise<void> {
 
     // 4. Live values (SI) arrive via the layout-derived subscription and are shown converted.
     const { ws } = await sk.stream(admin);
-    const publish = (values: Record<string, number | boolean | string>) =>
+    const publish = (values: Record<string, number | boolean | string | object>) =>
       ws.send(
         JSON.stringify({
           context: 'vessels.self',
@@ -315,6 +316,53 @@ async function main(): Promise<void> {
     });
     await goTo(3, 'Helm');
     await fw.screenshot('09-multi-helm', shots);
+
+    // 8b. A chart page (ADR-0012): tiles of the charts stand-in through the plugin, the vessel
+    //     in the middle, the anchor and its alarm radius. Then back to the multi-page layout.
+    const charts = fixture('valid/chart-page.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(charts.id)}`, admin, charts);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: charts.id });
+    check(
+      'firmware renders the chart layout',
+      await fw.waitLog(/Showing fetched layout "chart" \(3 pages/),
+    );
+    publish({
+      'navigation.position': { latitude: 60.15, longitude: 24.95 },
+      'navigation.headingTrue': 0.8,
+      'navigation.anchor.position': { latitude: 60.1506, longitude: 24.9488 },
+      'navigation.anchor.maxRadius': 60,
+      'notifications.navigation.anchor': { state: 'normal', message: 'Anchor watch' },
+    });
+    await sleep(6000); // 25 tiles, one at a time
+    await fw.screenshot('16-chart', shots);
+    // About 350 m north: the vessel moves into the next tile row and the grid recentres.
+    publish({ 'navigation.position': { latitude: 60.1532, longitude: 24.95 } });
+    await sleep(4000);
+    await fw.screenshot('17-chart-moved', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'chart zoom_in');
+    check('chart zooms in through its + button', await fw.waitLog(/Chart chart: zoom 16/));
+    await sleep(6000);
+    await fw.screenshot('18-chart-zoomed', shots);
+    publish({
+      'navigation.position': { latitude: 60.1508, longitude: 24.9497 },
+      'notifications.navigation.anchor': { state: 'alarm', message: 'Anchor dragging' },
+    });
+    await sleep(4000);
+    await fw.screenshot('19-chart-anchor-alarm', shots);
+    // A chart the server doesn't have: placeholder tiles, the overlay still works.
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
+    check('chart page with an unknown chart shows', await fw.waitLog(/Page 2\/3 "Anchor"/));
+    await sleep(2500);
+    await fw.screenshot('20-chart-unknown', shots);
+    check(
+      'the plugin answered the unknown chart with 404 (no tiles drawn, no crash)',
+      fw.count(/tile .* failed/) === 0,
+    );
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
+    check(
+      'back to the multi-page layout',
+      await fw.waitLog(/Showing fetched layout "multi-480" \(5 pages/, 15000, 2),
+    );
 
     // 9. The autopilot (ADR-0011), against the autopilot stand-in in the harness.
     const pilot = (part: string) =>
