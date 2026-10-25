@@ -101,13 +101,52 @@ module.exports = (app) => ({
 `;
 
 /**
+ * A stand-in for an autopilot plugin with the classic PUT interface (what the legacy app and
+ * the autopilot tile use): `steering.autopilot.state` is echoed, and
+ * `steering.autopilot.actions.adjustHeading` (degrees) moves `steering.autopilot.target`
+ * (radians) only while engaged, like a real pilot. It reads the current values from the
+ * server, so tests can also set them with plain deltas.
+ */
+const AUTOPILOT_SIM_PLUGIN = `
+module.exports = (app) => {
+  const current = (path) => {
+    const v = app.getSelfPath(path);
+    return v && typeof v === 'object' && 'value' in v ? v.value : v;
+  };
+  const send = (path, value) =>
+    app.handleMessage('esphelm-autopilot-sim', { updates: [{ values: [{ path, value }] }] });
+  return {
+    id: 'esphelm-autopilot-sim',
+    name: 'ESPHelm e2e autopilot stand-in',
+    schema: {},
+    start() {
+      app.registerPutHandler('vessels.self', 'steering.autopilot.state', (c, p, value) => {
+        send('steering.autopilot.state', value);
+        return { state: 'COMPLETED', statusCode: 200 };
+      });
+      app.registerPutHandler('vessels.self', 'steering.autopilot.actions.adjustHeading', (c, p, value) => {
+        const state = current('steering.autopilot.state');
+        if (!state || state === 'standby') return { state: 'COMPLETED', statusCode: 400 };
+        const target = Number(current('steering.autopilot.target')) || 0;
+        const next = (target + (Number(value) * Math.PI) / 180 + 2 * Math.PI) % (2 * Math.PI);
+        send('steering.autopilot.target', next);
+        return { state: 'COMPLETED', statusCode: 200 };
+      });
+    },
+    stop() {},
+  };
+};
+`;
+
+/**
  * Start the server. SIGNALK_SERVER=/path/to/bin/signalk-server picks an install; default: the
  * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one);
  * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...);
- * `putEcho` lists paths whose PUTs are accepted and echoed back as deltas.
+ * `putEcho` lists paths whose PUTs are accepted and echoed back as deltas; `autopilotSim`
+ * installs the autopilot stand-in above.
  */
 export async function startSignalK(
-  opts: { port?: number; sampleData?: boolean; putEcho?: string[] } = {},
+  opts: { port?: number; sampleData?: boolean; putEcho?: string[]; autopilotSim?: boolean } = {},
 ): Promise<SignalKHarness> {
   if (!existsSync(join(PLUGIN_DIR, 'dist/index.js'))) throw new Error('run `npm run build` first');
   const bin = realpathSync(
@@ -145,6 +184,25 @@ export async function startSignalK(
       JSON.stringify({ enabled: true, configuration: { paths: opts.putEcho } }),
     );
     dependencies['esphelm-put-echo'] = '*';
+  }
+  if (opts.autopilotSim) {
+    const sim = join(config, 'node_modules', 'esphelm-autopilot-sim');
+    mkdirSync(sim);
+    writeFileSync(
+      join(sim, 'package.json'),
+      JSON.stringify({
+        name: 'esphelm-autopilot-sim',
+        version: '1.0.0',
+        main: 'index.js',
+        keywords: ['signalk-node-server-plugin'],
+      }),
+    );
+    writeFileSync(join(sim, 'index.js'), AUTOPILOT_SIM_PLUGIN);
+    writeFileSync(
+      join(config, 'plugin-config-data', 'esphelm-autopilot-sim.json'),
+      JSON.stringify({ enabled: true, configuration: {} }),
+    );
+    dependencies['esphelm-autopilot-sim'] = '*';
   }
   writeFileSync(
     join(config, 'package.json'),

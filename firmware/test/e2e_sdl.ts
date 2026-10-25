@@ -131,7 +131,11 @@ async function main(): Promise<void> {
   mkdirSync(work720);
   const fw720 = new Firmware(work720, binary('esphelm-sdl-720'));
   try {
-    sk = await startSignalK({ port: PORT, putEcho: ['electrical.switches.bilgePump.state'] });
+    sk = await startSignalK({
+      port: PORT,
+      putEcho: ['electrical.switches.bilgePump.state'],
+      autopilotSim: true,
+    });
     console.log(`signalk-server ${sk.version} on ${sk.base}; firmware working dir ${work}\n`);
     const { json, admin } = sk;
 
@@ -176,7 +180,7 @@ async function main(): Promise<void> {
 
     // 4. Live values (SI) arrive via the layout-derived subscription and are shown converted.
     const { ws } = await sk.stream(admin);
-    const publish = (values: Record<string, number | boolean>) =>
+    const publish = (values: Record<string, number | boolean | string>) =>
       ws.send(
         JSON.stringify({
           context: 'vessels.self',
@@ -245,7 +249,7 @@ async function main(): Promise<void> {
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'firmware renders the multi-page layout',
-      await fw.waitLog(/Showing fetched layout "multi-480" \(4 pages/),
+      await fw.waitLog(/Showing fetched layout "multi-480" \(5 pages/),
     );
     publish({
       'navigation.speedOverGround': 3.2, // 6.2 kn
@@ -265,7 +269,7 @@ async function main(): Promise<void> {
 
     const goTo = async (index: number, title: string) => {
       writeFileSync(join(fw.workDir, 'esphelm_page_request'), String(index));
-      const shown = await fw.waitLog(new RegExp(`Page ${index + 1}/4 "${title}"`));
+      const shown = await fw.waitLog(new RegExp(`Page ${index + 1}/5 "${title}"`));
       check(`page hook shows page ${index + 1} (${title})`, shown);
       await sleep(1500);
     };
@@ -295,26 +299,111 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw.screenshot('08-switch-on', shots);
 
-    // 8. Wind roses as tiles next to other tiles: a 2x2 rose (about 250 px: compact, two slots)
-    //    and a 1x1 rose (about 120 px: pointers only), with live values.
+    // 8. Wind roses as tiles next to other tiles: a 2x2 rose (about 250 px: compact, two slots),
+    //    a 1x1 rose (about 120 px: pointers only) and a 1x1 autopilot (status only), live.
+    publish({
+      'steering.autopilot.state': 'standby',
+      'steering.autopilot.target': 3.0, // 172 deg
+      'navigation.headingMagnetic': 3.05, // 175 deg
+    });
     await goTo(3, 'Helm');
     await fw.screenshot('09-multi-helm', shots);
 
-    // 9. Server gone: values and needles go stale instead of freezing.
+    // 9. The autopilot (ADR-0011), against the autopilot stand-in in the harness.
+    const pilot = (part: string) =>
+      writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `pilot-ap ${part}`);
+    const stateNow = async () =>
+      (await json('GET', '/signalk/v1/api/vessels/self/steering/autopilot/state', admin)).body
+        ?.value;
+    const targetNow = async () =>
+      Number(
+        (await json('GET', '/signalk/v1/api/vessels/self/steering/autopilot/target', admin)).body
+          ?.value,
+      );
+    const waitState = async (want: string) => {
+      for (let i = 0; i < 20; i++) {
+        if ((await stateNow()) === want) return true;
+        await sleep(250);
+      }
+      return false;
+    };
+    const puts = () => fw.count(/Autopilot pilot-ap: PUT /);
+    await goTo(4, 'Pilot');
+    await fw.screenshot('10-pilot-standby', shots);
+
+    pilot('+10');
+    check(
+      'autopilot: course buttons do nothing in standby',
+      (await fw.waitLog(/pilot-ap: \+10 ignored \(not engaged\)/)) && puts() === 0,
+    );
+    pilot('auto');
+    check('autopilot: first tap on AUTO only arms it', await fw.waitLog(/pilot-ap: armed auto/));
+    await sleep(600);
+    check(
+      'autopilot: no PUT before the confirming tap',
+      puts() === 0 && (await stateNow()) === 'standby',
+    );
+    await fw.screenshot('11-pilot-armed', shots);
+    pilot('auto');
+    check(
+      'autopilot: second tap engages AUTO',
+      (await fw.waitLog(/pilot-ap: PUT steering\.autopilot\.state = auto/)) &&
+        (await waitState('auto')),
+    );
+    await sleep(1200);
+    await fw.screenshot('12-pilot-auto', shots);
+
+    const before = await targetNow();
+    pilot('+10');
+    await fw.waitLog(/pilot-ap: PUT steering\.autopilot\.actions\.adjustHeading = \+10/);
+    let after = before;
+    for (let i = 0; i < 20 && Math.abs(after - before) < 0.1; i++) {
+      await sleep(250);
+      after = await targetNow();
+    }
+    check(
+      'autopilot: +10 moves the target by 10 degrees',
+      Math.abs(((after - before) * 180) / Math.PI - 10) < 0.01,
+      `${before} -> ${after}`,
+    );
+    await sleep(1200);
+    await fw.screenshot('13-pilot-adjusted', shots);
+
+    pilot('wind');
+    await fw.waitLog(/pilot-ap: armed wind/);
+    check(
+      'autopilot: an armed mode expires after 3 s without sending',
+      (await fw.waitLog(/pilot-ap: arm expired \(wind\)/, 5000)) &&
+        fw.count(/pilot-ap: PUT steering\.autopilot\.state = wind/) === 0,
+    );
+    pilot('standby');
+    check(
+      'autopilot: STANDBY is one tap',
+      (await fw.waitLog(/pilot-ap: PUT steering\.autopilot\.state = standby/)) &&
+        (await waitState('standby')),
+    );
+
+    // 10. Server gone: values and needles go stale, and the autopilot shows "offline" with
+    //     every button disabled.
     await sk.stop();
     sk = undefined;
     await sleep(7500); // > staleAfter (6 s) since the last value
-    await fw.screenshot('10-stale-values', shots);
+    await fw.screenshot('14-stale-offline', shots);
+    pilot('standby');
+    check(
+      'autopilot: offline, even STANDBY is refused (nothing could be sent)',
+      await fw.waitLog(/pilot-ap: standby ignored \(offline\)/),
+    );
 
     // 10. Reboot without a server: the cached multi-page layout comes back on its first page.
     await fw.stop();
     fw.start();
     check(
       'reboot without server shows the cached multi-page layout',
-      await fw.waitLog(/Showing cached layout "multi-480" \(4 pages/),
+      await fw.waitLog(/Showing cached layout "multi-480" \(5 pages/),
     );
     await sleep(1500);
-    await fw.screenshot('11-offline-cached', shots);
+    await fw.screenshot('15-offline-cached', shots);
     await fw.stop();
 
     // 11. The 720x720 build (P4-86 fonts), started offline from a seeded cache: a full-size rose
@@ -332,6 +421,19 @@ async function main(): Promise<void> {
     check('720 page hook', await fw720.waitLog(/Page 2\/2 "Small roses"/));
     await sleep(1500);
     await fw720.screenshot('720-02-small-roses', shots);
+    await fw720.stop();
+
+    // 12. The same 720 build with the Helm starter layout: a wind rose and the autopilot side by
+    //     side (offline, so the autopilot buttons are disabled).
+    const helm720 = readFileSync(join(REPO, 'packages/schema/templates/helm-720.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(helm720, '"seed-helm"'));
+    fw720.start();
+    check(
+      '720 build shows the Helm template',
+      await fw720.waitLog(/Showing cached layout "template-helm-720" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-03-helm-autopilot', shots);
   } finally {
     await fw.stop();
     await fw720.stop();
