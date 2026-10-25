@@ -103,6 +103,13 @@ export function PageTabs(props: Props) {
           >
             Wind rose page{!supported.has('wind_rose') && ' (not supported)'}
           </button>
+          <button
+            role="menuitem"
+            disabled={!supported.has('autopilot')}
+            onClick={() => (props.onAdd('autopilot'), close())}
+          >
+            Autopilot page{!supported.has('autopilot') && ' (not supported)'}
+          </button>
           {templates.map((t) => (
             <button
               key={t.id}
@@ -110,7 +117,7 @@ export function PageTabs(props: Props) {
               disabled={!templateSupported(t, supported)}
               onClick={() => (props.onAddTemplate(t.id), close())}
             >
-              {t.name ?? t.id} page{!templateSupported(t, supported) && ' (not supported)'}
+              Starter: {t.name ?? t.id}{!templateSupported(t, supported) && ' (not supported)'}
             </button>
           ))}
         </div>

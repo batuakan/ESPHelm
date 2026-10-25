@@ -17,7 +17,8 @@
     "gauge",
     "bar",
     "switch",
-    "wind_rose"
+    "wind_rose",
+    "autopilot"
   ],
   "fonts": [
     "tiny",

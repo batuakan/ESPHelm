@@ -3,6 +3,7 @@
 // operations take the index of the page they work on. Ids are unique across the whole layout
 // (pages and tiles share one namespace, like the validator's DUPLICATE_ID check).
 import {
+  AUTOPILOT_DEFAULTS,
   WIND_ROSE_DEFAULTS,
   type DataItem,
   type GridPage,
@@ -72,6 +73,11 @@ function withRose(
 
 /** SignalK paths a tile shows (what the live preview subscribes to). */
 export function tilePaths(tile: Tile): string[] {
+  if (tile.type === 'autopilot') {
+    // The adjust path is only written to, never shown.
+    const cfg = { ...AUTOPILOT_DEFAULTS, ...tile.config };
+    return [cfg.statePath, cfg.targetPath, cfg.headingPath];
+  }
   if (tile.type !== 'wind_rose') return [tile.path];
   const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   return [
@@ -120,6 +126,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, path: '' };
     case 'wind_rose':
       return { type, ...place, slots: {} };
+    case 'autopilot':
+      return { type, ...place };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -139,9 +147,11 @@ export function addTile(
   if (!page) return null;
   const cell = at && fits(page, { ...at, w: 1, h: 1 }) ? at : at ? null : firstFreeCell(page);
   if (!cell) return null;
-  const id = nextId(usedIds(layout), type === 'wind_rose' ? 'rose' : 'tile');
+  const prefix = type === 'wind_rose' ? 'rose' : type === 'autopilot' ? 'pilot' : 'tile';
+  const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
-  if (type === 'wind_rose' && fits(page, { ...cell, w: 2, h: 2 })) {
+  const big = type === 'wind_rose' || type === 'autopilot';
+  if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
   }
@@ -213,11 +223,11 @@ export function setGrid(layout: Layout, index: number, cols: number, rows: numbe
 
 // ---- pages ----
 
-export type NewPageKind = 'grid' | 'wind_rose';
+export type NewPageKind = 'grid' | 'wind_rose' | 'autopilot';
 
 /**
  * Insert a new page after `after` (default: at the end). Returns the new page's index.
- * A wind rose page is a 1x1 grid with one wind rose tile filling the screen.
+ * A wind rose or autopilot page is a 1x1 grid with one such tile filling the screen.
  */
 export function addPage(
   layout: Layout,
@@ -235,24 +245,21 @@ export function addPage(
     };
     return insertPages(layout, [page], after);
   }
-  const id = nextId(used, 'wind');
+  const rose = kind === 'wind_rose';
+  const id = nextId(used, rose ? 'wind' : 'pilot');
   used.add(id);
+  const suffix = rose ? 'rose' : 'ap';
+  const tileId = used.has(`${id}-${suffix}`) ? nextId(used, `${id}-${suffix}`) : `${id}-${suffix}`;
+  const place = { id: tileId, x: 0, y: 0, w: 1, h: 1 };
   const page: Page = {
     kind: 'grid',
     id,
-    title: 'Wind',
+    title: rose ? 'Wind' : 'Autopilot',
     grid: { cols: 1, rows: 1 },
     tiles: [
-      {
-        type: 'wind_rose',
-        id: used.has(`${id}-rose`) ? nextId(used, `${id}-rose`) : `${id}-rose`,
-        x: 0,
-        y: 0,
-        w: 1,
-        h: 1,
-        config: { showTrueWind: true },
-        slots: {},
-      },
+      rose
+        ? { type: 'wind_rose', ...place, config: { showTrueWind: true }, slots: {} }
+        : { type: 'autopilot', ...place },
     ],
   };
   return insertPages(layout, [page], after);
@@ -334,17 +341,26 @@ export function updateSlot(
   });
 }
 
-/** Merge into a wind-rose tile's config; undefined values fall back to the defaults. */
+/**
+ * Merge into the config of tile `id` (wind rose or autopilot); undefined values fall back to
+ * the defaults, and an empty config is removed.
+ */
 export function setTileConfig(
   layout: Layout,
   index: number,
   id: string,
-  patch: Partial<Record<keyof typeof WIND_ROSE_DEFAULTS, unknown>>,
+  patch: Record<string, unknown>,
 ): Layout {
-  return withRose(layout, index, id, (t) => {
-    const config = merge(t.config ?? {}, patch);
-    return Object.keys(config).length > 0 ? { ...t, config } : merge(t, { config: undefined });
-  });
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => {
+      if (t.id !== id || (t.type !== 'wind_rose' && t.type !== 'autopilot')) return t;
+      const config = merge<Record<string, unknown>>(t.config ?? {}, patch);
+      return Object.keys(config).length > 0
+        ? ({ ...t, config } as Tile)
+        : merge(t, { config: undefined });
+    }),
+  }));
 }
 
 /** What a validation error points at (e.g. "/pages/0/tiles/2/label"). */

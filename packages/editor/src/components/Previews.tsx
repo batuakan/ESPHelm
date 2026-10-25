@@ -2,18 +2,20 @@
 // SDL screenshots in firmware/test/golden). Values arrive in SI and are converted like the
 // firmware does.
 import {
+  AUTOPILOT_DEFAULTS,
   UNITS,
   WIND_ROSE_DEFAULTS,
   toDisplay,
   type DataItem,
   type Layout,
+  type AutopilotTile,
   type Tile,
   type WindRoseTile,
   type Zone,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
-import type { RoseTier } from '../sizing';
+import type { AutopilotTier, RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
@@ -94,14 +96,74 @@ function SwitchPreview({ value }: { value: unknown }) {
   );
 }
 
+const AP_TITLES: Record<string, string> = {
+  auto: 'AUTO',
+  wind: 'WIND',
+  route: 'TRACK',
+  standby: 'STANDBY',
+};
+
+/**
+ * Autopilot tile, as the display draws it at this size. The buttons are drawings only: the
+ * editor never commands the autopilot.
+ */
+function AutopilotPreview(props: {
+  tile: AutopilotTile;
+  values: Map<string, unknown>;
+  tier: AutopilotTier;
+}) {
+  const { tile, values } = props;
+  const cfg = { ...AUTOPILOT_DEFAULTS, ...tile.config };
+  const modes = tile.modes ?? AUTOPILOT_DEFAULTS.modes;
+  const state = values.get(cfg.statePath);
+  const deg = (path: string) => {
+    const v = values.get(path);
+    return typeof v === 'number' && Number.isFinite(v)
+      ? `${Math.round((((v * RAD) % 360) + 360) % 360)}°`
+      : '--';
+  };
+  const stateText = typeof state === 'string' ? (AP_TITLES[state] ?? state.toUpperCase()) : '--';
+  return (
+    <span className={`tile-graphic autopilot ap-${props.tier}`} data-testid={`autopilot-${tile.id}`}>
+      <span className={`ap-state ${typeof state === 'string' && state !== 'standby' ? 'engaged' : ''}`}>
+        {stateText}
+      </span>
+      <span className="ap-course">
+        TGT {deg(cfg.targetPath)} &nbsp; HDG {deg(cfg.headingPath)}
+      </span>
+      {props.tier === 'controls' && (
+        <span className="ap-buttons" aria-hidden>
+          <span className="ap-row">
+            {['-10', '-1', '+1', '+10'].map((b) => (
+              <span key={b} className="ap-btn">
+                {b}
+              </span>
+            ))}
+          </span>
+          <span className="ap-row">
+            {[...modes, 'standby'].map((m) => (
+              <span key={m} className={`ap-btn ${m === state ? 'current' : ''}`}>
+                {AP_TITLES[m]}
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function TilePreview(props: {
   tile: Tile;
   values: Map<string, unknown>;
   roseTier?: RoseTier;
+  autopilotTier?: AutopilotTier;
   selectedSlot?: SlotName;
   onSelectSlot?(slot: SlotName): void;
 }) {
   const { tile, values } = props;
+  if (tile.type === 'autopilot')
+    return <AutopilotPreview tile={tile} values={values} tier={props.autopilotTier ?? 'controls'} />;
   if (tile.type === 'wind_rose')
     return (
       <WindRosePreview

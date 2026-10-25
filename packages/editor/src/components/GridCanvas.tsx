@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GridPage, Tile, TileType } from '@esphelm/schema';
 import { fits, type Rect, type SlotName } from '../layoutOps';
-import type { RoseTier } from '../sizing';
+import type { AutopilotTier, RoseTier } from '../sizing';
 import { TilePreview } from './Previews';
 
 export interface NewTileDrag {
@@ -21,6 +21,8 @@ interface Props {
   selectedSlot?: SlotName;
   /** Size tier the display will draw a wind rose tile with. */
   roseTier(tile: Tile): RoseTier;
+  /** Whether the display will show an autopilot tile's buttons. */
+  autopilotTier(tile: Tile): AutopilotTier;
   problemTileIds: Set<string>;
   supported: Set<string>;
   newTileDrag: NewTileDrag | null;
@@ -167,12 +169,17 @@ export function GridCanvas(props: Props) {
               data-testid={`tile-${tile.id}`}
             >
               <span className="tile-label">
-                {tile.type === 'wind_rose' ? '' : tile.label || (tile.path ? '' : 'Pick a path')}
+                {tile.type === 'wind_rose'
+                  ? ''
+                  : tile.type === 'autopilot'
+                    ? (tile.label ?? '')
+                    : tile.label || (tile.path ? '' : 'Pick a path')}
               </span>
               <TilePreview
                 tile={tile}
                 values={values}
                 roseTier={tile.type === 'wind_rose' ? props.roseTier(tile) : undefined}
+                autopilotTier={tile.type === 'autopilot' ? props.autopilotTier(tile) : undefined}
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />

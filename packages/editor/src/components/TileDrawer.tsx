@@ -4,12 +4,15 @@
 // have three slots, their source paths and the true-wind toggle.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  AUTOPILOT_DEFAULTS,
   LABEL_PATTERN,
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
   quantityForSignalKUnits,
   unitsForSignalKUnits,
+  type AutopilotMode,
+  type AutopilotTile,
   type DataItem,
   type Tile,
   type UnitId,
@@ -422,6 +425,76 @@ function RoseFields(
   );
 }
 
+const AUTOPILOT_PATHS: { key: 'statePath' | 'targetPath' | 'adjustPath' | 'headingPath'; label: string }[] = [
+  { key: 'statePath', label: 'State (auto, wind, route, standby)' },
+  { key: 'targetPath', label: 'Target course' },
+  { key: 'adjustPath', label: 'Course adjustment (PUT, degrees)' },
+  { key: 'headingPath', label: 'Heading' },
+];
+const MODE_TITLES: Record<AutopilotMode, string> = { auto: 'AUTO', wind: 'WIND', route: 'TRACK' };
+
+/** Autopilot tile: which modes it offers, its caption, and the SignalK paths it uses. */
+function AutopilotFields(
+  props: Common & { tile: AutopilotTile; onChange(patch: Patch): void; onConfig(patch: Patch): void },
+) {
+  const { tile } = props;
+  const modes = tile.modes ?? AUTOPILOT_DEFAULTS.modes;
+  const config = tile.config ?? {};
+  const label = tile.label ?? '';
+  const toggle = (m: AutopilotMode, on: boolean) => {
+    // Keep the canonical order; the default (all three) is stored as "no modes field".
+    const next = (['auto', 'wind', 'route'] as AutopilotMode[]).filter((x) => (x === m ? on : modes.includes(x)));
+    props.onChange({ modes: next.length === 3 ? undefined : next });
+  };
+  return (
+    <>
+      <fieldset className="modes">
+        <legend>Modes it can engage</legend>
+        {(['auto', 'wind', 'route'] as AutopilotMode[]).map((m) => (
+          <label key={m} className="check">
+            <input type="checkbox" checked={modes.includes(m)} onChange={(e) => toggle(m, e.target.checked)} />
+            {MODE_TITLES[m]}
+          </label>
+        ))}
+        <small className="hint">STANDBY is always there. Engaging needs a second, confirming tap on the display.</small>
+      </fieldset>
+      <label className="field">
+        <span>Label</span>
+        <input
+          value={label}
+          placeholder="e.g. Pilot"
+          onChange={(e) => props.onChange({ label: e.target.value || undefined })}
+          aria-label="Label"
+          aria-invalid={!LABEL_RE.test(label)}
+        />
+        {!LABEL_RE.test(label) && (
+          <small className="error">Only letters A-Z, digits, punctuation and ° can be shown.</small>
+        )}
+      </label>
+      <details className="slot-section">
+        <summary>Autopilot paths</summary>
+        {AUTOPILOT_PATHS.map(({ key, label: title }) => (
+          <div key={key}>
+            <PathPicker
+              path={config[key] ?? ''}
+              paths={props.paths}
+              values={props.values}
+              label={title}
+              placeholder={`default: ${AUTOPILOT_DEFAULTS[key]}`}
+              onPick={(path) => props.onConfig({ [key]: path || undefined })}
+            />
+            {config[key] && (
+              <button className="link" onClick={() => props.onConfig({ [key]: undefined })}>
+                use the default ({AUTOPILOT_DEFAULTS[key]})
+              </button>
+            )}
+          </div>
+        ))}
+      </details>
+    </>
+  );
+}
+
 export function TileDrawer(
   props: Common & {
     tile: Tile;
@@ -436,13 +509,26 @@ export function TileDrawer(
   },
 ) {
   const { tile, onChange } = props;
-  const title = tile.type === 'wind_rose' ? 'Wind rose' : tile.label || tile.id;
+  const title =
+    tile.type === 'wind_rose' ? 'Wind rose' : tile.type === 'autopilot' ? 'Autopilot' : tile.label || tile.id;
   return (
     <Drawer title={title} label="Tile settings" onClose={props.onClose}>
       {!props.supported && (
         <p className="warn">This display's firmware cannot show {tile.type} tiles yet.</p>
       )}
-      {tile.type === 'wind_rose' ? (
+      {tile.type === 'autopilot' ? (
+        <>
+          {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
+          <AutopilotFields
+            tile={tile}
+            paths={props.paths}
+            values={props.values}
+            onChange={onChange}
+            onConfig={props.onConfig}
+            onClose={props.onClose}
+          />
+        </>
+      ) : tile.type === 'wind_rose' ? (
         <>
           {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
           <RoseFields

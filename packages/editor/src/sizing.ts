@@ -1,8 +1,8 @@
 // Approximate pixel size of a tile on the display, from the display's resolution (hello) and the
 // runtime's fixed geometry (renderer.cpp): page area padding 8, grid gaps 8, tile padding 10,
 // and a footer of about 11 % of the height when the layout has several pages. Used for the
-// wind rose size hint; the display decides for itself from the cell it actually gets.
-import { WIND_ROSE_FIT, type Layout, type Tile } from '@esphelm/schema';
+// wind rose and autopilot size hints; the display decides from the cell it actually gets.
+import { AUTOPILOT_FIT, WIND_ROSE_FIT, type Layout, type Tile } from '@esphelm/schema';
 
 const AREA_PAD = 8;
 const GAP = 8;
@@ -46,4 +46,18 @@ export const ROSE_TIER_TEXT: Record<RoseTier, string> = {
   full: 'full: tick labels, heading and the centre values',
   compact: 'compact: no tick labels or heading; as many centre values as fit',
   pointers: 'pointers only; too small for centre values',
+};
+
+export type AutopilotTier = 'controls' | 'status';
+
+/** Whether the display shows an autopilot's buttons at this content size (AUTOPILOT_FIT). */
+export function autopilotTier(px: { width: number; height: number }): AutopilotTier {
+  return px.width >= AUTOPILOT_FIT.controlsWidth && px.height >= AUTOPILOT_FIT.controlsHeight
+    ? 'controls'
+    : 'status';
+}
+
+export const AUTOPILOT_TIER_TEXT: Record<AutopilotTier, string> = {
+  controls: 'course and mode buttons',
+  status: 'status only; too small for safe controls (make it bigger to steer from here)',
 };

@@ -1,6 +1,6 @@
-import { TEMPLATES, WIND_ROSE_FIT, type Layout } from '@esphelm/schema';
+import { AUTOPILOT_FIT, TEMPLATES, WIND_ROSE_FIT, type Layout } from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
-import { roseTier, tilePixels } from '../src/sizing';
+import { autopilotTier, roseTier, tilePixels } from '../src/sizing';
 
 const onePage = (cols: number, rows: number, pages = 1): Layout => ({
   version: 1,
@@ -53,5 +53,24 @@ describe('roseTier', () => {
       const px = tilePixels({ width: 720, height: 720 }, t, 0, rose);
       expect(roseTier(Math.min(px.width, px.height))).toBe('full');
     }
+  });
+});
+
+describe('autopilotTier', () => {
+  it('shows controls only from AUTOPILOT_FIT', () => {
+    const { controlsWidth: w, controlsHeight: h } = AUTOPILOT_FIT;
+    expect(autopilotTier({ width: w, height: h })).toBe('controls');
+    expect(autopilotTier({ width: w - 1, height: h + 100 })).toBe('status');
+    expect(autopilotTier({ width: w + 100, height: h - 1 })).toBe('status');
+  });
+
+  it('the autopilot and helm templates get controls on their display sizes', () => {
+    const at = (key: string, size: number) => {
+      const t = TEMPLATES[key]!;
+      const ap = t.pages[0]!.tiles.find((x) => x.type === 'autopilot')!;
+      return autopilotTier(tilePixels({ width: size, height: size }, t, 0, ap));
+    };
+    expect(at('autopilot', 480)).toBe('controls');
+    expect(at('helm-720', 720)).toBe('controls');
   });
 });

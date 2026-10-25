@@ -197,7 +197,7 @@ async function main(): Promise<void> {
     // grid page with a gauge, a zone and a small rose tile next to it; then the wind page moves
     // to the front. Save & send delivers all three.
     await page.getByRole('button', { name: 'Add page' }).click();
-    await page.getByRole('menuitem', { name: 'Wind page' }).click();
+    await page.getByRole('menuitem', { name: 'Starter: Wind', exact: true }).click();
     await page.getByTestId('slot-wind-rose-center3').click();
     const drawer = page.getByRole('complementary', { name: 'Tile settings' });
     const center3 = drawer.getByTestId('slot-section-center3');
@@ -318,6 +318,48 @@ async function main(): Promise<void> {
       JSON.stringify(sailing.body.pages) === JSON.stringify(TEMPLATES['sailing-720']?.pages),
     );
 
+    // The Helm layout puts the autopilot next to the wind rose. Drop WIND from its modes,
+    // check the size hint, send it.
+    await page.getByRole('button', { name: 'Templates' }).click();
+    await page.getByRole('menuitem', { name: 'Helm (large display)' }).click();
+    await page.getByRole('button', { name: 'Replace' }).click();
+    await page.getByTestId('tile-autopilot').click();
+    const apDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    const apHint = (await apDrawer.locator('.size-hint').textContent()) ?? '';
+    check(
+      'the 2x2 autopilot on 720 gets its buttons',
+      /course and mode buttons/.test(apHint),
+      apHint,
+    );
+    await apDrawer.getByRole('checkbox', { name: 'WIND' }).uncheck();
+    await page.getByText('No problems').waitFor();
+    await page.waitForTimeout(1000);
+    await shot(page, '07-desktop-night-helm-autopilot');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
+    const helm = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const ap = ((helm.body.pages as ServedPage[] | undefined)?.[0]?.tiles ?? []).find(
+      (t) => t.type === 'autopilot',
+    );
+    check(
+      'the display gets the autopilot without WIND',
+      JSON.stringify(ap) ===
+        JSON.stringify({
+          type: 'autopilot',
+          id: 'autopilot',
+          x: 2,
+          y: 0,
+          w: 2,
+          h: 2,
+          modes: ['auto', 'route'],
+        }),
+      JSON.stringify(ap),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,
@@ -347,7 +389,7 @@ async function main(): Promise<void> {
       .getByTestId('slot-section-center1')
       .evaluate((el) => el.hasAttribute('open'));
     await mobile.waitForTimeout(500);
-    await shot(mobile, '07-phone-dark-rose-slot');
+    await shot(mobile, '08-phone-dark-rose-slot');
     check('phone: tapping a rose slot opens it in the tile drawer', open);
     await phone.close();
   } finally {

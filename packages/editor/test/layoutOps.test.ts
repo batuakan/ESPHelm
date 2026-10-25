@@ -208,6 +208,43 @@ describe('pages', () => {
     expect(ok(small.layout)).toEqual([]);
   });
 
+  it('adds autopilot tiles and pages, with config and modes on the tile', () => {
+    let l = setGrid(base(), 0, 3, 3);
+    const r = addTile(l, 0, 'autopilot', { x: 1, y: 0 })!;
+    expect(gridPage(r.layout, 0)!.tiles[1]).toEqual({
+      type: 'autopilot',
+      id: 'pilot-1',
+      x: 1,
+      y: 0,
+      w: 2,
+      h: 2,
+    });
+    l = r.layout;
+    expect(tilePaths(gridPage(l, 0)!.tiles[1]!)).toEqual([
+      'steering.autopilot.state',
+      'steering.autopilot.target',
+      'navigation.headingMagnetic',
+    ]);
+    l = setTileConfig(l, 0, 'pilot-1', { headingPath: 'navigation.headingTrue' });
+    l = updateTile(l, 0, 'pilot-1', { modes: ['auto', 'route'], label: 'Pilot' });
+    expect(gridPage(l, 0)!.tiles[1]).toMatchObject({
+      config: { headingPath: 'navigation.headingTrue' },
+      modes: ['auto', 'route'],
+      label: 'Pilot',
+    });
+    l = setTileConfig(l, 0, 'pilot-1', { headingPath: undefined });
+    expect(gridPage(l, 0)!.tiles[1]).not.toHaveProperty('config');
+    expect(ok(l)).toEqual([]);
+
+    const page = addPage(l, 'autopilot');
+    expect(page.layout.pages[page.index]).toMatchObject({
+      title: 'Autopilot',
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'autopilot', id: 'pilot-2-ap', w: 1, h: 1 }],
+    });
+    expect(ok(page.layout)).toEqual([]);
+  });
+
   it('edits wind-rose slots and config on the tile', () => {
     let l = addPage(base(), 'wind_rose').layout;
     const id = 'wind-1-rose';

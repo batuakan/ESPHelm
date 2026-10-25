@@ -892,3 +892,70 @@ select.zone-emergency {
 .slot-section summary .now {
   margin-left: 8px;
 }
+
+/* Autopilot tile (buttons are drawings: the editor never commands the autopilot) */
+.tile-graphic.autopilot {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 0;
+}
+.ap-state {
+  text-align: center;
+  font-size: clamp(16px, 4.5vmin, 40px);
+  line-height: 1.1;
+}
+.ap-state.engaged {
+  color: var(--tile-accent);
+}
+.ap-course {
+  text-align: center;
+  font-size: 12px;
+  color: var(--tile-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-status .ap-state {
+  margin-top: auto;
+}
+.ap-status .ap-course {
+  margin-bottom: auto;
+}
+.ap-buttons {
+  margin-top: auto;
+  flex: 0 1 55%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+.ap-row {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  min-height: 0;
+}
+.ap-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ap-btn.current {
+  outline: 2px solid var(--tile-accent);
+}
+fieldset.modes {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}

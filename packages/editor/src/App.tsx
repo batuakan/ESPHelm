@@ -38,7 +38,13 @@ import { PageTabs } from './components/PageTabs';
 import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
 import { SLOT_TITLES, TileDrawer } from './components/TileDrawer';
-import { ROSE_TIER_TEXT, roseTier, tilePixels } from './sizing';
+import {
+  AUTOPILOT_TIER_TEXT,
+  ROSE_TIER_TEXT,
+  autopilotTier,
+  roseTier,
+  tilePixels,
+} from './sizing';
 
 export type Theme = 'light' | 'dark' | 'night';
 
@@ -259,9 +265,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const drawerOpen = !!tile;
   const display = device?.hello.display ?? { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
+  const tileBox = (t: Tile) => (layout ? tilePixels(display, layout, index, t) : { width: 0, height: 0 });
   const tilePx = (t: Tile) => {
-    if (!layout) return 0;
-    const { width, height } = tilePixels(display, layout, index, t);
+    const { width, height } = tileBox(t);
     return Math.min(width, height);
   };
   const canSave = !!layout && device?.state === 'adopted' && problems.length === 0 && !saving;
@@ -407,6 +413,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   selectedId={tile?.id}
                   selectedSlot={selection?.slot}
                   roseTier={(t) => roseTier(tilePx(t))}
+                  autopilotTier={(t) => autopilotTier(tileBox(t))}
                   problemTileIds={problemTileIds}
                   supported={supported}
                   newTileDrag={newTileDrag}
@@ -457,7 +464,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           paths={paths}
           values={shownValues}
           supported={supported.has(tile.type)}
-          sizeHint={tile.type === 'wind_rose' ? sizeHint(tilePx(tile), !!device) : undefined}
+          sizeHint={
+            tile.type === 'wind_rose'
+              ? sizeHint(tilePx(tile), !!device)
+              : tile.type === 'autopilot'
+                ? autopilotHint(tileBox(tile), !!device)
+                : undefined
+          }
           openSlot={selection?.slot}
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}
           onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
@@ -476,6 +489,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 function sizeHint(px: number, known: boolean): string {
   const where = known ? 'on this display' : 'on a 480×480 display';
   return `About ${px} px ${where}: ${ROSE_TIER_TEXT[roseTier(px)]}.`;
+}
+
+function autopilotHint(box: { width: number; height: number }, known: boolean): string {
+  const where = known ? 'on this display' : 'on a 480×480 display';
+  return `About ${box.width}×${box.height} px ${where}: ${AUTOPILOT_TIER_TEXT[autopilotTier(box)]}.`;
 }
 
 function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined, layout: Layout) {

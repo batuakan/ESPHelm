@@ -29,7 +29,7 @@ function fakeServer(devices: Device[]) {
     if (path === '/paths') return json(paths);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'wind_rose'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'wind_rose', 'autopilot'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -260,6 +260,43 @@ describe('editor', () => {
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Engine']);
     await screen.findByText('No problems');
     expect(within(screen.getByTestId('grid')).getAllByText(/RPM|Coolant|Oil/)).toHaveLength(3);
+  });
+
+  it('adds an autopilot next to other tiles; modes and size hint', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Autopilot/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    // 2x2 of the 2x2 grid on 720x720: controls.
+    expect(within(drawer).getByText(/course and mode buttons/)).toBeTruthy();
+    expect([...live.paths()].sort()).toEqual([
+      'navigation.headingMagnetic',
+      'steering.autopilot.state',
+      'steering.autopilot.target',
+    ]);
+    fireEvent.click(within(drawer).getByRole('checkbox', { name: 'WIND' }));
+    live.emit('steering.autopilot.state', 'auto');
+    live.emit('steering.autopilot.target', Math.PI);
+    const preview = screen.getByTestId('autopilot-pilot-1');
+    within(preview).getByText('AUTO', { selector: '.ap-state' });
+    expect(preview.textContent).toMatch(/TGT 180°/);
+    expect(within(preview).queryByText('WIND')).toBeNull();
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]!.tiles).toEqual([
+      { type: 'autopilot', id: 'pilot-1', x: 0, y: 0, w: 2, h: 2, modes: ['auto', 'route'] },
+    ]);
+
+    // Shrunk to one cell of a 3x3 grid it would be status only.
+    fireEvent.change(screen.getByLabelText('Columns'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '3' } });
+    expect(within(drawer).getByText(/course and mode buttons/)).toBeTruthy(); // still 2x2
+    fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Autopilot page' }));
+    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Autopilot');
   });
 
   it('greys out tile types the display cannot render', async () => {
