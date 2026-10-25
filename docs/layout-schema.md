@@ -16,7 +16,8 @@ Regenerate after any change with `npm run generate`. `npm test` fails while gene
 - `version` is the **major** version (`1`). A device rejects any layout whose major it doesn't support (`hello.schema.major`), keeps its last-known-good layout, and logs `UNSUPPORTED_VERSION`.
 - Within a major, changes are **additive only**: new optional fields, new tile types, new full-page widgets.
   - The plugin and editor validate strictly (`additionalProperties: false`).
-  - **Firmware ignores unknown fields** but validates every field it knows. That lets older firmware accept a layout written for newer firmware of the same major.
+  - **Firmware ignores unknown fields** but validates every field it knows. That lets older firmware accept a layout written for newer firmware of the same major. Verified by `firmware/test/parser.cpp.test.ts`: the C++ parser reports exactly the TS codes and pointers on every fixture and extra mutations, except `UNKNOWN_FIELD`.
+  - Slot names are part of a widget's contract, so an unknown slot is still `UNKNOWN_SLOT` on the device.
   - The plugin doesn't send a device a tile type or widget it didn't list in `hello.widgets`.
 - Removing or changing the meaning of a field requires a new major (CLAUDE.md golden rule 7: ask first).
 
@@ -115,6 +116,13 @@ An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_D
 | `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max` |
 | `INVALID_ZONE` | semantic | zone `from` is not below `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
+
+**Device-only codes** (firmware parser, never produced by `validateLayout`):
+
+| Code | Meaning |
+|---|---|
+| `INVALID_JSON` | the body isn't valid JSON (truncated, garbage, empty) |
+| `CAPACITY_EXCEEDED` | the body, a string or the nesting depth exceeds the device's capacity guard, or memory ran out while building. See `docs/firmware-runtime.md`. |
 
 The published JSON Schema carries an annotation keyword `errorCode` with the code for each constraint. It never affects validity, but a strict validator must be told about it: in Ajv, `ajv.addKeyword({ keyword: 'errorCode', schemaType: 'string' })`.
 
