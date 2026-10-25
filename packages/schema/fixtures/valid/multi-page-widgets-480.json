@@ -38,9 +38,13 @@
           "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
           "config": { "showTrueWind": true },
           "slots": {
-            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6},
-            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6},
-            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6}
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "staleAfter": 6 },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS", "staleAfter": 6 },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS", "staleAfter": 6 },
+            "topLeft": { "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "Volts", "staleAfter": 6 },
+            "topRight": { "path": "propulsion.main.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil", "staleAfter": 6 },
+            "bottomLeft": { "path": "navigation.headingTrue", "unit": "deg", "decimals": 0, "label": "HDG", "staleAfter": 6 },
+            "bottomRight": { "path": "environment.wind.angleApparent", "unit": "deg180", "decimals": 0, "label": "AWA", "staleAfter": 6 }
           }
         }
       ]

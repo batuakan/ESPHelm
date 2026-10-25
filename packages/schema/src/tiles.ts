@@ -85,9 +85,15 @@ export const SwitchTile = Type.Object(
  */
 const WindRoseSlots = Type.Object(
   {
+    // stacked in the middle of the rose
     center1: Type.Optional(DataItem),
     center2: Type.Optional(DataItem),
     center3: Type.Optional(DataItem),
+    // in the tile's corners, outside the ring (shown when there is room)
+    topLeft: Type.Optional(DataItem),
+    topRight: Type.Optional(DataItem),
+    bottomLeft: Type.Optional(DataItem),
+    bottomRight: Type.Optional(DataItem),
   },
   { additionalProperties: false, errorCode: 'UNKNOWN_SLOT' },
 );
@@ -196,7 +202,7 @@ export type TileType = keyof typeof TILE_TYPES;
 
 /** Named slots of the tile types that have them. */
 export const TILE_SLOTS = {
-  wind_rose: Object.keys(WindRoseSlots.properties) as ('center1' | 'center2' | 'center3')[],
+  wind_rose: Object.keys(WindRoseSlots.properties) as (keyof Type.Static<typeof WindRoseSlots>)[],
 } as const;
 
 export const Tile = Type.Union([

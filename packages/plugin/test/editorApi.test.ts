@@ -196,7 +196,17 @@ describe('widget catalog', () => {
   it('lists tiles, their slots, and units', async () => {
     const body = (await (await api('GET', '/widgets')).json()) as Record<string, unknown>;
     expect(body.tiles).toEqual(['value', 'gauge', 'bar', 'switch', 'wind_rose', 'autopilot']);
-    expect(body.tileSlots).toEqual({ wind_rose: ['center1', 'center2', 'center3'] });
+    expect(body.tileSlots).toEqual({
+      wind_rose: [
+        'center1',
+        'center2',
+        'center3',
+        'topLeft',
+        'topRight',
+        'bottomLeft',
+        'bottomRight',
+      ],
+    });
     expect(body).not.toHaveProperty('pageWidgets');
     expect(body.units).toHaveProperty('kn.label', 'kn');
   });
