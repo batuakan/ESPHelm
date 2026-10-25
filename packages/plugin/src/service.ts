@@ -1,4 +1,5 @@
 import type { Path } from '@signalk/server-api';
+import { AlarmAcks } from './alarms.js';
 import { httpPort, securityMode, type PluginHost, type SecurityMode } from './host.js';
 import { Store, type DeviceRecord, type StoredLayout } from './store.js';
 import { resourcesChartSource, TileService, type ChartSource } from './tiles.js';
@@ -27,6 +28,9 @@ export class Service {
   private store: Store | undefined;
   /** RGB565 chart tiles for displays (ADR-0012). */
   readonly tiles: TileService;
+  /** Alarm acknowledgements from displays (ADR-0014). */
+  readonly alarms: AlarmAcks;
+  private filtering = false;
 
   constructor(
     private readonly host: PluginHost,
@@ -34,6 +38,7 @@ export class Service {
     charts: ChartSource = resourcesChartSource(host.resourcesApi, () => httpPort(host)),
   ) {
     this.tiles = new TileService(charts);
+    this.alarms = new AlarmAcks(host, PLUGIN_ID);
   }
 
   start(): void {
@@ -47,6 +52,13 @@ export class Service {
     );
     store.load();
     this.store = store;
+    // signalk-server drops a plugin's delta input handlers when it stops; register once anyway.
+    if (!this.filtering && this.host.registerDeltaInputHandler) {
+      this.host.registerDeltaInputHandler((delta, next) =>
+        next(this.alarms.filter(delta, this.host.selfContext)),
+      );
+      this.filtering = true;
+    }
     // Publish every device's current version so a subscribing device gets it replayed.
     for (const device of store.listDevices()) this.notify(device);
     const mode = securityMode(this.host);
@@ -60,6 +72,7 @@ export class Service {
 
   stop(): void {
     this.store = undefined;
+    this.alarms.clear();
   }
 
   /** The loaded store, or undefined before start()/after stop(). */

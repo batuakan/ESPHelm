@@ -67,6 +67,22 @@ The plugin looks `:chart` up in the SignalK resources API, fetches its tile from
 
 Converted tiles are kept in a 64-tile LRU (about 8 MB).
 
+### `POST /signalk/v1/api/esphelm/notifications/ack`
+Acknowledges an alarm from a display (ADR-0014). Body `{ "path": "notifications.…" }`. Needs a read/write device token.
+
+signalk-server has no acknowledge API (2.26 only has GET routes for notifications), so the plugin silences the notification itself:
+1. It republishes the current value with `"sound"` removed from `method`. The state and message stay, so the alarm stays visible everywhere.
+2. Its delta input handler (`registerDeltaInputHandler`) removes `"sound"` from later deltas of that path for this vessel, while the state stays the acknowledged one. A source that resends the alarm every few seconds therefore stays silent.
+3. Any other state (escalation, or `normal`) ends the acknowledgement, so an escalation sounds again.
+
+| Status | Meaning |
+|---|---|
+| 200 | `{ path, state }`: acknowledged |
+| 400 | `INVALID_PATH`: not a `notifications.*` path (no wildcards) |
+| 404 | `NO_ALARM`: no notification there, or its state isn't `alert`, `warn`, `alarm` or `emergency` |
+
+Acknowledgements are kept in memory; a plugin or server restart forgets them. Clients that ignore `method` (and sound for every alarm state) aren't affected.
+
 ### Change notification
 On every change that alters what a device would download (layout saved with different bytes, assignment changed, adopted or un-adopted, device deleted), and once for every device on plugin start, the plugin emits:
 

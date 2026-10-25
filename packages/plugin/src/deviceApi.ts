@@ -19,6 +19,7 @@ function requireStore(service: Service, res: Response): Store | undefined {
  *   POST /signalk/v1/api/esphelm/devices/hello
  *   GET  /signalk/v1/api/esphelm/devices/:id/layout   (ETag / If-None-Match -> 304)
  *   GET  /signalk/v1/api/esphelm/tiles/:chart/:z/:x/:y  (raw RGB565 chart tile, ADR-0012)
+ *   POST /signalk/v1/api/esphelm/notifications/ack     { path } (silence an alarm, ADR-0014)
  */
 export function registerDeviceApi(router: IRouter, service: Service): IRouter {
   router.post(`${DEVICE_API_PREFIX}/devices/hello`, (req: Request, res: Response) => {
@@ -109,6 +110,22 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       return;
     }
     res.status(200).type('application/octet-stream').send(tile.body);
+  });
+
+  router.post(`${DEVICE_API_PREFIX}/notifications/ack`, (req: Request, res: Response) => {
+    if (!requireStore(service, res)) return;
+    const auth = authorizeDevice(req, service.security);
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error, message: auth.message });
+      return;
+    }
+    const path: unknown = (req.body as { path?: unknown } | undefined)?.path;
+    const result = service.alarms.ack(typeof path === 'string' ? path : '');
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error, message: result.message });
+      return;
+    }
+    res.json({ path, state: result.state });
   });
 
   return router;

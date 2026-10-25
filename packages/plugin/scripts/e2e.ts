@@ -174,6 +174,61 @@ async function main(): Promise<void> {
       headers: { Authorization: `Bearer ${rw}` },
     });
     check('an unknown chart is 404', unknown.status === 404, String(unknown.status));
+
+    // Alarms (ADR-0014): another source raises a notification with sound; a display
+    // acknowledges it; the plugin silences it, and keeps it silent when it is sent again.
+    const notifPath = 'notifications.environment.depth.belowTransducer';
+    const restPath = `/signalk/v1/api/vessels/self/${notifPath.replace(/\./g, '/')}`;
+    const alarmSource = await sk.stream(admin);
+    const raise = (state: string) =>
+      alarmSource.ws.send(
+        JSON.stringify({
+          context: 'vessels.self',
+          updates: [
+            {
+              values: [
+                {
+                  path: notifPath,
+                  value: { state, method: ['visual', 'sound'], message: 'Shallow water' },
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    const methodNow = async () =>
+      ((await json('GET', restPath, admin)).body as { value?: { method?: string[] } } | undefined)
+        ?.value?.method;
+    raise('alarm');
+    await new Promise((res) => setTimeout(res, 300));
+    check(
+      'the alarm reaches the server with sound',
+      (await methodNow())?.includes('sound') === true,
+    );
+    r = await json('POST', '/signalk/v1/api/esphelm/notifications/ack', ro, { path: notifPath });
+    check('a read-only token cannot acknowledge', r.status === 403, String(r.status));
+    r = await json('POST', '/signalk/v1/api/esphelm/notifications/ack', rw, { path: notifPath });
+    check('the display acknowledges the alarm', r.status === 200, JSON.stringify(r.body));
+    await new Promise((res) => setTimeout(res, 300));
+    let method = await methodNow();
+    check(
+      'the alarm is silenced (method without sound)',
+      JSON.stringify(method) === '["visual"]',
+      JSON.stringify(method),
+    );
+    raise('alarm');
+    await new Promise((res) => setTimeout(res, 300));
+    method = await methodNow();
+    check(
+      'sent again with sound, it stays silent',
+      JSON.stringify(method) === '["visual"]',
+      JSON.stringify(method),
+    );
+    raise('emergency');
+    await new Promise((res) => setTimeout(res, 300));
+    method = await methodNow();
+    check('an escalation sounds again', method?.includes('sound') === true, JSON.stringify(method));
+    alarmSource.ws.close();
   } finally {
     await sk.stop();
   }

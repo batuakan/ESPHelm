@@ -12,7 +12,7 @@ export type PluginHost = Pick<
   | 'getSelfPath'
   | 'getMetadata'
 > &
-  Partial<Pick<ServerAPI, 'resourcesApi'>> & {
+  Partial<Pick<ServerAPI, 'resourcesApi' | 'registerDeltaInputHandler' | 'selfContext'>> & {
     streambundle: Pick<ServerAPI['streambundle'], 'getAvailablePaths'>;
   } & {
     /**

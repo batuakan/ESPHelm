@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Delta } from '@signalk/server-api';
+import type { Delta, DeltaInputHandler } from '@signalk/server-api';
 import express from 'express';
 import { registerDeviceApi } from '../src/deviceApi.js';
 import { registerEditorApi } from '../src/editorApi.js';
@@ -37,6 +37,10 @@ export interface Harness {
   errors: string[];
   service: Service;
   security: { disabled: boolean };
+  /** A delta from another source (e.g. an alarm plugin), through the plugin's input handler. */
+  publish(delta: Delta): void;
+  /** Current value of a self path in the fake data model. */
+  value(path: string): unknown;
   /** fetch with an optional principal (as signalk-server's http_authorize would set it). */
   call(
     method: string,
@@ -71,11 +75,30 @@ export async function startHarness(
     'navigation.speedOverGround': { units: 'm/s', description: 'Speed over ground' },
     'environment.depth.belowTransducer': { units: 'm' },
   };
+  // Like signalk-server: deltas pass the plugin's input handler before they reach the model.
+  // Only notifications are kept in the model, so /api/paths stays as above.
+  let inputHandler: DeltaInputHandler | undefined;
+  const ingest = (delta: Delta) => {
+    const apply = (d: Delta) => {
+      deltas.push(d);
+      for (const u of d.updates) {
+        if (!('values' in u)) continue;
+        for (const pv of u.values) {
+          if (pv.path.startsWith('notifications.'))
+            skData[pv.path] = { value: pv.value, timestamp: '2026-10-24T12:00:03.000Z' };
+        }
+      }
+    };
+    if (inputHandler) inputHandler(delta, apply);
+    else apply(delta);
+  };
   const host: PluginHost = {
     getDataDirPath: () => dataDir,
-    handleMessage: (_id, delta) => {
-      deltas.push(delta as Delta);
+    handleMessage: (_id, delta) => ingest(delta as Delta),
+    registerDeltaInputHandler: (handler) => {
+      inputHandler = handler;
     },
+    selfContext: 'vessels.urn:mrn:imo:mmsi:230000000',
     setPluginStatus: () => {},
     setPluginError: (msg) => {
       errors.push(msg);
@@ -115,6 +138,8 @@ export async function startHarness(
     errors,
     service,
     security,
+    publish: ingest,
+    value: (path) => skData[path]?.value,
     call: (method, path, o = {}) =>
       fetch(base + path, {
         method,
