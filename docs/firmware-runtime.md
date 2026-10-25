@@ -75,7 +75,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 - There is no swiping; the legacy apps keep theirs.
 
 ## Widgets
-All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): day is the dark-blue palette, night is red on black with zones differing in brightness, not hue.
+All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue.
 
 | Widget | Drawn with | Notes |
 |---|---|---|
@@ -90,6 +90,8 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 - **full** (≥ 260 px): every tick, all 16 compass points, heading, slots. Slot values use the biggest font (value → label → small) at which all of them fit inside the card.
 - **compact** (≥ 150 px): ticks every 30°, only N/E/S/W on the card, no heading; as many slots as fit.
 - **pointers** (< 150 px): ring, sectors and markers only.
+
+**Corner values** (`topLeft`, `topRight`, `bottomLeft`, `bottomRight`): a value over its caption, pushed into the tile's corner and aligned to its side. Each shows only in the full tier and when its box (value in the label font, else the small font, and the caption) lies outside the ring; otherwise it's hidden.
 
 Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy page). The rose tile uses the page background instead of the tile colour. Zone styles are kept per (state, arc width), so a gauge and a rose on the same page keep their own arc widths.
 
@@ -142,8 +144,8 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 94,436 B (16.4 %), flash 2.66 MB (16.1 %) |
-| C3 compile check, static | RAM 108,448 B of 321,296 B (33.8 %), flash 1.23 MB of 1.8 MB (66.9 %) |
+| P4 runtime firmware, static | RAM 94,676 B (16.4 %), flash 2.66 MB (16.1 %) |
+| C3 compile check, static | RAM 108,688 B of 321,296 B (33.8 %), flash 1.23 MB of 1.8 MB (67.0 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 

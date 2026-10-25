@@ -86,7 +86,7 @@ A `wind_rose` tile draws a fixed design and exposes **named slots at predetermin
 
 | Slots | `config` (all optional) |
 |---|---|
-| `center1`, `center2`, `center3` (stacked in the centre of the rose) | `apparentAngle` (default `environment.wind.angleApparent`), `trueDirection` (default `environment.wind.directionTrue`), `heading` (default `navigation.headingTrue`), `showTrueWind` (default `true`) |
+| `center1`, `center2`, `center3` (stacked in the centre of the rose); `topLeft`, `topRight`, `bottomLeft`, `bottomRight` (in the tile's corners, outside the ring) | `apparentAngle` (default `environment.wind.angleApparent`), `trueDirection` (default `environment.wind.directionTrue`), `heading` (default `navigation.headingTrue`), `showTrueWind` (default `true`) |
 
 An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_DEFAULTS`, slot names as `TILE_SLOTS.wind_rose`.
 
@@ -94,7 +94,7 @@ An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_D
 
 | Tier | Shorter side | Drawn |
 |---|---|---|
-| full | ≥ 260 px | tick labels, heading, centre slots (values in the small font if all three don't fit otherwise) |
+| full | ≥ 260 px | compass card, heading, centre slots (the biggest font at which all fit); corner slots where they fit outside the ring |
 | compact | ≥ 150 px | ring, sectors, pointers, as many slots as fit |
 | pointers | < 150 px | ring, sectors and pointers only |
 
