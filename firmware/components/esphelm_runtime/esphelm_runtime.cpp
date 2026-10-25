@@ -10,6 +10,9 @@
 
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
 #include <esp_heap_caps.h>
+#include <esp_system.h>
+#else
+#include <cstdlib>
 #endif
 
 namespace esphome {
@@ -21,6 +24,28 @@ static const uint32_t DRAW_INTERVAL_MS = 250;       // at most 4 redraws per til
 static const uint32_t POLL_INTERVAL_MS = 5 * 60 * 1000;  // fallback when a version delta is missed
 static const uint32_t LKG_AFTER_MS = 30 * 1000;      // rendered this long without trouble -> last known good
 static const uint32_t MAX_HELLO_BACKOFF_MS = 60 * 1000;
+static const unsigned MAX_BOOT_ATTEMPTS = 2;         // crashes while a cached layout was shown -> skip it
+
+/// Did the previous boot end in a crash (rather than a power cut, OTA or a requested restart)?
+static bool crash_reset() {
+#ifdef USE_ESP32_FRAMEWORK_ESP_IDF
+  switch (esp_reset_reason()) {
+    case ESP_RST_PANIC:
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:
+      return true;
+    default:
+      return false;
+  }
+#else
+  return true;  // host: a clean exit clears the record (atexit), so anything left is a crash
+#endif
+}
+
+#ifndef USE_ESP32_FRAMEWORK_ESP_IDF
+static EsphelmRuntime *exit_instance = nullptr;
+#endif
 
 void EsphelmRuntime::compute_capacity_() {
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
@@ -56,9 +81,16 @@ void EsphelmRuntime::setup() {
     }
   });
 
-  // Offline first: show what we had before any network traffic.
+  // Offline first: show what we had before any network traffic. The boot guard first decides
+  // whether the cached layout is the one that keeps crashing the display (ADR-0013).
   StoredLayout stored;
-  if (this->store_.load(Slot::CURRENT, stored) && this->apply_(stored.body, stored.etag, false, "cached")) {
+  const bool cached = this->store_.load(Slot::CURRENT, stored);
+  this->check_boot_record_(cached ? stored.etag : "");
+#ifndef USE_ESP32_FRAMEWORK_ESP_IDF
+  exit_instance = this;
+  std::atexit([] { exit_instance->clean_exit(); });
+#endif
+  if (cached && this->apply_(stored.body, stored.etag, false, "cached")) {
     // shown
   } else if (this->store_.load(Slot::LAST_KNOWN_GOOD, stored) &&
              this->apply_(stored.body, stored.etag, false, "last known good")) {
@@ -120,6 +152,10 @@ void EsphelmRuntime::loop() {
     for (auto &w : this->widgets_)
       w->tick(now);
     if (!this->lkg_saved_ && now - this->shown_at_ >= LKG_AFTER_MS) {
+      if (this->boot_attempts_ != 0) {
+        this->boot_attempts_ = 0;  // survived: no longer a suspect
+        this->save_boot_record_();
+      }
       if (this->etag_ != this->lkg_etag_ && this->store_.save(Slot::LAST_KNOWN_GOOD, {this->etag_, this->body_}))
         this->lkg_etag_ = this->etag_;
       this->lkg_saved_ = true;
@@ -165,6 +201,8 @@ void EsphelmRuntime::send_hello_() {
   doc["capabilities"]["put"] = true;
   if (!this->etag_.empty())
     doc["layoutEtag"] = this->etag_;
+  if (!this->bad_etag_.empty())
+    doc["recovery"]["skippedLayoutEtag"] = this->bad_etag_;
 
   HttpRequest req;
   req.kind = RequestKind::HELLO;
@@ -278,6 +316,11 @@ void EsphelmRuntime::handle_layout_(const HttpResult &result) {
 // ---- Layout ----
 
 bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bool persist, const char *origin) {
+  if (!this->bad_etag_.empty() && etag == this->bad_etag_) {
+    this->layout_error_ = "This layout crashed the display; change it in the editor and send it again";
+    ESP_LOGE(TAG, "%s layout %s skipped: it crashed the display before", origin, etag.c_str());
+    return false;
+  }
   esphelm::ParseResult parsed = esphelm::parse_layout(body.data(), body.size(), this->limits_);
   if (!parsed.ok) {
     const esphelm::ParseError &e = parsed.errors.front();
@@ -290,7 +333,14 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   const bool same_layout = this->has_layout_ && parsed.layout.id == this->layout_.id;
   size_t page = same_layout && this->page_ < parsed.layout.pages.size() ? this->page_ : 0;
   this->layout_ = std::move(parsed.layout);
+  // Count the attempt before building: if building or showing it crashes the display, the next
+  // boot knows which layout it was.
+  this->boot_attempts_ = etag == this->boot_etag_ ? this->boot_attempts_ + 1 : 1;
+  this->boot_etag_ = etag;
+  this->save_boot_record_();
   if (!this->build_page_(page)) {
+    this->boot_attempts_ = 0;  // refused cleanly, not a crash
+    this->save_boot_record_();
     this->layout_error_ = "CAPACITY_EXCEEDED (out of memory while building)";
     this->has_layout_ = false;
     this->status_key_.clear();
@@ -309,6 +359,42 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   ESP_LOGI(TAG, "Showing %s layout \"%s\" (%u pages, %u bytes, ETag %s)", origin, this->layout_.id.c_str(),
            (unsigned) this->layout_.pages.size(), (unsigned) body.size(), etag.c_str());
   return true;
+}
+
+// ---- Boot guard (ADR-0013) ----
+
+void EsphelmRuntime::check_boot_record_(const std::string &cached_etag) {
+  StoredLayout rec;
+  if (!this->store_.load(Slot::BOOT, rec))
+    return;
+  const unsigned attempts = std::strtoul(rec.body.c_str(), nullptr, 10);
+  const size_t nl = rec.body.find('\n');
+  if (nl != std::string::npos)
+    this->bad_etag_ = rec.body.substr(nl + 1);
+  if (attempts == 0 || rec.etag.empty() || !crash_reset())
+    return;  // the last boot survived its layout, or ended by power cut / restart
+  // A fetched layout that crashed before it was cached, or a cached one that crashed repeatedly.
+  if (rec.etag != cached_etag || attempts >= MAX_BOOT_ATTEMPTS) {
+    ESP_LOGE(TAG, "Layout %s crashed the display (%u attempt%s); skipping it", rec.etag.c_str(), attempts,
+             attempts == 1 ? "" : "s");
+    this->bad_etag_ = rec.etag;
+    this->save_boot_record_();
+  } else {
+    ESP_LOGW(TAG, "The display crashed while showing layout %s; trying it once more", rec.etag.c_str());
+    this->boot_etag_ = rec.etag;
+    this->boot_attempts_ = attempts;
+  }
+}
+
+void EsphelmRuntime::save_boot_record_() {
+  this->store_.save(Slot::BOOT, {this->boot_etag_, std::to_string(this->boot_attempts_) + "\n" + this->bad_etag_});
+}
+
+void EsphelmRuntime::clean_exit() {
+  if (this->boot_attempts_ != 0) {
+    this->boot_attempts_ = 0;
+    this->save_boot_record_();
+  }
 }
 
 bool EsphelmRuntime::build_page_(size_t index) {

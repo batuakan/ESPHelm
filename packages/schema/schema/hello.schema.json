@@ -140,6 +140,19 @@
     "layoutEtag": {
       "type": "string",
       "description": "ETag of the cached layout, if any."
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "skippedLayoutEtag"
+      ],
+      "properties": {
+        "skippedLayoutEtag": {
+          "type": "string",
+          "description": "A layout that crashed the display while it was shown; the device refuses it until a different one is sent (ADR-0013)."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

@@ -75,6 +75,11 @@ export function DeviceList(props: {
               <span className="device-meta">
                 {d.hello.display.width}×{d.hello.display.height} · {d.state}
               </span>
+              {d.hello.recovery && (
+                <span className="device-warning">
+                  A layout crashed this display; it shows an older one until you send a changed layout
+                </span>
+              )}
             </button>
             {d.state === 'pending' && (
               <button className="small" onClick={() => props.onAdopt(d.id)}>

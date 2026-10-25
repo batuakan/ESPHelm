@@ -1,7 +1,8 @@
 #pragma once
 // esphelm_runtime: renders layouts served by the signalk-esphelm plugin (docs/firmware-runtime.md).
 //
-// Boot: show the cached layout (current, else last-known-good), else a status page.
+// Boot: show the cached layout (current, else last-known-good), else a status page; a layout
+// that crashed the display is skipped (boot guard, ADR-0013).
 // Online: hello -> learn state -> fetch the layout with If-None-Match when its version
 // (plugins.esphelm.<id>.version) differs -> validate -> render -> persist.
 // All LVGL work happens in loop(); HTTP runs on LayoutClient's worker.
@@ -46,6 +47,8 @@ class EsphelmRuntime : public Component {
   void show_page(size_t index);
   /// Act as if the tile with this id (and its button `part`, if any) was tapped (test hook).
   void tap(const std::string &tile_id, const std::string &part = "");
+  /// Host build: the process is exiting normally, so a pending boot attempt was no crash.
+  void clean_exit();
   void dump_config() override;
   // After LVGL (setup_priority::PROCESSOR) has created the display and our container.
   float get_setup_priority() const override { return setup_priority::PROCESSOR - 10; }
@@ -67,6 +70,8 @@ class EsphelmRuntime : public Component {
   void send_fetch_();
   std::string base_url_() const;
   void compute_capacity_();
+  void check_boot_record_(const std::string &cached_etag);
+  void save_boot_record_();
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
@@ -99,6 +104,12 @@ class EsphelmRuntime : public Component {
   std::string lkg_etag_;
   std::vector<uint32_t> listeners_;
   std::string status_key_;  // last status page shown, to avoid rebuilding it every loop
+
+  // Boot guard (ADR-0013): the layout being tried and how often it was shown when the display
+  // crashed; a layout that keeps crashing it is skipped (and refused when fetched) by its etag.
+  std::string boot_etag_;
+  unsigned boot_attempts_{0};
+  std::string bad_etag_;
 
   // Protocol state
   ServerState server_state_{ServerState::UNKNOWN};

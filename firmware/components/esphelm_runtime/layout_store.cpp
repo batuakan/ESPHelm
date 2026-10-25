@@ -20,7 +20,16 @@ static const char *const TAG = "esphelm.store";
 static const uint32_t MAGIC = 0x4C484845;  // "EHHL"
 static const size_t HEADER = 13;
 
-static const char *slot_key(Slot slot) { return slot == Slot::CURRENT ? "cur" : "lkg"; }
+static const char *slot_key(Slot slot) {
+  switch (slot) {
+    case Slot::CURRENT:
+      return "cur";
+    case Slot::LAST_KNOWN_GOOD:
+      return "lkg";
+    default:
+      return "boot";
+  }
+}
 
 static void put_u32(std::string &s, uint32_t v) {
   for (int i = 0; i < 4; i++)

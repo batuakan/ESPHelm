@@ -56,11 +56,15 @@ class Firmware {
 
   private runs = 0;
 
-  start(): void {
+  start(env: Record<string, string> = {}): void {
     if (this.out) writeFileSync(join(this.work, `firmware-${this.runs}.log`), this.log());
     this.runs++;
     this.out = '';
-    this.proc = spawn(this.program, [], { cwd: this.work, stdio: ['ignore', 'pipe', 'pipe'] });
+    this.proc = spawn(this.program, [], {
+      cwd: this.work,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
     this.proc.stdout?.on('data', (d: Buffer) => (this.out += d.toString()));
     this.proc.stderr?.on('data', (d: Buffer) => (this.out += d.toString()));
   }
@@ -103,6 +107,11 @@ class Firmware {
     writeFileSync(join(this.work, `firmware-${this.runs}.log`), this.log());
   }
 
+  /** Waits for the program to end by itself (e.g. the boot guard's test crash). */
+  async waitExit(ms = 15000): Promise<boolean> {
+    return waitFor(() => this.proc?.exitCode !== null || this.proc?.signalCode !== null, ms);
+  }
+
   async stop(): Promise<void> {
     if (!this.proc || this.proc.exitCode !== null) return;
     writeFileSync(join(this.work, 'esphelm_exit_request'), '');
@@ -137,6 +146,9 @@ async function main(): Promise<void> {
   const work720 = join(work, '720');
   mkdirSync(work720);
   const fw720 = new Firmware(work720, binary('esphelm-sdl-720'));
+  const workBoot = join(work, 'boot');
+  mkdirSync(workBoot);
+  const fwBoot = new Firmware(workBoot);
   try {
     sk = await startSignalK({
       port: PORT,
@@ -364,6 +376,56 @@ async function main(): Promise<void> {
       await fw.waitLog(/Showing fetched layout "multi-480" \(5 pages/, 15000, 2),
     );
 
+    // 8c. Boot guard (ADR-0013): a fetched layout that crashes the display while it is built
+    //     (ESPHELM_TEST_CRASH_ON aborts at that tile) is skipped after the crash, refused when
+    //     fetched again, and reported in the hello.
+    await fw.stop();
+    const crashEnv = { ESPHELM_TEST_CRASH_ON: 'crash-me' };
+    fw.start(crashEnv);
+    check(
+      'boot guard: restarted on the cached layout',
+      await fw.waitLog(/Showing cached layout "multi-480"/),
+    );
+    await fw.waitLog(/Sending hello/, 15000);
+    const crashing = fixture('valid/grid-2x2-values-480.json');
+    crashing.id = 'crashing';
+    const victim = crashing.pages[0]?.tiles[0];
+    if (victim) victim.id = 'crash-me';
+    await json('PUT', '/plugins/esphelm/api/layouts/crashing', admin, crashing);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'crashing' });
+    check(
+      'boot guard: the new layout crashes the display while it is built',
+      (await fw.waitExit(20000)) && fw.count(/crashing at tile crash-me/) === 1,
+    );
+    fw.start(crashEnv);
+    check(
+      'boot guard: after the crash the fetched layout is skipped, the cached one shown',
+      (await fw.waitLog(/crashed the display \(1 attempt\); skipping it/)) &&
+        (await fw.waitLog(/Showing cached layout "multi-480"/)),
+    );
+    check(
+      'boot guard: the layout is refused when fetched again (no second crash)',
+      (await fw.waitLog(/fetched layout .* skipped: it crashed the display before/, 20000)) &&
+        fw.count(/crashing at tile/) === 0,
+    );
+    const devices = (await json('GET', '/plugins/esphelm/api/devices', admin)).body as unknown as {
+      id: string;
+      hello: { recovery?: { skippedLayoutEtag: string } };
+    }[];
+    check(
+      'boot guard: the hello reports the skipped layout',
+      !!devices.find((d) => d.id === DEVICE_ID)?.hello.recovery?.skippedLayoutEtag,
+      JSON.stringify(devices.find((d) => d.id === DEVICE_ID)?.hello.recovery),
+    );
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
+    await fw.stop();
+    fw.start();
+    check(
+      'boot guard: back to the multi-page layout',
+      await fw.waitLog(/Showing cached layout "multi-480" \(5 pages/),
+    );
+    await sleep(1500);
+
     // 9. The autopilot (ADR-0011), against the autopilot stand-in in the harness.
     const pilot = (part: string) =>
       writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `pilot-ap ${part}`);
@@ -489,13 +551,46 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-03-helm-autopilot', shots);
+    await fw720.stop();
+
+    // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the
+    //     last known good one is shown, and it stays skipped after a normal restart.
+    const good = readFileSync(join(FIXTURES, 'valid/minimal.json'), 'utf8');
+    writeFileSync(
+      join(workBoot, 'esphelm_cur.bin'),
+      cacheRecord(JSON.stringify(crashing), '"bad"'),
+    );
+    writeFileSync(join(workBoot, 'esphelm_lkg.bin'), cacheRecord(good, '"good"'));
+    fwBoot.start(crashEnv);
+    check('boot guard: first boot crashes', await fwBoot.waitExit());
+    fwBoot.start(crashEnv);
+    check(
+      'boot guard: second boot tries the layout once more and crashes',
+      (await fwBoot.waitLog(/trying it once more/)) && (await fwBoot.waitExit()),
+    );
+    fwBoot.start(crashEnv);
+    check(
+      'boot guard: third boot skips it and shows the last known good layout',
+      (await fwBoot.waitLog(/crashed the display \(2 attempts\); skipping it/)) &&
+        (await fwBoot.waitLog(/Showing last known good layout/)) &&
+        fwBoot.count(/crashing at tile/) === 0,
+    );
+    await fwBoot.stop();
+    fwBoot.start();
+    check(
+      'boot guard: a normal restart keeps skipping it',
+      (await fwBoot.waitLog(/cached layout "bad" skipped/)) &&
+        (await fwBoot.waitLog(/Showing last known good layout/)),
+    );
   } finally {
     await fw.stop();
     await fw720.stop();
+    await fwBoot.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
       fw720.saveLog();
+      fwBoot.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
     } else {
       rmSync(work, { recursive: true, force: true });

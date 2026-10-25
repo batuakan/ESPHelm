@@ -50,6 +50,17 @@ export const Hello = Type.Object(
       { additionalProperties: false },
     ),
     layoutEtag: Type.Optional(Type.String({ description: 'ETag of the cached layout, if any.' })),
+    recovery: Type.Optional(
+      Type.Object(
+        {
+          skippedLayoutEtag: Type.String({
+            description:
+              'A layout that crashed the display while it was shown; the device refuses it until a different one is sent (ADR-0013).',
+          }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   {
     additionalProperties: false,

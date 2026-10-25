@@ -2,6 +2,8 @@
 
 #include "esphome/core/log.h"
 
+#include <cstdlib>
+
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
 #include <esp_heap_caps.h>
 #elif defined(__GLIBC__)
@@ -184,6 +186,14 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
       return false;
     }
     const esphelm::Tile &tile = page.tiles[i];
+#ifdef USE_HOST
+    // Test hook (SDL e2e of the boot guard): crash while building this tile, as a renderer bug would.
+    const char *crash_on = std::getenv("ESPHELM_TEST_CRASH_ON");
+    if (crash_on != nullptr && tile.id == crash_on) {
+      ESP_LOGE(TAG, "ESPHELM_TEST_CRASH_ON: crashing at tile %s", tile.id.c_str());
+      std::abort();
+    }
+#endif
     lv_obj_t *cell = lv_obj_create(area);
     lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, tile.x, tile.w, LV_GRID_ALIGN_STRETCH, tile.y, tile.h);
     widgets.push_back(make_tile_widget(cell, tile, env));
