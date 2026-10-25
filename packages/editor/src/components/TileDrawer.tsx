@@ -343,6 +343,10 @@ export const SLOT_TITLES: Record<SlotName, string> = {
   center1: 'Centre, top',
   center2: 'Centre, middle',
   center3: 'Centre, bottom',
+  topLeft: 'Top left corner',
+  topRight: 'Top right corner',
+  bottomLeft: 'Bottom left corner',
+  bottomRight: 'Bottom right corner',
 };
 
 const ROSE_PATHS: { key: 'apparentAngle' | 'trueDirection' | 'heading'; label: string }[] = [

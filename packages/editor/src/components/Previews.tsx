@@ -14,7 +14,7 @@ import {
   type Zone,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
-import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
@@ -248,6 +248,55 @@ export function WindRosePreview(props: {
       </g>
     );
   };
+  const slotButton = (slot: SlotName) => {
+    const item = tile.slots[slot];
+    const corner = CORNER_SLOTS.includes(slot);
+    if (corner && !item && props.selectedSlot !== slot) {
+      // Empty corners are only hinted, so a rose without corner values looks like the display.
+      return (
+        <button
+          key={slot}
+          className={`rose-slot corner corner-${slot} empty`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onSelectSlot?.(slot);
+          }}
+          aria-label={`Slot ${slot}`}
+          data-testid={`slot-${tile.id}-${slot}`}
+        >
+          <span className="slot-label">+</span>
+        </button>
+      );
+    }
+    return (
+      <button
+        key={slot}
+        className={`rose-slot ${corner ? `corner corner-${slot}` : ''} ${props.selectedSlot === slot ? 'selected' : ''} ${item ? '' : 'empty'}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onSelectSlot?.(slot);
+        }}
+        aria-label={`Slot ${slot}`}
+        data-testid={`slot-${tile.id}-${slot}`}
+      >
+        {item ? (
+          <>
+            <span className="slot-value">
+              {item.path ? formatValue(values.get(item.path), item.unit, item.decimals) : '--'}
+            </span>
+            <span className="slot-caption">
+              {[item.label, item.unit ? UNITS[item.unit].label : ''].filter(Boolean).join(' ') ||
+                'Pick a path'}
+            </span>
+          </>
+        ) : (
+          <span className="slot-label">+</span>
+        )}
+      </button>
+    );
+  };
   return (
     <span className={`tile-graphic rose rose-${tier}`} data-testid={`rose-${tile.id}`}>
       <svg viewBox="-100 -100 200 200" aria-hidden>
@@ -288,39 +337,11 @@ export function WindRosePreview(props: {
               {hdg === undefined ? '--' : Math.round(hdgDeg) % 360}°{suffix}
             </span>
           )}
-          {WIND_ROSE_SLOTS.map((slot) => {
-            const item = tile.slots[slot];
-            return (
-              <button
-                key={slot}
-                className={`rose-slot ${props.selectedSlot === slot ? 'selected' : ''} ${item ? '' : 'empty'}`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.onSelectSlot?.(slot);
-                }}
-                aria-label={`Slot ${slot}`}
-                data-testid={`slot-${tile.id}-${slot}`}
-              >
-                {item ? (
-                  <>
-                    <span className="slot-value">
-                      {item.path ? formatValue(values.get(item.path), item.unit, item.decimals) : '--'}
-                    </span>
-                    <span className="slot-caption">
-                      {[item.label, item.unit ? UNITS[item.unit].label : '']
-                        .filter(Boolean)
-                        .join(' ') || 'Pick a path'}
-                    </span>
-                  </>
-                ) : (
-                  <span className="slot-label">+</span>
-                )}
-              </button>
-            );
-          })}
+          {CENTER_SLOTS.map(slotButton)}
         </span>
       )}
+      {/* Corners: shown on the display when they fit outside the ring (full tier only). */}
+      {full && CORNER_SLOTS.map(slotButton)}
     </span>
   );
 }

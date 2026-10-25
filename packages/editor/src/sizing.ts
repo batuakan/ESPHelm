@@ -43,7 +43,7 @@ export function roseTier(px: number): RoseTier {
 }
 
 export const ROSE_TIER_TEXT: Record<RoseTier, string> = {
-  full: 'full: tick labels, heading and the centre values',
+  full: 'full: compass card, heading, centre values, and corner values where they fit',
   compact: 'compact: no tick labels or heading; as many centre values as fit',
   pointers: 'pointers only; too small for centre values',
 };

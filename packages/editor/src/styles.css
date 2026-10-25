@@ -301,24 +301,25 @@ select {
 /* The preview follows the layout's display theme (esphelm_runtime colors_for), whatever the
    editor's own theme is. */
 .display-frame[data-theme-preview='day'] {
-  --tile-bg: #1e2a36;
-  --tile-text: #f2f5f8;
-  --tile-muted: #7a8794;
-  --canvas-bg: #10161c;
-  --zone-normal: #3dbb74;
-  --zone-warn: #f0b04a;
-  --zone-alarm: #e5484d;
-  --zone-emergency: #d34dd9;
-  --tile-accent: #4a9eff;
-  --tile-second: #f2c14e;
+  /* light, for sunlight */
+  --tile-bg: #e6eaee;
+  --tile-text: #111820;
+  --tile-muted: #5d6b78;
+  --canvas-bg: #ffffff;
+  --zone-normal: #1d8a4f;
+  --zone-warn: #c77700;
+  --zone-alarm: #d32f2f;
+  --zone-emergency: #9c27b0;
+  --tile-accent: #0a6cd6;
+  --tile-second: #b07800;
   /* wind rose, the legacy wind page's colours */
   --rose-port: #ff0000;
-  --rose-stbd: #00ff00;
+  --rose-stbd: #00c800;
   --rose-apparent: #ff8000;
   --rose-true: #a020f0;
-  --rose-ring: #aaaaaa;
+  --rose-ring: #555555;
   --rose-card: #2e2e2e;
-  --rose-card-text: #f2f5f8;
+  --rose-card-text: #ffffff;
 }
 .display-frame[data-theme-preview='night'] {
   --tile-bg: #140404;
@@ -841,6 +842,40 @@ select.zone-emergency {
 .rose-slot:hover,
 .rose-slot.empty {
   border-color: var(--tile-muted);
+}
+.rose-slot.corner {
+  position: absolute;
+  min-width: 0;
+  padding: 0 4px;
+}
+.rose-slot.corner .slot-value {
+  font-size: 7cqmin;
+}
+.rose-slot.corner .slot-caption {
+  font-size: max(8px, 3.6cqmin);
+}
+.corner-topLeft {
+  top: 0;
+  left: 0;
+  align-items: flex-start;
+}
+.corner-topRight {
+  top: 0;
+  right: 0;
+  align-items: flex-end;
+}
+.corner-bottomLeft {
+  bottom: 0;
+  left: 0;
+  align-items: flex-start;
+}
+.corner-bottomRight {
+  bottom: 0;
+  right: 0;
+  align-items: flex-end;
+}
+.rose-slot.corner.empty {
+  opacity: 0.35;
 }
 .rose-slot.selected {
   border: 2px solid var(--accent);

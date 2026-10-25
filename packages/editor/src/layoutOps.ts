@@ -27,7 +27,16 @@ export interface DeviceRef {
 }
 
 export type SlotName = keyof WindRoseTile['slots'];
-export const WIND_ROSE_SLOTS: readonly SlotName[] = ['center1', 'center2', 'center3'];
+/** Centre stack, top to bottom. */
+export const CENTER_SLOTS: readonly SlotName[] = ['center1', 'center2', 'center3'];
+/** Tile corners, outside the ring. */
+export const CORNER_SLOTS: readonly SlotName[] = [
+  'topLeft',
+  'topRight',
+  'bottomLeft',
+  'bottomRight',
+];
+export const WIND_ROSE_SLOTS: readonly SlotName[] = [...CENTER_SLOTS, ...CORNER_SLOTS];
 
 /** Layout id for a display's own layout (one layout per display). */
 export function layoutIdFor(deviceId: string): string {

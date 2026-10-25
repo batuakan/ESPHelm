@@ -204,6 +204,33 @@ describe('editor', () => {
     });
   });
 
+  it('sets a corner value on a wind rose', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wind rose page' }));
+    fireEvent.click(screen.getByTestId('tile-wind-1-rose'));
+    fireEvent.click(screen.getByTestId('slot-wind-1-rose-topLeft'));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    const section = within(drawer).getByTestId('slot-section-topLeft');
+    expect((section as HTMLDetailsElement).open).toBe(true);
+    expect(section.textContent).toMatch(/Top left corner/);
+    fireEvent.change(within(section).getByLabelText('Search SignalK paths'), { target: { value: 'depth' } });
+    fireEvent.click(within(section).getByRole('option', { name: /belowTransducer/ }));
+    live.emit('environment.depth.belowTransducer', 7.44);
+    within(screen.getByTestId('slot-wind-1-rose-topLeft')).getByText('7.4');
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[1]!.tiles[0]).toMatchObject({
+      slots: { topLeft: { path: 'environment.depth.belowTransducer', unit: 'm' } },
+    });
+  });
+
   it('adds a wind rose tile next to other tiles and warns when it is small', async () => {
     const server = fakeServer([device('adopted')]);
     render(<App api={server.api} live={fakeLive().factory} />);
