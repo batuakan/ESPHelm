@@ -14,11 +14,12 @@ Regenerate after any change with `npm run generate`. `npm test` fails while gene
 
 ## 1. Versioning and compatibility
 - `version` is the **major** version (`1`). A device rejects any layout whose major it doesn't support (`hello.schema.major`), keeps its last-known-good layout, and logs `UNSUPPORTED_VERSION`.
-- Within a major, changes are **additive only**: new optional fields, new tile types, new full-page widgets.
+- Within a major, changes are **additive only**: new optional fields, new tile types, new page kinds.
+  - One exception, approved before any release: Phase 5b removed the `kind: "widget"` wind-rose page in favour of the `wind_rose` tile (ADR-0010). The plugin migrates stored layouts on load (`migrateLayout`); the validator rejects the old shape with `UNKNOWN_PAGE_KIND`.
   - The plugin and editor validate strictly (`additionalProperties: false`).
   - **Firmware ignores unknown fields** but validates every field it knows. That lets older firmware accept a layout written for newer firmware of the same major. Verified by `firmware/test/parser.cpp.test.ts`: the C++ parser reports exactly the TS codes and pointers on every fixture and extra mutations, except `UNKNOWN_FIELD`.
-  - Slot names are part of a widget's contract, so an unknown slot is still `UNKNOWN_SLOT` on the device.
-  - The plugin doesn't send a device a tile type or widget it didn't list in `hello.widgets`.
+  - Slot names are part of a tile type's contract, so an unknown slot is still `UNKNOWN_SLOT` on the device.
+  - The plugin doesn't send a device a tile type it didn't list in `hello.widgets`.
 - Removing or changing the meaning of a field requires a new major (CLAUDE.md golden rule 7: ask first).
 
 ## 2. Structure
@@ -31,18 +32,17 @@ Layout
 ├─ theme: "day" | "night"
 └─ pages: Page[]            (at least 1)
 
-Page = GridPage | WidgetPage          (discriminator: kind)
+Page = GridPage                       (discriminator: kind; the only kind in v1)
 
 GridPage                              kind: "grid"
 ├─ id: Id, title?: Label
 ├─ grid: { cols ≥ 1, rows ≥ 1 }
 └─ tiles: Tile[]            (at least 1)
 
-WidgetPage                            kind: "widget", discriminator: widget
-└─ wind_rose: { id, title?, config?, slots }
-
-Tile = value | gauge | bar | switch   (discriminator: type)
+Tile = value | gauge | bar | switch | wind_rose   (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
+
+A full-screen wind rose is a 1x1 grid page with one wind_rose tile.
 ```
 
 ### Primitives
@@ -58,7 +58,7 @@ Tile = value | gauge | bar | switch   (discriminator: type)
 There are **no size or count limits** in the v1 schema (no max pages, tiles, string length). Each device protects itself with memory-derived capacity guards and reports its capacity in `hello.capacity` (§5). The editor uses that to warn before sending a layout that won't fit.
 
 ### DataItem
-A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and by full-page widget slots.
+A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and by wind rose slots.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -76,17 +76,28 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `gauge` | DataItem + `min`, `max`, `zones?` | round gauge with needle |
 | `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
+| `wind_rose` | `config?`, `slots` | see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
-### Full-page widgets
-A full-page widget draws a fixed design and exposes **named slots at predetermined positions**. Each slot shows a DataItem you choose. Slots are optional; an empty slot shows nothing.
+### Wind rose tiles
+A `wind_rose` tile draws a fixed design and exposes **named slots at predetermined positions**. Each slot shows a DataItem you choose. Slots are optional; an empty slot shows nothing. It can sit next to other tiles and several can share a page.
 
-| `widget` | Slots | `config` (all optional) |
+| Slots | `config` (all optional) |
+|---|---|
+| `center1`, `center2`, `center3` (stacked in the centre of the rose) | `apparentAngle` (default `environment.wind.angleApparent`), `trueDirection` (default `environment.wind.directionTrue`), `heading` (default `navigation.headingTrue`), `showTrueWind` (default `true`) |
+
+An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_DEFAULTS`, slot names as `TILE_SLOTS.wind_rose`.
+
+**Size is the device's business.** The layout has no minimum span, because cell size depends on the grid and the screen. The device measures the cell it got (shorter side, in pixels) and draws one of three tiers, `WIND_ROSE_FIT` (generated into the firmware's `esphelm_sizes.h`):
+
+| Tier | Shorter side | Drawn |
 |---|---|---|
-| `wind_rose` | `center1`, `center2`, `center3` (stacked in the centre of the rose) | `apparentAngle` (default `environment.wind.angleApparent`), `trueDirection` (default `environment.wind.directionTrue`), `heading` (default `navigation.headingTrue`), `showTrueWind` (default `true`) |
+| full | ≥ 260 px | tick labels, heading, centre slots (values in the small font if all three don't fit otherwise) |
+| compact | ≥ 150 px | ring, sectors, pointers, as many slots as fit |
+| pointers | < 150 px | ring, sectors and pointers only |
 
-An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_DEFAULTS`. The `wind_rose` renderer lands in Phase 5; until then, firmware that can't render it doesn't list it in `hello.widgets`.
+The editor shows the expected tier for the selected display.
 
 ## 3. Validation and error codes
 `validateLayout(input)` returns `{ ok, value?, errors[] }`, with each error `{ pointer, code, message }`. `pointer` is an RFC 6901 JSON Pointer into the input. It works in two stages, and the **firmware mirrors both and logs the same codes**:
@@ -108,8 +119,8 @@ An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_D
 | `EMPTY_PAGE` | structure | grid page without tiles |
 | `INVALID_ID` / `INVALID_LABEL` / `INVALID_PATH` | structure | primitive rule failed (§2) |
 | `UNKNOWN_UNIT` | structure | unit not in `units.json` |
-| `UNKNOWN_PAGE_KIND` / `UNKNOWN_WIDGET` / `UNKNOWN_TILE_TYPE` | structure | discriminator not in the catalog |
-| `UNKNOWN_SLOT` | structure | slot name not defined by the widget |
+| `UNKNOWN_PAGE_KIND` / `UNKNOWN_TILE_TYPE` | structure | discriminator not in the catalog (`kind: "widget"` included, ADR-0010) |
+| `UNKNOWN_SLOT` | structure | slot name not defined by the tile type |
 | `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use) |
 | `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
 | `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
@@ -170,7 +181,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `schema.major` | highest layout major the firmware parses |
 | `board` | board/model name |
 | `display` | `width`, `height` (px), `rotation` (0/90/180/270) |
-| `widgets` | tile types and full-page widgets this firmware renders |
+| `widgets` | tile types this firmware renders |
 | `fonts?` | semantic font sizes available |
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
 | `capabilities` | `touch`, `put` (the token allows PUT) |
@@ -181,7 +192,11 @@ See `packages/schema/fixtures/valid/`:
 - `minimal.json`: one tile.
 - `grid-2x2-values-480.json`: four speeds on a 480² screen.
 - `mixed-720.json`: gauge, bar, value and switch, with multi-cell tiles.
-- `three-pages-wind-rose.json`: wind rose with three slots, a grid page, and a wind rose with empty slots.
+- `three-pages-wind-rose.json`: a full-screen wind rose with three slots, a grid page, and a rose with empty slots.
 - `legacy-port.json`: today's wind, grid, energy and engine apps, using their real SignalK paths.
+- `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.
+- `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
+
+Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
 
 The invalid examples in `fixtures/invalid/` each break one rule and list the expected `{ code, pointer }`.

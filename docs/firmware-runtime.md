@@ -2,7 +2,7 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
-**Scope (Phase 5a):** every page of the layout, with `value`, `gauge`, `bar` and `switch` tiles and the `wind_rose` page. `hello.widgets` lists exactly these, so the plugin warns before assigning a layout that needs anything else (autopilot and chart/anchor come in Phases 5b/5c).
+**Scope (Phase 5b):** every page of the layout, with `value`, `gauge`, `bar`, `switch` and `wind_rose` tiles. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else (the autopilot tile and chart/anchor come in Phases 5c/5d).
 
 ## Configuration
 
@@ -40,6 +40,7 @@ Ready-made configs:
 | File | Target | Status |
 |---|---|---|
 | `firmware/esphelm_sdl.yaml` | desktop, 480×480 | compile, run, e2e test |
+| `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, offline render check in the e2e test |
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
@@ -65,7 +66,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 4. If the plugin answers that the device is pending or has no layout, the screen clears.
 5. If the plugin is unreachable, the cached layout stays up.
 
-**Subscriptions** are derived from the **visible page** (one listener per unique path of its tiles, or of the wind rose's sources and slots), plus the layout version path. ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values. So a page shows the latest values as soon as it is opened.
+**Subscriptions** are derived from the **visible page** (one listener per unique path of its tiles, including each wind rose's sources and slots), plus the layout version path. ESPHomeSignalK batches changes: additions are an incremental subscribe; a removal is unsubscribe-all followed by a full resubscribe, and the server replays cached values. So a page shows the latest values as soon as it is opened.
 
 ## Pages and the footer (ADR-0009)
 - **Only the visible page exists.** Changing page deletes its LVGL objects and widgets and builds the next one, so memory stays at one page's worth (matters on C3/C6 without PSRAM).
@@ -79,10 +80,17 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 | Widget | Drawn with | Notes |
 |---|---|---|
 | `value` | labels | as before |
-| `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; tick labels are hidden below 160 px |
+| `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; below 240 px the value uses the small font, below 160 px tick labels and the unit are dropped |
 | `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value |
 | `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
-| `wind_rose` page | `lv_scale` 0–360 (bow at top), close-hauled sectors 20–60°, pointer lines | apparent wind pointer from `apparentAngle`; true wind pointer from `trueDirection − heading` when `showTrueWind`; "HDG x°"; slots `center1..3` stacked in the middle. Pointers cover the outer third of the radius so the slots stay readable |
+| `wind_rose` | `lv_scale` 0–360 (bow at top), close-hauled sectors 20–60°, pointer lines | apparent wind pointer from `apparentAngle`; true wind pointer from `trueDirection − heading` when `showTrueWind`; "HDG x°"; slots `center1..3` stacked in the middle. Pointers cover the outer third of the radius so the slots stay readable. Size tiers below |
+
+**Wind rose size tiers** (`esphelm_sizes.h`, generated from `WIND_ROSE_FIT` in `packages/schema`, ADR-0010). The rose measures the shorter side of its cell after layout:
+- **full** (≥ 260 px): tick labels every 30°, heading, slots. Slot values use the label font if all slots fit that way, else the small font.
+- **compact** (≥ 150 px): ticks every 30° without labels, no heading, thinner sectors; as many slots as fit (small font if needed).
+- **pointers** (< 150 px): ring, sectors and pointers only.
+
+Pointer and sector widths scale with the rose. Zone styles are kept per (state, arc width), so a gauge and a rose on the same page keep their own arc widths.
 
 The PUT goes through ESPHomeSignalK `put_request`; signalk-server answers it only if a provider handles that path (e.g. a digital-switching plugin). The firmware does not read the PUT response, it trusts the value stream.
 
@@ -121,13 +129,13 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `value` tile (LVGL objects) | **≈1.8–2.0 KB** on the 64-bit host build (24 tiles = 49,136 B; 4 tiles = 7,136 B). |
 | `switch` tile | ≈2.6 KB (8 tiles = 20,992 B) |
 | `gauge`, `bar` tiles | ≈2–2.7 KB each (energy page: gauge + bar + value = 6,416 B; engine page: 2 gauges + bar = 6,544 B) |
-| `wind_rose` page | 4,720 B |
+| `wind_rose` tile | ≈4.5–6.5 KB (full screen at 480: 6,576 B; 720 page with a 2x2 rose and five tiles: 18,288 B) |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
+| Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
+| P4 runtime firmware, static | RAM 94,156 B (16.3 %), flash 2.64 MB (16.0 %) |
+| C3 compile check, static | RAM 108,200 B of 321,296 B (33.7 %), flash 1.21 MB of 1.8 MB (65.9 %) |
 
-All figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
-| Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies |
-| P4 runtime firmware, static | RAM 93,708 B (16.3 %), flash 2.64 MB (16.0 %) |
-| C3 compile check, static | RAM 107,760 B of 321,296 B (33.5 %), flash 1.21 MB of 1.8 MB (65.9 %) |
+Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
 The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't been measured, because there's no C3 hardware yet.
 
@@ -141,12 +149,13 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   5. an edit is picked up via the version delta
   6. unsubscribe-all + resubscribe happens on the same socket
   7. stale values after the server stops
-  8. a three-page layout (`fixtures/valid/multi-page-widgets-480.json`: value, gauge, bar, wind rose, vertical bar, switch) renders with the footer; every page is shown through the page hook with live values
+  8. a four-page layout (`fixtures/valid/multi-page-widgets-480.json`: value, gauge, bar, a full-screen rose, vertical bar, switch, and a Helm page with a 2x2 and a 1x1 rose next to engine tiles) renders with the footer; every page is shown through the page hook with live values
   9. tapping the switch (tap hook) sends a PUT, which a PUT-echo test plugin (`startSignalK({ putEcho })`) answers with a delta; the server has the new value and the switch follows
   10. stale values after the server stops
   11. the cached multi-page layout appears on a reboot without a server
+  12. the 720×720 build (`esphelm_sdl_720.yaml`) starts offline from a seeded cache record (`firmware/test/cache_record.ts`) and renders `fixtures/valid/rose-and-engine-720.json`
 
-  Ten screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Thirteen screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -157,5 +166,5 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
 5. Power-cycle the display with the server still unreachable. The same layout comes back immediately.
 6. Watch the log for `Page n/m "…": k widgets, N bytes of LVGL objects`; that's the real per-page memory on the P4.
 7. Assign `packages/schema/fixtures/valid/multi-page-widgets-480.json` (or a template from the editor). The footer is at the bottom; `<` and `>` change pages, and are greyed out at the ends. Check that the buttons are easy to hit with a finger.
-8. Gauges, bars and the wind rose look right at 720×720 (label sizes, needle length, sectors at ±20–60°).
+8. Gauges, bars and the wind rose look right at 720×720 (label sizes, needle length, sectors at ±20–60°). Assign the *Sailing (large display)* template from the editor: a 3x3 rose next to SOG/STW/depth with engine tiles below. All three centre values should be readable at a glance.
 9. A switch tile on a path with a real PUT handler toggles the device; on a path without one it reverts after 5 s with `!`.

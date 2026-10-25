@@ -1,6 +1,6 @@
 # ADR-0005: Page model: grid pages plus full-page widgets with slots
 
-Status: **Accepted** (Phase 1, 2026-10-24)
+Status: **Accepted** (Phase 1, 2026-10-24). The full-page widget part is **superseded by ADR-0010** (Phase 5b): the wind rose is now a tile, and `kind: "widget"` pages are gone.
 
 ## Context
 Today's apps fall into two kinds:

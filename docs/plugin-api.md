@@ -4,7 +4,7 @@ Package `packages/plugin` (npm name `signalk-esphelm`, plugin id `esphelm`). Dat
 
 | File | Content |
 |---|---|
-| `layouts/<layoutId>.json` | one layout, validated with `validateLayout` on save **and** on load. Invalid files are reported in the plugin status and never served. |
+| `layouts/<layoutId>.json` | one layout, validated with `validateLayout` on save **and** on load. Invalid files are reported in the plugin status and never served. A file with the pre-5b wind-rose page kind is migrated on load (`migrateLayout`: a 1x1 grid page with a `wind_rose` tile) and rewritten once. |
 | `devices.json` | device registry: `{ [deviceId]: { id, state: "pending" \| "adopted", name?, layoutId?, hello, firstSeen, lastSeen } }` |
 
 Writes are atomic (temp file + rename).
@@ -66,7 +66,7 @@ The device subscribes to that path over its existing SignalK WebSocket. The serv
 
 | Method and path | Body | Result |
 |---|---|---|
-| `GET /plugins/esphelm/api/widgets` | | `{ tiles, pageWidgets: { name: { slots } }, units, quantities }` |
+| `GET /plugins/esphelm/api/widgets` | | `{ tiles, tileSlots: { wind_rose: [slot names] }, units, quantities }` |
 | `GET /plugins/esphelm/api/paths` | | `[{ path, units, description, value, timestamp }]`: the server's self paths (`streambundle.getAvailablePaths()`), SignalK `meta.units`/description (`getMetadata`), and the latest value (`getSelfPath`), for the editor's path picker |
 | `GET /plugins/esphelm/api/layouts` | | `[{ id, name, pages, bytes, etag, devices }]` |
 | `GET /plugins/esphelm/api/layouts/:id` | | the layout (`ETag` header) |
@@ -81,7 +81,7 @@ The device subscribes to that path over its existing SignalK WebSocket. The serv
 | Check | Result |
 |---|---|
 | layout major above `schema.major` | `UNSUPPORTED_SCHEMA`, refused (409) |
-| layout uses a tile or full-page widget the device doesn't list in `widgets` | `UNSUPPORTED_WIDGET`, refused (409) |
+| layout uses a tile type the device doesn't list in `widgets` | `UNSUPPORTED_WIDGET`, refused (409) |
 | layout bytes above `capacity.maxLayoutBytes` | `LAYOUT_TOO_LARGE`, a **warning** only (no hard limits in v1) |
 
 ## Editor webapp
