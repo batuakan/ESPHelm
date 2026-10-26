@@ -93,8 +93,10 @@ function SwitchPreview({ value }: { value: unknown }) {
   const known = typeof value === 'boolean';
   return (
     <span className="tile-graphic switch">
-      <span className={`toggle ${value === true ? 'on' : ''}`} />
-      <span className="switch-state">{known ? (value ? 'on' : 'off') : '--'}</span>
+      <span className="switch-box">
+        <span className={`toggle ${value === true ? 'on' : ''}`} />
+        <span className="switch-state">{known ? (value ? 'on' : 'off') : '--'}</span>
+      </span>
     </span>
   );
 }

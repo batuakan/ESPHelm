@@ -427,25 +427,55 @@ class SwitchWidget : public Widget {
  public:
   SwitchWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
       : id_(tile.id), path_(tile.data.path), colors_(env.colors), put_(env.put), cell_(cell) {
-    lv_obj_t *caption = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
-    lv_obj_align(caption, LV_ALIGN_TOP_LEFT, 0, 0);
+    caption_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
+    lv_label_set_long_mode(caption_, LV_LABEL_LONG_MODE_DOTS);
     sw_ = lv_switch_create(cell);
     lv_obj_set_style_bg_color(sw_, env.colors.background, LV_PART_MAIN);
     lv_obj_set_style_bg_color(sw_, env.colors.accent, static_cast<lv_style_selector_t>(LV_PART_INDICATOR) | LV_STATE_CHECKED);
+    // Theme-coloured knob (LVGL's default is white: invisible on a day track, glaring at night).
+    lv_obj_set_style_bg_color(sw_, env.colors.text, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(sw_, env.colors.tile, static_cast<lv_style_selector_t>(LV_PART_KNOB) | LV_STATE_CHECKED);
     lv_obj_add_event_cb(
         sw_, [](lv_event_t *e) { static_cast<SwitchWidget *>(lv_event_get_user_data(e))->toggled_(); },
         LV_EVENT_VALUE_CHANGED, this);
     state_ = make_label(cell, env.fonts.small, env.colors.muted, "--");
-    lv_obj_align(state_, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   }
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override { out.push_back(path_); }
   void layout_done() override {
-    // Keep the track twice as wide as high, whatever the cell's shape.
-    const int32_t w = lv_obj_get_content_width(cell_) * 7 / 10;
-    const int32_t h = std::min(w / 2, lv_obj_get_content_height(cell_) * 4 / 10);
-    lv_obj_set_size(sw_, h * 2, h);
-    lv_obj_align(sw_, LV_ALIGN_CENTER, 0, 6);
+    // The track is twice as wide as high. Three arrangements; the one with the largest track wins:
+    //  - stacked: caption above, state below, the track between them (squarish cells)
+    //  - side: caption and state on the left, the track on the right (wide, short cells)
+    //  - split: caption across the top, state and track below it (narrow, short cells)
+    const int32_t w = lv_obj_get_content_width(cell_);
+    const int32_t h = lv_obj_get_content_height(cell_);
+    const int32_t line = lv_font_get_line_height(lv_obj_get_style_text_font(caption_, LV_PART_MAIN));
+    const int32_t stacked = std::min(w * 7 / 20, h - 2 * line - 8);
+    const int32_t side = std::min(h * 8 / 10, (w - 4 * line - 8) / 2);  // leaves the text 4 lines' width
+    const int32_t split = std::min(h - line - 6, (w - 2 * line - 8) / 2);
+    lv_obj_set_height(caption_, line);  // one line, cut with dots
+    if (side > stacked * 5 / 4 && side >= split) {
+      const int32_t t = std::max<int32_t>(8, side);
+      lv_obj_set_size(sw_, t * 2, t);
+      lv_obj_align(sw_, LV_ALIGN_RIGHT_MID, 0, 0);
+      lv_obj_set_width(caption_, std::max<int32_t>(0, w - t * 2 - 8));
+      lv_obj_align(caption_, LV_ALIGN_LEFT_MID, 0, -(line / 2 + 2));
+      lv_obj_align(state_, LV_ALIGN_LEFT_MID, 0, line / 2 + 2);
+    } else if (split > stacked * 5 / 4) {
+      const int32_t t = std::max<int32_t>(8, split);
+      lv_obj_set_size(sw_, t * 2, t);
+      lv_obj_align(sw_, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+      lv_obj_set_width(caption_, w);
+      lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
+      lv_obj_align(state_, LV_ALIGN_BOTTOM_LEFT, 0, -(t - line) / 2);
+    } else {
+      const int32_t t = std::max<int32_t>(8, stacked);
+      lv_obj_set_size(sw_, t * 2, t);
+      lv_obj_align(sw_, LV_ALIGN_CENTER, 0, 0);
+      lv_obj_set_width(caption_, w);
+      lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
+      lv_obj_align(state_, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    }
   }
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
     if (path != path_ || !v.is<bool>())
@@ -504,6 +534,7 @@ class SwitchWidget : public Widget {
   Colors colors_;
   std::function<void(const std::string &, const PutValue &)> put_;
   lv_obj_t *cell_;
+  lv_obj_t *caption_;
   lv_obj_t *sw_;
   lv_obj_t *state_;
   bool known_{false}, on_{false}, pending_{false}, pending_value_{false}, failed_{false}, dirty_{true};

@@ -731,32 +731,55 @@ select.zone-emergency {
   font-variant-numeric: tabular-nums;
 }
 .tile-graphic.switch {
+  container-type: size; /* the toggle scales with the tile, as on the display */
+  width: 100%;
+  height: 100%;
+}
+.switch-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 .toggle {
-  width: 56px;
-  height: 28px;
-  border-radius: 14px;
+  --toggle-h: max(12px, min(35cqw, 100cqh - 24px));
+  height: var(--toggle-h);
+  width: calc(var(--toggle-h) * 2);
+  border-radius: calc(var(--toggle-h) / 2);
   background: var(--canvas-bg);
   position: relative;
+  flex: none;
+}
+/* Wide, short tiles: the state beside the toggle, which then takes most of the height. */
+@container (min-aspect-ratio: 3/1) {
+  .switch-box {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+  }
+  .toggle {
+    --toggle-h: max(12px, min(80cqh, 22cqw));
+  }
 }
 .toggle::after {
   content: '';
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 22px;
-  height: 22px;
+  height: calc(100% - 6px);
+  aspect-ratio: 1;
   border-radius: 50%;
   background: var(--tile-text);
-  transition: left 0.15s;
 }
 .toggle.on {
   background: var(--tile-accent);
 }
 .toggle.on::after {
-  left: 31px;
+  left: auto;
+  right: 3px;
+  background: var(--tile-bg);
 }
 .switch-state {
   font-size: 13px;
