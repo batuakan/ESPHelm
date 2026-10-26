@@ -458,6 +458,42 @@ async function main(): Promise<void> {
       JSON.stringify(withSettings.body.settings),
     );
 
+    // A position tile on a new page, in degrees, minutes and seconds.
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page' }).click();
+    await page.getByRole('button', { name: /^Position/ }).click();
+    const posDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await posDrawer.getByLabel('Degrees, minutes and seconds').check();
+    await page.waitForTimeout(1500); // the sample data's position arrives
+    await shot(page, '10-desktop-position-tile');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withPosition = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const positionTile = (
+      withPosition.body.pages as { tiles?: { type: string; format?: string }[] }[]
+    )
+      .flatMap((p) => p.tiles ?? [])
+      .find((t) => t.type === 'position');
+    check(
+      'the display gets the position tile in DMS',
+      positionTile?.format === 'dms',
+      JSON.stringify(positionTile),
+    );
+    const posText = await page
+      .getByTestId(/^position-/)
+      .first()
+      .textContent();
+    check(
+      'the preview shows the live position in DMS',
+      /\d+° \d\d' \d\d\.\d" [NS]/.test(posText ?? ''),
+      String(posText),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

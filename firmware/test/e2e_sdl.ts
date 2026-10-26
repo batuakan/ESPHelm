@@ -626,6 +626,22 @@ async function main(): Promise<void> {
     );
     writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
     check('settings: a touch switches it on', await fw.waitLog(/Screen on \(touch\)/));
+
+    // 9d. Position tiles: the four text formats of one live position (two wide tiles, two
+    //     single cells that fall back to a smaller font), then a value that isn't a position.
+    const position = fixture('valid/position.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/position', admin, position);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'position' });
+    check(
+      'position: the layout with four position tiles renders',
+      await fw.waitLog(/Showing fetched layout "position" \(1 pages/),
+    );
+    publish({ 'navigation.position': { latitude: -33.858131, longitude: 151.214512 } });
+    await sleep(1500);
+    await fw.screenshot('28-position-formats', shots);
+    publish({ 'navigation.position': { latitude: 'here', longitude: 151.2 } });
+    await sleep(1200);
+    await fw.screenshot('29-position-not-a-position', shots);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'settings: back to the multi-page layout (no settings: its first page, never off)',
@@ -639,7 +655,7 @@ async function main(): Promise<void> {
     //     every button disabled.
     await sk.stop();
     sk = undefined;
-    await sleep(7500); // > staleAfter (6 s) since the last value
+    await sleep(16000); // > every staleAfter (6 s on tiles, the 15 s default on the autopilot)
     await fw.screenshot('14-stale-offline', shots);
     pilot('standby');
     check(
