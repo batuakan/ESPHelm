@@ -63,6 +63,7 @@ void EsphelmRuntime::setup() {
   this->compute_capacity_();
   this->renderer_.set_fonts(this->fonts_);
   this->renderer_.set_navigation([this](int step) { this->pending_step_ += step; });
+  this->renderer_.set_theme_toggle([this]() { this->theme_toggle_wanted_ = true; });
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
@@ -164,6 +165,10 @@ void EsphelmRuntime::loop() {
   }
 
   if (this->has_layout_) {
+    if (this->theme_toggle_wanted_) {
+      this->theme_toggle_wanted_ = false;
+      this->toggle_theme_();
+    }
     if (this->pending_step_ != 0) {
       const int target = static_cast<int>(this->page_) + this->pending_step_;
       this->pending_step_ = 0;
@@ -382,7 +387,10 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
     }
   }
   this->layout_ = std::move(parsed.layout);
-  // The theme the page is built with: the layout's, or night by environment.sun (autoTheme).
+  // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
+  // or what was chosen on the display, unless this layout brings another theme.
+  if (this->layout_.theme != this->base_theme_)
+    this->manual_theme_ = -1;
   this->base_theme_ = this->layout_.theme;
   if (this->layout_.settings.auto_theme_path != this->sun_path_)
     this->sun_night_ = -1;  // a different source: unknown until its value arrives
@@ -430,6 +438,8 @@ bool EsphelmRuntime::has_backlight_() const {
 }
 
 esphelm::Theme EsphelmRuntime::effective_theme_() const {
+  if (this->manual_theme_ >= 0)
+    return static_cast<esphelm::Theme>(this->manual_theme_);
   if (this->layout_.settings.auto_theme == esphelm::AutoTheme::SUN && this->sun_night_ == 1)
     return esphelm::Theme::NIGHT;
   return this->base_theme_;
@@ -458,6 +468,10 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
   if (night == this->sun_night_)
     return;
   this->sun_night_ = night;
+  if (this->manual_theme_ >= 0) {
+    ESP_LOGI(TAG, "Sun: %s, back to the automatic theme", sun);
+    this->manual_theme_ = -1;
+  }
   if (!this->has_layout_)
     return;
   const esphelm::Theme theme = this->effective_theme_();
@@ -467,6 +481,17 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
   this->layout_.theme = theme;
   this->theme_ = theme;
   this->build_page_(this->page_);  // a theme change rebuilds the page (twice a day)
+  this->apply_brightness_();
+}
+
+void EsphelmRuntime::toggle_theme_() {
+  const esphelm::Theme theme =
+      this->layout_.theme == esphelm::Theme::NIGHT ? esphelm::Theme::DAY : esphelm::Theme::NIGHT;
+  ESP_LOGI(TAG, "Theme switched on the display: %s", theme == esphelm::Theme::NIGHT ? "night" : "day");
+  this->manual_theme_ = static_cast<int8_t>(theme);
+  this->layout_.theme = theme;
+  this->theme_ = theme;
+  this->build_page_(this->page_);
   this->apply_brightness_();
 }
 
@@ -632,6 +657,10 @@ void EsphelmRuntime::show_page(size_t index) {
 void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
   if (tile_id == "@alarm") {  // not a tile id (ids can't contain "@"): the alarm banner
     this->alarms_.tap(part);
+    return;
+  }
+  if (tile_id == "@theme") {  // the footer title held down
+    this->theme_toggle_wanted_ = true;
     return;
   }
   if (tile_id == "@screen") {  // a touch on the switched-off screen

@@ -626,6 +626,26 @@ async function main(): Promise<void> {
     );
     writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
     check('settings: a touch switches it on', await fw.waitLog(/Screen on \(touch\)/));
+    // Day/night chosen on the display (the footer title held down): kept while the sun stays
+    // the same, handed back to autoTheme when it changes.
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@theme');
+    check(
+      'theme: holding the footer title switches night to day',
+      (await fw.waitLog(/Theme switched on the display: day/)) &&
+        (await fw.waitLog(/Brightness 90 % \(no backlight configured\)/)),
+    );
+    publish({ 'environment.sun': 'night' });
+    await sleep(1500);
+    check(
+      'theme: the choice holds while the sun stays down',
+      fw.count(/back to the automatic theme/) === 0 &&
+        fw.count(/switching to the night theme/) === 1,
+    );
+    publish({ 'environment.sun': 'day' });
+    check(
+      'theme: sunrise hands it back to the automatic theme',
+      await fw.waitLog(/Sun: day, back to the automatic theme/),
+    );
 
     // 9d. Position tiles: the four text formats of one live position (two wide tiles, two
     //     single cells that fall back to a smaller font), then a value that isn't a position.

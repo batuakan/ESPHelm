@@ -18,6 +18,7 @@ static const char *const TAG = "esphelm.render";
 // Stop building when free heap drops below this (all allocation capabilities). Leaves room for
 // Wi-Fi, SignalK and LVGL redraws; matters on boards without PSRAM.
 static const size_t MIN_FREE_HEAP = 32 * 1024;
+static const uint32_t THEME_HOLD_MS = 1000;  // holding the footer title this long switches day/night
 
 /// Bytes currently allocated (all heaps), for the per-page memory log.
 static size_t heap_used() {
@@ -151,6 +152,26 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
                             std::to_string(layout.pages.size());
   lv_obj_t *label = make_label(footer, this->fonts_.small, c.text, title);
   lv_obj_center(label);
+  // Holding the page title switches day/night. It takes a full second, so a brushing touch
+  // never turns a night screen bright. The hit area spans the footer between the buttons.
+  lv_obj_add_flag(label, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(label, h / 2);
+  lv_obj_add_event_cb(
+      label,
+      [](lv_event_t *e) {
+        auto *self = static_cast<Renderer *>(lv_event_get_user_data(e));
+        const lv_event_code_t code = lv_event_get_code(e);
+        if (code == LV_EVENT_PRESSED) {
+          self->title_pressed_ms_ = lv_tick_get();
+          self->title_fired_ = false;
+        } else if (code == LV_EVENT_PRESSING && !self->title_fired_ &&
+                   lv_tick_elaps(self->title_pressed_ms_) >= THEME_HOLD_MS) {
+          self->title_fired_ = true;
+          if (self->theme_toggle_)
+            self->theme_toggle_();
+        }
+      },
+      LV_EVENT_ALL, this);
 }
 
 bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const WidgetEnv &env,

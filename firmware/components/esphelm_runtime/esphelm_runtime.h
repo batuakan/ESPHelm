@@ -82,6 +82,7 @@ class EsphelmRuntime : public Component {
   void save_boot_record_();
   // Display settings (ADR-0015)
   esphelm::Theme effective_theme_() const;
+  void toggle_theme_();
   void watch_sun_();
   void on_sun_(ArduinoJson::JsonVariantConst value);
   void apply_brightness_();
@@ -114,6 +115,7 @@ class EsphelmRuntime : public Component {
   esphelm::Layout layout_;
   size_t page_{0};
   int pending_step_{0};  // footer button presses, applied in loop() (never inside LVGL events)
+  bool theme_toggle_wanted_{false};  // the footer title was held: switch day/night in loop()
   std::vector<std::unique_ptr<Widget>> widgets_;
   esphelm::Theme theme_{esphelm::Theme::NIGHT};
   std::string etag_;
@@ -134,6 +136,9 @@ class EsphelmRuntime : public Component {
   // brightness last applied, and the screen timeout's state.
   esphelm::Theme base_theme_{esphelm::Theme::DAY};
   int8_t sun_night_{-1};  // -1 unknown, 0 not night, 1 dusk or night
+  // Day/night chosen on the display (footer title held); -1 none. Kept until the sun changes
+  // (autoTheme) or a layout with another theme arrives; not kept across a reboot.
+  int8_t manual_theme_{-1};
   std::string sun_path_;
   uint32_t sun_listener_{0};
   int applied_brightness_{-1};
