@@ -1,6 +1,7 @@
 export * from './primitives.js';
 export * from './tiles.js';
 export * from './position.js';
+export * from './valueZones.js';
 export * from './pages.js';
 export * from './layout.js';
 export * from './settings.js';

@@ -199,6 +199,72 @@
                           "type": "number",
                           "exclusiveMinimum": 0,
                           "description": "Seconds without an update before the value is shown as stale."
+                        },
+                        "color": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "blue"
+                            },
+                            {
+                              "type": "string",
+                              "const": "green"
+                            },
+                            {
+                              "type": "string",
+                              "const": "yellow"
+                            },
+                            {
+                              "type": "string",
+                              "const": "orange"
+                            },
+                            {
+                              "type": "string",
+                              "const": "red"
+                            },
+                            {
+                              "type": "string",
+                              "const": "purple"
+                            }
+                          ]
+                        },
+                        "zones": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "from": {
+                                "type": "number"
+                              },
+                              "to": {
+                                "type": "number"
+                              },
+                              "state": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "const": "normal"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "warn"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "alarm"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "emergency"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "additionalProperties": false

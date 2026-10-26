@@ -29,12 +29,36 @@ export const Zone = Type.Object(
 );
 export type Zone = Type.Static<typeof Zone>;
 
-/** Shows one value with label and unit. */
+/**
+ * Colour names for value tiles. The display theme decides the actual colour: distinct colours
+ * by day, the night text colour at night (night vision). Layouts never carry hex colours.
+ */
+export const VALUE_COLORS = ['blue', 'green', 'yellow', 'orange', 'red', 'purple'] as const;
+export const ValueColor = Type.Union(VALUE_COLORS.map((c) => Type.Literal(c)));
+export type ValueColor = (typeof VALUE_COLORS)[number];
+
+/**
+ * A range of a value tile, in display units, that colours the number. A value tile has no
+ * min/max, so either end may be left open; at least one is required.
+ */
+export const ValueZone = Type.Object(
+  {
+    from: Type.Optional(Type.Number()),
+    to: Type.Optional(Type.Number()),
+    state: ZoneState,
+  },
+  { additionalProperties: false },
+);
+export type ValueZone = Type.Static<typeof ValueZone>;
+
+/** Shows one value with label and unit; optionally coloured (fixed, or by value). */
 export const ValueTile = Type.Object(
   {
     type: Type.Literal('value'),
     ...Placement,
     ...DataItem.properties,
+    color: Type.Optional(ValueColor),
+    zones: Type.Optional(Type.Array(ValueZone)),
   },
   { additionalProperties: false },
 );

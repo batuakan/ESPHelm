@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ValueZone } from '../src/index.js';
 import { PACKAGE_ROOT } from '../scripts/render.js';
 
 export interface ExpectedError {
@@ -39,6 +40,20 @@ export function invalidFixtures(rel: string, key: 'layout' | 'hello'): InvalidFi
 export function unitCases(): { si: number; unit: string; expected: number }[] {
   const file = JSON.parse(readFileSync(join(FIXTURES, 'units.cases.json'), 'utf8')) as {
     cases: { si: number; unit: string; expected: number }[];
+  };
+  return file.cases;
+}
+
+export interface ValueZoneCase {
+  n: number;
+  zones: ValueZone[];
+  expected: ValueZone['state'] | null;
+  note: string;
+}
+
+export function valueZoneCases(): ValueZoneCase[] {
+  const file = JSON.parse(readFileSync(join(FIXTURES, 'value-zones.cases.json'), 'utf8')) as {
+    cases: ValueZoneCase[];
   };
   return file.cases;
 }

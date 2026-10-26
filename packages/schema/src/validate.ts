@@ -239,6 +239,25 @@ function validateSemantics(layout: Layout): ValidationError[] {
         }
         placed.push({ x: tile.x, y: tile.y, w: tile.w, h: tile.h, j });
       }
+      if (tile.type === 'value') {
+        // Open-ended ranges: at least one end, and from below to when both are given.
+        (tile.zones ?? []).forEach((zone, k) => {
+          const zp = `${tbase}/zones/${k}`;
+          if (zone.from === undefined && zone.to === undefined) {
+            errors.push({
+              pointer: zp,
+              code: 'INVALID_ZONE',
+              message: 'zone needs "from", "to" or both',
+            });
+          } else if (zone.from !== undefined && zone.to !== undefined && !(zone.from < zone.to)) {
+            errors.push({
+              pointer: zp,
+              code: 'INVALID_ZONE',
+              message: 'zone "to" must be greater than "from"',
+            });
+          }
+        });
+      }
       if (tile.type === 'gauge' || tile.type === 'bar') {
         if (!(tile.min < tile.max)) {
           errors.push({
