@@ -63,7 +63,7 @@ export async function startHarness(
   const errors: string[] = [];
   const security = { disabled: false };
   // A tiny SignalK data model for /api/paths.
-  const skData: Record<string, { value: unknown; timestamp: string }> = {
+  const skData: Record<string, { value: unknown; timestamp: string; $source?: string }> = {
     'navigation.speedOverGround': { value: 3.19, timestamp: '2026-10-24T12:00:00.000Z' },
     'environment.depth.belowTransducer': { value: 12.4, timestamp: '2026-10-24T12:00:01.000Z' },
     'navigation.position': {
@@ -85,7 +85,11 @@ export async function startHarness(
         if (!('values' in u)) continue;
         for (const pv of u.values) {
           if (pv.path.startsWith('notifications.'))
-            skData[pv.path] = { value: pv.value, timestamp: '2026-10-24T12:00:03.000Z' };
+            skData[pv.path] = {
+              value: pv.value,
+              timestamp: '2026-10-24T12:00:03.000Z',
+              ...(typeof u.$source === 'string' ? { $source: u.$source } : {}),
+            };
         }
       }
     };

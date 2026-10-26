@@ -39,6 +39,19 @@ describe('POST /notifications/ack', () => {
     expect(h.service.alarms.isAcknowledged(DEPTH)).toBe(true);
   });
 
+  it("republishes under the notification's own source, so no silenced copy lingers", async () => {
+    h.publish({
+      updates: [
+        {
+          $source: 'anchoralarm.plugin' as never,
+          values: [{ path: DEPTH as Path, value: { state: 'alarm', method: ['sound'] } as never }],
+        },
+      ],
+    });
+    await ack(DEPTH);
+    expect(h.deltas.at(-1)?.updates[0]).toMatchObject({ $source: 'anchoralarm.plugin' });
+  });
+
   it('keeps it silent when the alarm plugin resends it with sound', async () => {
     h.publish(shallow('alarm'));
     await ack(DEPTH);

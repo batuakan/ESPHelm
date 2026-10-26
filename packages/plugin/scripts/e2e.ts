@@ -228,6 +228,41 @@ async function main(): Promise<void> {
     await new Promise((res) => setTimeout(res, 300));
     method = await methodNow();
     check('an escalation sounds again', method?.includes('sound') === true, JSON.stringify(method));
+    // The same alarm comes back later: a display that (re)subscribes must not be replayed a
+    // silenced copy from the earlier acknowledgement (it would show the new alarm as acknowledged).
+    raise('normal');
+    await new Promise((res) => setTimeout(res, 300));
+    raise('alarm');
+    await new Promise((res) => setTimeout(res, 300));
+    const node = (await json('GET', restPath, admin)).body as { values?: Record<string, unknown> };
+    check(
+      'one source holds the notification (no silenced copy beside it)',
+      !node.values || Object.keys(node.values).length === 1,
+      JSON.stringify(node.values ?? {}),
+    );
+    const display = await sk.stream(rw);
+    display.ws.send(
+      JSON.stringify({
+        context: 'vessels.self',
+        subscribe: [{ path: 'notifications.*', policy: 'instant' }],
+      }),
+    );
+    await new Promise((res) => setTimeout(res, 800));
+    const replayed = display.messages.flatMap((m) =>
+      (
+        (m as { updates?: { values?: { path: string; value: { method?: string[] } }[] }[] })
+          .updates ?? []
+      )
+        .flatMap((u) => u.values ?? [])
+        .filter((v) => v.path === notifPath)
+        .map((v) => v.value.method),
+    );
+    check(
+      'a new subscriber is replayed only the sounding alarm',
+      replayed.length > 0 && replayed.every((m) => m?.includes('sound')),
+      JSON.stringify(replayed),
+    );
+    display.ws.close();
     alarmSource.ws.close();
   } finally {
     await sk.stop();

@@ -55,15 +55,24 @@ export class AlarmAcks {
         message: 'path must be a notifications.* path',
       };
     }
-    const node = this.host.getSelfPath(path) as { value?: unknown } | undefined;
+    const node = this.host.getSelfPath(path) as { value?: unknown; $source?: unknown } | undefined;
     const value = node?.value;
     const state = isNotification(value) ? value.state : undefined;
     if (!isNotification(value) || !(ALARM_STATES as readonly unknown[]).includes(state)) {
       return { ok: false, status: 404, error: 'NO_ALARM', message: `no active alarm at ${path}` };
     }
     this.acked.set(path, state as string);
+    // Under the notification's own $source, so the silenced value replaces it. Under the
+    // plugin's source it would stay next to the original (SignalK keeps a value per source) and
+    // come back on a resubscribe, making a later alarm in the same state look acknowledged.
+    const origin = typeof node?.$source === 'string' ? node.$source : undefined;
     this.host.handleMessage(this.source, {
-      updates: [{ values: [{ path: path as Path, value: silenced(value) as never }] }],
+      updates: [
+        {
+          ...(origin ? { $source: origin as never } : {}),
+          values: [{ path: path as Path, value: silenced(value) as never }],
+        },
+      ],
     });
     return { ok: true, state: state as string };
   }
