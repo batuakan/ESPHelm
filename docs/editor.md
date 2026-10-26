@@ -44,6 +44,8 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 - **Display theme** (*Display: Day / Night* above the canvas) is part of the layout. The display draws with it after *Save & send*, and the preview shows the same palette. New layouts start at Night; starter layouts bring their own.
 - **Editor theme** (*Day*, *Dark*, *Night* in the top bar) only changes this editor's colours, is remembered per browser, and follows the system setting by default. It never changes the display.
 
+**Position tile:** shows `navigation.position` (or another position path) as two lines. The drawer lists the four formats, each with an example from the live value: degrees and decimal minutes (`60° 09.000' N`), degrees, minutes and seconds, decimal degrees, and signed decimal. *Decimals* applies to the last part (minutes, seconds or degrees); empty uses the format's default. The preview uses the same formatter as the display.
+
 **Display settings** (the *Display settings* button next to the display theme, ADR-0015) are part of the layout too, sent with *Save & send*:
 - brightness for the day and the night theme (disabled when the display reports it can't dim its backlight)
 - the start page

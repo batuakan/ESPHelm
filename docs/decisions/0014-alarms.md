@@ -9,6 +9,10 @@ You wanted alarms shown as a banner, with an acknowledge that reaches SignalK.
 
 signalk-server has no acknowledge or silence API: in 2.26 the notifications API only has GET routes.
 
+> **Correction (2026-10-26):** that was wrong for 2.26. signalk-server 2.26.0 implements a v2 notifications API with `POST /signalk/v2/api/notifications/:id/silence` and `/:id/acknowledge` (plus `silenceAll` / `acknowledgeAll`), and adds `id` and `status { silenced, acknowledged, canSilence, canAcknowledge }` to notification values. 2.17.2 and 2.19.0 ship only its OpenAPI description, not the routes. The decision below still works on all three; using the native API where it exists is an open follow-up.
+
+Also fixed on 2026-10-26: the plugin republished the silenced notification under its own source. SignalK keeps a value per source, so that copy stayed next to the original and could be replayed to a resubscribing display after the alarm returned, making it look acknowledged. It now republishes under the notification's own `$source`.
+
 ## Decision
 - **Firmware:** the runtime itself listens to `notifications.*` (one wildcard subscription). This is independent of the layout, so it works on every page and on the status page.
   - It keeps a fixed table of active notifications: 16 entries with PSRAM, 8 without. When the table is full, a worse alarm replaces the least severe one. Paths and messages are cut to fixed lengths, and messages are filtered to the font's characters.

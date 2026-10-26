@@ -89,6 +89,7 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 | `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; below 240 px the value uses the small font, below 160 px tick labels and the unit are dropped |
 | `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value |
 | `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
+| `position` | labels | latitude over longitude, formatted by `esphelm_position.h` (the same text as the editor, checked against `fixtures/position.cases.json`). The largest font (value → label → small) in which the widest text of the chosen format fits; it's chosen again when the page is laid out anew (alarm banner). Anything but two numbers in range shows `--` |
 | `wind_rose` | two `lv_scale`s and a drawn overlay | the legacy wind page: a fixed ring relative to the bow (thick ticks every 30°, thin every 5°, wide red/green close-hauled sectors at 20–60°), a compass card inside it turning with the heading (the 16 points written along the band), triangle markers on the ring (orange A for apparent wind, purple T for true wind = `trueDirection − heading`), the heading ("12°T", or °M for a magnetic path) and big centre values. Night uses reds only. Size tiers below |
 | `autopilot` | labels and `lv_button`s | state (AUTO / WIND / TRACK / STANDBY), "TGT x°" and "HDG x°"; course buttons −10/−1/+1/+10, the configured mode buttons and STANDBY (on its own wide row when it wouldn't fit a quarter of the width). Rules below |
 
@@ -160,6 +161,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `gauge`, `bar` tiles | ≈2–2.7 KB each (energy page: gauge + bar + value = 6,416 B; engine page: 2 gauges + bar = 6,544 B) |
 | `wind_rose` tile | ≈6.7–6.9 KB in full (full screen: 6,720 B at 720, 6,864 B at 480); 720 page with a 2x2 rose and five tiles: 23,936 B |
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
+| `position` tile | ≈1.7 KB (four tiles = 6,640 B) |
 | `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
@@ -206,7 +208,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`)
 
-  Thirty-four screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
+
+  Thirty-six screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -239,3 +243,4 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - Without touching, the backlight turns off after 30 s. One tap turns it on again **without** pressing anything under your finger (try it over a switch tile).
     - A new alarm turns the screen on.
     - Switch the display theme (or wait for dusk with the derived-data plugin's `environment.sun`): night is clearly dimmer, and day goes back to full brightness. Check that 10 % is still readable in the dark and that the backlight doesn't flicker at low brightness (the LEDC runs at 100 Hz).
+14. **Position tile.** Add a *Position* tile (it uses `navigation.position`) and try each format in the drawer; the display should show the same text as the editor's preview. Check that a 1×1 tile on the 720×720 display is still readable, and that unplugging the GPS turns it to `--` after the stale time.

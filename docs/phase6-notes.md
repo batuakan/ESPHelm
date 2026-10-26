@@ -38,7 +38,7 @@ Not done this round: landscape and other sizes, auth and recovery tooling. Desig
   - **Schema:** settings and hello fixtures, plus mutations, through both the TS validator and the C++ parser.
   - **Plugin:** the ack route (silencing, the re-strip on resend, escalation, other vessels, 400/403/404, restart).
   - **Editor:** `updateSettings` and the start-page reset; component tests of the drawer.
-- `npm run e2e -w signalk-esphelm` against **signalk-server 2.17.2 and 2.26.0**:
+- `npm run e2e -w signalk-esphelm` (corrected 2026-10-26: the runs here were both on **2.26.0**, as the harness picks it by default; 2.17.2 was run explicitly later, alarm checks pass there, and a chart check fails, see below):
   - a real alarm from another WebSocket source is silenced by a device token
   - it stays silent when resent
   - it sounds again on escalation
@@ -60,6 +60,11 @@ Not done this round: landscape and other sizes, auth and recovery tooling. Desig
 - **The editor has no list of active alarms** (the optional part of the plan; I left it out).
 - **No day-theme 720 render of the banner.** The 720 e2e steps run offline, where there are no alarms.
 - **Your SignalK server on :3000 wasn't running** when I checked during this phase. I didn't stop it: I only stopped three throwaway test servers of mine (`/tmp/esphelm-e2e-*`) that a failed script had left on port 3993.
+
+## Corrections (2026-10-26)
+- **signalk-server 2.26.0 does have a notifications acknowledge/silence API** (v2, `/signalk/v2/api/notifications/:id/acknowledge` and `/silence`); 2.17.2 and 2.19.0 don't. ADR-0014 has the details. Using it where available is an open follow-up.
+- **Bug fixed:** the plugin's silenced copy of an acknowledged alarm stayed in SignalK under the plugin's source. When the same alarm came back, a resubscribing display could be replayed that copy and show the new alarm as acknowledged. It now republishes under the notification's own `$source`. The plugin e2e checks the replay, and fails without the fix.
+- **Not fixed:** on 2.17.2 the plugin answers a tile of an unknown chart with 415 instead of 404 (the 5d chart check). Charts were only verified on 2.26.0.
 
 ## Repository note
 Your untracked `.gitattributes` routes `*.png` and `*.svg` through Git LFS. The goldens committed in 5d and now are LFS pointers, which work on this machine. A clone without that file, or without the LFS objects, gets pointer text instead of images. Commit `.gitattributes` (and push the LFS objects) or drop it, whichever you intended.

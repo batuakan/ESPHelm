@@ -70,7 +70,7 @@ Converted tiles are kept in a 64-tile LRU (about 8 MB).
 ### `POST /signalk/v1/api/esphelm/notifications/ack`
 Acknowledges an alarm from a display (ADR-0014). Body `{ "path": "notifications.…" }`. Needs a read/write device token.
 
-signalk-server has no acknowledge API (2.26 only has GET routes for notifications), so the plugin silences the notification itself:
+signalk-server before 2.26 has no acknowledge API (2.26.0 adds `POST /signalk/v2/api/notifications/:id/acknowledge` and `/silence`, not used yet; see ADR-0014), so the plugin silences the notification itself, under the notification's own `$source` so no silenced copy stays beside it:
 1. It republishes the current value with `"sound"` removed from `method`. The state and message stay, so the alarm stays visible everywhere.
 2. Its delta input handler (`registerDeltaInputHandler`) removes `"sound"` from later deltas of that path for this vessel, while the state stays the acknowledged one. A source that resends the alarm every few seconds therefore stays silent.
 3. Any other state (escalation, or `normal`) ends the acknowledgement, so an escalation sounds again.
