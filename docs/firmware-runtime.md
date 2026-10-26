@@ -85,7 +85,7 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 
 | Widget | Drawn with | Notes |
 |---|---|---|
-| `value` | labels | as before |
+| `value` | labels | as before; the number coloured by `color` or `zones` (ADR-0016) |
 | `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; below 240 px the value uses the small font, below 160 px tick labels and the unit are dropped |
 | `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value |
 | `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
@@ -210,7 +210,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
-  Thirty-six screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  19. **value tile colours**: six fixed colours, a depth in its warn zone, a voltage in its alarm zone over the tile's own blue, an engine temperature in a normal zone; by day and at night
+
+  Thirty-eight screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -248,3 +250,6 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - After one second the page redraws in the other theme, at that theme's brightness. A short tap does nothing, and neither do the **<** / **>** buttons when held.
     - With *Auto day/night* on, the choice holds until `environment.sun` changes; a restart goes back to the layout's theme.
     - (Only the test hook was exercised on the desktop build; the real touch path is checked here for the first time.)
+16. **Value tile colours.** Give a few value tiles a colour, and a depth tile zones such as "3 or less warn, 2 or less alarm".
+    - By day, check that every colour is readable in sunlight, yellow in particular.
+    - At night everything is red; check that a warn and an alarm value can still be told apart from normal.

@@ -63,7 +63,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🌊 Features
 
-- **Tiles:** value, gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice, and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
+- **Tiles:** value (coloured by a fixed colour or by thresholds), gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice, and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
 - **Pages:** as many as you like, with page buttons in a footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.

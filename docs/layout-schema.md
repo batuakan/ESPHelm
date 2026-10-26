@@ -80,7 +80,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 
 | `type` | Extra fields | Notes |
 |---|---|---|
-| `value` | DataItem fields | big number + label + unit |
+| `value` | DataItem + `color?`, `zones?` (value zones) | big number + label + unit; the number coloured by a fixed colour or by value (below) |
 | `gauge` | DataItem + `min`, `max`, `zones?` | round gauge with needle |
 | `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
@@ -88,6 +88,17 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
+
+### Value tile colours (ADR-0016)
+- `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
+- `zones` (optional): `{ from?, to?, state }`, in display units. A value tile has no `min`/`max`, so a missing end is open: `{ "to": 2, "state": "alarm" }` means "2 or less". At least one end is required, and `from` must be below `to` when both are given (`INVALID_ZONE`). Both ends are included, and the last matching zone wins (`valueZoneState`).
+- The number is coloured, in this order: muted when stale; a matching zone's colour (at night a `normal` zone uses the text colour); the fixed `color`; the theme's text colour. Older firmware ignores both fields and shows the value uncoloured.
+
+```json
+{ "type": "value", "id": "depth", "x": 0, "y": 0, "w": 1, "h": 1,
+  "path": "environment.depth.belowTransducer", "unit": "m", "color": "blue",
+  "zones": [{ "to": 3, "state": "warn" }, { "to": 2, "state": "alarm" }] }
+```
 
 ### Wind rose tiles
 A `wind_rose` tile draws a fixed design and exposes **named slots at predetermined positions**. Each slot shows a DataItem you choose. Slots are optional; an empty slot shows nothing. It can sit next to other tiles and several can share a page.
@@ -202,7 +213,7 @@ Brightness needs a backlight the firmware can dim (`capabilities.backlight` in t
 | `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
 | `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
 | `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max` |
-| `INVALID_ZONE` | semantic | zone `from` is not below `to` |
+| `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value-tile zone with neither `from` nor `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
 | `UNKNOWN_PAGE` | semantic | `settings.startPage` isn't a page of the layout |
 
