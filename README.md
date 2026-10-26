@@ -63,11 +63,12 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🌊 Features
 
-- **Tiles:** value, gauge (with coloured zones), bar, switch (sends a SignalK PUT), wind rose with up to seven values of your choice, and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
+- **Tiles:** value, gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice, and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
 - **Pages:** as many as you like, with page buttons in a footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button.
+- **Day/night on the display itself:** hold the page title in the footer for a second (see [On the display](#-on-the-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
 - **Resolution agnostic:** layouts are grids, so the same layout works on 480×480 and 720×720.
@@ -77,6 +78,16 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
  <img width="360px" src="/docs/images/display-sailing-720-night.png">
 </p>
 <p align="center"><em>The "Sailing" template on a 720×720 display, night theme.</em></p>
+
+## 👆 On the display
+
+- **Change page:** the **<** and **>** buttons in the footer.
+- **Switch day/night:** press and **hold the page title** in the footer (between the **<** and **>** buttons) for one second. The page redraws in the other theme, at that theme's brightness.
+  - With automatic day/night on, your choice holds until the next sunrise or sunset, then the sun takes over again.
+  - Sending a layout with a different theme from the editor also replaces it, and a restart goes back to the layout's theme.
+  - The footer only appears on layouts with more than one page, so a single-page layout can't be switched on the display: set its theme in the editor.
+- **Alarms:** tap the banner to see the next alarm, **ACK** to acknowledge it.
+- **Screen off** (screen timeout): the first touch only wakes the display, it never presses a button.
 
 ## 🚀 Getting started
 

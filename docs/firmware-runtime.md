@@ -206,7 +206,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
       - offline, a cached layout that crashes is tried twice, then the last known good layout is shown, also after a normal restart
   16. **alarms**: a depth alarm and a battery warning show in the banner (worst first, "+1"); tapping shows the next; ACK goes to the plugin, which silences the alarm on the server; both acknowledged give the strip; an escalation to `emergency` shows the full banner again; back to `normal` clears it
 
-  17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`)
+  17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); holding the footer title (`esphelm_tap_request @theme`) switches night to day, which holds while the sun stays down and is handed back to `autoTheme` at sunrise
 
   18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
@@ -244,3 +244,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - A new alarm turns the screen on.
     - Switch the display theme (or wait for dusk with the derived-data plugin's `environment.sun`): night is clearly dimmer, and day goes back to full brightness. Check that 10 % is still readable in the dark and that the backlight doesn't flicker at low brightness (the LEDC runs at 100 Hz).
 14. **Position tile.** Add a *Position* tile (it uses `navigation.position`) and try each format in the drawer; the display should show the same text as the editor's preview. Check that a 1×1 tile on the 720×720 display is still readable, and that unplugging the GPS turns it to `--` after the stale time.
+15. **Day/night on the display.** On a layout with two or more pages, press and hold the page title in the footer.
+    - After one second the page redraws in the other theme, at that theme's brightness. A short tap does nothing, and neither do the **<** / **>** buttons when held.
+    - With *Auto day/night* on, the choice holds until `environment.sun` changes; a restart goes back to the layout's theme.
+    - (Only the test hook was exercised on the desktop build; the real touch path is checked here for the first time.)

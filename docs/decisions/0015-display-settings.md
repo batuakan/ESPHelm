@@ -10,6 +10,7 @@ You asked for brightness, start page, automatic day/night and a screen timeout. 
 - **Brightness** `day` / `night` in % follows the theme shown. It needs a dimmable `light` given to the runtime as `backlight:` in YAML. The hello reports `capabilities.backlight`, so the editor shows the brightness controls only when they work.
 - **Start page:** shown at boot, and when a layout arrives with a different start page. An edit that keeps the start page keeps the page you're on.
 - **Auto day/night** (`autoTheme: sun`): the night theme while `environment.sun` (the derived-data plugin) is `dusk` or `night`; otherwise the layout's theme. The page is rebuilt on a switch, which happens about twice a day. Without a value, the layout's theme stays.
+- **Day/night on the display** (added 2026-10-26): holding the footer's page title for one second switches the theme on the display itself. The choice lives in RAM: it holds until `environment.sun` changes (with `autoTheme: sun`) or a layout with a different theme arrives, and a restart forgets it. No schema change; single-page layouts have no footer, so they can't be switched this way.
 - **Screen timeout:**
   - After `screenTimeout` s without a touch (minimum 10, 0 = never), the runtime turns the backlight off and puts a black cover on LVGL's system layer.
   - The first touch only wakes the screen: the cover catches it, or on the P4, the board YAML resumes LVGL before the touch reaches it. So waking never presses a button.
