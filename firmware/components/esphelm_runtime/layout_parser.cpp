@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 // Mirrors packages/schema/src/validate.ts: structural checks first (dispatching on page `kind`
 // and tile `type`, so each problem is reported once at the field that is wrong), then
@@ -265,6 +266,7 @@ const char *const ORIENTATIONS[] = {"horizontal", "vertical"};
 const char *const THEMES[] = {"day", "night"};
 // Same order as position::Format.
 const char *const POSITION_FORMATS[] = {"ddm", "dms", "dd", "decimal"};
+const char *const VALUE_COLORS[] = {"blue", "green", "yellow", "orange", "red", "purple"};
 const char *const SLOT_NAMES[RoseConfig::MAX_SLOTS] = {"center1",  "center2",  "center3",   "topLeft",
                                                        "topRight", "bottomLeft", "bottomRight"};
 
@@ -445,11 +447,15 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     return;
   }
   data_item_fields(chk, obj, ptr, tile.data);
-  if (tile.type == TileType::VALUE)
-    return;
-
-  number_field(chk, obj, ptr, "min", true, tile.min);
-  number_field(chk, obj, ptr, "max", true, tile.max);
+  const bool value = tile.type == TileType::VALUE;
+  if (value) {
+    int c = enum_field(chk, obj, ptr, "color", false, VALUE_COLORS, 6);
+    if (c >= 0)
+      tile.color = static_cast<ValueColor>(c);
+  } else {
+    number_field(chk, obj, ptr, "min", true, tile.min);
+    number_field(chk, obj, ptr, "max", true, tile.max);
+  }
   if (has(obj, "zones")) {
     JsonVariantConst zones = obj["zones"];
     if (!zones.is<JsonArrayConst>()) {
@@ -463,9 +469,11 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
           continue;
         }
         JsonObjectConst zo = z.as<JsonObjectConst>();
-        Zone zone{};
-        number_field(chk, zo, zp, "from", true, zone.from);
-        number_field(chk, zo, zp, "to", true, zone.to);
+        // Value tiles have no min/max, so either end may be open.
+        Zone zone{-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
+                  ZoneState::NORMAL};
+        number_field(chk, zo, zp, "from", !value, zone.from);
+        number_field(chk, zo, zp, "to", !value, zone.to);
         int state = enum_field(chk, zo, zp, "state", true, ZONE_STATES, 4);
         if (state >= 0)
           zone.state = static_cast<ZoneState>(state);
@@ -671,6 +679,14 @@ void check_semantics(Checker &chk, const Layout &layout) {
           }
         }
         placed.push_back(j);
+      }
+      if (t.type == TileType::VALUE) {
+        for (size_t k = 0; k < t.zones.size(); k++) {
+          const Zone &z = t.zones[k];
+          // Missing ends are infinite: both infinite means neither was given.
+          if ((std::isinf(z.from) && std::isinf(z.to)) || !(z.from < z.to))
+            chk.add(tp + "/zones/" + std::to_string(k), "INVALID_ZONE");
+        }
       }
       if (t.type == TileType::GAUGE || t.type == TileType::BAR) {
         if (!(t.min < t.max)) {

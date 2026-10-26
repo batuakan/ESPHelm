@@ -25,7 +25,10 @@ Colors colors_for(esphelm::Theme theme) {
                   {lv_color_hex(0x6A2020), lv_color_hex(0xB0401A), lv_color_hex(0xFF3B30), lv_color_hex(0xFF6060)},
                   // port bright, starboard dim; apparent bright, true dim
                   lv_color_hex(0xFF3B30), lv_color_hex(0x7A1A12), lv_color_hex(0xE0302A), lv_color_hex(0x8A1E18),
-                  lv_color_hex(0x6A2020), lv_color_hex(0x1C0606), lv_color_hex(0x9A2A22)};
+                  lv_color_hex(0x6A2020), lv_color_hex(0x1C0606), lv_color_hex(0x9A2A22),
+                  // value tile colours: hue would cost night vision, so all are the text red
+                  {lv_color_hex(0xE0302A), lv_color_hex(0xE0302A), lv_color_hex(0xE0302A), lv_color_hex(0xE0302A),
+                   lv_color_hex(0xE0302A), lv_color_hex(0xE0302A)}};
   }
   // Day: light, for sunlight. White page, light grey tiles, dark text.
   return Colors{lv_color_hex(0xFFFFFF), lv_color_hex(0xE6EAEE), lv_color_hex(0x111820), lv_color_hex(0x5D6B78),
@@ -33,7 +36,11 @@ Colors colors_for(esphelm::Theme theme) {
                 {lv_color_hex(0x1D8A4F), lv_color_hex(0xC77700), lv_color_hex(0xD32F2F), lv_color_hex(0x9C27B0)},
                 // The legacy wind page: red port, green starboard, orange A, purple T; a dark card.
                 lv_color_hex(0xFF0000), lv_color_hex(0x00C800), lv_color_hex(0xFF8000), lv_color_hex(0xA020F0),
-                lv_color_hex(0x555555), lv_color_hex(0x2E2E2E), lv_color_hex(0xFFFFFF)};
+                lv_color_hex(0x555555), lv_color_hex(0x2E2E2E), lv_color_hex(0xFFFFFF),
+                // value tile colours: blue, green, yellow, orange, red, purple (dark enough for the
+                // light grey tile in sunlight)
+                {lv_color_hex(0x0A6CD6), lv_color_hex(0x1D8A4F), lv_color_hex(0xA68A00), lv_color_hex(0xD96C00),
+                 lv_color_hex(0xD32F2F), lv_color_hex(0x8E24AA)}};
 }
 
 // ---- Value formatting (same rules as packages/editor/src/format.ts) ----
@@ -190,7 +197,8 @@ static void style_cell(lv_obj_t *cell, const Colors &c) {
 
 class ValueWidget : public Widget {
  public:
-  ValueWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env) : id_(tile.id), colors_(env.colors) {
+  ValueWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
+      : id_(tile.id), colors_(env.colors), night_(env.night), color_(tile.color), zones_(tile.zones) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
@@ -214,12 +222,29 @@ class ValueWidget : public Widget {
     if (!b_.due(now, stale))
       return;
     set_text(value_, shown_, stale ? "--" : b_.text);
-    lv_obj_set_style_text_color(value_, stale ? colors_.muted : colors_.text, LV_PART_MAIN);
+    lv_obj_set_style_text_color(value_, stale ? colors_.muted : number_color_(), LV_PART_MAIN);
   }
 
  protected:
+  /// A matching zone, else the tile's colour, else the theme's text colour (ADR-0016).
+  lv_color_t number_color_() const {
+    esphelm::ZoneState state;
+    if (b_.has_number && esphelm::value_zone_state(b_.number, zones_, state)) {
+      // At night the dim "normal" zone shade would look stale: normal is the text colour.
+      if (night_ && state == esphelm::ZoneState::NORMAL)
+        return colors_.text;
+      return colors_.zone[static_cast<int>(state)];
+    }
+    if (color_ != esphelm::ValueColor::NONE)
+      return colors_.palette[static_cast<int>(color_)];
+    return colors_.text;
+  }
+
   std::string id_;
   Colors colors_;
+  bool night_;
+  esphelm::ValueColor color_;
+  std::vector<esphelm::Zone> zones_;
   Binding b_;
   lv_obj_t *value_;
   std::string shown_{"--"};

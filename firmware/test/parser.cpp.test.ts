@@ -79,6 +79,19 @@ const mutations: { name: string; doc: unknown }[] = [
   { name: 'integer written as 2.0', doc: withTile({ w: 1.0, decimals: 2.0 }) },
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
   { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },
+  { name: 'value colour of the wrong type', doc: withTile({ color: 1 }) },
+  {
+    name: 'value zones of the wrong types',
+    doc: withTile({ zones: [{ from: '1', state: 'warn' }, { to: 2, state: 'loud' }, 'x'] }),
+  },
+  { name: 'value zones not an array', doc: withTile({ zones: { to: 2, state: 'alarm' } }) },
+  { name: 'value zone with min/max on a value tile', doc: withTile({ min: 0, max: 10 }) },
+  {
+    name: 'value zones, several problems at once',
+    doc: withTile({
+      zones: [{ state: 'warn' }, { from: 5, to: 5, state: 'alarm' }, { to: 1, state: 'normal' }],
+    }),
+  },
   {
     name: 'position with a zero stale time and fractional decimals',
     doc: withTile({ type: 'position', staleAfter: 0, decimals: 1.5 }),

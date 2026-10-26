@@ -39,6 +39,8 @@ struct Colors {
   lv_color_t apparent, true_wind;  // A and T markers
   lv_color_t ring;              // outer ring ticks
   lv_color_t card, card_text;   // compass card band and its letters
+  // Value tile colour names (esphelm::ValueColor order); all the text colour at night
+  lv_color_t palette[6];
 };
 
 Colors colors_for(esphelm::Theme theme);

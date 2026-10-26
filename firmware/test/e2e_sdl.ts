@@ -662,6 +662,39 @@ async function main(): Promise<void> {
     publish({ 'navigation.position': { latitude: 'here', longitude: 151.2 } });
     await sleep(1200);
     await fw.screenshot('29-position-not-a-position', shots);
+
+    // 9e. Value tile colours (ADR-0016): six fixed colours, and colour by value (depth in its
+    //     warn zone, house voltage in its alarm zone over the tile's own blue, engine temperature
+    //     in a normal zone), by day and at night.
+    const colors = fixture('valid/value-colors.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/value-colors', admin, colors);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'value-colors',
+    });
+    check(
+      'colours: the value colour layout renders',
+      await fw.waitLog(/Showing fetched layout "value-colors" \(1 pages/),
+    );
+    const colourValues = {
+      'navigation.speedOverGround': 3.1, // 6.0 kn
+      'environment.depth.belowTransducer': 2.6, // warn (3 or less)
+      'electrical.batteries.house.voltage': 11.5, // alarm (11.8 or less), over the tile's blue
+      'propulsion.p0.temperature': 353.15, // 80 °C, normal (0..95)
+    };
+    publish(colourValues);
+    await sleep(1500);
+    await fw.screenshot('30-value-colors-day', shots);
+    await json('PUT', '/plugins/esphelm/api/layouts/value-colors', admin, {
+      ...colors,
+      theme: 'night',
+    });
+    check(
+      'colours: the same layout at night',
+      await fw.waitLog(/Showing fetched layout "value-colors" \(1 pages/, 15000, 2),
+    );
+    publish(colourValues);
+    await sleep(1500);
+    await fw.screenshot('31-value-colors-night', shots);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'settings: back to the multi-page layout (no settings: its first page, never off)',

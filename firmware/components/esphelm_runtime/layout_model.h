@@ -9,20 +9,16 @@
 
 #include "esphelm_position.h"
 #include "esphelm_units.h"
+#include "esphelm_value_zones.h"
 
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
 enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
-enum class ZoneState : uint8_t { NORMAL, WARN, ALARM, EMERGENCY };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
-
-struct Zone {
-  double from;
-  double to;
-  ZoneState state;
-};
+/// Value tile colour names (schema VALUE_COLORS); the theme decides the actual colour.
+enum class ValueColor : int8_t { NONE = -1, BLUE, GREEN, YELLOW, ORANGE, RED, PURPLE };
 
 /// A value bound to one SignalK path (value-like tiles and wind rose slots).
 struct DataItem {
@@ -62,7 +58,8 @@ struct Tile {
   DataItem data;  // switch tiles use data.path and data.label only
   // gauge / bar
   double min{0}, max{0};
-  std::vector<Zone> zones;
+  std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf
+  ValueColor color{ValueColor::NONE};  // value
   Orientation orientation{Orientation::HORIZONTAL};
   // position (data.path defaults to navigation.position; data.decimals -1 = the format's default)
   position::Format position_format{position::Format::DDM};
