@@ -147,9 +147,10 @@ module.exports = (app) => {
  */
 const CHART_SIM_PLUGIN = (pngjsPath: string) => `
 const { PNG } = require(${JSON.stringify(pngjsPath)});
+// The v2 resources shape (format, type, url), as signalk-charts-provider-simple publishes it.
 const CHART = {
   identifier: 'test-chart', name: 'Test chart', description: 'generated tiles',
-  chartFormat: 'png', tilemapUrl: '/signalk/chart-tiles/test-chart/{z}/{x}/{y}.png',
+  format: 'png', type: 'tilelayer', url: '/signalk/chart-tiles/test-chart/{z}/{x}/{y}.png',
   bounds: [[-180, -85], [180, 85]],
 };
 function tile(z, x, y) {

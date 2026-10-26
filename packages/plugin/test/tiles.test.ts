@@ -5,6 +5,7 @@ import {
   chartInfo,
   decodeTile,
   TILE_BYTES,
+  tileRequest,
   tileUrl,
   TileService,
   toRgb565,
@@ -73,6 +74,45 @@ describe('tile conversion', () => {
     expect(CHARTS.sea!.supported).toBe(true);
     expect(CHARTS.vector!.supported).toBe(false);
     expect(chartInfo('x', { chartFormat: 'jpg' }).supported).toBe(false); // no tilemapUrl
+  });
+
+  it('reads v2 resources (format, url, type), as signalk-charts-provider-simple serves them', () => {
+    const v2 = (format: string, type: string, url: string) =>
+      chartInfo('c', { identifier: 'c', name: 'C', format, type, url, proxy: true });
+    const tiled = v2('png', 'tilelayer', '/signalk/chart-tiles/c/{z}/{x}/{y}');
+    expect(tiled).toMatchObject({
+      supported: true,
+      tilemapUrl: '/signalk/chart-tiles/c/{z}/{x}/{y}',
+    });
+    expect(tiled.reason).toBeUndefined();
+    expect(v2('jpg', 'tilelayer', '/t/{z}/{x}/{y}').supported).toBe(true);
+    expect(v2('webp', 'tilelayer', '/t/{z}/{x}/{y}')).toMatchObject({
+      supported: false,
+      reason: 'webp tiles',
+    });
+    expect(v2('mvt', 'S-57', 'https://x/{z}/{x}/{y}.mvt')).toMatchObject({
+      supported: false,
+      reason: 'S-57 charts',
+    });
+    const wms = v2('png', 'WMS', 'https://x/wms?SERVICE=WMS&REQUEST=GetMap');
+    expect(wms).toMatchObject({ supported: false, reason: 'WMS charts' });
+    expect(wms.tilemapUrl).toBeUndefined();
+    expect(v2('png', 'WMTS', 'https://x/WMTS').reason).toBe('WMTS charts');
+    expect(v2('png', 'tilelayer', '/style.json')).toMatchObject({
+      supported: false,
+      reason: 'no tile URL',
+    });
+  });
+
+  it('sends the device token only to this server, never to an online chart source', () => {
+    expect(tileRequest('/signalk/chart-tiles/c/1/0/0', 3000, 'Bearer dev')).toEqual({
+      url: 'http://127.0.0.1:3000/signalk/chart-tiles/c/1/0/0',
+      headers: { Authorization: 'Bearer dev' },
+    });
+    expect(tileRequest('https://tiles.example/1/0/0.png', 3000, 'Bearer dev')).toEqual({
+      url: 'https://tiles.example/1/0/0.png',
+      headers: {},
+    });
   });
 });
 

@@ -20,6 +20,8 @@ export interface ChartInfo {
   bounds?: [[number, number], [number, number]];
   /** Whether ESPHelm can convert this chart's tiles (raster PNG or JPEG with a tile URL). */
   supported: boolean;
+  /** Why it isn't supported, for the editor (e.g. "WMS charts", "webp tiles"). */
+  reason?: string;
 }
 
 /** What the tile service needs from the server (tests provide a fake). */
@@ -32,16 +34,57 @@ export interface ChartSource {
 
 export const RASTER_FORMATS = ['png', 'jpg', 'jpeg'];
 
+/**
+ * A chart resource in either shape charts plugins publish: v1 (`chartFormat`, `tilemapUrl`) or
+ * the v2 resources API (`format`, `url`, and `type`: only "tilelayer" has a {z}/{x}/{y} tile URL;
+ * WMS, WMTS, S-57 and style-JSON charts don't).
+ */
 export function chartInfo(id: string, raw: Record<string, unknown>): ChartInfo {
   const format = String(raw.chartFormat ?? raw.format ?? '').toLowerCase();
-  const tilemapUrl = typeof raw.tilemapUrl === 'string' ? raw.tilemapUrl : undefined;
+  const type = typeof raw.type === 'string' ? raw.type : 'tilelayer';
+  const template =
+    typeof raw.tilemapUrl === 'string'
+      ? raw.tilemapUrl
+      : type.toLowerCase() === 'tilelayer' && typeof raw.url === 'string'
+        ? raw.url
+        : undefined;
+  const tiled =
+    template !== undefined &&
+    /\{z\}/.test(template) &&
+    /\{x\}/.test(template) &&
+    /\{-?y\}/.test(template);
+  const reason =
+    type.toLowerCase() !== 'tilelayer'
+      ? `${type} charts`
+      : !tiled
+        ? 'no tile URL'
+        : !RASTER_FORMATS.includes(format)
+          ? `${format || 'unknown'} tiles`
+          : undefined;
   return {
     identifier: typeof raw.identifier === 'string' ? raw.identifier : id,
     name: typeof raw.name === 'string' ? raw.name : id,
     format,
-    ...(tilemapUrl ? { tilemapUrl } : {}),
+    ...(tiled ? { tilemapUrl: template } : {}),
     ...(Array.isArray(raw.bounds) ? { bounds: raw.bounds as ChartInfo['bounds'] } : {}),
-    supported: RASTER_FORMATS.includes(format) && tilemapUrl !== undefined,
+    supported: reason === undefined,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+/**
+ * Where to fetch a tile and with which headers. Relative URLs are on this server and get the
+ * device's own Authorization; absolute URLs (an online chart source) never see the token.
+ */
+export function tileRequest(
+  url: string,
+  port: number,
+  authorization?: string,
+): { url: string; headers: Record<string, string> } {
+  if (/^https?:\/\//i.test(url)) return { url, headers: {} };
+  return {
+    url: `http://127.0.0.1:${port}${url.startsWith('/') ? '' : '/'}${url}`,
+    headers: authorization ? { Authorization: authorization } : {},
   };
 }
 
@@ -205,11 +248,9 @@ export function resourcesChartSource(
       return raw ? chartInfo(id, raw) : undefined;
     },
     async fetchTile(url, authorization) {
-      const absolute = /^https?:\/\//.test(url)
-        ? url
-        : `http://127.0.0.1:${port()}${url.startsWith('/') ? '' : '/'}${url}`;
-      const res = await fetch(absolute, {
-        headers: authorization ? { Authorization: authorization } : {},
+      const req = tileRequest(url, port(), authorization);
+      const res = await fetch(req.url, {
+        headers: req.headers,
         signal: AbortSignal.timeout(timeoutMs),
       });
       return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };

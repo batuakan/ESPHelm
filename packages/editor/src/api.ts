@@ -32,6 +32,8 @@ export interface ChartInfo {
   bounds?: [[number, number], [number, number]];
   /** Raster PNG/JPEG with a tile URL: displays can show it. */
   supported: boolean;
+  /** Why not, when it isn't (e.g. "WMS charts", "webp tiles"). */
+  reason?: string;
 }
 
 export interface WidgetCatalog {

@@ -642,7 +642,7 @@ export function ChartDrawer(
           {charts.map((c) => (
             <option key={c.identifier} value={c.identifier} disabled={!c.supported}>
               {c.name}
-              {c.supported ? '' : ` (${c.format || 'unknown format'}, not supported)`}
+              {c.supported ? '' : ` (${c.reason ?? `${c.format || 'unknown'} tiles`}, not supported)`}
             </option>
           ))}
         </select>
