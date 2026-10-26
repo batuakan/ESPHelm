@@ -425,6 +425,42 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('colours a value tile: fixed colour, open-ended zones over it, and saves both', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.change(screen.getByLabelText('Search SignalK paths'), { target: { value: 'speed' } });
+    fireEvent.click(screen.getByRole('option', { name: /navigation.speedOverGround/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    live.emit('navigation.speedOverGround', 5.0); // 9.7 kn
+    const number = within(screen.getByTestId('tile-tile-1')).getByText('9.7');
+    expect(number.className).not.toMatch(/value-(color|zone)/);
+
+    fireEvent.change(within(drawer).getByLabelText('Colour'), { target: { value: 'blue' } });
+    expect(number.className).toMatch(/value-color-blue/);
+
+    // A zone with only a lower bound ("8 kn or more"): it wins over the colour.
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Add zone' }));
+    fireEvent.change(within(drawer).getByLabelText('Zone 1 to'), { target: { value: '' } });
+    fireEvent.change(within(drawer).getByLabelText('Zone 1 from'), { target: { value: '8' } });
+    fireEvent.change(within(drawer).getByLabelText('Zone 1 state'), { target: { value: 'warn' } });
+    expect(number.className).toMatch(/value-zone-warn/);
+    live.emit('navigation.speedOverGround', 3.0); // 5.8 kn: below the zone, the colour again
+    expect(within(screen.getByTestId('tile-tile-1')).getByText('5.8').className).toMatch(/value-color-blue/);
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [{ type: 'value', id: 'tile-1', color: 'blue', zones: [{ from: 8, state: 'warn' }] }],
+    });
+    const saved = (server.layouts.get(`display-${p4.deviceId}`)!.pages[0] as { tiles: { zones: object[] }[] })
+      .tiles[0]!.zones[0]!;
+    expect('to' in saved).toBe(false); // a cleared bound is left out, not kept as undefined
+  });
+
   it('edits the display settings and sends them with the layout', async () => {
     const d = { ...device('adopted'), layoutId: `display-${p4.deviceId}` };
     const server = fakeServer([d]);

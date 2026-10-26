@@ -317,6 +317,14 @@ select {
   --zone-emergency: #9c27b0;
   --tile-accent: #0a6cd6;
   --tile-second: #b07800;
+  /* value tile colours (ADR-0016) */
+  --value-blue: #0a6cd6;
+  --value-green: #1d8a4f;
+  --value-yellow: #a68a00;
+  --value-orange: #d96c00;
+  --value-red: #d32f2f;
+  --value-purple: #8e24aa;
+  --value-zone-normal: var(--zone-normal);
   /* wind rose, the legacy wind page's colours */
   --rose-port: #ff0000;
   --rose-stbd: #00c800;
@@ -327,6 +335,15 @@ select {
   --rose-card-text: #ffffff;
 }
 .display-frame[data-theme-preview='night'] {
+  /* value tile colours: hue would cost night vision, so all are the text red; a "normal" zone
+     too (its dim shade would look stale) */
+  --value-blue: var(--tile-text);
+  --value-green: var(--tile-text);
+  --value-yellow: var(--tile-text);
+  --value-orange: var(--tile-text);
+  --value-red: var(--tile-text);
+  --value-purple: var(--tile-text);
+  --value-zone-normal: var(--tile-text);
   --tile-bg: #140404;
   --tile-text: #e0302a;
   --tile-muted: #6a2020;
@@ -941,13 +958,31 @@ select.zone-emergency {
   flex-direction: column;
   gap: 6px;
 }
+/* Two lines in the narrow drawer: from, to and remove, then the state across. */
 .zone-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.4fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'from to remove'
+    'state state .';
   gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
 .zone-row input {
   min-width: 0;
+}
+.zone-row input:nth-of-type(1) {
+  grid-area: from;
+}
+.zone-row input:nth-of-type(2) {
+  grid-area: to;
+}
+.zone-row select {
+  grid-area: state;
+}
+.zone-row button {
+  grid-area: remove;
 }
 .check {
   display: flex;
@@ -1221,4 +1256,44 @@ fieldset.modes {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: pre;
+}
+
+/* Value tile colours (ADR-0016): a matching zone wins over the tile's colour. */
+.tile-value.value-color-blue {
+  color: var(--value-blue);
+}
+.tile-value.value-color-green {
+  color: var(--value-green);
+}
+.tile-value.value-color-yellow {
+  color: var(--value-yellow);
+}
+.tile-value.value-color-orange {
+  color: var(--value-orange);
+}
+.tile-value.value-color-red {
+  color: var(--value-red);
+}
+.tile-value.value-color-purple {
+  color: var(--value-purple);
+}
+.tile-value.value-zone-normal {
+  color: var(--value-zone-normal);
+}
+.tile-value.value-zone-warn {
+  color: var(--zone-warn);
+}
+.tile-value.value-zone-alarm {
+  color: var(--zone-alarm);
+}
+.tile-value.value-zone-emergency {
+  color: var(--zone-emergency);
+}
+.color-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  flex: none;
 }

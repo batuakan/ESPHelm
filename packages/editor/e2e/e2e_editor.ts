@@ -113,6 +113,18 @@ async function main(): Promise<void> {
       live,
       (await tile1Value.textContent()) ?? '',
     );
+    // Colour (ADR-0016): blue, then a zone with no lower bound ("1000 kn or less") over it.
+    const tileDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await tileDrawer.getByLabel('Colour').selectOption('blue');
+    const blue = /value-color-blue/.test((await tile1Value.getAttribute('class')) ?? '');
+    await tileDrawer.getByRole('button', { name: 'Add zone' }).click();
+    await tileDrawer.getByLabel('Zone 1 to').fill('1000');
+    await tileDrawer.getByLabel('Zone 1 state').selectOption('warn');
+    check(
+      'value colour and an open-ended zone colour the preview',
+      blue && /value-zone-warn/.test((await tile1Value.getAttribute('class')) ?? ''),
+      (await tile1Value.getAttribute('class')) ?? '',
+    );
 
     // Add a second tile by dragging the library item onto cell (1,0); make tile-1 two rows tall.
     const libraryValue = page
@@ -191,6 +203,12 @@ async function main(): Promise<void> {
     const gotVersion = await waitFor(
       () => JSON.stringify(messages).includes(JSON.stringify(etag).slice(1, -1)),
       5000,
+    );
+    check(
+      'the display gets the colour and the open-ended zone',
+      JSON.stringify([tiles[0]?.color, tiles[0]?.zones]) ===
+        JSON.stringify(['blue', [{ to: 1000, state: 'warn' }]]),
+      JSON.stringify([tiles[0]?.color, tiles[0]?.zones]),
     );
     check('the display is notified with the new version', gotVersion, String(etag));
     // Pages: a wind page from a template (a 1x1 grid with a rose tile, slots prefilled), a new

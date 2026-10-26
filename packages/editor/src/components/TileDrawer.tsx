@@ -25,6 +25,10 @@ import {
   type PositionTile,
   type Tile,
   type UnitId,
+  type ValueColor,
+  type ValueTile,
+  type ValueZone,
+  VALUE_COLORS,
   type WindRoseTile,
   type Zone,
 } from '@esphelm/schema';
@@ -331,13 +335,136 @@ function PositionFields(props: Common & { tile: PositionTile; onChange(patch: Pa
   );
 }
 
+/**
+ * Zone rows (from, to, state). With `openEnds` (value tiles) a blank bound means no limit;
+ * otherwise both bounds are numbers (gauge and bar zones lie within min..max).
+ */
+function ZoneList(props: {
+  zones: ValueZone[];
+  openEnds?: boolean;
+  onChange(next: ValueZone[]): void;
+  newZone(): ValueZone;
+}) {
+  const { zones, openEnds, onChange } = props;
+  const setZone = (i: number, patch: Partial<ValueZone>) =>
+    onChange(
+      zones.map((z, k) => {
+        if (k !== i) return z;
+        const next: ValueZone = { ...z, ...patch };
+        // Drop a cleared bound instead of keeping `undefined` in the layout.
+        if (next.from === undefined) delete next.from;
+        if (next.to === undefined) delete next.to;
+        return next;
+      }),
+    );
+  const bound = (v: string) => (openEnds && v.trim() === '' ? undefined : Number(v));
+  return (
+    <>
+      {zones.map((z, i) => (
+        <div className="zone-row" key={i}>
+          <input
+            type="number"
+            value={z.from === undefined ? '' : String(z.from)}
+            placeholder={openEnds ? 'no limit' : undefined}
+            onChange={(e) => setZone(i, { from: bound(e.target.value) })}
+            aria-label={`Zone ${i + 1} from`}
+          />
+          <input
+            type="number"
+            value={z.to === undefined ? '' : String(z.to)}
+            placeholder={openEnds ? 'no limit' : undefined}
+            onChange={(e) => setZone(i, { to: bound(e.target.value) })}
+            aria-label={`Zone ${i + 1} to`}
+          />
+          <select
+            value={z.state}
+            onChange={(e) => setZone(i, { state: e.target.value as Zone['state'] })}
+            aria-label={`Zone ${i + 1} state`}
+            className={`zone-${z.state}`}
+          >
+            {ZONE_STATES.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+          <button
+            className="icon"
+            onClick={() => onChange(zones.filter((_, k) => k !== i))}
+            aria-label={`Remove zone ${i + 1}`}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button className="small" onClick={() => onChange([...zones, props.newZone()])}>
+        Add zone
+      </button>
+    </>
+  );
+}
+
+/** Day colours of the value colour names, for the swatch (the display's own, ADR-0016). */
+const COLOR_SWATCH: Record<ValueColor, string> = {
+  blue: '#0a6cd6',
+  green: '#1d8a4f',
+  yellow: '#a68a00',
+  orange: '#d96c00',
+  red: '#d32f2f',
+  purple: '#8e24aa',
+};
+
+/** A value tile's fixed colour and its colour-by-value zones (display units). */
+function ValueColorFields(props: { tile: ValueTile; onChange(p: Patch): void }) {
+  const { tile, onChange } = props;
+  const zones = tile.zones ?? [];
+  return (
+    <>
+      <label className="field">
+        <span>Colour</span>
+        <span className="field-row color-field">
+          <select
+            value={tile.color ?? ''}
+            onChange={(e) => onChange({ color: e.target.value === '' ? undefined : e.target.value })}
+            aria-label="Colour"
+          >
+            <option value="">theme default</option>
+            {VALUE_COLORS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <span
+            className="color-swatch"
+            style={{ background: tile.color ? COLOR_SWATCH[tile.color] : 'transparent' }}
+            aria-hidden
+          />
+        </span>
+        <small className="hint">At night every colour shows in the night red.</small>
+      </label>
+      <fieldset className="zones">
+        <legend>Colour by value</legend>
+        <small className="hint">
+          In {tile.unit ?? 'the value as received'}; leave a bound empty for no limit. The last
+          matching row wins, over the colour above.
+        </small>
+        <ZoneList
+          zones={zones}
+          openEnds
+          onChange={(next) => onChange({ zones: next.length > 0 ? next : undefined })}
+          newZone={() => ({ to: 0, state: 'alarm' })}
+        />
+      </fieldset>
+    </>
+  );
+}
+
 /** Min/max, zones and (bars) orientation, in display units. */
 function RangeFields(props: { tile: Tile & { min: number; max: number }; onChange(p: Patch): void }) {
   const { tile, onChange } = props;
-  const zones: Zone[] = 'zones' in tile ? (tile.zones ?? []) : [];
+  const zones: Zone[] = tile.type === 'gauge' || tile.type === 'bar' ? (tile.zones ?? []) : [];
   const setZones = (next: Zone[]) => onChange({ zones: next.length > 0 ? next : undefined });
-  const setZone = (i: number, patch: Partial<Zone>) =>
-    setZones(zones.map((z, k) => (k === i ? { ...z, ...patch } : z)));
   return (
     <>
       <div className="field-row">
@@ -375,49 +502,11 @@ function RangeFields(props: { tile: Tile & { min: number; max: number }; onChang
       )}
       <fieldset className="zones">
         <legend>Zones</legend>
-        {zones.map((z, i) => (
-          <div className="zone-row" key={i}>
-            <input
-              type="number"
-              value={String(z.from)}
-              onChange={(e) => setZone(i, { from: Number(e.target.value) })}
-              aria-label={`Zone ${i + 1} from`}
-            />
-            <input
-              type="number"
-              value={String(z.to)}
-              onChange={(e) => setZone(i, { to: Number(e.target.value) })}
-              aria-label={`Zone ${i + 1} to`}
-            />
-            <select
-              value={z.state}
-              onChange={(e) => setZone(i, { state: e.target.value as Zone['state'] })}
-              aria-label={`Zone ${i + 1} state`}
-              className={`zone-${z.state}`}
-            >
-              {ZONE_STATES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <button
-              className="icon"
-              onClick={() => setZones(zones.filter((_, k) => k !== i))}
-              aria-label={`Remove zone ${i + 1}`}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-        <button
-          className="small"
-          onClick={() =>
-            setZones([...zones, { from: tile.max - (tile.max - tile.min) / 5, to: tile.max, state: 'alarm' }])
-          }
-        >
-          Add zone
-        </button>
+        <ZoneList
+          zones={zones}
+          onChange={(next) => setZones(next as Zone[])}
+          newZone={() => ({ from: tile.max - (tile.max - tile.min) / 5, to: tile.max, state: 'alarm' })}
+        />
       </fieldset>
     </>
   );
@@ -761,6 +850,7 @@ export function TileDrawer(
           {(tile.type === 'gauge' || tile.type === 'bar') && (
             <RangeFields tile={tile} onChange={onChange} />
           )}
+          {tile.type === 'value' && <ValueColorFields tile={tile} onChange={onChange} />}
         </>
       )}
       <button className="danger" onClick={props.onDelete}>

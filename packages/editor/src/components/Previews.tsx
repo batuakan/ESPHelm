@@ -14,7 +14,9 @@ import {
   type AutopilotTile,
   type Tile,
   type WindRoseTile,
+  type ValueTile,
   type Zone,
+  valueZoneState,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
@@ -37,6 +39,17 @@ function arc(cx: number, cy: number, r: number, from: number, to: number): strin
   const [x1, y1] = polar(cx, cy, r, from);
   const [x2, y2] = polar(cx, cy, r, to);
   return `M${x1} ${y1}A${r} ${r} 0 ${to - from > 180 ? 1 : 0} 1 ${x2} ${y2}`;
+}
+
+/**
+ * Class for a value tile's number, as the display colours it (ADR-0016): a matching zone, else
+ * the tile's colour, else none (the theme's text colour). Stale or not a number: none.
+ */
+export function valueColorClass(tile: ValueTile, value: unknown): string {
+  const n = displayNumber(value, tile);
+  const state = n === undefined ? undefined : valueZoneState(n, tile.zones);
+  if (state) return `value-zone-${state}`;
+  return tile.color ? `value-color-${tile.color}` : '';
 }
 
 function zoneFor(n: number | undefined, zones: Zone[] | undefined): string {
@@ -191,7 +204,7 @@ export function TilePreview(props: {
     default:
       return (
         <>
-          <span className="tile-value">
+          <span className={`tile-value ${tile.type === 'value' ? valueColorClass(tile, value) : ''}`}>
             {tile.path ? formatValue(value, tile.unit, tile.decimals) : '--'}
           </span>
           <span className="tile-unit">{tile.unit ? UNITS[tile.unit].label : ''}</span>
