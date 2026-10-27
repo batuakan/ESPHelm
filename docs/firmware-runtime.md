@@ -29,6 +29,7 @@ esphelm_runtime:
     label: esphelm_font_label
     small: esphelm_font_small
     extra: [esphelm_font_medium, esphelm_font_huge]   # optional: more sizes for tile text
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]  # optional: glyphs "0123456789.-" only
   board: waveshare-esp32-p4-86    # reported in hello
   touch: true
   stale_after: 15s                # default when a tile sets no staleAfter
@@ -37,7 +38,7 @@ esphelm_runtime:
   # backlight: display_backlight  # a dimmable light: layout brightness and screen timeout
 ```
 
-All the fonts form one ladder, sorted by line height. Tile text picks the largest size that fits the tile (ADR-0017). `firmware/fonts.yaml` sets the sizes by substitution: P4 and the 720 SDL build use 28 / 42 / 64 / 96 / 144 px, the default 480 build 22 / 32 / 48 / 64 / 96, and the C3 14 / 20 / 28 / 40 / 56. The hello reports the ladder as `fontLineHeights`.
+All the fonts form one ladder, sorted by line height. Tile text picks the largest size that fits the tile (ADR-0017). `firmware/fonts.yaml` sets the sizes by substitution: P4 and the 720 SDL build use 28 / 42 / 64 / 96 / 144 px, the default 480 build 22 / 32 / 48 / 64 / 96, and the C3 14 / 20 / 28 / 40 / 56. The `digits` fonts (192 / 288, 128 / 192 and 80 / 112) have only the glyphs a number needs, so they're cheap even that large. Only a value tile's number uses them, while its text is numeric. The hello reports the ladder as `fontLineHeights` and `digitFontLineHeights`.
 
 `backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
 
@@ -169,8 +170,8 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 95,486 B (16.6 %), flash 3.06 MB (18.5 %); the five fonts (up to 144 px) are about 0.6 MB of that |
-| C3 compile check, static | RAM 109,512 B of 321,296 B (34.1 %), flash 1.34 MB of 1.8 MB (73.1 %) |
+| P4 runtime firmware, static | RAM 95,702 B (16.6 %), flash 3.26 MB (19.7 %); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 109,728 B of 321,296 B (34.1 %), flash 1.37 MB of 1.8 MB (74.8 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -259,6 +260,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - By day, check that every colour is readable in sunlight, yellow in particular.
     - At night everything is red; check that a warn and an alarm value can still be told apart from normal.
 17. **Text sizes.** Assign `packages/schema/fixtures/valid/value-sizes.json`.
-    - The full-width SOG shows the 144 px number, and the captions grow with the numbers.
+    - The full-width SOG and the 2x2 depth use the large digit fonts, and the captions grow with the numbers.
+    - A value tile on a boolean path shows "on"/"off" in a full font (the digit fonts have no letters).
     - In the single cells nothing is clipped. An RPM in the thousands or a 3-digit heading may shrink one size when its first value arrives.
     - Captions and units are readable at arm's length, and the editor's preview shows the same proportions.

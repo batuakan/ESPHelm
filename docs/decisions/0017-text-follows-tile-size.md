@@ -14,6 +14,11 @@ The alternatives were rejected:
   - `fonts.value`, `fonts.label` and `fonts.small`
   - any number of `fonts.extra`
   - `firmware/fonts.yaml` adds `medium` and `huge`
+- **Digits-only fonts** (`fonts.digits`) contain just `0123456789.-`, which is everything a formatted number can contain. With about a dozen glyphs instead of about a hundred, even very large sizes are cheap: `fonts.yaml` adds two of them.
+  - They join the ladder, flagged as digits-only.
+  - Only a value tile's number may use them, and only while its text is numeric.
+  - A boolean ("on"/"off") or a text value steps down to the largest full font that fits.
+  - Captions, units, gauge and bar values (they carry the unit), position and autopilot never use them.
 - **The fit rule** (`TEXT_FIT` in `packages/schema/src/tiles.ts`, generated into `esphelm_sizes.h`). A value tile's number gets the largest font in which:
   - its sample text fits the content width; the sample is `"88"` plus the tile's decimals (`88.8` with the default one decimal)
   - its digits, plus the caption line above and the unit line below (when the tile has them), fit the height
@@ -32,22 +37,23 @@ The alternatives were rejected:
   - the switch caption
   - the wind rose, which keeps its own pixel tiers (ADR-0010)
   - the alarm banner, footer and chart page
-- **Hello** reports `fontLineHeights`, so the editor previews the same sizes.
+- **Hello** reports `fontLineHeights` and `digitFontLineHeights`, so the editor previews the same sizes.
   - The editor estimates widths from Roboto's proportions (`textFit.ts`) and draws value tiles in the same Roboto file, so its choice matches the device's in practice.
   - The device always measures real glyphs.
-- **Within schema v1:** the layout format doesn't change, and `fontLineHeights` is optional.
+- **Within schema v1:** the layout format doesn't change, and both hello fields are optional.
   - The plugin's hello validation rejects unknown fields, so update the plugin before flashing firmware that sends it.
 
 ## Consequences
 - **Ladders and flash cost:**
 
-  | Board | Ladder (px) | Flash | RAM |
-  |---|---|---|---|
-  | P4 and the 720 SDL build | 28 / 42 / 64 / 96 / 144 | +386 KB (2.68 → 3.06 MB of 16.5 MB) | +280 B |
-  | default 480 build | 22 / 32 / 48 / 64 / 96 | | |
-  | C3 | 14 / 20 / 28 / 40 / 56 | 69.2 → 73.1 % | +280 B |
+  | Board | Ladder (px) | Digits only (px) | Flash | RAM |
+  |---|---|---|---|---|
+  | P4 and the 720 SDL build | 28 / 42 / 64 / 96 / 144 | 192 / 288 | +583 KB (2.68 → 3.26 MB of 16.5 MB); the two digit fonts are 197 KB of it | +500 B |
+  | default 480 build | 22 / 32 / 48 / 64 / 96 | 128 / 192 | | |
+  | C3 | 14 / 20 / 28 / 40 / 56 | 80 / 112 | 69.2 → 74.8 % | +500 B |
 
 - **The sample is a compromise.** Two digits suits most speeds, depths, voltages and temperatures. Headings, percentages and RPM step down once when the first value arrives, so a tile's number can shrink once right after the page appears.
+- **In wide, short tiles the caption and unit lines limit the number.** Each takes its own line of up to 40 % of the number's height, so a full-width tile two rows high doesn't reach the largest digit font. Capping captions at the label font would let it; that's a possible follow-up.
 - **A tile's font can stay one size too small.** After a value like 105 m, the depth stays smaller until the layout is applied again; growing back on every shorter value would make the text jump.
 - **Two decimals make the number smaller.** A tile with two decimals has a wider sample, so its number is smaller than a one-decimal tile of the same size.
 - Many SDL goldens changed (bigger numbers in roomy tiles, smaller in narrow ones). Two were added: `32-value-sizes` and `720-04-value-sizes`.

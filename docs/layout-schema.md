@@ -273,6 +273,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `widgets` | tile types this firmware renders |
 | `fonts?` | semantic font sizes available |
 | `fontLineHeights?` | line heights (px) of the fonts tile text can use, smallest first; the editor sizes its preview text from them (ADR-0017). Integers ≥ 1 |
+| `digitFontLineHeights?` | the same for the digits-only fonts (glyphs `0123456789.-`), which only a value tile's number uses, while its text is numeric |
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
 | `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight) |
 | `layoutEtag?` | ETag of the cached layout |
