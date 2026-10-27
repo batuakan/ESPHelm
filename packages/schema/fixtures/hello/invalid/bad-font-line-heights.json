@@ -1,0 +1,46 @@
+{
+  "description": "font line heights must be positive whole pixels",
+  "expect": [
+    {
+      "code": "INVALID_TYPE",
+      "pointer": "/fontLineHeights/1"
+    },
+    {
+      "code": "OUT_OF_RANGE",
+      "pointer": "/fontLineHeights/2"
+    }
+  ],
+  "hello": {
+    "deviceId": "0c1d2e3f-4a5b-6c7d-0ba2-0c1d2e3f4a5b",
+    "fw": {
+      "version": "0.3.0"
+    },
+    "schema": {
+      "major": 1
+    },
+    "board": "esp32-c3-gc9a01-240",
+    "display": {
+      "width": 240,
+      "height": 240,
+      "rotation": 0
+    },
+    "widgets": [
+      "value",
+      "bar"
+    ],
+    "capacity": {
+      "psram": false,
+      "maxLayoutBytes": 8192,
+      "freeHeapBytes": 95000
+    },
+    "capabilities": {
+      "touch": false,
+      "put": true
+    },
+    "fontLineHeights": [
+      16,
+      23.5,
+      0
+    ]
+  }
+}

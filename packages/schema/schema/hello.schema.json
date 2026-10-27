@@ -100,6 +100,14 @@
       },
       "description": "Semantic font sizes."
     },
+    "fontLineHeights": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "description": "Line heights in pixels of the fonts tile text can use, smallest first (ADR-0017). The editor sizes its preview text from them."
+    },
     "capacity": {
       "type": "object",
       "required": [

@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AUTOPILOT_FIT, migrateLayout, validateLayout, WIND_ROSE_FIT } from '../src/index.js';
+import {
+  AUTOPILOT_FIT,
+  migrateLayout,
+  TEXT_FIT,
+  validateLayout,
+  WIND_ROSE_FIT,
+} from '../src/index.js';
 import { PACKAGE_ROOT } from '../scripts/render.js';
 
 /** A layout as stored before Phase 5b, with the wind rose as a page kind. */
@@ -81,5 +87,7 @@ describe('size tiers', () => {
     expect(WIND_ROSE_FIT.full).toBeGreaterThan(WIND_ROSE_FIT.compact);
     expect(header).toContain(`AUTOPILOT_CONTROLS_WIDTH = ${AUTOPILOT_FIT.controlsWidth};`);
     expect(header).toContain(`AUTOPILOT_CONTROLS_HEIGHT = ${AUTOPILOT_FIT.controlsHeight};`);
+    expect(header).toContain(`TEXT_COMPANION_PERCENT = ${TEXT_FIT.companionPercent};`);
+    expect(header).toContain(`TEXT_SAMPLE_DIGITS = ${TEXT_FIT.sampleDigits};`);
   });
 });

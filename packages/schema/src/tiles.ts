@@ -244,6 +244,14 @@ export const AUTOPILOT_DEFAULTS = {
  */
 export const AUTOPILOT_FIT = { controlsWidth: 260, controlsHeight: 220 } as const;
 
+/**
+ * How tile text follows the tile size (ADR-0017). The device has a ladder of compiled fonts and
+ * gives each tile's number the largest one whose sample text ("88" plus the tile's decimals)
+ * fits; captions and units take the largest font at most `companionPercent` of the number's line
+ * height (never below the smallest). Generated into esphelm_sizes.h.
+ */
+export const TEXT_FIT = { companionPercent: 40, sampleDigits: 2 } as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,

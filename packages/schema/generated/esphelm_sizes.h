@@ -14,5 +14,10 @@ inline constexpr int WIND_ROSE_COMPACT = 150;
 inline constexpr int AUTOPILOT_CONTROLS_WIDTH = 260;
 inline constexpr int AUTOPILOT_CONTROLS_HEIGHT = 220;
 
+// Tile text (ADR-0017): captions and units at most this share of the number's line height;
+// the number's sample text has this many integer digits.
+inline constexpr int TEXT_COMPANION_PERCENT = 40;
+inline constexpr int TEXT_SAMPLE_DIGITS = 2;
+
 }  // namespace sizes
 }  // namespace esphelm

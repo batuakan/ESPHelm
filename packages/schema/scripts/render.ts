@@ -190,6 +190,7 @@ function renderUnitsHeader(units: FlatUnit[]): string {
 function renderSizesHeader(
   fit: { full: number; compact: number },
   ap: { controlsWidth: number; controlsHeight: number },
+  text: { companionPercent: number; sampleDigits: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -207,6 +208,11 @@ function renderSizesHeader(
     '// Autopilot: content box in pixels from which the buttons are shown (else status only).',
     `inline constexpr int AUTOPILOT_CONTROLS_WIDTH = ${ap.controlsWidth};`,
     `inline constexpr int AUTOPILOT_CONTROLS_HEIGHT = ${ap.controlsHeight};`,
+    '',
+    "// Tile text (ADR-0017): captions and units at most this share of the number's line height;",
+    "// the number's sample text has this many integer digits.",
+    `inline constexpr int TEXT_COMPANION_PERCENT = ${text.companionPercent};`,
+    `inline constexpr int TEXT_SAMPLE_DIGITS = ${text.sampleDigits};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',
@@ -297,7 +303,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT, AUTOPILOT_FIT } = await import('../src/tiles.js');
+  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -305,10 +311,11 @@ export async function renderAll(): Promise<Record<string, string>> {
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
-    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT),
+    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
       AUTOPILOT_FIT,
+      TEXT_FIT,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

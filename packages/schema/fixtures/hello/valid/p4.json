@@ -31,6 +31,13 @@
     "LARGE",
     "Huge"
   ],
+  "fontLineHeights": [
+    33,
+    49,
+    75,
+    113,
+    169
+  ],
   "capacity": {
     "psram": true,
     "maxLayoutBytes": 262144,

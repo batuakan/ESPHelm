@@ -33,6 +33,12 @@ export const Hello = Type.Object(
       description: 'Tile types and full-page widgets this firmware can render.',
     }),
     fonts: Type.Optional(Type.Array(Type.String(), { description: 'Semantic font sizes.' })),
+    fontLineHeights: Type.Optional(
+      Type.Array(Type.Integer({ minimum: 1 }), {
+        description:
+          'Line heights in pixels of the fonts tile text can use, smallest first (ADR-0017). The editor sizes its preview text from them.',
+      }),
+    ),
     capacity: Type.Object(
       {
         psram: Type.Boolean(),
