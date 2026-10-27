@@ -66,15 +66,18 @@ export interface ValueTextSize {
 /**
  * The fonts the display gives a value tile of content size `box` (ADR-0017), from the display's
  * font ladder (hello.fontLineHeights), as shares of the tile height so the preview scales alike.
- * `text` is the value shown: a wider one steps down, as on the display.
+ * `text` is the value shown: a wider one steps down, as on the display. `digits` are the
+ * display's digits-only fonts (hello.digitFontLineHeights), for numeric text only.
  */
 export function valueTextSize(
   ladder: readonly number[],
   box: { width: number; height: number },
   tile: ValueTile,
   text?: string,
+  digits?: readonly number[],
 ): ValueTextSize {
   const fit = fitValueText(ladder, box, {
+    digits,
     decimals: tile.decimals ?? 1,
     caption: !!tile.label,
     unit: !!tile.unit && UNITS[tile.unit].label !== '',

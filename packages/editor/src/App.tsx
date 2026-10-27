@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   CHART_DEFAULTS,
+  DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
   DEFAULT_FONT_LINE_HEIGHTS,
   TEMPLATES,
   TILE_TYPES,
@@ -296,6 +297,10 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     return Math.min(width, height);
   };
   const fontLines = device?.hello.fontLineHeights ?? DEFAULT_FONT_LINE_HEIGHTS;
+  // A display that reports its fonts reports its digits-only fonts too (none if it has none).
+  const digitLines = device?.hello.fontLineHeights
+    ? (device.hello.digitFontLineHeights ?? [])
+    : DEFAULT_DIGIT_FONT_LINE_HEIGHTS;
   const canSave = !!layout && device?.state === 'adopted' && problems.length === 0 && !saving;
 
   return (
@@ -480,6 +485,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                           tileBox(t),
                           t,
                           t.path ? formatValue(shownValues.get(t.path), t.unit, t.decimals) : undefined,
+                          digitLines,
                         )
                       : undefined
                   }
