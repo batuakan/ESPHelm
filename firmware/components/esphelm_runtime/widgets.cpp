@@ -109,6 +109,60 @@ static bool set_text(lv_obj_t *label, std::string &shown, const std::string &tex
   return true;
 }
 
+// ---- Text that follows the tile size (ADR-0017) ----
+
+static int32_t line_height(const lv_font_t *font) { return lv_font_get_line_height(font); }
+
+/// Width of `text` in `font`, in pixels.
+static int32_t text_width(const char *text, const lv_font_t *font) {
+  lv_point_t size;
+  lv_text_get_size(&size, text, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  return size.x;
+}
+
+/// Height of a digit's ink in `font` (a line also has room for ascenders and descenders).
+static int32_t digit_height(const lv_font_t *font) {
+  lv_font_glyph_dsc_t dsc;
+  if (lv_font_get_glyph_dsc(font, &dsc, '8', 0))
+    return dsc.box_h;
+  return line_height(font);
+}
+
+/// The number a value-like tile sizes its font for: "88" plus its decimals (-1: the default 1).
+static std::string value_sample(int decimals) {
+  if (decimals < 0)
+    decimals = 1;
+  std::string s(esphelm::sizes::TEXT_SAMPLE_DIGITS, '8');
+  if (decimals > 0)
+    s += "." + std::string(decimals, '8');
+  return s;
+}
+
+/// The largest ladder font, no taller than `max` if given, in which `lines` lines of `text` fit
+/// w x h; the smallest when none does.
+static const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines = 1,
+                                 const lv_font_t *max = nullptr) {
+  for (int i = fonts.count - 1; i >= 0; i--) {
+    const lv_font_t *f = fonts.ladder[i];
+    if (max != nullptr && line_height(f) > line_height(max))
+      continue;
+    if (lines * line_height(f) <= h && text_width(text, f) <= w)
+      return f;
+  }
+  return fonts.count > 0 ? fonts.ladder[0] : fonts.small;
+}
+
+/// Caption and unit font beside a number in `font`: the largest at most TEXT_COMPANION_PERCENT
+/// of its line height, never below the smallest.
+static const lv_font_t *companion_font(const Fonts &fonts, const lv_font_t *font) {
+  const lv_font_t *best = fonts.count > 0 ? fonts.ladder[0] : fonts.small;
+  for (uint8_t i = 0; i < fonts.count; i++) {
+    if (line_height(fonts.ladder[i]) * 100 <= line_height(font) * esphelm::sizes::TEXT_COMPANION_PERCENT)
+      best = fonts.ladder[i];
+  }
+  return best;
+}
+
 static uint32_t stale_ms(const esphelm::DataItem &item, const WidgetEnv &env) {
   return item.stale_after > 0 ? static_cast<uint32_t>(item.stale_after * 1000) : env.default_stale_ms;
 }
@@ -195,24 +249,63 @@ static void style_cell(lv_obj_t *cell, const Colors &c) {
 
 // ---- value ----
 
+/**
+ * Caption, number and unit. The number gets the largest font whose sample ("88" plus the
+ * decimals) fits the cell, with the caption line above and the unit line below; caption and unit
+ * scale with it (ADR-0017). A wider live value (RPM, text) steps the number down a size until it
+ * fits, and it stays there until the page is laid out again. Memory: three labels.
+ */
 class ValueWidget : public Widget {
  public:
   ValueWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
-      : id_(tile.id), colors_(env.colors), night_(env.night), color_(tile.color), zones_(tile.zones) {
+      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), night_(env.night), color_(tile.color),
+        zones_(tile.zones), sample_(value_sample(tile.data.decimals)) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
-    lv_obj_t *caption = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
-    lv_obj_align(caption, LV_ALIGN_TOP_LEFT, 0, 0);
+    caption_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
     value_ = make_label(cell, env.fonts.value, env.colors.muted, "--");
-    lv_obj_align(value_, LV_ALIGN_CENTER, 0, 0);
-    if (tile.data.unit != nullptr) {
-      lv_obj_t *unit = make_label(cell, env.fonts.small, env.colors.muted, tile.data.unit->label);
-      lv_obj_align(unit, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    }
+    lv_label_set_long_mode(value_, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_style_text_align(value_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    if (tile.data.unit != nullptr && tile.data.unit->label[0] != '\0')
+      unit_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.unit->label);
   }
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override { out.push_back(b_.item.path); }
+
+  void layout_done() override {
+    width_ = lv_obj_get_content_width(cell_);
+    const int32_t h = lv_obj_get_content_height(cell_);
+    const bool has_caption = !b_.item.label.empty();
+    level_ = 0;
+    for (int i = fonts_.count - 1; i >= 0; i--) {
+      const lv_font_t *c = companion_font(fonts_, fonts_.ladder[i]);
+      const int32_t bands = (has_caption ? line_height(c) : 0) + (unit_ != nullptr ? line_height(c) : 0);
+      if (text_width(sample_.c_str(), fonts_.ladder[i]) <= width_ && digit_height(fonts_.ladder[i]) + bands <= h) {
+        level_ = i;
+        break;
+      }
+    }
+    const lv_font_t *companion = companion_font(fonts_, number_font_());
+    const int32_t top = has_caption ? line_height(companion) : 0;
+    const int32_t bottom = unit_ != nullptr ? line_height(companion) : 0;
+    lv_obj_set_style_text_font(caption_, companion, LV_PART_MAIN);
+    lv_obj_set_width(caption_, width_);
+    lv_label_set_long_mode(caption_, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
+    if (unit_ != nullptr) {
+      lv_obj_set_style_text_font(unit_, companion, LV_PART_MAIN);
+      lv_obj_align(unit_, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    }
+    // The number centres in the band between the caption and the unit.
+    offset_y_ = (top - bottom) / 2;
+    lv_obj_set_width(value_, width_);
+    apply_number_font_();
+    shrink_to_fit_();
+    if (!b_.stale_shown)
+      b_.dirty = true;
+  }
+
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
     if (path == b_.item.path)
       b_.set(v, now);
@@ -221,11 +314,32 @@ class ValueWidget : public Widget {
     bool stale;
     if (!b_.due(now, stale))
       return;
-    set_text(value_, shown_, stale ? "--" : b_.text);
+    if (set_text(value_, shown_, stale ? "--" : b_.text))
+      shrink_to_fit_();
     lv_obj_set_style_text_color(value_, stale ? colors_.muted : number_color_(), LV_PART_MAIN);
   }
 
  protected:
+  const lv_font_t *number_font_() const { return fonts_.count > 0 ? fonts_.ladder[level_] : fonts_.value; }
+  void apply_number_font_() {
+    lv_obj_set_style_text_font(value_, number_font_(), LV_PART_MAIN);
+    lv_obj_align(value_, LV_ALIGN_CENTER, 0, offset_y_);
+  }
+  /// Step the number down while the shown text is wider than the cell. Text no longer than the
+  /// sample fits by construction, so most values are never measured.
+  void shrink_to_fit_() {
+    if (shown_.size() <= sample_.size() || width_ <= 0)
+      return;
+    const int before = level_;
+    while (level_ > 0 && text_width(shown_.c_str(), number_font_()) > width_)
+      level_--;
+    if (level_ != before) {
+      ESP_LOGD(TAG, "Value %s: smaller font (line %d px) for \"%s\"", id_.c_str(), (int) line_height(number_font_()),
+               shown_.c_str());
+      apply_number_font_();
+    }
+  }
+
   /// A matching zone, else the tile's colour, else the theme's text colour (ADR-0016).
   lv_color_t number_color_() const {
     esphelm::ZoneState state;
@@ -242,11 +356,18 @@ class ValueWidget : public Widget {
 
   std::string id_;
   Colors colors_;
+  Fonts fonts_;
+  lv_obj_t *cell_;
   bool night_;
   esphelm::ValueColor color_;
   std::vector<esphelm::Zone> zones_;
+  std::string sample_;
   Binding b_;
+  lv_obj_t *caption_;
   lv_obj_t *value_;
+  lv_obj_t *unit_{nullptr};
+  int level_{0};  // index of the number's font in fonts_.ladder
+  int32_t width_{0}, offset_y_{0};
   std::string shown_{"--"};
 };
 
@@ -255,7 +376,8 @@ class ValueWidget : public Widget {
 class GaugeWidget : public Widget {
  public:
   GaugeWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
-      : id_(tile.id), colors_(env.colors), cell_(cell), min_(tile.min), max_(tile.max) {
+      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), min_(tile.min), max_(tile.max),
+        sample_(value_sample(tile.data.decimals)) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
@@ -301,8 +423,6 @@ class GaugeWidget : public Widget {
 
     caption_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
     lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
-    label_font_ = env.fonts.label;
-    small_font_ = env.fonts.small;
     // Value and unit sit in the open bottom of the 270 degree arc, clear of the needle hub.
     value_ = make_label(cell, env.fonts.label, env.colors.muted, "--");
     if (tile.data.unit != nullptr && tile.data.unit->label[0] != '\0')
@@ -316,12 +436,13 @@ class GaugeWidget : public Widget {
     const int32_t d = std::max<int32_t>(16, std::min(lv_obj_get_content_width(cell_), h));
     lv_obj_set_size(scale_, d, d);
     lv_obj_align(scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
-    // Small gauges: the label font would run into the ends of the arc; tiny ones drop the unit
-    // (the caption names the quantity).
-    lv_obj_set_style_text_font(value_, d >= 240 ? label_font_ : small_font_, LV_PART_MAIN);
     // Runs again when the page is laid out anew (alarm banner), so every choice is undone too.
+    // Tiny gauges drop the unit (the caption names the quantity).
     const bool small = d < 160;
     suffix_ = small ? "" : unit_suffix_;
+    // The value fits the open bottom of the arc (its chord is about 0.7 d), clear of the hub.
+    const std::string sample = sample_ + suffix_;
+    lv_obj_set_style_text_font(value_, fit_font(fonts_, sample.c_str(), d * 7 / 10, d / 4), LV_PART_MAIN);
     set_text(value_, shown_, "--" + suffix_);
     lv_obj_update_layout(value_);
     lv_obj_align_to(value_, scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -354,15 +475,15 @@ class GaugeWidget : public Widget {
  protected:
   std::string id_;
   Colors colors_;
+  Fonts fonts_;
   lv_obj_t *cell_;
   double min_, max_;
+  std::string sample_;
   Binding b_;
   lv_obj_t *scale_;
   lv_obj_t *needle_;
   lv_obj_t *caption_;
   lv_obj_t *value_;
-  const lv_font_t *label_font_{nullptr};
-  const lv_font_t *small_font_{nullptr};
   std::string unit_suffix_;
   std::string suffix_;
   std::string shown_{"--"};
@@ -375,11 +496,13 @@ class GaugeWidget : public Widget {
 class BarWidget : public Widget {
  public:
   BarWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
-      : id_(tile.id), colors_(env.colors), min_(tile.min), max_(tile.max), zones_(tile.zones) {
+      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), min_(tile.min), max_(tile.max),
+        zones_(tile.zones), sample_(value_sample(tile.data.decimals)) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
     const bool vertical = tile.orientation == esphelm::Orientation::VERTICAL;
+    vertical_ = vertical;
 
     lv_obj_t *caption = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
     lv_obj_align(caption, LV_ALIGN_TOP_LEFT, 0, 0);
@@ -410,6 +533,28 @@ class BarWidget : public Widget {
     }
   }
   const std::string &id() const override { return id_; }
+  void layout_done() override {
+    // The value takes the largest font that fits beside or above the bar (ADR-0017).
+    const int32_t w = lv_obj_get_content_width(cell_);
+    const int32_t h = lv_obj_get_content_height(cell_);
+    const int32_t small_h = line_height(fonts_.small);
+    const int32_t caption_h = b_.item.label.empty() ? 0 : small_h;
+    const std::string sample = sample_ + suffix_;
+    if (vertical_) {
+      // Beside the bar (22 % of the width), over the unit line.
+      const lv_font_t *f = fit_font(fonts_, sample.c_str(), w * 74 / 100, (h - caption_h - small_h) / 2);
+      lv_obj_set_style_text_font(value_, f, LV_PART_MAIN);
+      lv_obj_align(value_, LV_ALIGN_BOTTOM_RIGHT, 0, -small_h);
+    } else {
+      // Between the caption and the bar (the bottom 26 % of the height).
+      const int32_t band = h * 74 / 100 - caption_h - 4;
+      const lv_font_t *f = fit_font(fonts_, sample.c_str(), w, band);
+      lv_obj_set_style_text_font(value_, f, LV_PART_MAIN);
+      lv_obj_align(value_, LV_ALIGN_TOP_RIGHT, 0, caption_h + (band - line_height(f)) / 2);
+    }
+    if (!b_.stale_shown)
+      b_.dirty = true;
+  }
   void paths(std::vector<std::string> &out) const override { out.push_back(b_.item.path); }
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
     if (path == b_.item.path)
@@ -437,8 +582,12 @@ class BarWidget : public Widget {
  protected:
   std::string id_;
   Colors colors_;
+  Fonts fonts_;
+  lv_obj_t *cell_;
   double min_, max_;
   std::vector<esphelm::Zone> zones_;
+  std::string sample_;
+  bool vertical_{false};
   Binding b_;
   lv_obj_t *bar_;
   lv_obj_t *value_;
@@ -646,7 +795,12 @@ class AutopilotWidget : public Widget {
     narrow_ = w < esphelm::sizes::AUTOPILOT_CONTROLS_WIDTH;
     lv_obj_align(caption_, LV_ALIGN_TOP_LEFT, 0, 0);
     // Status lines span the tile and centre their text, so they stay centred as the text changes.
-    const lv_font_t *state_font = w >= 400 ? fonts_.value : w >= 200 ? fonts_.label : fonts_.small;
+    // The state takes the largest font in which its longest word fits (ADR-0017): with buttons up
+    // to the value font in a third of the height, status only in what the other lines leave.
+    const int32_t small_line = lv_font_get_line_height(fonts_.small);
+    const lv_font_t *state_font =
+        controls_ ? fit_font(fonts_, "STANDBY", w, h / 3, 1, fonts_.value)
+                  : fit_font(fonts_, "STANDBY", w, h - 4 * small_line);
     lv_obj_set_style_text_font(state_label_, state_font, LV_PART_MAIN);
     for (lv_obj_t *l : {state_label_, course_label_, note_label_}) {
       lv_obj_set_width(l, w);
@@ -1329,15 +1483,7 @@ class PositionWidget : public Widget {
     // The widest text this format can produce (8 is the widest digit in most fonts).
     std::string worst_lat, worst_lon;
     esphelm::position::format(-88.8888888, -178.8888888, format_, decimals_, worst_lat, worst_lon);
-    const lv_font_t *font = fonts_.small;
-    for (const lv_font_t *f : {fonts_.value, fonts_.label, fonts_.small}) {
-      lv_point_t size;
-      lv_text_get_size(&size, worst_lon.c_str(), f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-      if (size.x <= w && 2 * lv_font_get_line_height(f) <= h) {
-        font = f;
-        break;
-      }
-    }
+    const lv_font_t *font = fit_font(fonts_, worst_lon.c_str(), w, h, 2);
     const int32_t line = lv_font_get_line_height(font);
     const int32_t top = caption_h + std::max<int32_t>(0, (h - 2 * line) / 2);
     for (lv_obj_t *l : {lat_, lon_})

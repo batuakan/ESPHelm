@@ -42,6 +42,7 @@ esphelm_runtime:
     value: esphelm_font_value
     label: esphelm_font_label
     small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
   board: sdl-480
   touch: true
 

@@ -24,6 +24,25 @@ struct Fonts {
   const lv_font_t *value{nullptr};
   const lv_font_t *label{nullptr};
   const lv_font_t *small{nullptr};
+  /// Every font tile text can pick from, smallest line height first (ADR-0017). Filled once at
+  /// setup by add(); fonts with the line height of one already there are skipped.
+  static const uint8_t MAX_LADDER = 8;
+  const lv_font_t *ladder[MAX_LADDER]{};
+  uint8_t count{0};
+  void add(const lv_font_t *font) {
+    if (font == nullptr || this->count == MAX_LADDER)
+      return;
+    const int32_t line = lv_font_get_line_height(font);
+    uint8_t i = 0;
+    while (i < this->count && lv_font_get_line_height(this->ladder[i]) < line)
+      i++;
+    if (i < this->count && lv_font_get_line_height(this->ladder[i]) == line)
+      return;
+    for (uint8_t j = this->count; j > i; j--)
+      this->ladder[j] = this->ladder[j - 1];
+    this->ladder[i] = font;
+    this->count++;
+  }
 };
 
 struct Colors {

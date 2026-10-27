@@ -695,6 +695,32 @@ async function main(): Promise<void> {
     publish(colourValues);
     await sleep(1500);
     await fw.screenshot('31-value-colors-night', shots);
+
+    // 9f. Text follows the tile size (ADR-0017): a full-width, a 2x2 and four single-cell value
+    //     tiles; the RPM is wider than its sample ("88"), so it steps down a size.
+    const sizes = fixture('valid/value-sizes.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/value-sizes', admin, sizes);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'value-sizes',
+    });
+    check(
+      'sizes: the value sizes layout renders',
+      await fw.waitLog(/Showing fetched layout "value-sizes" \(1 pages/),
+    );
+    publish({
+      'navigation.speedOverGround': 3.1, // 6.0 kn
+      'environment.depth.belowTransducer': 12.4,
+      'propulsion.p0.revolutions': 40, // 2400 rpm
+      'electrical.batteries.house.voltage': 12.75,
+      'propulsion.p0.temperature': 353.15, // 80 °C
+      'navigation.headingTrue': 4.2, // 241°
+    });
+    check(
+      'sizes: a value wider than the sample steps down a font size',
+      await fw.waitLog(/Value rpm: smaller font \(line \d+ px\) for "2400"/),
+    );
+    await sleep(1500);
+    await fw.screenshot('32-value-sizes', shots);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'settings: back to the multi-page layout (no settings: its first page, never off)',
@@ -755,6 +781,19 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-03-helm-autopilot', shots);
+    await fw720.stop();
+
+    // 12b. The value sizes layout at 720 (P4-86 fonts, offline): the full-width tile gets the
+    //      largest font.
+    const sizes720 = readFileSync(join(FIXTURES, 'valid/value-sizes.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(sizes720, '"seed-sizes"'));
+    fw720.start();
+    check(
+      '720 build shows the value sizes layout',
+      await fw720.waitLog(/Showing cached layout "value-sizes" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-04-value-sizes', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

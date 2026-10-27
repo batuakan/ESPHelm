@@ -3,7 +3,9 @@
 # and how much static RAM it leaves on the smallest target (CLAUDE.md §6).
 #   ~/venv/bin/esphome compile firmware/esphelm_c3_compile_check.yaml
 substitutions:
+  font_huge_size: "56"
   font_value_size: "40"
+  font_medium_size: "28"
   font_label_size: "20"
   font_small_size: "14"
 
@@ -64,5 +66,6 @@ esphelm_runtime:
     value: esphelm_font_value
     label: esphelm_font_label
     small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
   board: esp32-c3-gc9a01-240
   touch: false

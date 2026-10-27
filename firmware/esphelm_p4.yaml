@@ -5,7 +5,9 @@
 substitutions:
   screen_width: "720"
   screen_height: "720"
+  font_huge_size: "144"
   font_value_size: "96"
+  font_medium_size: "64"
   font_label_size: "42"
   font_small_size: "28"
   esp32_hosted_firmware: ../legacy/network_adapter_esp32c6.bin
@@ -51,6 +53,7 @@ esphelm_runtime:
     value: esphelm_font_value
     label: esphelm_font_label
     small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
   board: waveshare-esp32-p4-86
   backlight: display_backlight
   touch: true

@@ -37,8 +37,14 @@ class EsphelmRuntime : public Component {
   void set_signalk(signalk::SignalK *signalk) { this->signalk_ = signalk; }
   void set_container(lv_obj_t *container) { this->renderer_.set_container(container); }
   void set_fonts(font::Font *value, font::Font *label, font::Font *small) {
-    this->fonts_ = Fonts{value->get_lv_font(), label->get_lv_font(), small->get_lv_font()};
+    this->fonts_.value = value->get_lv_font();
+    this->fonts_.label = label->get_lv_font();
+    this->fonts_.small = small->get_lv_font();
+    for (font::Font *f : {value, label, small})
+      this->fonts_.add(f->get_lv_font());
   }
+  /// One more size for tile text to pick from (fonts.extra).
+  void add_font(font::Font *extra) { this->fonts_.add(extra->get_lv_font()); }
   void set_board(const std::string &board) { this->board_ = board; }
   void set_touch(bool touch) { this->touch_ = touch; }
   void set_stale_after(uint32_t ms) { this->stale_after_ms_ = ms; }
