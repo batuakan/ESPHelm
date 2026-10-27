@@ -35,6 +35,17 @@ describe('tile text fit', () => {
     expect(textWidth(valueSample(1), quarter.value)).toBeLessThanOrEqual(150);
   });
 
+  it('steps a value wider than the sample down until it fits, keeping the caption', () => {
+    const box = { width: 130, height: 130 };
+    const opts = { decimals: 0, caption: true, unit: true };
+    const plain = fitValueText(P4, box, opts);
+    const rpm = fitValueText(P4, box, { ...opts, text: '2400' });
+    expect(rpm.value).toBeLessThan(plain.value);
+    expect(rpm.caption).toBe(plain.caption);
+    expect(textWidth('2400', rpm.value)).toBeLessThanOrEqual(130);
+    expect(fitValueText(P4, box, { ...opts, text: '24' })).toEqual(plain);
+  });
+
   it('falls back to the smallest font when nothing fits', () => {
     const fit = fitValueText(
       DEFAULT_FONT_LINE_HEIGHTS,

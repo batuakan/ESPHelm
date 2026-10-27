@@ -35,6 +35,11 @@ export function textWidth(text: string, line: number): number {
   return Math.ceil(w * em);
 }
 
+/** Font size (em) in pixels of the font with line height `line`. */
+export function fontSize(line: number): number {
+  return line * EM_PER_LINE;
+}
+
 /** Estimated height in pixels of a digit in the font with line height `line`. */
 export function digitHeight(line: number): number {
   return Math.ceil(line * EM_PER_LINE * DIGIT_HEIGHT);
@@ -58,11 +63,13 @@ export interface ValueTextFit {
 /**
  * The largest number font whose sample fits the tile's content box (device pixels), with the
  * caption line above and the unit line below when the tile has them; the smallest otherwise.
+ * With `text` (the value shown), a value wider than the sample steps the number down as the
+ * device does; the caption keeps its size.
  */
 export function fitValueText(
   ladder: readonly number[],
   box: { width: number; height: number },
-  opts: { decimals: number; caption: boolean; unit: boolean },
+  opts: { decimals: number; caption: boolean; unit: boolean; text?: string },
 ): ValueTextFit {
   const sorted = [...ladder].sort((a, b) => a - b);
   const sample = valueSample(opts.decimals);
@@ -71,7 +78,11 @@ export function fitValueText(
     const caption = companionLine(sorted, value);
     const bands = (opts.caption ? caption : 0) + (opts.unit ? caption : 0);
     if (textWidth(sample, value) <= box.width && digitHeight(value) + bands <= box.height) {
-      return { value, caption };
+      let j = i;
+      if (opts.text !== undefined && opts.text.length > sample.length) {
+        while (j > 0 && textWidth(opts.text, sorted[j]!) > box.width) j--;
+      }
+      return { value: sorted[j]!, caption };
     }
   }
   const value = sorted[0] ?? 0;
