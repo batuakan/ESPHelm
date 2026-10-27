@@ -1,10 +1,16 @@
 // The editable page: a CSS grid shaped like the display, tiles placed by cell. Pointer Events
 // handle mouse and touch alike: drag a tile to move it, drag its corner to resize it, drag a
 // tile type from the library onto a free cell. Placement rules live in layoutOps.
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { GridPage, Tile, TileType } from '@esphelm/schema';
 import { fits, type Rect, type SlotName } from '../layoutOps';
-import type { AutopilotTier, RoseTier } from '../sizing';
+import type { AutopilotTier, RoseTier, ValueTextSize } from '../sizing';
 import { TilePreview } from './Previews';
 
 export interface NewTileDrag {
@@ -23,6 +29,8 @@ interface Props {
   roseTier(tile: Tile): RoseTier;
   /** Whether the display will show an autopilot tile's buttons. */
   autopilotTier(tile: Tile): AutopilotTier;
+  /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
+  textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
   supported: Set<string>;
   newTileDrag: NewTileDrag | null;
@@ -156,14 +164,18 @@ export function GridCanvas(props: Props) {
             props.supported.has(tile.type) ? '' : 'unsupported',
             `tile-type-${tile.type}`,
           ];
+          const text = props.textSize?.(tile);
           return (
             <div
               key={tile.id}
               className={classes.filter(Boolean).join(' ')}
-              style={{
-                gridColumn: `${tile.x + 1} / span ${tile.w}`,
-                gridRow: `${tile.y + 1} / span ${tile.h}`,
-              }}
+              style={
+                {
+                  gridColumn: `${tile.x + 1} / span ${tile.w}`,
+                  gridRow: `${tile.y + 1} / span ${tile.h}`,
+                  ...(text && { '--tile-value-size': text.value, '--tile-caption-size': text.caption }),
+                } as CSSProperties
+              }
               onPointerDown={(e) => onTileDown(e, tile)}
               onClick={() => props.onSelect(tile.id)}
               data-testid={`tile-${tile.id}`}

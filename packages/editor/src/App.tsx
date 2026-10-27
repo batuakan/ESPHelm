@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   CHART_DEFAULTS,
+  DEFAULT_FONT_LINE_HEIGHTS,
   TEMPLATES,
   TILE_TYPES,
   validateLayout,
@@ -14,6 +15,7 @@ import {
   type TileType,
 } from '@esphelm/schema';
 import { ApiError, createApi, type Api, type ChartInfo, type Device, type PathInfo } from './api';
+import { formatValue } from './format';
 import { createLiveSource, type LiveSource } from './live';
 import {
   addPage,
@@ -51,6 +53,7 @@ import {
   autopilotTier,
   roseTier,
   tilePixels,
+  valueTextSize,
 } from './sizing';
 
 export type Theme = 'light' | 'dark' | 'night';
@@ -292,6 +295,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     const { width, height } = tileBox(t);
     return Math.min(width, height);
   };
+  const fontLines = device?.hello.fontLineHeights ?? DEFAULT_FONT_LINE_HEIGHTS;
   const canSave = !!layout && device?.state === 'adopted' && problems.length === 0 && !saving;
 
   return (
@@ -469,6 +473,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   selectedSlot={selection?.slot}
                   roseTier={(t) => roseTier(tilePx(t))}
                   autopilotTier={(t) => autopilotTier(tileBox(t))}
+                  textSize={(t) =>
+                    t.type === 'value'
+                      ? valueTextSize(
+                          fontLines,
+                          tileBox(t),
+                          t,
+                          t.path ? formatValue(shownValues.get(t.path), t.unit, t.decimals) : undefined,
+                        )
+                      : undefined
+                  }
                   problemTileIds={problemTileIds}
                   supported={supported}
                   newTileDrag={newTileDrag}

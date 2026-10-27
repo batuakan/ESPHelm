@@ -1,7 +1,7 @@
 import { AUTOPILOT_FIT, TEMPLATES, WIND_ROSE_FIT, type Layout } from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
 import { pageTiles } from '../src/layoutOps';
-import { autopilotTier, roseTier, tilePixels } from '../src/sizing';
+import { autopilotTier, roseTier, tilePixels, valueTextSize } from '../src/sizing';
 
 const onePage = (cols: number, rows: number, pages = 1): Layout => ({
   version: 1,
@@ -73,5 +73,35 @@ describe('autopilotTier', () => {
     };
     expect(at('autopilot', 480)).toBe('controls');
     expect(at('helm-720', 720)).toBe('controls');
+  });
+});
+
+describe('valueTextSize', () => {
+  const P4 = [33, 49, 75, 113, 169];
+  const tile = {
+    type: 'value',
+    id: 'v',
+    x: 0,
+    y: 0,
+    w: 1,
+    h: 1,
+    path: 'a.b',
+    label: 'SOG',
+    unit: 'kn',
+  } as const;
+  const px = (cqh: string, height: number) => (parseFloat(cqh) / 100) * height;
+
+  it('gives a big tile bigger text than a small one, in display pixels', () => {
+    const big = valueTextSize(P4, { width: 680, height: 290 }, tile);
+    const small = valueTextSize(P4, { width: 150, height: 130 }, tile);
+    expect(px(big.value, 290)).toBeGreaterThan(px(small.value, 130));
+    expect(px(big.caption, 290)).toBeGreaterThan(px(small.caption, 130));
+    // The 144 px font (line height 169) on the full-width tile.
+    expect(px(big.value, 290)).toBeCloseTo(144, 0);
+  });
+
+  it('the caption stays well below the number', () => {
+    const t = valueTextSize(P4, { width: 680, height: 290 }, tile);
+    expect(parseFloat(t.caption)).toBeLessThan(parseFloat(t.value) / 2);
   });
 });

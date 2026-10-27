@@ -438,6 +438,33 @@ select {
   font-size: clamp(20px, 6vmin, 52px);
   font-variant-numeric: tabular-nums;
 }
+/* Value tiles: the sizes the display picks for this tile (ADR-0017), as shares of its height,
+   in the display's own font so the fit matches (Roboto, Apache-2.0, shared with the firmware). */
+@font-face {
+  font-family: 'ESPHelm Display';
+  src: url('../../../legacy/modules/assets/fonts/Roboto.ttf') format('truetype');
+  font-display: swap;
+}
+.tile.tile-type-value {
+  container-type: size;
+}
+.tile-type-value .tile-value,
+.tile-type-value .tile-label,
+.tile-type-value .tile-unit {
+  font-family: 'ESPHelm Display', Roboto, system-ui, sans-serif;
+}
+.tile-type-value .tile-value {
+  font-size: var(--tile-value-size, clamp(20px, 6vmin, 52px));
+  line-height: 1.17;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tile-type-value .tile-label,
+.tile-type-value .tile-unit {
+  font-size: var(--tile-caption-size, 13px);
+}
 .resize-handle {
   position: absolute;
   right: 0;

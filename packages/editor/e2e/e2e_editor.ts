@@ -156,6 +156,25 @@ async function main(): Promise<void> {
       await page.mouse.up();
     }
 
+    // Value tiles show the text sizes the display picks for them (ADR-0017).
+    const tile1 = page.getByTestId('tile-tile-1');
+    const fontPx = async (selector: string) =>
+      parseFloat(
+        await tile1
+          .locator(selector)
+          .evaluate((el) => el.ownerDocument.defaultView!.getComputedStyle(el).fontSize),
+      );
+    const text = {
+      style: (await tile1.getAttribute('style')) ?? '',
+      value: await fontPx('.tile-value'),
+      caption: await fontPx('.tile-label'),
+    };
+    check(
+      "a value tile previews the display's text size",
+      /--tile-value-size: [\d.]+cqh/.test(text.style) && text.value > 2 * text.caption,
+      JSON.stringify(text),
+    );
+
     // An invalid label is flagged and blocks Save & send.
     await page.getByTestId('tile-tile-2').click();
     await page.getByLabel('Label').fill('Wind ä');

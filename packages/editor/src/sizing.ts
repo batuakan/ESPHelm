@@ -2,7 +2,16 @@
 // runtime's fixed geometry (renderer.cpp): page area padding 8, grid gaps 8, tile padding 10,
 // and a footer of about 11 % of the height when the layout has several pages. Used for the
 // wind rose and autopilot size hints; the display decides from the cell it actually gets.
-import { AUTOPILOT_FIT, WIND_ROSE_FIT, type Layout, type Tile } from '@esphelm/schema';
+import {
+  AUTOPILOT_FIT,
+  fitValueText,
+  fontSize,
+  UNITS,
+  WIND_ROSE_FIT,
+  type Layout,
+  type Tile,
+  type ValueTile,
+} from '@esphelm/schema';
 
 const AREA_PAD = 8;
 const GAP = 8;
@@ -47,6 +56,34 @@ export const ROSE_TIER_TEXT: Record<RoseTier, string> = {
   compact: 'compact: no tick labels or heading; as many centre values as fit',
   pointers: 'pointers only; too small for centre values',
 };
+
+/** CSS font sizes for a value tile's preview, relative to the tile's height (cqh). */
+export interface ValueTextSize {
+  value: string;
+  caption: string;
+}
+
+/**
+ * The fonts the display gives a value tile of content size `box` (ADR-0017), from the display's
+ * font ladder (hello.fontLineHeights), as shares of the tile height so the preview scales alike.
+ * `text` is the value shown: a wider one steps down, as on the display.
+ */
+export function valueTextSize(
+  ladder: readonly number[],
+  box: { width: number; height: number },
+  tile: ValueTile,
+  text?: string,
+): ValueTextSize {
+  const fit = fitValueText(ladder, box, {
+    decimals: tile.decimals ?? 1,
+    caption: !!tile.label,
+    unit: !!tile.unit && UNITS[tile.unit].label !== '',
+    text,
+  });
+  const cqh = (line: number) =>
+    `${((fontSize(line) / Math.max(1, box.height)) * 100).toFixed(2)}cqh`;
+  return { value: cqh(fit.value), caption: cqh(fit.caption) };
+}
 
 export type AutopilotTier = 'controls' | 'status';
 
