@@ -233,8 +233,9 @@ void EsphelmRuntime::send_hello_() {
   fonts.add("label");
   fonts.add("small");
   ArduinoJson::JsonArray lines = doc["fontLineHeights"].to<ArduinoJson::JsonArray>();
+  ArduinoJson::JsonArray digit_lines = doc["digitFontLineHeights"].to<ArduinoJson::JsonArray>();
   for (uint8_t i = 0; i < this->fonts_.count; i++)
-    lines.add(lv_font_get_line_height(this->fonts_.ladder[i]));
+    (this->fonts_.digits[i] ? digit_lines : lines).add(lv_font_get_line_height(this->fonts_.ladder[i]));
   doc["capacity"]["psram"] = this->psram_;
   doc["capacity"]["maxLayoutBytes"] = this->limits_.max_bytes;
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF

@@ -43,6 +43,7 @@ esphelm_runtime:
     label: esphelm_font_label
     small: esphelm_font_small
     extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
   board: sdl-480
   touch: true
 

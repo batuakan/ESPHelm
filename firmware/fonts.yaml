@@ -1,8 +1,11 @@
 # Fonts for the runtime firmware. Default glyph set (GF_Latin_Kernel): ASCII and the degree sign,
 # which is what layouts may contain. Sizes via substitutions so 480 and 720 screens can differ.
 # Tile text picks the largest of all five that fits the tile (ADR-0017): list medium and huge
-# under the runtime's fonts.extra.
+# under the runtime's fonts.extra. The two digit fonts have only "0123456789.-" (a dozen glyphs,
+# so very large sizes are cheap) and go under fonts.digits: only value tile numbers use them.
 substitutions:
+  font_digits_huge_size: "192"
+  font_digits_large_size: "128"
   font_huge_size: "96"
   font_value_size: "64"
   font_medium_size: "48"
@@ -10,6 +13,16 @@ substitutions:
   font_small_size: "22"
 
 font:
+  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+    id: esphelm_font_digits_huge
+    size: ${font_digits_huge_size}
+    bpp: 4
+    glyphs: ["0123456789.-"]
+  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+    id: esphelm_font_digits_large
+    size: ${font_digits_large_size}
+    bpp: 4
+    glyphs: ["0123456789.-"]
   - file: ../legacy/modules/assets/fonts/Roboto.ttf
     id: esphelm_font_huge
     size: ${font_huge_size}

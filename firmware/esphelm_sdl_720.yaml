@@ -9,6 +9,8 @@ substitutions:
   signalk_port: "3000"
   screen_width: "720"
   screen_height: "720"
+  font_digits_huge_size: "288"
+  font_digits_large_size: "192"
   font_huge_size: "144"
   font_value_size: "96"
   font_medium_size: "64"

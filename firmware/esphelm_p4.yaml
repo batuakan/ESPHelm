@@ -5,6 +5,8 @@
 substitutions:
   screen_width: "720"
   screen_height: "720"
+  font_digits_huge_size: "288"
+  font_digits_large_size: "192"
   font_huge_size: "144"
   font_value_size: "96"
   font_medium_size: "64"
@@ -54,6 +56,7 @@ esphelm_runtime:
     label: esphelm_font_label
     small: esphelm_font_small
     extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
   board: waveshare-esp32-p4-86
   backlight: display_backlight
   touch: true

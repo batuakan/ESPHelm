@@ -45,6 +45,8 @@ class EsphelmRuntime : public Component {
   }
   /// One more size for tile text to pick from (fonts.extra).
   void add_font(font::Font *extra) { this->fonts_.add(extra->get_lv_font()); }
+  /// A size with only the digits, "." and "-" (fonts.digits), for value tile numbers.
+  void add_digit_font(font::Font *digits) { this->fonts_.add(digits->get_lv_font(), true); }
   void set_board(const std::string &board) { this->board_ = board; }
   void set_touch(bool touch) { this->touch_ = touch; }
   void set_stale_after(uint32_t ms) { this->stale_after_ms_ = ms; }

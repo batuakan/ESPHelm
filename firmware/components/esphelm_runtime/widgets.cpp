@@ -138,26 +138,41 @@ static std::string value_sample(int decimals) {
   return s;
 }
 
-/// The largest ladder font, no taller than `max` if given, in which `lines` lines of `text` fit
-/// w x h; the smallest when none does.
+/// What a formatted number can contain; the digits-only fonts have just these glyphs.
+static bool is_numeric(const std::string &text) {
+  return text.find_first_not_of("0123456789.-") == std::string::npos;
+}
+
+/// The smallest full (not digits-only) font.
+static const lv_font_t *smallest_font(const Fonts &fonts) {
+  for (uint8_t i = 0; i < fonts.count; i++) {
+    if (!fonts.digits[i])
+      return fonts.ladder[i];
+  }
+  return fonts.small;
+}
+
+/// The largest full ladder font, no taller than `max` if given, in which `lines` lines of `text`
+/// fit w x h; the smallest when none does. Digits-only fonts are skipped: `text` may be anything.
 static const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines = 1,
                                  const lv_font_t *max = nullptr) {
   for (int i = fonts.count - 1; i >= 0; i--) {
     const lv_font_t *f = fonts.ladder[i];
-    if (max != nullptr && line_height(f) > line_height(max))
+    if (fonts.digits[i] || (max != nullptr && line_height(f) > line_height(max)))
       continue;
     if (lines * line_height(f) <= h && text_width(text, f) <= w)
       return f;
   }
-  return fonts.count > 0 ? fonts.ladder[0] : fonts.small;
+  return smallest_font(fonts);
 }
 
-/// Caption and unit font beside a number in `font`: the largest at most TEXT_COMPANION_PERCENT
-/// of its line height, never below the smallest.
+/// Caption and unit font beside a number in `font`: the largest full font at most
+/// TEXT_COMPANION_PERCENT of its line height, never below the smallest.
 static const lv_font_t *companion_font(const Fonts &fonts, const lv_font_t *font) {
-  const lv_font_t *best = fonts.count > 0 ? fonts.ladder[0] : fonts.small;
+  const lv_font_t *best = smallest_font(fonts);
   for (uint8_t i = 0; i < fonts.count; i++) {
-    if (line_height(fonts.ladder[i]) * 100 <= line_height(font) * esphelm::sizes::TEXT_COMPANION_PERCENT)
+    if (!fonts.digits[i] &&
+        line_height(fonts.ladder[i]) * 100 <= line_height(font) * esphelm::sizes::TEXT_COMPANION_PERCENT)
       best = fonts.ladder[i];
   }
   return best;
@@ -325,13 +340,15 @@ class ValueWidget : public Widget {
     lv_obj_set_style_text_font(value_, number_font_(), LV_PART_MAIN);
     lv_obj_align(value_, LV_ALIGN_CENTER, 0, offset_y_);
   }
-  /// Step the number down while the shown text is wider than the cell. Text no longer than the
-  /// sample fits by construction, so most values are never measured.
+  /// Step the number down while the shown text is wider than the cell, or isn't numeric in a
+  /// digits-only font. Numeric text no longer than the sample fits by construction, so most
+  /// values are never measured.
   void shrink_to_fit_() {
-    if (shown_.size() <= sample_.size() || width_ <= 0)
+    const bool numeric = is_numeric(shown_);
+    if ((numeric && shown_.size() <= sample_.size()) || width_ <= 0)
       return;
     const int before = level_;
-    while (level_ > 0 && text_width(shown_.c_str(), number_font_()) > width_)
+    while (level_ > 0 && ((fonts_.digits[level_] && !numeric) || text_width(shown_.c_str(), number_font_()) > width_))
       level_--;
     if (level_ != before) {
       ESP_LOGD(TAG, "Value %s: smaller font (line %d px) for \"%s\"", id_.c_str(), (int) line_height(number_font_()),

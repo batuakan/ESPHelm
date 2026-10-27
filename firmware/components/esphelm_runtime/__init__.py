@@ -18,6 +18,7 @@ CONF_VALUE = "value"
 CONF_LABEL = "label"
 CONF_SMALL = "small"
 CONF_EXTRA = "extra"
+CONF_DIGITS = "digits"
 CONF_BOARD = "board"
 CONF_TOUCH = "touch"
 CONF_STALE_AFTER = "stale_after"
@@ -54,6 +55,8 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Required(CONF_SMALL): cv.use_id(font.Font),
                 # More sizes for tile text to pick from (ADR-0017), in any order.
                 cv.Optional(CONF_EXTRA, default=[]): cv.ensure_list(cv.use_id(font.Font)),
+                # Fonts with only the glyphs "0123456789.-": value tile numbers only.
+                cv.Optional(CONF_DIGITS, default=[]): cv.ensure_list(cv.use_id(font.Font)),
             }
         ),
         cv.Optional(CONF_BOARD, default=""): cv.string,
@@ -93,6 +96,8 @@ async def to_code(config):
     )
     for extra in fonts[CONF_EXTRA]:
         cg.add(var.add_font(await cg.get_variable(extra)))
+    for digits in fonts[CONF_DIGITS]:
+        cg.add(var.add_digit_font(await cg.get_variable(digits)))
     cg.add(var.set_board(config[CONF_BOARD]))
     cg.add(var.set_touch(config[CONF_TOUCH]))
     cg.add(var.set_stale_after(config[CONF_STALE_AFTER].total_milliseconds))
