@@ -3,6 +3,7 @@ import {
   companionLine,
   DEFAULT_FONT_LINE_HEIGHTS,
   fitValueText,
+  isNumericText,
   textWidth,
   valueSample,
 } from '../src/index.js';
@@ -44,6 +45,19 @@ describe('tile text fit', () => {
     expect(rpm.caption).toBe(plain.caption);
     expect(textWidth('2400', rpm.value)).toBeLessThanOrEqual(130);
     expect(fitValueText(P4, box, { ...opts, text: '24' })).toEqual(plain);
+  });
+
+  it('lets numbers use the digits-only fonts, never captions or text', () => {
+    const box = { width: 680, height: 680 };
+    const opts = { decimals: 1, caption: true, unit: true, digits: [225, 338] };
+    const big = fitValueText(P4, box, opts);
+    expect(big.value).toBe(338);
+    expect(P4).toContain(big.caption);
+    expect(fitValueText(P4, box, { ...opts, text: '12.4' }).value).toBe(338);
+    // "on" (a boolean) isn't in the digits-only fonts: the largest full font instead.
+    expect(fitValueText(P4, box, { ...opts, text: 'on' }).value).toBe(169);
+    expect(isNumericText('-12.5')).toBe(true);
+    expect(isNumericText('off')).toBe(false);
   });
 
   it('falls back to the smallest font when nothing fits', () => {

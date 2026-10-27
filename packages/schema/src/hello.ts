@@ -39,6 +39,12 @@ export const Hello = Type.Object(
           'Line heights in pixels of the fonts tile text can use, smallest first (ADR-0017). The editor sizes its preview text from them.',
       }),
     ),
+    digitFontLineHeights: Type.Optional(
+      Type.Array(Type.Integer({ minimum: 1 }), {
+        description:
+          "Line heights in pixels of the digits-only fonts (0-9 . -), smallest first; only a value tile's number uses them, while it is numeric (ADR-0017).",
+      }),
+    ),
     capacity: Type.Object(
       {
         psram: Type.Boolean(),

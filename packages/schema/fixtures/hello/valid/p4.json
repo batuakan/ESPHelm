@@ -38,6 +38,10 @@
     113,
     169
   ],
+  "digitFontLineHeights": [
+    225,
+    338
+  ],
   "capacity": {
     "psram": true,
     "maxLayoutBytes": 262144,

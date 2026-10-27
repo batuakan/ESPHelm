@@ -16,6 +16,8 @@ const OTHER_WIDTH = 0.6;
 
 /** Line heights of the default 480×480 build's fonts (firmware/fonts.yaml), smallest first. */
 export const DEFAULT_FONT_LINE_HEIGHTS: readonly number[] = [26, 38, 56, 75, 113];
+/** Line heights of the default 480×480 build's digits-only fonts. */
+export const DEFAULT_DIGIT_FONT_LINE_HEIGHTS: readonly number[] = [150, 225];
 
 /** The number a value tile sizes its font for: "88" plus its decimals (wider values step down). */
 export function valueSample(decimals: number): string {
@@ -60,31 +62,62 @@ export interface ValueTextFit {
   caption: number;
 }
 
+/** Characters a formatted number can contain: what the digits-only fonts have. */
+export const DIGIT_GLYPHS = '0123456789.-';
+
+/** Whether `text` can be drawn in a digits-only font. */
+export function isNumericText(text: string): boolean {
+  for (const ch of text) if (!DIGIT_GLYPHS.includes(ch)) return false;
+  return true;
+}
+
 /**
  * The largest number font whose sample fits the tile's content box (device pixels), with the
  * caption line above and the unit line below when the tile has them; the smallest otherwise.
- * With `text` (the value shown), a value wider than the sample steps the number down as the
- * device does; the caption keeps its size.
+ * `digits` are the digits-only fonts (hello.digitFontLineHeights): the number may use them while
+ * its text is numeric; captions never do. With `text` (the value shown), a value wider than the
+ * sample, or a non-numeric one in a digits-only font, steps down as the device does; the caption
+ * keeps its size.
  */
 export function fitValueText(
   ladder: readonly number[],
   box: { width: number; height: number },
-  opts: { decimals: number; caption: boolean; unit: boolean; text?: string },
+  opts: {
+    decimals: number;
+    caption: boolean;
+    unit: boolean;
+    text?: string;
+    digits?: readonly number[];
+  },
 ): ValueTextFit {
-  const sorted = [...ladder].sort((a, b) => a - b);
+  const full = [...ladder].sort((a, b) => a - b);
+  // One list of both kinds; a full font wins over a digits-only one of the same line height.
+  const fonts = [
+    ...full.map((line) => ({ line, digits: false })),
+    ...(opts.digits ?? [])
+      .filter((line) => !full.includes(line))
+      .map((line) => ({ line, digits: true })),
+  ].sort((a, b) => a.line - b.line);
   const sample = valueSample(opts.decimals);
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const value = sorted[i]!;
-    const caption = companionLine(sorted, value);
+  const text = opts.text;
+  for (let i = fonts.length - 1; i >= 0; i--) {
+    const value = fonts[i]!.line;
+    const caption = companionLine(full, value);
     const bands = (opts.caption ? caption : 0) + (opts.unit ? caption : 0);
     if (textWidth(sample, value) <= box.width && digitHeight(value) + bands <= box.height) {
       let j = i;
-      if (opts.text !== undefined && opts.text.length > sample.length) {
-        while (j > 0 && textWidth(opts.text, sorted[j]!) > box.width) j--;
+      if (text !== undefined) {
+        const numeric = isNumericText(text);
+        while (
+          j > 0 &&
+          ((fonts[j]!.digits && !numeric) ||
+            (text.length > sample.length && textWidth(text, fonts[j]!.line) > box.width))
+        )
+          j--;
       }
-      return { value: sorted[j]!, caption };
+      return { value: fonts[j]!.line, caption };
     }
   }
-  const value = sorted[0] ?? 0;
+  const value = full[0] ?? 0;
   return { value, caption: value };
 }
