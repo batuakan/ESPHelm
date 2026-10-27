@@ -28,6 +28,7 @@ esphelm_runtime:
     value: esphelm_font_value
     label: esphelm_font_label
     small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]   # optional: more sizes for tile text
   board: waveshare-esp32-p4-86    # reported in hello
   touch: true
   stale_after: 15s                # default when a tile sets no staleAfter
@@ -35,6 +36,8 @@ esphelm_runtime:
   # store_dir: "."                # host build only: where the cache files go
   # backlight: display_backlight  # a dimmable light: layout brightness and screen timeout
 ```
+
+All the fonts form one ladder, sorted by line height. Tile text picks the largest size that fits the tile (ADR-0017). `firmware/fonts.yaml` sets the sizes by substitution: P4 and the 720 SDL build use 28 / 42 / 64 / 96 / 144 px, the default 480 build 22 / 32 / 48 / 64 / 96, and the C3 14 / 20 / 28 / 40 / 56. The hello reports the ladder as `fontLineHeights`.
 
 `backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
 
@@ -85,11 +88,11 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 
 | Widget | Drawn with | Notes |
 |---|---|---|
-| `value` | labels | as before; the number coloured by `color` or `zones` (ADR-0016) |
-| `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc; below 240 px the value uses the small font, below 160 px tick labels and the unit are dropped |
-| `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value |
+| `value` | labels | the number in the largest font whose sample ("88" plus the decimals) fits the tile, with the caption and unit scaled alongside; a wider live value steps it down (ADR-0017). Coloured by `color` or `zones` (ADR-0016) |
+| `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc, in the largest font that fits there (ADR-0017); below 160 px tick labels and the unit are dropped |
+| `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value. The value takes the largest font that fits beside or above the bar |
 | `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
-| `position` | labels | latitude over longitude, formatted by `esphelm_position.h` (the same text as the editor, checked against `fixtures/position.cases.json`). The largest font (value → label → small) in which the widest text of the chosen format fits; it's chosen again when the page is laid out anew (alarm banner). Anything but two numbers in range shows `--` |
+| `position` | labels | latitude over longitude, formatted by `esphelm_position.h` (the same text as the editor, checked against `fixtures/position.cases.json`). The largest font of the ladder in which the widest text of the chosen format fits; it's chosen again when the page is laid out anew (alarm banner). Anything but two numbers in range shows `--` |
 | `wind_rose` | two `lv_scale`s and a drawn overlay | the legacy wind page: a fixed ring relative to the bow (thick ticks every 30°, thin every 5°, wide red/green close-hauled sectors at 20–60°), a compass card inside it turning with the heading (the 16 points written along the band), triangle markers on the ring (orange A for apparent wind, purple T for true wind = `trueDirection − heading`), the heading ("12°T", or °M for a magnetic path) and big centre values. Night uses reds only. Size tiers below |
 | `autopilot` | labels and `lv_button`s | state (AUTO / WIND / TRACK / STANDBY), "TGT x°" and "HDG x°"; course buttons −10/−1/+1/+10, the configured mode buttons and STANDBY (on its own wide row when it wouldn't fit a quarter of the width). Rules below |
 
@@ -166,8 +169,8 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 95,262 B (16.5 %), flash 2.69 MB (16.3 %) |
-| C3 compile check, static | RAM 109,208 B of 321,296 B (34.0 %), flash 1.26 MB of 1.8 MB (68.8 %) |
+| P4 runtime firmware, static | RAM 95,486 B (16.6 %), flash 3.06 MB (18.5 %); the five fonts (up to 144 px) are about 0.6 MB of that |
+| C3 compile check, static | RAM 109,512 B of 321,296 B (34.1 %), flash 1.34 MB of 1.8 MB (73.1 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -212,7 +215,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   19. **value tile colours**: six fixed colours, a depth in its warn zone, a voltage in its alarm zone over the tile's own blue, an engine temperature in a normal zone; by day and at night
 
-  Thirty-eight screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  20. **text sizes** (`fixtures/valid/value-sizes.json`): a full-width, a 2x2 and four single-cell value tiles at 480 with live values (the RPM "2400" steps down a size), and the same layout offline at 720
+
+  Thirty-six screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -253,3 +258,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
 16. **Value tile colours.** Give a few value tiles a colour, and a depth tile zones such as "3 or less warn, 2 or less alarm".
     - By day, check that every colour is readable in sunlight, yellow in particular.
     - At night everything is red; check that a warn and an alarm value can still be told apart from normal.
+17. **Text sizes.** Assign `packages/schema/fixtures/valid/value-sizes.json`.
+    - The full-width SOG shows the 144 px number, and the captions grow with the numbers.
+    - In the single cells nothing is clipped. An RPM in the thousands or a 3-digit heading may shrink one size when its first value arrives.
+    - Captions and units are readable at arm's length, and the editor's preview shows the same proportions.

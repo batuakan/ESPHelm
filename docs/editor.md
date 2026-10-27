@@ -44,6 +44,8 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 - **Display theme** (*Display: Day / Night* above the canvas) is part of the layout. The display draws with it after *Save & send*, and the preview shows the same palette. New layouts start at Night; starter layouts bring their own.
 - **Editor theme** (*Day*, *Dark*, *Night* in the top bar) only changes this editor's colours, is remembered per browser, and follows the system setting by default. It never changes the display.
 
+**Text sizes** (ADR-0017): a value tile's number, caption and unit are previewed at the sizes the display will pick for that tile. The editor uses the display's font list from its hello, or the default 480 build's for a display that doesn't report one. A bigger tile gets bigger text. A value wider than two digits (plus decimals) steps down a size, as on the display. The preview draws value tiles in the display's font (Roboto) so the fit matches.
+
 **Value tile colours** (ADR-0016): *Colour* sets a fixed colour (by day; at night everything is red), and *Colour by value* adds rows of from, to and state in the tile's display unit. Leave a bound empty for no limit ("2 or less"). The last matching row wins, over the fixed colour. The preview colours the number as the display does, in the display theme's colours.
 
 **Position tile:** shows `navigation.position` (or another position path) as two lines. The drawer lists the four formats, each with an example from the live value: degrees and decimal minutes (`60° 09.000' N`), degrees, minutes and seconds, decimal degrees, and signed decimal. *Decimals* applies to the last part (minutes, seconds or degrees); empty uses the format's default. The preview uses the same formatter as the display.
@@ -68,6 +70,7 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - drag from the library, corner resize
     - invalid label blocks sending
     - a value colour and an open-ended zone, coloured in the preview
+    - the value tile's preview text size comes from the display's fonts
     - Save & send, and that the display downloads exactly that layout (with the colour and zone) and is notified
     - a wind page from a template with a slot changed to depth (live pointer and value, size hint "full"), a new grid page with a gauge, a zone and a rose tile next to it, moving the wind page to the front, and that the display downloads the three pages in that order
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template
