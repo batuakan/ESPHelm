@@ -68,3 +68,16 @@ Not done this round: landscape and other sizes, auth and recovery tooling. Desig
 
 ## Repository note
 Your untracked `.gitattributes` routes `*.png` and `*.svg` through Git LFS. The goldens committed in 5d and now are LFS pointers, which work on this machine. A clone without that file, or without the LFS objects, gets pointer text instead of images. Commit `.gitattributes` (and push the LFS objects) or drop it, whichever you intended.
+
+## Value history popup (2026-10-28, branch `feat/value-history`)
+A tap on a value tile opens a graph of its recent values; only the close button closes it (ADR-0018). The display records the history itself, from boot, on every page, so it works offline.
+- **Schema:** optional `history` on value tiles (absent = on), and `HISTORY` (windows, points, limits per board) generated into `esphelm_sizes.h`.
+- **Firmware:**
+  - `value_history.cpp`: rings of 120 points for 10 min / 1 h / 6 h, carry-forward while fresh, kept across layout updates, unit-tested with g++.
+  - `history_popup.cpp`: the popup on the top layer, below the alarm banner.
+  - The sparkline mark on tappable tiles.
+- **Editor:** a *Tap for history* checkbox, the mark in the preview, and *Preview graph* (a mock of the popup).
+- **Tests:**
+  - SDL e2e: seven new goldens (480 day/night, 1 h window, collecting, under an alarm, the page after closing, 720), plus a live recording check through the log. Every golden with value tiles was re-recorded for the 66-pixel mark, and each diff was checked to be the mark only.
+  - Editor e2e: the mock popup, history off, and `history: false` in the served layout.
+- **Not verified:** touch on the P4 (hardware step 18), PSRAM allocation and the C3's internal-RAM guard on real chips (both only compile), and a full 6 h recording (the windows were tested with the unit test and a seeded curve).

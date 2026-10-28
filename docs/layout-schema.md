@@ -80,7 +80,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 
 | `type` | Extra fields | Notes |
 |---|---|---|
-| `value` | DataItem + `color?`, `zones?` (value zones) | big number + label + unit; the number coloured by a fixed colour or by value (below) |
+| `value` | DataItem + `color?`, `zones?` (value zones), `history?` | big number + label + unit; the number coloured by a fixed colour or by value (below); a tap opens its history graph |
 | `gauge` | DataItem + `min`, `max`, `zones?` | round gauge with needle |
 | `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
@@ -93,6 +93,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 - `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
 - `zones` (optional): `{ from?, to?, state }`, in display units. A value tile has no `min`/`max`, so a missing end is open: `{ "to": 2, "state": "alarm" }` means "2 or less". At least one end is required, and `from` must be below `to` when both are given (`INVALID_ZONE`). Both ends are included, and the last matching zone wins (`valueZoneState`).
 - The number is coloured, in this order: muted when stale; a matching zone's colour (at night a `normal` zone uses the text colour); the fixed `color`; the theme's text colour. Older firmware ignores both fields and shows the value uncoloured.
+- `history` (optional boolean, ADR-0018): a tap on the tile opens a graph of its recent values (10 min, 1 h and, on displays with PSRAM, 6 h), which the display records from boot. Absent means `true`; `false` turns it off. Older firmware ignores it.
 
 ```json
 { "type": "value", "id": "depth", "x": 0, "y": 0, "w": 1, "h": 1,
