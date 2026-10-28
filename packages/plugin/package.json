@@ -31,6 +31,7 @@
     "express": "4.22.3"
   },
   "signalk": {
-    "displayName": "ESPHelm"
+    "displayName": "ESPHelm",
+    "appIcon": "./icon-192.png"
   }
 }

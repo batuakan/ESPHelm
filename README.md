@@ -1,4 +1,6 @@
-# ⚓ ESPHelm
+<p align="center"><img width="96px" src="packages/editor/public/icon.svg" alt="ESPHelm"></p>
+
+# ESPHelm
 
 **ESPHelm — Open-source ESP32 multifunction marine displays with native SignalK support.**
 
