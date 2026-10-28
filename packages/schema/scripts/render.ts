@@ -191,6 +191,13 @@ function renderSizesHeader(
   fit: { full: number; compact: number },
   ap: { controlsWidth: number; controlsHeight: number },
   text: { companionPercent: number; sampleDigits: number },
+  history: {
+    points: number;
+    windows: readonly { label: string; seconds: number }[];
+    noPsramWindows: number;
+    maxTilesPsram: number;
+    maxTilesNoPsram: number;
+  },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -213,6 +220,15 @@ function renderSizesHeader(
     "// the number's sample text has this many integer digits.",
     `inline constexpr int TEXT_COMPANION_PERCENT = ${text.companionPercent};`,
     `inline constexpr int TEXT_SAMPLE_DIGITS = ${text.sampleDigits};`,
+    '',
+    '// Value history (ADR-0018): points per window, the windows, and the limits per board.',
+    `inline constexpr int HISTORY_POINTS = ${history.points};`,
+    `inline constexpr int HISTORY_WINDOWS = ${history.windows.length};`,
+    `inline constexpr int HISTORY_WINDOW_SECONDS[HISTORY_WINDOWS] = {${history.windows.map((w) => w.seconds).join(', ')}};`,
+    `inline constexpr const char *HISTORY_WINDOW_LABELS[HISTORY_WINDOWS] = {${history.windows.map((w) => JSON.stringify(w.label)).join(', ')}};`,
+    `inline constexpr int HISTORY_NO_PSRAM_WINDOWS = ${history.noPsramWindows};`,
+    `inline constexpr int HISTORY_MAX_TILES_PSRAM = ${history.maxTilesPsram};`,
+    `inline constexpr int HISTORY_MAX_TILES_NO_PSRAM = ${history.maxTilesNoPsram};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',
@@ -303,7 +319,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT } = await import('../src/tiles.js');
+  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -311,11 +327,12 @@ export async function renderAll(): Promise<Record<string, string>> {
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
-    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT),
+    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
       AUTOPILOT_FIT,
       TEXT_FIT,
+      HISTORY,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

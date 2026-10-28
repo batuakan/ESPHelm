@@ -5,6 +5,7 @@ import {
   AUTOPILOT_FIT,
   migrateLayout,
   TEXT_FIT,
+  HISTORY,
   validateLayout,
   WIND_ROSE_FIT,
 } from '../src/index.js';
@@ -89,5 +90,11 @@ describe('size tiers', () => {
     expect(header).toContain(`AUTOPILOT_CONTROLS_HEIGHT = ${AUTOPILOT_FIT.controlsHeight};`);
     expect(header).toContain(`TEXT_COMPANION_PERCENT = ${TEXT_FIT.companionPercent};`);
     expect(header).toContain(`TEXT_SAMPLE_DIGITS = ${TEXT_FIT.sampleDigits};`);
+    expect(header).toContain(`HISTORY_POINTS = ${HISTORY.points};`);
+    expect(header).toContain(
+      `HISTORY_WINDOW_SECONDS[HISTORY_WINDOWS] = {${HISTORY.windows.map((w) => w.seconds).join(', ')}};`,
+    );
+    expect(header).toContain(`HISTORY_NO_PSRAM_WINDOWS = ${HISTORY.noPsramWindows};`);
+    expect(header).toContain(`HISTORY_MAX_TILES_NO_PSRAM = ${HISTORY.maxTilesNoPsram};`);
   });
 });

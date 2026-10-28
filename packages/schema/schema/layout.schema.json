@@ -265,6 +265,10 @@
                             },
                             "additionalProperties": false
                           }
+                        },
+                        "history": {
+                          "type": "boolean",
+                          "description": "Tap the tile for a graph of its recent values (ADR-0018). Absent means true; false turns it off."
                         }
                       },
                       "additionalProperties": false

@@ -59,6 +59,12 @@ export const ValueTile = Type.Object(
     ...DataItem.properties,
     color: Type.Optional(ValueColor),
     zones: Type.Optional(Type.Array(ValueZone)),
+    history: Type.Optional(
+      Type.Boolean({
+        description:
+          'Tap the tile for a graph of its recent values (ADR-0018). Absent means true; false turns it off.',
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -251,6 +257,24 @@ export const AUTOPILOT_FIT = { controlsWidth: 260, controlsHeight: 220 } as cons
  * height (never below the smallest). Generated into esphelm_sizes.h.
  */
 export const TEXT_FIT = { companionPercent: 40, sampleDigits: 2 } as const;
+
+/**
+ * Value history (ADR-0018). The display records every value tile with history on, from boot,
+ * into one ring of `points` points per window (each point: mean, min and max of its values).
+ * Boards without PSRAM keep only the first `noPsramWindows` windows and fewer tiles. Generated
+ * into esphelm_sizes.h; the editor's mock popup uses the same windows.
+ */
+export const HISTORY = {
+  points: 120,
+  windows: [
+    { label: '10 min', seconds: 600 },
+    { label: '1 h', seconds: 3600 },
+    { label: '6 h', seconds: 21600 },
+  ],
+  noPsramWindows: 2,
+  maxTilesPsram: 48,
+  maxTilesNoPsram: 6,
+} as const;
 
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
