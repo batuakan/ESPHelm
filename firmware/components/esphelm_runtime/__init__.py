@@ -28,7 +28,7 @@ CONF_BACKLIGHT = "backlight"
 
 # LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
 # links against it for image needles).
-LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image")
+LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image", "chart")
 
 esphelm_ns = cg.esphome_ns.namespace("esphelm_runtime")
 EsphelmRuntime = esphelm_ns.class_("EsphelmRuntime", cg.Component)

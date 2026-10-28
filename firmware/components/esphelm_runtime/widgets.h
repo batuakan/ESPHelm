@@ -97,6 +97,10 @@ struct WidgetEnv {
   bool psram{false};
   /// The layout's theme is night (charts are darkened and tinted red).
   bool night{false};
+  /// Whether a value tile records its history (ADR-0018), and opening its popup. A tap only asks
+  /// for it; the runtime opens it in loop(). Unset or false: the tile isn't tappable.
+  std::function<bool(const std::string &tile_id)> has_history;
+  std::function<void(const std::string &tile_id)> open_history;
 };
 
 class Widget {
@@ -130,6 +134,14 @@ std::string format_value(ArduinoJson::JsonVariantConst value, const esphelm::uni
 
 /// Text the fonts can draw: printable ASCII and the degree sign; other characters become "?".
 std::string printable(const char *s);
+
+/// Width of `text` in `font`, in pixels.
+int32_t text_width(const char *text, const lv_font_t *font);
+
+/// The largest full ladder font, no taller than `max` if given, in which `lines` lines of `text`
+/// fit w x h; the smallest when none does. Digits-only fonts are skipped: `text` may be anything.
+const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines = 1,
+                          const lv_font_t *max = nullptr);
 
 /// Display-unit number from a SignalK value; false if it is not a finite number.
 bool display_number(ArduinoJson::JsonVariantConst value, const esphelm::units::UnitDef *unit, double &out);

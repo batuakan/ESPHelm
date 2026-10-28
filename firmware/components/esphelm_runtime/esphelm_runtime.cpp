@@ -69,6 +69,9 @@ void EsphelmRuntime::setup() {
   this->client_.start();
   this->tiles_.start();
 
+  this->popup_.set_fonts(this->fonts_);
+  this->popup_.set_history(&this->history_);
+
   // Alarms (ADR-0014): every notification, whatever the layout shows.
   this->alarms_.set_fonts(this->fonts_);
   this->alarms_.set_capacity(this->psram_ ? 16 : 8);
@@ -164,6 +167,7 @@ void EsphelmRuntime::loop() {
     this->next_poll_ms_ = now + POLL_INTERVAL_MS;
   }
 
+  bool history_closed = false;
   if (this->has_layout_) {
     if (this->theme_toggle_wanted_) {
       this->theme_toggle_wanted_ = false;
@@ -177,6 +181,11 @@ void EsphelmRuntime::loop() {
     }
     for (auto &w : this->widgets_)
       w->tick(now);
+    history_closed = this->history_.tick(now);
+    if (!this->history_wanted_.empty()) {
+      this->open_history_(this->history_wanted_);
+      this->history_wanted_.clear();
+    }
     if (!this->lkg_saved_ && now - this->shown_at_ >= LKG_AFTER_MS) {
       if (this->boot_attempts_ != 0) {
         this->boot_attempts_ = 0;  // survived: no longer a suspect
@@ -203,6 +212,9 @@ void EsphelmRuntime::loop() {
     for (auto &w : this->widgets_)
       w->layout_done();
   }
+  // The popup sits below the banner too, and the banner stays in front of it.
+  if (this->popup_.tick(now, history_closed, this->theme_, this->alarms_.height()))
+    this->alarms_.raise();
 }
 
 // ---- Network ----
@@ -391,6 +403,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
     }
   }
   this->layout_ = std::move(parsed.layout);
+  this->configure_history_();
   // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
   // or what was chosen on the display, unless this layout brings another theme.
   if (this->layout_.theme != this->base_theme_)
@@ -627,6 +640,8 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.can_put = [this]() { return this->signalk_->is_connected(); };
   env.psram = this->psram_;
   env.night = this->layout_.theme == esphelm::Theme::NIGHT;
+  env.has_history = [this](const std::string &id) { return this->history_.find(id) >= 0; };
+  env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
   env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
       return false;
@@ -663,6 +678,10 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
     this->alarms_.tap(part);
     return;
   }
+  if (tile_id == "@history") {  // the history popup's buttons: close, 10m, 1h, 6h
+    this->popup_.tap(part);
+    return;
+  }
   if (tile_id == "@theme") {  // the footer title held down
     this->theme_toggle_wanted_ = true;
     return;
@@ -672,6 +691,10 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
       this->wake_wanted_ = true;
     else
       lv_display_trigger_activity(nullptr);
+    return;
+  }
+  if (this->popup_.is_open()) {
+    ESP_LOGW(TAG, "tap: %s is under the history popup", tile_id.c_str());
     return;
   }
   for (auto &w : this->widgets_) {
@@ -693,6 +716,8 @@ void EsphelmRuntime::clear_layout_() {
   }
   if (this->asleep_)
     this->wake_("no layout");
+  this->popup_.close();
+  this->history_.clear();
   this->widgets_.clear();
   this->has_layout_ = false;
   this->etag_.clear();
@@ -708,6 +733,9 @@ void EsphelmRuntime::subscribe_page_() {
   std::vector<std::string> paths;
   for (const auto &w : this->widgets_)
     w->paths(paths);
+  // History records on every page, so it also listens to the value tiles it can't see.
+  for (size_t i = 0; i < this->history_.size(); i++)
+    paths.push_back(this->history_.path(i));
   std::sort(paths.begin(), paths.end());
   paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
   for (const auto &path : paths) {
@@ -722,6 +750,83 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
   const uint32_t now = millis();
   for (auto &w : this->widgets_)
     w->on_value(path, value, now);
+  for (size_t i = 0; i < this->history_.size(); i++) {
+    double v;
+    if (this->history_.path(i) == path && display_number(value, this->history_.unit(i), v))
+      this->history_.record(i, v, now);
+  }
+}
+
+// ---- Value history (ADR-0018) ----
+
+const esphelm::Tile *EsphelmRuntime::find_tile_(const std::string &id) const {
+  for (const auto &page : this->layout_.pages) {
+    for (const auto &tile : page.tiles) {
+      if (tile.id == id)
+        return &tile;
+    }
+  }
+  return nullptr;
+}
+
+void EsphelmRuntime::configure_history_() {
+  std::vector<esphelm::ValueHistory::Spec> specs;
+  for (const auto &page : this->layout_.pages) {
+    for (const auto &tile : page.tiles) {
+      if (tile.type != esphelm::TileType::VALUE || !tile.history)
+        continue;
+      const uint32_t stale = tile.data.stale_after > 0 ? static_cast<uint32_t>(tile.data.stale_after * 1000)
+                                                       : this->stale_after_ms_;
+      specs.push_back({tile.id, tile.data.path, tile.data.unit, stale});
+    }
+  }
+  std::vector<std::string> skipped;
+  const int windows = this->psram_ ? esphelm::sizes::HISTORY_WINDOWS : esphelm::sizes::HISTORY_NO_PSRAM_WINDOWS;
+  const size_t max_tiles =
+      this->psram_ ? esphelm::sizes::HISTORY_MAX_TILES_PSRAM : esphelm::sizes::HISTORY_MAX_TILES_NO_PSRAM;
+  this->history_.configure(specs, millis(), windows, max_tiles, this->psram_, skipped);
+  if (!skipped.empty()) {
+    std::string ids;
+    for (const auto &id : skipped)
+      ids += (ids.empty() ? "" : ", ") + id;
+    ESP_LOGW(TAG, "No history for %u value tiles (limit %u on this display): %s", (unsigned) skipped.size(),
+             (unsigned) max_tiles, ids.c_str());
+  }
+  ESP_LOGD(TAG, "History: %u value tiles, %u windows, %u bytes", (unsigned) this->history_.size(),
+           (unsigned) windows, (unsigned) this->history_.bytes());
+#ifdef USE_HOST
+  // Test hook (SDL e2e goldens): a fixed curve with a gap for this tile, kept still.
+  const char *seed = std::getenv("ESPHELM_TEST_HISTORY");
+  const int idx = seed != nullptr ? this->history_.find(seed) : -1;
+  if (idx >= 0) {
+    for (int w = 0; w < this->history_.windows(); w++) {
+      for (int k = 0; k < esphelm::sizes::HISTORY_POINTS; k++) {
+        float v = 6.0f + 1.5f * std::sin(k / (12.0f + 8.0f * w)) + 0.3f * std::sin(k / 2.5f);
+        if (k >= 70 && k < 78)
+          v = std::nanf("");
+        this->history_.push(idx, w, {v, v - 0.2f, v + 0.2f});
+      }
+    }
+    this->history_.freeze(idx);
+    ESP_LOGI(TAG, "ESPHELM_TEST_HISTORY: seeded %s", seed);
+  }
+#endif
+  // An open popup follows its tile into the new layout, or closes if the tile is gone.
+  if (this->popup_.is_open()) {
+    const esphelm::Tile *tile = this->find_tile_(this->popup_.tile_id());
+    if (tile != nullptr && this->history_.find(tile->id) >= 0)
+      this->popup_.open(*tile, this->theme_, this->alarms_.height());
+    else
+      this->popup_.close();
+  }
+}
+
+void EsphelmRuntime::open_history_(const std::string &tile_id) {
+  const esphelm::Tile *tile = this->find_tile_(tile_id);
+  if (tile == nullptr || this->history_.find(tile_id) < 0)
+    return;
+  this->popup_.open(*tile, this->theme_, this->alarms_.height());
+  this->alarms_.raise();
 }
 
 // ---- Status page ----

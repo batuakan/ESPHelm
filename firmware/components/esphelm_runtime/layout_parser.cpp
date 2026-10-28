@@ -452,6 +452,12 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     int c = enum_field(chk, obj, ptr, "color", false, VALUE_COLORS, 6);
     if (c >= 0)
       tile.color = static_cast<ValueColor>(c);
+    if (has(obj, "history")) {
+      if (!obj["history"].is<bool>())
+        chk.add(ptr + "/history", "INVALID_TYPE");
+      else
+        tile.history = obj["history"].as<bool>();
+    }
   } else {
     number_field(chk, obj, ptr, "min", true, tile.min);
     number_field(chk, obj, ptr, "max", true, tile.max);

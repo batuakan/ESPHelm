@@ -60,6 +60,7 @@ struct Tile {
   double min{0}, max{0};
   std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf
   ValueColor color{ValueColor::NONE};  // value
+  bool history{true};                  // value: records its history, tap for the graph (ADR-0018)
   Orientation orientation{Orientation::HORIZONTAL};
   // position (data.path defaults to navigation.position; data.decimals -1 = the format's default)
   position::Format position_format{position::Format::DDM};

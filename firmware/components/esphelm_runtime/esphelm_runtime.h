@@ -21,11 +21,13 @@
 #endif
 
 #include "alarms.h"
+#include "history_popup.h"
 #include "layout_client.h"
 #include "layout_model.h"
 #include "layout_parser.h"
 #include "layout_store.h"
 #include "renderer.h"
+#include "value_history.h"
 
 namespace esphome {
 namespace esphelm_runtime {
@@ -80,6 +82,9 @@ class EsphelmRuntime : public Component {
   bool build_page_(size_t index);
   void subscribe_page_();
   void on_value_(const std::string &path, ArduinoJson::JsonVariantConst value);
+  void configure_history_();
+  void open_history_(const std::string &tile_id);
+  const esphelm::Tile *find_tile_(const std::string &id) const;
   void update_status_();
   void show_status_(const std::string &headline, const std::string &detail);
   void send_hello_();
@@ -103,6 +108,10 @@ class EsphelmRuntime : public Component {
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
   AlarmBanner alarms_;
+  // Value history (ADR-0018): recorded for every value tile of the layout, shown in the popup.
+  esphelm::ValueHistory history_;
+  HistoryPopup popup_;
+  std::string history_wanted_;  // a value tile was tapped: open its popup in loop()
   Fonts fonts_;
   LayoutStore store_;
   LayoutClient client_;

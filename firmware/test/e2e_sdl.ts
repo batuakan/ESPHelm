@@ -721,6 +721,103 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw.screenshot('32-value-sizes', shots);
+
+    // 9g. Value history (ADR-0018): a tap on a value tile opens a graph of its recent values;
+    //     its close button brings the page back. Tiles record from boot on every page.
+    const history = fixture('valid/value-history.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/value-history', admin, history);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'value-history',
+    });
+    check(
+      'history: the value history layout renders',
+      await fw.waitLog(/Showing fetched layout "value-history" \(2 pages/),
+    );
+    const tapTile = (tile: string, part = '') =>
+      writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `${tile} ${part}`.trim());
+    tapTile('hdg');
+    await sleep(800);
+    check(
+      'history: a tile with history off opens nothing',
+      fw.count(/History of hdg opened/) === 0,
+    );
+    // The water temperature (page 2) never had a value: nothing to draw yet.
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
+    check('history: page 2', await fw.waitLog(/Page 2\/2 "Other"/));
+    tapTile('water');
+    check(
+      'history: a tap on a value tile opens its history',
+      await fw.waitLog(/History of water opened/),
+    );
+    await sleep(800);
+    await fw.screenshot('33-history-collecting', shots);
+    tapTile('@history', 'close');
+    check('history: the close button closes it', await fw.waitLog(/History of water closed/));
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '0');
+    await fw.waitLog(/Page 1\/2 "History"/, 15000, 2);
+    // Live recording: the SOG, sent every second, fills 5 s points while the popup is open.
+    tapTile('sog');
+    await fw.waitLog(/History of sog opened/);
+    const sogTimer = setInterval(() => publish({ 'navigation.speedOverGround': 3.1 }), 1000);
+    check(
+      'history: live values become points of the graph',
+      await fw.waitLog(/History of sog, 10 min: \d+ points, [2-9]\d* with values/, 20000),
+    );
+    clearInterval(sogTimer);
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of sog closed/);
+
+    // Goldens need a fixed curve: restart with the test hook seeding the SOG's history.
+    await fw.stop();
+    fw.start({ ESPHELM_TEST_HISTORY: 'sog' });
+    check(
+      'history: restarted with a seeded SOG history',
+      (await fw.waitLog(/Showing cached layout "value-history"/)) &&
+        (await fw.waitLog(/ESPHELM_TEST_HISTORY: seeded sog/)),
+    );
+    await fw.waitLog(/Sending hello/, 15000);
+    const historyPage = {
+      'navigation.speedOverGround': 3.1, // 6.0 kn
+      'environment.depth.belowTransducer': 12.4,
+      'navigation.headingTrue': 4.2, // 241°
+    };
+    publish(historyPage); // fixed values: SignalK would replay older ones, or none
+    await sleep(1500);
+    await fw.screenshot('34-history-page', shots);
+    tapTile('sog');
+    await fw.waitLog(/History of sog opened/);
+    publish({ 'navigation.speedOverGround': 3.1 });
+    await sleep(1000);
+    await fw.screenshot('35-history-10min', shots);
+    tapTile('@history', '1h');
+    check('history: the 1 h window', await fw.waitLog(/History of sog, 1 h: 120 points/));
+    publish({ 'navigation.speedOverGround': 3.1 });
+    await sleep(1000);
+    await fw.screenshot('36-history-1h', shots);
+    // An alarm appears: the banner stays in front, the popup moves below it.
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    await fw.waitLog(/ALARM notifications\.environment\.depth\.belowTransducer/);
+    publish({ 'navigation.speedOverGround': 3.1 });
+    await sleep(1200);
+    await fw.screenshot('37-history-alarm', shots);
+    notify(DEPTH, 'normal', '', []);
+    await fw.waitLog(/belowTransducer cleared/);
+    // Night: the popup follows the theme (red only).
+    tapTile('@theme');
+    publish({ 'navigation.speedOverGround': 3.1 });
+    await sleep(1500);
+    await fw.screenshot('38-history-night', shots);
+    tapTile('@theme');
+    await sleep(800);
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of sog closed/);
+    publish(historyPage);
+    await sleep(1500);
+    await fw.screenshot('34-history-page', shots); // the page as before the tap
+    await fw.stop();
+    fw.start();
+    await fw.waitLog(/Showing cached layout "value-history"/);
+    await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'settings: back to the multi-page layout (no settings: its first page, never off)',
@@ -794,6 +891,21 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-04-value-sizes', shots);
+    await fw720.stop();
+
+    // 12c. The history popup at 720 (offline, seeded SOG history).
+    const history720 = readFileSync(join(FIXTURES, 'valid/value-history.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(history720, '"seed-history"'));
+    fw720.start({ ESPHELM_TEST_HISTORY: 'sog' });
+    check(
+      '720 build shows the value history layout',
+      await fw720.waitLog(/Showing cached layout "value-history" \(2 pages/),
+    );
+    await sleep(1000);
+    writeFileSync(join(work720, 'esphelm_tap_request'), 'sog');
+    check('720 history popup opens', await fw720.waitLog(/History of sog opened/));
+    await sleep(1000);
+    await fw720.screenshot('720-05-history', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

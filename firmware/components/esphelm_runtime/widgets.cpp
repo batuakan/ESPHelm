@@ -113,8 +113,7 @@ static bool set_text(lv_obj_t *label, std::string &shown, const std::string &tex
 
 static int32_t line_height(const lv_font_t *font) { return lv_font_get_line_height(font); }
 
-/// Width of `text` in `font`, in pixels.
-static int32_t text_width(const char *text, const lv_font_t *font) {
+int32_t text_width(const char *text, const lv_font_t *font) {
   lv_point_t size;
   lv_text_get_size(&size, text, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   return size.x;
@@ -152,10 +151,8 @@ static const lv_font_t *smallest_font(const Fonts &fonts) {
   return fonts.small;
 }
 
-/// The largest full ladder font, no taller than `max` if given, in which `lines` lines of `text`
-/// fit w x h; the smallest when none does. Digits-only fonts are skipped: `text` may be anything.
-static const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines = 1,
-                                 const lv_font_t *max = nullptr) {
+const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines,
+                          const lv_font_t *max) {
   for (int i = fonts.count - 1; i >= 0; i--) {
     const lv_font_t *f = fonts.ladder[i];
     if (fonts.digits[i] || (max != nullptr && line_height(f) > line_height(max)))
@@ -284,9 +281,30 @@ class ValueWidget : public Widget {
     lv_obj_set_style_text_align(value_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     if (tile.data.unit != nullptr && tile.data.unit->label[0] != '\0')
       unit_ = make_label(cell, env.fonts.small, env.colors.muted, tile.data.unit->label);
+    if (env.has_history && env.open_history && env.has_history(tile.id)) {
+      // Tap for the history popup (ADR-0018); a small sparkline mark bottom-left says so.
+      open_history_ = env.open_history;
+      static const lv_point_precise_t MARK[] = {{0, 10}, {6, 4}, {12, 7}, {20, 0}};
+      mark_ = lv_line_create(cell);
+      lv_line_set_points(mark_, MARK, 4);
+      lv_obj_set_style_line_width(mark_, 2, LV_PART_MAIN);
+      lv_obj_set_style_line_rounded(mark_, true, LV_PART_MAIN);
+      lv_obj_set_style_line_color(mark_, env.colors.muted, LV_PART_MAIN);
+      lv_obj_align(mark_, LV_ALIGN_BOTTOM_LEFT, 0, -4);
+      lv_obj_add_flag(cell, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_add_event_cb(
+          cell, [](lv_event_t *e) { static_cast<ValueWidget *>(lv_event_get_user_data(e))->tap(""); },
+          LV_EVENT_CLICKED, this);
+    } else {
+      lv_obj_remove_flag(cell, LV_OBJ_FLAG_CLICKABLE);
+    }
   }
   const std::string &id() const override { return id_; }
   void paths(std::vector<std::string> &out) const override { out.push_back(b_.item.path); }
+  void tap(const std::string &part) override {
+    if (open_history_)
+      open_history_(id_);
+  }
 
   void layout_done() override {
     width_ = lv_obj_get_content_width(cell_);
@@ -383,6 +401,8 @@ class ValueWidget : public Widget {
   lv_obj_t *caption_;
   lv_obj_t *value_;
   lv_obj_t *unit_{nullptr};
+  lv_obj_t *mark_{nullptr};
+  std::function<void(const std::string &)> open_history_;
   int level_{0};  // index of the number's font in fonts_.ladder
   int32_t width_{0}, offset_y_{0};
   std::string shown_{"--"};

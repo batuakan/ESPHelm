@@ -45,6 +45,11 @@ class AlarmBanner {
     return w;
   }
   size_t active() const { return this->entries_.size(); }
+  /// Bring the banner in front of whatever else is on the top layer (the history popup).
+  void raise() {
+    if (this->banner_ != nullptr)
+      lv_obj_move_foreground(this->banner_);
+  }
   /// Height the banner takes at the top of the screen (0 when hidden).
   int32_t height() const { return this->height_; }
 
