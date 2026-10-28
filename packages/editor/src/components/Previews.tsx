@@ -244,7 +244,7 @@ export function PositionPreview(props: { tile: PositionTile; values: Map<string,
 const RAD = 180 / Math.PI;
 const CARD_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
-// Rose geometry in the SVG's 200x200 box, as the firmware draws it (widgets.cpp): ring about
+// Rose geometry in the SVG's 200x200 box, as the firmware draws it (widget_wind_rose.cpp): ring about
 // d/15 wide, the compass card band just inside it, markers on the ring.
 const R = 96;
 const RING = 13;

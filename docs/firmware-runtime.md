@@ -88,6 +88,8 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue.
 
+Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `switch`, `autopilot`, `wind_rose`, `position`), with its class and factory. `widgets.cpp` holds the theme colours, value formatting, the font fitting and `make_tile_widget()`, which picks the factory. Helpers shared by the widgets are declared in `widget_common.h`. A new tile type adds a file and a case there.
+
 | Widget | Drawn with | Notes |
 |---|---|---|
 | `value` | labels | the number in the largest font whose sample ("88" plus the decimals) fits the tile, with the caption and unit scaled alongside; a wider live value steps it down (ADR-0017). Coloured by `color` or `zones` (ADR-0016). With history on, the tile is tappable and shows a small sparkline mark bottom-left (ADR-0018) |
