@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateLayout } from '@esphelm/schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { arduinoJsonSrc } from './arduinojson.js';
 
 const FIRMWARE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = join(FIRMWARE, '../packages/schema/fixtures');
@@ -210,7 +211,7 @@ describe.skipIf(!compiler)('firmware layout parser', () => {
       '-Werror',
       '-O1',
       `-I${RUNTIME}`,
-      `-I${join(FIRMWARE, 'test/third_party/ArduinoJson/src')}`,
+      `-I${arduinoJsonSrc()}`,
       join(RUNTIME, 'layout_parser.cpp'),
       join(FIRMWARE, 'test/cpp/parser_driver.cpp'),
       '-o',

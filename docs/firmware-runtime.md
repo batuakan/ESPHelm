@@ -183,7 +183,7 @@ Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k w
 The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't been measured, because there's no C3 hardware yet.
 
 ## Tests
-- `npm test` includes `firmware/test/parser.cpp.test.ts`. It compiles the parser with g++ (`-Wall -Wextra -Werror`) against the vendored ArduinoJson 7.4.3 (`firmware/test/third_party/`, MIT) and compares it with `validateLayout` on every fixture and on mutations. It also covers the device-only guards.
+- `npm test` includes `firmware/test/parser.cpp.test.ts`. It compiles the parser with g++ (`-Wall -Wextra -Werror`) against ArduinoJson 7.4.3 (MIT), fetched from GitHub on first run into the git-ignored `firmware/test/.cache/` (`firmware/test/arduinojson.ts`; `ESPHELM_ARDUINOJSON=<dir with ArduinoJson.h>` for offline runs) and compares it with `validateLayout` on every fixture and on mutations. It also covers the device-only guards.
 - `npm run build && npm run e2e:sdl` compiles `esphelm_sdl.yaml` for a test port (3993) and runs it against a real security-enabled signalk-server with the plugin. It checks:
   1. the access request asks for read/write
   2. the approval and adoption screens

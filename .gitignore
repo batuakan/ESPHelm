@@ -23,3 +23,6 @@ packages/plugin/public/
 
 # The static ESPHome apps live on in the ESPHelmv1 tag; a local copy may stay here
 /legacy/
+
+# ArduinoJson for the host C++ tests, fetched on first run (firmware/test/arduinojson.ts)
+firmware/test/.cache/
