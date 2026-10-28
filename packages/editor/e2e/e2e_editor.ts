@@ -126,6 +126,21 @@ async function main(): Promise<void> {
       (await tile1Value.getAttribute('class')) ?? '',
     );
 
+    // History (ADR-0018): value tiles show the "tap for history" mark; the drawer previews the
+    // display's popup, in its windows, and closes it again.
+    const mark = page.getByTestId('tile-tile-1').locator('.tile-history-mark');
+    await tileDrawer.getByRole('button', { name: 'Preview graph' }).click();
+    const popup = page.getByRole('dialog', { name: 'History preview' });
+    await popup.waitFor();
+    await popup.getByRole('button', { name: '1 h' }).click();
+    const oneHour = await popup.getByText('-60 m').isVisible();
+    await shot(page, '03-history-preview');
+    await popup.getByRole('button', { name: 'Close history' }).click();
+    check(
+      'a value tile has the history mark and previews its graph',
+      (await mark.isVisible()) && oneHour && (await popup.count()) === 0,
+    );
+
     // Add a second tile by dragging the library item onto cell (1,0); make tile-1 two rows tall.
     const libraryValue = page
       .getByRole('region', { name: 'Tiles' })
@@ -145,6 +160,11 @@ async function main(): Promise<void> {
     await page.getByLabel('Search SignalK paths').fill('speedApparent');
     await page.getByRole('option', { name: /environment\.wind\.speedApparent/ }).click();
     await page.getByLabel('Label').fill('AWS');
+    await page.getByLabel('Tap for history').uncheck();
+    check(
+      'turning history off removes the mark',
+      (await page.getByTestId('tile-tile-2').locator('.tile-history-mark').count()) === 0,
+    );
 
     const handle = page.getByTestId('tile-tile-1').getByLabel('Resize');
     const hb = await handle.boundingBox();
@@ -228,6 +248,11 @@ async function main(): Promise<void> {
       JSON.stringify([tiles[0]?.color, tiles[0]?.zones]) ===
         JSON.stringify(['blue', [{ to: 1000, state: 'warn' }]]),
       JSON.stringify([tiles[0]?.color, tiles[0]?.zones]),
+    );
+    check(
+      'the display gets history off for the AWS tile only',
+      tiles[0]?.history === undefined && tiles[1]?.history === false,
+      JSON.stringify([tiles[0]?.history, tiles[1]?.history]),
     );
     check('the display is notified with the new version', gotVersion, String(etag));
     // Pages: a wind page from a template (a 1x1 grid with a rose tile, slots prefilled), a new

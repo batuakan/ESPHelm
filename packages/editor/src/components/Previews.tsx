@@ -17,6 +17,7 @@ import {
   type ValueTile,
   type Zone,
   valueZoneState,
+  historyEnabled,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
@@ -208,6 +209,11 @@ export function TilePreview(props: {
             {tile.path ? formatValue(value, tile.unit, tile.decimals) : '--'}
           </span>
           <span className="tile-unit">{tile.unit ? UNITS[tile.unit].label : ''}</span>
+          {tile.type === 'value' && historyEnabled(tile) && (
+            <svg className="tile-history-mark" viewBox="0 0 20 10" role="img" aria-label="Has history">
+              <polyline points="1,9 6,4 12,7 19,1" />
+            </svg>
+          )}
         </>
       );
   }

@@ -580,6 +580,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 : undefined
           }
           openSlot={selection?.slot}
+          theme={layout.theme}
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}
           onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
           onSlot={(slot, patch) => edit(updateSlot(layout, index, tile.id, slot, patch))}

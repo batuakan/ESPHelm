@@ -12,6 +12,7 @@ import {
   POSITION_FORMAT_NAMES,
   POSITION_FORMATS,
   formatPosition,
+  historyEnabled,
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
@@ -21,6 +22,7 @@ import {
   type AutopilotTile,
   type ChartPage,
   type DataItem,
+  type Layout,
   type PositionFormat,
   type PositionTile,
   type Tile,
@@ -35,6 +37,7 @@ import {
 import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import { HistoryPreview } from './HistoryPreview';
 
 const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 const ZONE_STATES: Zone['state'][] = ['normal', 'warn', 'alarm', 'emergency'];
@@ -414,6 +417,42 @@ const COLOR_SWATCH: Record<ValueColor, string> = {
   purple: '#8e24aa',
 };
 
+/** Whether a tap on the tile opens its history graph on the display (ADR-0018), with a mock. */
+function ValueHistoryField(props: {
+  tile: ValueTile;
+  value: unknown;
+  theme: Layout['theme'];
+  onChange(p: Patch): void;
+}) {
+  const { tile } = props;
+  const on = historyEnabled(tile);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => props.onChange({ history: e.target.checked ? undefined : false })}
+          aria-label="Tap for history"
+        />
+        Tap for history: a graph of the last 10 min, 1 h or 6 h
+      </label>
+      <button className="small" disabled={!on} onClick={() => setOpen(true)}>
+        Preview graph
+      </button>
+      {open && (
+        <HistoryPreview
+          tile={tile}
+          value={props.value}
+          theme={props.theme}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 /** A value tile's fixed colour and its colour-by-value zones (display units). */
 function ValueColorFields(props: { tile: ValueTile; onChange(p: Patch): void }) {
   const { tile, onChange } = props;
@@ -786,6 +825,8 @@ export function TileDrawer(
     /** Wind rose only: how the display will draw it at this size. */
     sizeHint?: string;
     openSlot?: SlotName;
+    /** The layout's display theme (the history mock follows it). */
+    theme?: Layout['theme'];
     onChange(patch: Patch): void;
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
@@ -851,6 +892,14 @@ export function TileDrawer(
             <RangeFields tile={tile} onChange={onChange} />
           )}
           {tile.type === 'value' && <ValueColorFields tile={tile} onChange={onChange} />}
+          {tile.type === 'value' && (
+            <ValueHistoryField
+              tile={tile}
+              value={tile.path ? props.values.get(tile.path) : undefined}
+              theme={props.theme ?? 'day'}
+              onChange={onChange}
+            />
+          )}
         </>
       )}
       <button className="danger" onClick={props.onDelete}>
