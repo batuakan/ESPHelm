@@ -12,6 +12,7 @@
       "tiles": [
         {
           "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "history": ["center3", "topLeft", "apparentAngle"],
           "config": { "showTrueWind": true },
           "slots": {
             "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },

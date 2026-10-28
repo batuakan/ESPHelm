@@ -62,7 +62,7 @@ export const ValueTile = Type.Object(
     history: Type.Optional(
       Type.Boolean({
         description:
-          'Tap the tile for a graph of its recent values (ADR-0018). Absent means true; false turns it off.',
+          'Record the value; a tap on the tile shows a graph of its recent values (ADR-0018, ADR-0019). Absent means false.',
       }),
     ),
   },
@@ -159,6 +159,25 @@ const WindRoseSlots = Type.Object(
   { additionalProperties: false, errorCode: 'UNKNOWN_SLOT' },
 );
 
+/**
+ * What a wind rose can record (ADR-0019): its slots, then the three angles it draws. The order
+ * is the order of the popup's buttons and of the editor's checkboxes.
+ */
+export const RoseHistoryKey = Type.Union([
+  Type.Literal('center1'),
+  Type.Literal('center2'),
+  Type.Literal('center3'),
+  Type.Literal('topLeft'),
+  Type.Literal('topRight'),
+  Type.Literal('bottomLeft'),
+  Type.Literal('bottomRight'),
+  Type.Literal('apparentAngle'),
+  Type.Literal('trueDirection'),
+  Type.Literal('heading'),
+]);
+export type RoseHistoryKey = Type.Static<typeof RoseHistoryKey>;
+export const ROSE_HISTORY_KEYS = RoseHistoryKey.anyOf.map((l) => l.const) as RoseHistoryKey[];
+
 export const WindRoseTile = Type.Object(
   {
     type: Type.Literal('wind_rose'),
@@ -175,6 +194,13 @@ export const WindRoseTile = Type.Object(
       ),
     ),
     slots: WindRoseSlots,
+    history: Type.Optional(
+      Type.Array(RoseHistoryKey, {
+        uniqueItems: true,
+        description:
+          'The values that record; a tap on the rose shows their graphs (ADR-0019). Absent: none. A name whose slot is empty records nothing.',
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -259,10 +285,11 @@ export const AUTOPILOT_FIT = { controlsWidth: 260, controlsHeight: 220 } as cons
 export const TEXT_FIT = { companionPercent: 40, sampleDigits: 2 } as const;
 
 /**
- * Value history (ADR-0018). The display records every value tile with history on, from boot,
- * into one ring of `points` points per window (each point: mean, min and max of its values).
- * Boards without PSRAM keep only the first `noPsramWindows` windows and fewer tiles. Generated
- * into esphelm_sizes.h; the editor's mock popup uses the same windows.
+ * Value history (ADR-0018, ADR-0019). The display records every value switched on (value tiles
+ * with `history: true`, the wind rose's `history` names), from boot, into one ring of `points`
+ * points per window (each point: mean, min and max of its values). Boards without PSRAM keep
+ * only the first `noPsramWindows` windows and fewer values. Generated into esphelm_sizes.h; the
+ * editor's mock popup and its memory counter use the same numbers.
  */
 export const HISTORY = {
   points: 120,
@@ -272,8 +299,8 @@ export const HISTORY = {
     { label: '6 h', seconds: 21600 },
   ],
   noPsramWindows: 2,
-  maxTilesPsram: 48,
-  maxTilesNoPsram: 6,
+  maxValuesPsram: 48,
+  maxValuesNoPsram: 6,
 } as const;
 
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */

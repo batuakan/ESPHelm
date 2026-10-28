@@ -49,15 +49,21 @@ static lv_obj_t *button(lv_obj_t *parent, const Colors &c, int32_t w, int32_t h)
   return b;
 }
 
-void HistoryPopup::open(const esphelm::Tile &tile, esphelm::Theme theme, int32_t top) {
-  this->tile_ = tile;
+void HistoryPopup::open(const std::string &tile_id, std::vector<HistorySeries> series, size_t selected,
+                        esphelm::Theme theme, int32_t top) {
+  if (series.empty())
+    return;
+  this->tile_id_ = tile_id;
+  this->series_ = std::move(series);
+  this->selected_ = selected < this->series_.size() ? selected : 0;
   this->theme_ = theme;
   this->top_ = top;
   this->window_ = 0;
   this->pending_window_ = -1;
+  this->pending_series_ = -1;
   this->pending_close_ = false;
   this->build_();
-  ESP_LOGI(TAG, "History of %s opened", tile.id.c_str());
+  ESP_LOGI(TAG, "History of %s opened", this->cur_().key.c_str());
 }
 
 void HistoryPopup::close() {
@@ -66,9 +72,10 @@ void HistoryPopup::close() {
   lv_obj_delete(this->root_);
   this->root_ = nullptr;
   this->value_ = this->minmax_ = this->plot_ = this->chart_ = this->collecting_ = nullptr;
-  this->series_ = nullptr;
+  this->line_ = nullptr;
+  this->series_buttons_.clear();
   this->bands_.clear();
-  ESP_LOGI(TAG, "History of %s closed", this->tile_.id.c_str());
+  ESP_LOGI(TAG, "History of %s closed", this->cur_().key.c_str());
 }
 
 void HistoryPopup::tap(const std::string &part) {
@@ -85,6 +92,12 @@ void HistoryPopup::tap(const std::string &part) {
       return;
     }
   }
+  for (size_t i = 0; i < this->series_.size(); i++) {
+    if (!this->series_[i].name.empty() && part == this->series_[i].name) {
+      this->pending_series_ = static_cast<int>(i);
+      return;
+    }
+  }
   ESP_LOGW(TAG, "tap: no button \"%s\" in the history popup", part.c_str());
 }
 
@@ -96,7 +109,13 @@ bool HistoryPopup::tick(uint32_t now, bool points_closed, esphelm::Theme theme, 
     return false;
   }
   bool rebuilt = false;
-  if (theme != this->theme_ || top != this->top_) {
+  if (this->pending_series_ >= 0) {
+    // Another value: its caption, unit, decimals and zones differ, so build it anew.
+    this->selected_ = static_cast<size_t>(this->pending_series_);
+    this->pending_series_ = -1;
+    rebuilt = true;
+  }
+  if (rebuilt || theme != this->theme_ || top != this->top_) {
     this->theme_ = theme;
     this->top_ = top;
     this->build_();
@@ -117,9 +136,21 @@ bool HistoryPopup::tick(uint32_t now, bool points_closed, esphelm::Theme theme, 
 
 std::string HistoryPopup::format_(double v) const {
   char buf[32];
-  const int d = this->tile_.data.decimals >= 0 ? this->tile_.data.decimals : 1;
+  const int d = this->cur_().data.decimals >= 0 ? this->cur_().data.decimals : 1;
   std::snprintf(buf, sizeof(buf), "%.*f", d, v);
   return buf;
+}
+
+std::string HistoryPopup::format_axis_(double v) const {
+  const esphelm::units::UnitDef *u = this->cur_().data.unit;
+  if (this->circular_ && u != nullptr && u->has_wrap) {
+    // Back into the unit's range, rounded first so that 359.96 reads 0, not 360.
+    const double scale = std::pow(10.0, this->cur_().data.decimals >= 0 ? this->cur_().data.decimals : 1);
+    v = std::round(v * scale) / scale;
+    const double span = u->wrap_max - u->wrap_min;
+    v -= span * std::floor((v - u->wrap_min) / span);
+  }
+  return this->format_(v);
 }
 
 lv_color_t HistoryPopup::number_color_(bool has, float v) const {
@@ -127,13 +158,13 @@ lv_color_t HistoryPopup::number_color_(bool has, float v) const {
   if (!has)
     return c.muted;
   esphelm::ZoneState state;
-  if (esphelm::value_zone_state(v, this->tile_.zones, state)) {
+  if (esphelm::value_zone_state(v, this->cur_().zones, state)) {
     if (this->theme_ == esphelm::Theme::NIGHT && state == esphelm::ZoneState::NORMAL)
       return c.text;
     return c.zone[static_cast<int>(state)];
   }
-  if (this->tile_.color != esphelm::ValueColor::NONE)
-    return c.palette[static_cast<int>(this->tile_.color)];
+  if (this->cur_().color != esphelm::ValueColor::NONE)
+    return c.palette[static_cast<int>(this->cur_().color)];
   return c.text;
 }
 
@@ -167,7 +198,7 @@ void HistoryPopup::build_() {
   lv_obj_set_size(this->root_, sw, sh - this->top_);
 
   // Header: caption, and the close button.
-  const std::string &name = this->tile_.data.label.empty() ? this->tile_.data.path : this->tile_.data.label;
+  const std::string &name = this->cur_().data.label.empty() ? this->cur_().data.path : this->cur_().data.label;
   lv_obj_t *caption = label(this->root_, big, c.muted, name.c_str());
   lv_label_set_long_mode(caption, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_size(caption, inner_w - btn_h - 8, line_big);
@@ -179,15 +210,47 @@ void HistoryPopup::build_() {
       close, [](lv_event_t *e) { static_cast<HistoryPopup *>(lv_event_get_user_data(e))->tap("close"); },
       LV_EVENT_CLICKED, this);
 
+  // A wind rose's values: one button each, in rows under the header.
+  int32_t row_y = btn_h + 4;
+  this->series_buttons_.clear();
+  if (this->series_.size() > 1) {
+    int32_t x = 0;
+    for (size_t i = 0; i < this->series_.size(); i++) {
+      const int32_t w = std::max<int32_t>(btn_h, text_width(this->series_[i].title.c_str(), big) + 24);
+      if (x > 0 && x + w > inner_w) {
+        x = 0;
+        row_y += btn_h + 8;
+      }
+      lv_obj_t *b = button(this->root_, c, std::min(w, inner_w), btn_h);
+      lv_obj_set_pos(b, x, row_y);
+      lv_obj_t *l = label(b, big, c.muted, this->series_[i].title.c_str());
+      lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
+      lv_obj_set_width(l, std::min(w, inner_w) - 16);
+      lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+      lv_obj_center(l);
+      lv_obj_set_user_data(b, reinterpret_cast<void *>(static_cast<intptr_t>(i)));
+      lv_obj_add_event_cb(
+          b,
+          [](lv_event_t *e) {
+            auto *self = static_cast<HistoryPopup *>(lv_event_get_user_data(e));
+            auto *target = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
+            self->tap(self->series_[reinterpret_cast<intptr_t>(lv_obj_get_user_data(target))].name);
+          },
+          LV_EVENT_CLICKED, this);
+      this->series_buttons_.push_back(b);
+      x += w + 8;
+    }
+    row_y += btn_h + 8;
+  }
+
   // The live value, and the window's min and max beside it.
-  const int d = this->tile_.data.decimals >= 0 ? std::min<int>(this->tile_.data.decimals, 3) : 1;
-  const char *unit = this->tile_.data.unit != nullptr ? this->tile_.data.unit->label : "";
+  const int d = this->cur_().data.decimals >= 0 ? std::min<int>(this->cur_().data.decimals, 3) : 1;
+  const char *unit = this->cur_().data.unit != nullptr ? this->cur_().data.unit->label : "";
   std::string sample = std::string(esphelm::sizes::TEXT_SAMPLE_DIGITS + 1, '8');
   if (d > 0)
     sample += "." + std::string(d, '8');
   const std::string value_sample = sample + (unit[0] != '\0' ? std::string(" ") + unit : "");
   const lv_font_t *value_font = fit_font(this->fonts_, value_sample.c_str(), inner_w * 55 / 100, inner_h / 6);
-  const int32_t row_y = btn_h + 4;
   const int32_t row_h = std::max(lv_font_get_line_height(value_font), 2 * line_small);
   this->value_ = label(this->root_, value_font, c.muted, "--");
   lv_obj_set_pos(this->value_, 0, row_y + (row_h - lv_font_get_line_height(value_font)) / 2);
@@ -234,11 +297,11 @@ void HistoryPopup::build_() {
   lv_obj_set_pos(this->plot_, plot_x, plot_y);
   lv_obj_set_size(this->plot_, plot_w, plot_h);
   // Zone bands first, so the line is drawn over them.
-  for (size_t z = 0; z < this->tile_.zones.size(); z++) {
+  for (size_t z = 0; z < this->cur_().zones.size(); z++) {
     lv_obj_t *band = lv_obj_create(this->plot_);
     lv_obj_remove_style_all(band);
     lv_obj_remove_flag(band, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_bg_color(band, c.zone[static_cast<int>(this->tile_.zones[z].state)], LV_PART_MAIN);
+    lv_obj_set_style_bg_color(band, c.zone[static_cast<int>(this->cur_().zones[z].state)], LV_PART_MAIN);
     lv_obj_set_style_bg_opa(band, night ? LV_OPA_30 : LV_OPA_20, LV_PART_MAIN);
     lv_obj_add_flag(band, LV_OBJ_FLAG_HIDDEN);
     this->bands_.push_back(band);
@@ -259,8 +322,8 @@ void HistoryPopup::build_() {
   lv_chart_set_type(this->chart_, LV_CHART_TYPE_LINE);
   lv_chart_set_div_line_count(this->chart_, 3, 0);
   lv_chart_set_point_count(this->chart_, esphelm::sizes::HISTORY_POINTS);
-  this->series_ = lv_chart_add_series(this->chart_, c.accent, LV_CHART_AXIS_PRIMARY_Y);
-  lv_chart_set_series_ext_y_array(this->chart_, this->series_, this->chart_y_);
+  this->line_ = lv_chart_add_series(this->chart_, c.accent, LV_CHART_AXIS_PRIMARY_Y);
+  lv_chart_set_series_ext_y_array(this->chart_, this->line_, this->chart_y_);
   this->collecting_ = label(this->plot_, small, c.muted, "Collecting...");
   lv_obj_align(this->collecting_, LV_ALIGN_CENTER, 0, -line_small);  // clear of the middle grid line
 
@@ -289,6 +352,11 @@ void HistoryPopup::style_buttons_() {
     lv_obj_set_style_border_width(b, on ? 2 : 0, LV_PART_MAIN);
     lv_obj_set_style_text_color(lv_obj_get_child(b, 0), on ? c.text : c.muted, LV_PART_MAIN);
   }
+  for (size_t i = 0; i < this->series_buttons_.size(); i++) {
+    const bool on = i == this->selected_;
+    lv_obj_set_style_border_width(this->series_buttons_[i], on ? 2 : 0, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lv_obj_get_child(this->series_buttons_[i], 0), on ? c.text : c.muted, LV_PART_MAIN);
+  }
   // Time axis of the chosen window.
   if (this->root_ == nullptr || this->plot_ == nullptr)
     return;
@@ -309,8 +377,32 @@ void HistoryPopup::style_buttons_() {
 void HistoryPopup::refresh_chart_() {
   if (this->chart_ == nullptr)
     return;
-  const int idx = this->history_ != nullptr ? this->history_->find(this->tile_.id) : -1;
+  const int idx = this->history_ != nullptr ? this->history_->find(this->cur_().key) : -1;
   const size_t n = idx >= 0 ? this->history_->series(idx, this->window_, this->points_) : 0;
+  // Angles: around the window's mean on the circle, so a line across north doesn't jump.
+  this->circular_ = idx >= 0 && this->history_->circular(idx);
+  if (this->circular_) {
+    const esphelm::units::UnitDef &u = *this->history_->unit(idx);
+    double s = 0, c = 0;
+    uint32_t count = 0;
+    for (size_t k = 0; k < n; k++) {
+      if (this->points_[k].gap())
+        continue;
+      const double turn = esphelm::circular_turn(this->points_[k].mean, u.wrap_min, u.wrap_max);
+      s += std::sin(turn);
+      c += std::cos(turn);
+      count++;
+    }
+    const double centre = esphelm::circular_from_sums(s, c, count, u.wrap_min, u.wrap_max);
+    for (size_t k = 0; centre == centre && k < n; k++) {
+      auto &p = this->points_[k];
+      if (p.gap())
+        continue;
+      const float shift =
+          static_cast<float>(esphelm::unwrap_around(p.mean, centre, u.wrap_min, u.wrap_max) - p.mean);
+      p = {p.mean + shift, p.min + shift, p.max + shift};
+    }
+  }
   float mn = 0, mx = 0;
   size_t valid = 0;
   for (size_t k = 0; k < n; k++) {
@@ -322,7 +414,7 @@ void HistoryPopup::refresh_chart_() {
     valid++;
   }
   const int N = esphelm::sizes::HISTORY_POINTS;
-  ESP_LOGD(TAG, "History of %s, %s: %u points, %u with values", this->tile_.id.c_str(),
+  ESP_LOGD(TAG, "History of %s, %s: %u points, %u with values", this->cur_().key.c_str(),
            esphelm::sizes::HISTORY_WINDOW_LABELS[this->window_], (unsigned) n, (unsigned) valid);
   if (valid < 2) {
     for (int k = 0; k < N; k++)
@@ -345,7 +437,7 @@ void HistoryPopup::refresh_chart_() {
     this->lo_ = mn - span * 0.1;
     this->hi_ = mx + span * 0.1;
   }
-  const int d = this->tile_.data.decimals >= 0 ? std::min<int>(this->tile_.data.decimals, 3) : 1;
+  const int d = this->cur_().data.decimals >= 0 ? std::min<int>(this->cur_().data.decimals, 3) : 1;
   this->scale_ = 1;
   for (int k = 0; k < d; k++)
     this->scale_ *= 10;
@@ -363,17 +455,21 @@ void HistoryPopup::refresh_chart_() {
   }
   lv_chart_refresh(this->chart_);
 
-  lv_label_set_text(this->y_labels_[0], this->format_(this->hi_).c_str());
-  lv_label_set_text(this->y_labels_[1], this->format_((this->lo_ + this->hi_) / 2).c_str());
-  lv_label_set_text(this->y_labels_[2], this->format_(this->lo_).c_str());
-  const std::string mm = "min " + this->format_(mn) + "\nmax " + this->format_(mx);
+  lv_label_set_text(this->y_labels_[0], this->format_axis_(this->hi_).c_str());
+  lv_label_set_text(this->y_labels_[1], this->format_axis_((this->lo_ + this->hi_) / 2).c_str());
+  lv_label_set_text(this->y_labels_[2], this->format_axis_(this->lo_).c_str());
+  const std::string mm = "min " + this->format_axis_(mn) + "\nmax " + this->format_axis_(mx);
   lv_label_set_text(this->minmax_, mm.c_str());
 
   const int32_t ph = lv_obj_get_height(this->plot_);
   const int32_t pw = lv_obj_get_width(this->plot_);
   const double range = this->hi_ - this->lo_;
-  for (size_t z = 0; z < this->bands_.size() && z < this->tile_.zones.size(); z++) {
-    const auto &zone = this->tile_.zones[z];
+  for (size_t z = 0; z < this->bands_.size() && z < this->cur_().zones.size(); z++) {
+    const auto &zone = this->cur_().zones[z];
+    if (this->circular_) {  // zones are in the unit's range; the graph may run past its ends
+      lv_obj_add_flag(this->bands_[z], LV_OBJ_FLAG_HIDDEN);
+      continue;
+    }
     const double from = std::max(zone.from, this->lo_);
     const double to = std::min(zone.to, this->hi_);
     if (!(from < to)) {
@@ -392,13 +488,13 @@ void HistoryPopup::refresh_value_(uint32_t now) {
   if (this->value_ == nullptr)
     return;
   this->last_draw_ms_ = now;
-  const int idx = this->history_ != nullptr ? this->history_->find(this->tile_.id) : -1;
+  const int idx = this->history_ != nullptr ? this->history_->find(this->cur_().key) : -1;
   float v = 0;
   uint32_t ms = 0;
   const bool has = idx >= 0 && this->history_->last(idx, v, ms) && now - ms <= this->history_->stale_ms(idx);
   std::string text = has ? this->format_(v) : "--";
-  if (this->tile_.data.unit != nullptr && this->tile_.data.unit->label[0] != '\0')
-    text += std::string(" ") + this->tile_.data.unit->label;
+  if (this->cur_().data.unit != nullptr && this->cur_().data.unit->label[0] != '\0')
+    text += std::string(" ") + this->cur_().data.unit->label;
   if (text != this->shown_) {
     lv_label_set_text(this->value_, text.c_str());
     this->shown_ = text;

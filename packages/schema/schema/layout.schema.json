@@ -268,7 +268,7 @@
                         },
                         "history": {
                           "type": "boolean",
-                          "description": "Tap the tile for a graph of its recent values (ADR-0018). Absent means true; false turns it off."
+                          "description": "Record the value; a tap on the tile shows a graph of its recent values (ADR-0018, ADR-0019). Absent means false."
                         }
                       },
                       "additionalProperties": false
@@ -1412,6 +1412,55 @@
                           },
                           "additionalProperties": false,
                           "errorCode": "UNKNOWN_SLOT"
+                        },
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "center1"
+                              },
+                              {
+                                "type": "string",
+                                "const": "center2"
+                              },
+                              {
+                                "type": "string",
+                                "const": "center3"
+                              },
+                              {
+                                "type": "string",
+                                "const": "topLeft"
+                              },
+                              {
+                                "type": "string",
+                                "const": "topRight"
+                              },
+                              {
+                                "type": "string",
+                                "const": "bottomLeft"
+                              },
+                              {
+                                "type": "string",
+                                "const": "bottomRight"
+                              },
+                              {
+                                "type": "string",
+                                "const": "apparentAngle"
+                              },
+                              {
+                                "type": "string",
+                                "const": "trueDirection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "heading"
+                              }
+                            ]
+                          },
+                          "uniqueItems": true,
+                          "description": "The values that record; a tap on the rose shows their graphs (ADR-0019). Absent: none. A name whose slot is empty records nothing."
                         }
                       },
                       "additionalProperties": false

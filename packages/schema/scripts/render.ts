@@ -195,8 +195,8 @@ function renderSizesHeader(
     points: number;
     windows: readonly { label: string; seconds: number }[];
     noPsramWindows: number;
-    maxTilesPsram: number;
-    maxTilesNoPsram: number;
+    maxValuesPsram: number;
+    maxValuesNoPsram: number;
   },
 ): string {
   return [
@@ -221,14 +221,14 @@ function renderSizesHeader(
     `inline constexpr int TEXT_COMPANION_PERCENT = ${text.companionPercent};`,
     `inline constexpr int TEXT_SAMPLE_DIGITS = ${text.sampleDigits};`,
     '',
-    '// Value history (ADR-0018): points per window, the windows, and the limits per board.',
+    '// Value history (ADR-0018, ADR-0019): points per window, the windows, and how many values a board records.',
     `inline constexpr int HISTORY_POINTS = ${history.points};`,
     `inline constexpr int HISTORY_WINDOWS = ${history.windows.length};`,
     `inline constexpr int HISTORY_WINDOW_SECONDS[HISTORY_WINDOWS] = {${history.windows.map((w) => w.seconds).join(', ')}};`,
     `inline constexpr const char *HISTORY_WINDOW_LABELS[HISTORY_WINDOWS] = {${history.windows.map((w) => JSON.stringify(w.label)).join(', ')}};`,
     `inline constexpr int HISTORY_NO_PSRAM_WINDOWS = ${history.noPsramWindows};`,
-    `inline constexpr int HISTORY_MAX_TILES_PSRAM = ${history.maxTilesPsram};`,
-    `inline constexpr int HISTORY_MAX_TILES_NO_PSRAM = ${history.maxTilesNoPsram};`,
+    `inline constexpr int HISTORY_MAX_VALUES_PSRAM = ${history.maxValuesPsram};`,
+    `inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = ${history.maxValuesNoPsram};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',

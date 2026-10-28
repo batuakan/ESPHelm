@@ -14,6 +14,8 @@ import {
   type Tile,
   type TileType,
   type WindRoseTile,
+  ROSE_HISTORY_KEYS,
+  type RoseHistoryKey,
 } from '@esphelm/schema';
 
 export interface Rect {
@@ -431,8 +433,29 @@ export function updateSlot(
     const slots = { ...t.slots };
     if (patch === null) delete slots[slot];
     else slots[slot] = merge<DataItem>(slots[slot] ?? { path: '' }, patch);
-    return { ...t, slots };
+    // An emptied slot records nothing any more: drop it from the history list too.
+    return patch === null ? withHistory({ ...t, slots }, slot, false) : { ...t, slots };
   });
+}
+
+/** `tile` with `name` in its history list or not, in ROSE_HISTORY_KEYS order; [] removes it. */
+function withHistory(tile: WindRoseTile, name: RoseHistoryKey, on: boolean): WindRoseTile {
+  const names = new Set(tile.history ?? []);
+  if (on) names.add(name);
+  else names.delete(name);
+  const history = ROSE_HISTORY_KEYS.filter((k) => names.has(k));
+  return history.length > 0 ? { ...tile, history } : merge(tile, { history: undefined });
+}
+
+/** Record a value of wind-rose tile `id` (ADR-0019), or stop recording it. */
+export function setRoseHistory(
+  layout: Layout,
+  index: number,
+  id: string,
+  name: RoseHistoryKey,
+  on: boolean,
+): Layout {
+  return withRose(layout, index, id, (t) => withHistory(t, name, on));
 }
 
 /**

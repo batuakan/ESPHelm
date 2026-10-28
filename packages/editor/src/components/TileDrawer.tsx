@@ -1,7 +1,8 @@
 // Tile settings drawer. A DataItem (a tile or a wind-rose slot) gets: SignalK path (searchable,
 // with live value and SI units), display unit (only units that fit the path's quantity),
 // decimals, label, stale timeout. Gauges and bars add range, zones and orientation; wind roses
-// have three slots, their source paths and the true-wind toggle.
+// have their slots, source paths and the true-wind toggle. Value tiles and wind rose values can
+// record their history (ADR-0018, ADR-0019), with a count of what the layout records.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   AUTOPILOT_DEFAULTS,
@@ -12,7 +13,9 @@ import {
   POSITION_FORMAT_NAMES,
   POSITION_FORMATS,
   formatPosition,
+  HISTORY,
   historyEnabled,
+  roseHistorySeries,
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
@@ -25,6 +28,7 @@ import {
   type Layout,
   type PositionFormat,
   type PositionTile,
+  type RoseHistoryKey,
   type Tile,
   type UnitId,
   type ValueColor,
@@ -37,7 +41,7 @@ import {
 import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
-import { HistoryPreview } from './HistoryPreview';
+import { HistoryPreview, type PreviewSeries } from './HistoryPreview';
 
 const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 const ZONE_STATES: Zone['state'][] = ['normal', 'warn', 'alarm', 'emergency'];
@@ -417,38 +421,88 @@ const COLOR_SWATCH: Record<ValueColor, string> = {
   purple: '#8e24aa',
 };
 
-/** Whether a tap on the tile opens its history graph on the display (ADR-0018), with a mock. */
+/** How many values the layout records, against both kinds of display (historyCount()). */
+export interface HistoryCount {
+  count: number;
+  fitsPsram: boolean;
+  fitsNoPsram: boolean;
+}
+
+/** What the layout's history costs: a warning once a kind of display can't record it all. */
+function HistoryCounter(props: { count: HistoryCount }) {
+  const { count, fitsPsram, fitsNoPsram } = props.count;
+  const what = `Recording ${count} ${count === 1 ? 'value' : 'values'} in this layout`;
+  const text = !fitsPsram
+    ? `${what}: too many for any display (${HISTORY.maxValuesPsram} with PSRAM, ${HISTORY.maxValuesNoPsram} on C3/C6). The rest won't record.`
+    : !fitsNoPsram
+      ? `${what}: fits displays with PSRAM (${HISTORY.maxValuesPsram}), too many for C3/C6 (${HISTORY.maxValuesNoPsram}).`
+      : `${what}: fits every display (${HISTORY.maxValuesNoPsram} on C3/C6, ${HISTORY.maxValuesPsram} with PSRAM).`;
+  return (
+    <p className={fitsNoPsram ? 'hint history-count' : 'warn history-count'} role="status">
+      {text}
+    </p>
+  );
+}
+
+/** "Preview graph" and the mock popup it opens. */
+function HistoryPreviewButton(props: { series: PreviewSeries[]; theme: Layout['theme'] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="small" disabled={props.series.length === 0} onClick={() => setOpen(true)}>
+        Preview graph
+      </button>
+      {open && (
+        <HistoryPreview
+          series={props.series}
+          theme={props.theme}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Whether the value tile records, so a tap opens its graph on the display (ADR-0018). */
 function ValueHistoryField(props: {
   tile: ValueTile;
   value: unknown;
   theme: Layout['theme'];
+  count: HistoryCount;
   onChange(p: Patch): void;
 }) {
   const { tile } = props;
   const on = historyEnabled(tile);
-  const [open, setOpen] = useState(false);
   return (
     <>
       <label className="check">
         <input
           type="checkbox"
           checked={on}
-          onChange={(e) => props.onChange({ history: e.target.checked ? undefined : false })}
+          onChange={(e) => props.onChange({ history: e.target.checked ? true : undefined })}
           aria-label="Tap for history"
         />
-        Tap for history: a graph of the last 10 min, 1 h or 6 h
+        Tap for history: record a graph of the last 10 min, 1 h or 6 h
       </label>
-      <button className="small" disabled={!on} onClick={() => setOpen(true)}>
-        Preview graph
-      </button>
-      {open && (
-        <HistoryPreview
-          tile={tile}
-          value={props.value}
-          theme={props.theme}
-          onClose={() => setOpen(false)}
-        />
-      )}
+      <HistoryCounter count={props.count} />
+      <HistoryPreviewButton
+        theme={props.theme}
+        series={
+          on
+            ? [
+                {
+                  key: tile.id,
+                  title: tile.label || tile.path,
+                  caption: tile.label || tile.path,
+                  unit: tile.unit,
+                  decimals: tile.decimals,
+                  zones: tile.zones,
+                  value: props.value,
+                },
+              ]
+            : []
+        }
+      />
     </>
   );
 }
@@ -587,18 +641,54 @@ const ROSE_PATHS: { key: 'apparentAngle' | 'trueDirection' | 'heading'; label: s
   { key: 'heading', label: 'Heading' },
 ];
 
-/** Wind rose tile: source paths, true-wind pointer, and the three centre slots. */
+/** A "record history" checkbox for one wind rose value. */
+function RoseHistoryCheck(props: {
+  tile: WindRoseTile;
+  name: RoseHistoryKey;
+  title: string;
+  /** Visible text; the slot sections say what the checkbox does instead. */
+  text?: string;
+  onHistory(name: RoseHistoryKey, on: boolean): void;
+}) {
+  return (
+    <label className="check">
+      <input
+        type="checkbox"
+        checked={(props.tile.history ?? []).includes(props.name)}
+        onChange={(e) => props.onHistory(props.name, e.target.checked)}
+        aria-label={`History of ${props.title}`}
+      />
+      {props.text ?? 'Record history (tap the rose for a graph)'}
+    </label>
+  );
+}
+
+/** Wind rose tile: its slots, source paths, true-wind pointer, and which values record. */
 function RoseFields(
   props: Common & {
     tile: WindRoseTile;
     openSlot: SlotName | undefined;
+    theme: Layout['theme'];
+    count: HistoryCount;
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
+    onHistory(name: RoseHistoryKey, on: boolean): void;
   },
 ) {
   const { tile } = props;
   const config = tile.config ?? {};
   const showTrue = config.showTrueWind ?? WIND_ROSE_DEFAULTS.showTrueWind;
+  const recorded: PreviewSeries[] = roseHistorySeries(tile).map((s) => {
+    const item = s.name ? tile.slots[s.name as SlotName] : undefined;
+    return {
+      key: s.key,
+      title: s.title,
+      caption: s.title,
+      unit: s.unit,
+      decimals: item ? item.decimals : 0,
+      value: props.values.get(s.path),
+    };
+  });
   return (
     <>
       {WIND_ROSE_SLOTS.map((slot) => {
@@ -621,6 +711,14 @@ function RoseFields(
               showFormat
               onChange={(patch) => props.onSlot(slot, patch)}
             />
+            {item && (
+              <RoseHistoryCheck
+                tile={tile}
+                name={slot}
+                title={SLOT_TITLES[slot]}
+                onHistory={props.onHistory}
+              />
+            )}
             {item && (
               <button className="small" onClick={() => props.onSlot(slot, null)}>
                 Empty this slot
@@ -657,6 +755,29 @@ function RoseFields(
         />
         Show the true wind pointer
       </label>
+      <details className="slot-section" data-testid="rose-history">
+        <summary>
+          History
+          <span className="now">
+            {recorded.length === 0 ? 'none' : recorded.map((s) => s.title).join(', ')}
+          </span>
+        </summary>
+        {ROSE_PATHS.map(({ key, label }) => (
+          <RoseHistoryCheck
+            key={key}
+            tile={tile}
+            name={key}
+            title={label}
+            text={label}
+            onHistory={props.onHistory}
+          />
+        ))}
+        <p className="hint">
+          Tap the rose on the display for their graphs. The slots record from their own sections.
+        </p>
+      </details>
+      <HistoryCounter count={props.count} />
+      <HistoryPreviewButton series={recorded} theme={props.theme} />
     </>
   );
 }
@@ -827,6 +948,9 @@ export function TileDrawer(
     openSlot?: SlotName;
     /** The layout's display theme (the history mock follows it). */
     theme?: Layout['theme'];
+    /** What the whole layout records (the history memory counter). */
+    historyCount: HistoryCount;
+    onRoseHistory(name: RoseHistoryKey, on: boolean): void;
     onChange(patch: Patch): void;
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
@@ -873,8 +997,11 @@ export function TileDrawer(
             paths={props.paths}
             values={props.values}
             openSlot={props.openSlot}
+            theme={props.theme ?? 'day'}
+            count={props.historyCount}
             onConfig={props.onConfig}
             onSlot={props.onSlot}
+            onHistory={props.onRoseHistory}
             onClose={props.onClose}
           />
         </>
@@ -897,6 +1024,7 @@ export function TileDrawer(
               tile={tile}
               value={tile.path ? props.values.get(tile.path) : undefined}
               theme={props.theme ?? 'day'}
+              count={props.historyCount}
               onChange={onChange}
             />
           )}

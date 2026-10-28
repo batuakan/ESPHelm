@@ -95,6 +95,6 @@ describe('size tiers', () => {
       `HISTORY_WINDOW_SECONDS[HISTORY_WINDOWS] = {${HISTORY.windows.map((w) => w.seconds).join(', ')}};`,
     );
     expect(header).toContain(`HISTORY_NO_PSRAM_WINDOWS = ${HISTORY.noPsramWindows};`);
-    expect(header).toContain(`HISTORY_MAX_TILES_NO_PSRAM = ${HISTORY.maxTilesNoPsram};`);
+    expect(header).toContain(`HISTORY_MAX_VALUES_NO_PSRAM = ${HISTORY.maxValuesNoPsram};`);
   });
 });

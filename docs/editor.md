@@ -48,7 +48,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 
 **Value tile colours** (ADR-0016): *Colour* sets a fixed colour (by day; at night everything is red), and *Colour by value* adds rows of from, to and state in the tile's display unit. Leave a bound empty for no limit ("2 or less"). The last matching row wins, over the fixed colour. The preview colours the number as the display does, in the display theme's colours.
 
-**Value history** (ADR-0018): *Tap for history* (on by default) lets a tap on the tile open a graph of its recent values on the display, and shows the small sparkline mark in the tile's corner. Unchecking it writes `history: false`. *Preview graph* opens a mock of the display's popup in the layout's theme, with the 10 min / 1 h / 6 h windows and an example curve around the live value. The display draws what it recorded itself since it started, so the mock is only an example (6 h only on displays with PSRAM).
+**Value history** (ADR-0018, ADR-0019): *Tap for history* (off by default) makes the display record the value, so a tap on the tile opens a graph of it, and shows the small sparkline mark in the tile's corner. Checking it writes `history: true`. On a wind rose, each filled slot has a *Record history* checkbox, and the *History* section has the apparent wind angle, true wind direction and heading; they write the rose's `history` list, and emptying a slot drops its name. Under each checkbox a counter says how many values the whole layout records, with a warning past the C3/C6 limit (6) or the PSRAM limit (48). *Preview graph* opens a mock of the display's popup in the layout's theme (with a button per value on a wind rose; angles drawn around their mean, as on the display), with the 10 min / 1 h / 6 h windows and an example curve around the live value. The display draws what it recorded itself since it started, so the mock is only an example (6 h only on displays with PSRAM).
 
 **Position tile:** shows `navigation.position` (or another position path) as two lines. The drawer lists the four formats, each with an example from the live value: degrees and decimal minutes (`60° 09.000' N`), degrees, minutes and seconds, decimal degrees, and signed decimal. *Decimals* applies to the last part (minutes, seconds or degrees); empty uses the format's default. The preview uses the same formatter as the display.
 
@@ -73,7 +73,8 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - invalid label blocks sending
     - a value colour and an open-ended zone, coloured in the preview
     - the value tile's preview text size comes from the display's fonts
-    - the history mark and the mock history popup (1 h window, close), history off on a second tile, and that the display downloads `history: false` for it
+    - history off until checked, the counter, the mark and the mock history popup (1 h window, close), a new tile recording nothing, and that the display downloads `history: true` for the first tile only
+    - on the wind template: switching a corner's history off and the heading on, the counter, the preview's value buttons, and the `history` list the display downloads
     - Save & send, and that the display downloads exactly that layout (with the colour and zone) and is notified
     - a wind page from a template with a slot changed to depth (live pointer and value, size hint "full"), a new grid page with a gauge, a zone and a rose tile next to it, moving the wind page to the front, and that the display downloads the three pages in that order
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template

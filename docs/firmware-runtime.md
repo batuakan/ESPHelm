@@ -8,7 +8,7 @@ ESPHome external component in `firmware/components/esphelm_runtime/`. It shows l
 
 ```yaml
 external_components:
-  - source: { type: local, path: ../../ESPHomeSignalK/components }
+  - source: { type: git, url: https://github.com/batuakan/ESPHomeSignalK, ref: main, path: components }
     components: [signalk]
   - source: { type: local, path: components }
     components: [esphelm_runtime]
@@ -46,12 +46,12 @@ Ready-made configs:
 
 | File | Target | Status |
 |---|---|---|
-| `firmware/esphelm_sdl.yaml` | desktop, 480×480 | compile, run, e2e test. Test hooks: `esphelm_shot_request <file>`, `esphelm_page_request <n>`, `esphelm_tap_request <tile> [button]` (autopilot buttons: `-10 -1 +1 +10 auto wind route standby`; a value tile opens its history, `@history close\|10m\|1h\|6h` works its popup), `esphelm_exit_request`. `ESPHELM_TEST_HISTORY=<tile id>` seeds that tile with a fixed curve and keeps it still (goldens) |
+| `firmware/esphelm_sdl.yaml` | desktop, 480×480 | compile, run, e2e test. Test hooks: `esphelm_shot_request <file>`, `esphelm_page_request <n>`, `esphelm_tap_request <tile> [button]` (autopilot buttons: `-10 -1 +1 +10 auto wind route standby`; a value tile or a wind rose that records opens its history, `@history close\|10m\|1h\|6h\|<rose value name>` works its popup), `esphelm_exit_request`. `ESPHELM_TEST_HISTORY=<key>[,<key>…]` (a tile id, or `<rose id>/<name>`) seeds those values with a fixed curve, across north for angles, and keeps them still (goldens) |
 | `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, 720 renders in the e2e test. It repeats `signalk_host`/`signalk_port` because `-s` on the command line does not override substitutions of the included `esphelm_sdl.yaml`; the e2e test refuses to run a build that isn't compiled for its test port |
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
-The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`); a symlink to `../legacy/secrets.yaml` works.
+The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`); it is git-ignored.
 
 ## What the display does
 
@@ -65,7 +65,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Layout with more than one page | a footer: `<` and `>` buttons (disabled at the ends) and "title n/m" |
-| A tap on a value tile (ADR-0018) | its history popup below the banner: live value, min/max, a line graph of the last 10 min / 1 h / 6 h (6 h with PSRAM only), "Collecting..." until there are two points; only its close button closes it |
+| A tap on a value tile or wind rose that records (ADR-0018, ADR-0019) | its history popup below the banner: a button per value for a rose, live value, min/max, a line graph of the last 10 min / 1 h / 6 h (6 h with PSRAM only; angles drawn around their mean so north doesn't jump), "Collecting..." until there are two points; only its close button closes it |
 | An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
 | Layout `settings` (ADR-0015) | the start page at boot and when the start page changes; the night theme while `environment.sun` is dusk or night (`autoTheme: sun`, the page is rebuilt); day/night brightness; after `screenTimeout` s without a touch (at least 10) the backlight goes off under a black cover that swallows the waking touch. An `alarm`/`emergency` switches it back on |
 | A layout crashed the display (boot guard, ADR-0013) | the last known good layout (else the status page); the crashing layout is refused until a changed one is sent |
@@ -92,12 +92,12 @@ Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `
 
 | Widget | Drawn with | Notes |
 |---|---|---|
-| `value` | labels | the number in the largest font whose sample ("88" plus the decimals) fits the tile, with the caption and unit scaled alongside; a wider live value steps it down (ADR-0017). Coloured by `color` or `zones` (ADR-0016). With history on, the tile is tappable and shows a small sparkline mark bottom-left (ADR-0018) |
+| `value` | labels | the number in the largest font whose sample ("88" plus the decimals) fits the tile, with the caption and unit scaled alongside; a wider live value steps it down (ADR-0017). Coloured by `color` or `zones` (ADR-0016). With `history: true`, the tile records, is tappable and shows a small sparkline mark bottom-left (ADR-0018) |
 | `gauge` | `lv_scale` (270°, round inner), zone sections, line needle | the value and unit sit in the open bottom of the arc, in the largest font that fits there (ADR-0017); below 160 px tick labels and the unit are dropped |
 | `bar` | `lv_bar` | indicator colour follows the zone the value is in; vertical bars put the unit under the value. The value takes the largest font that fits beside or above the bar |
 | `switch` | `lv_switch` | a tap sends a PUT of the new boolean (needs the read/write token). The switch shows the requested state at once and then follows the path's value; without a confirming value within 5 s it reverts and shows `!` |
 | `position` | labels | latitude over longitude, formatted by `esphelm_position.h` (the same text as the editor, checked against `fixtures/position.cases.json`). The largest font of the ladder in which the widest text of the chosen format fits; it's chosen again when the page is laid out anew (alarm banner). Anything but two numbers in range shows `--` |
-| `wind_rose` | two `lv_scale`s and a drawn overlay | the legacy wind page: a fixed ring relative to the bow (thick ticks every 30°, thin every 5°, wide red/green close-hauled sectors at 20–60°), a compass card inside it turning with the heading (the 16 points written along the band), triangle markers on the ring (orange A for apparent wind, purple T for true wind = `trueDirection − heading`), the heading ("12°T", or °M for a magnetic path) and big centre values. Night uses reds only. Size tiers below |
+| `wind_rose` | two `lv_scale`s and a drawn overlay | the legacy wind page: a fixed ring relative to the bow (thick ticks every 30°, thin every 5°, wide red/green close-hauled sectors at 20–60°), a compass card inside it turning with the heading (the 16 points written along the band), triangle markers on the ring (orange A for apparent wind, purple T for true wind = `trueDirection − heading`), the heading ("12°T", or °M for a magnetic path) and big centre values. Night uses reds only. When any value in its `history` records, the whole rose is tappable and shows the mark in a free bottom corner (ADR-0019). Size tiers below |
 | `autopilot` | labels and `lv_button`s | state (AUTO / WIND / TRACK / STANDBY), "TGT x°" and "HDG x°"; course buttons −10/−1/+1/+10, the configured mode buttons and STANDBY (on its own wide row when it wouldn't fit a quarter of the width). Rules below |
 
 **Wind rose size tiers** (`esphelm_sizes.h`, generated from `WIND_ROSE_FIT` in `packages/schema`, ADR-0010). The rose measures the shorter side of its cell after layout:
@@ -170,13 +170,13 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
 | `position` tile | ≈1.7 KB (four tiles = 6,640 B) |
 | `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
-| Value history (ADR-0018) | per recording value tile, allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 tiles), 2,880 B without (two windows, up to 6 tiles, only while 48 KB of internal RAM stay free) |
-| History popup | about 25 LVGL objects while open, none when closed; a 2 KB point buffer inside the runtime |
+| Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
+| History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,182 B (17.0 %), flash 3.29 MB (19.9 %; the history popup and LVGL's chart widget about 30 KB of it); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,208 B of 321,296 B (34.9 %), flash 1.40 MB of 1.8 MB (76.5 %) |
+| P4 runtime firmware, static | RAM 98,094 B (17.0 %), flash 3.31 MB (20.0 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,120 B of 321,296 B (34.9 %), flash 1.42 MB of 1.8 MB (77.4 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -223,9 +223,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   20. **text sizes** (`fixtures/valid/value-sizes.json`): a full-width, a 2x2 and four single-cell value tiles at 480 with live values (the RPM "2400" steps down a size), and the same layout offline at 720
 
-  21. **value history**: a tile with `history: false` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the popup at 720
+  21. **value history**: a tile without `history` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the wind roses (a mark on the one that records, a tap on the other does nothing, its first value recording live, the popup's value buttons, the apparent wind angle and a heading tile across north without a jump); the popup and a rose's popup at 720
 
-  Forty-three screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Forty-eight screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -271,9 +271,11 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - A value tile on a boolean path shows "on"/"off" in a full font (the digit fonts have no letters).
     - In the single cells nothing is clipped. An RPM in the thousands or a 3-digit heading may shrink one size when its first value arrives.
     - Captions and units are readable at arm's length, and the editor's preview shows the same proportions.
-18. **Value history.** Assign `packages/schema/fixtures/valid/value-history.json` with a live SOG and depth.
-    - Value tiles show a small sparkline mark bottom-left; the HDG tile (history off) has none.
+18. **Value history.** Assign `packages/schema/fixtures/valid/value-history.json` with a live SOG, depth, wind and heading.
+    - Value tiles with `history: true` show a small sparkline mark bottom-left; the HDG tile (no `history`) has none.
     - Tap SOG: the popup opens below any alarm banner. Touching the graph or the empty space does nothing; only **X** closes it, and the page is as before.
     - Over 10 minutes the 10 min graph fills from the right; switch to 1 h and 6 h. A steady value draws a flat line, not gaps.
     - Raise an alarm while it's open: the banner stays on top and the popup moves down.
-    - Check the log for `History: N value tiles, 3 windows, … bytes` and that the free heap stays healthy.
+    - Page 3: the large rose shows the mark bottom-right (its bottom-left corner holds SOG); the small rose has none and a tap does nothing. Tap the large rose: buttons AWS, SOG, AWA; each switches the graph.
+    - Sail or turn across north: the AWA and HDG2 graphs stay smooth, their labels read e.g. 350, 0, 10.
+    - Check the log for `History: N values, 3 windows, … bytes` and that the free heap stays healthy.

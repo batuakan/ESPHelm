@@ -8,6 +8,7 @@ import {
   DEFAULT_FONT_LINE_HEIGHTS,
   TEMPLATES,
   TILE_TYPES,
+  historyCount,
   validateLayout,
   type Layout,
   type Page,
@@ -31,6 +32,7 @@ import {
   renamePage,
   resizeTile,
   setGrid,
+  setRoseHistory,
   setTileConfig,
   targetForPointer,
   tilePaths,
@@ -581,6 +583,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           }
           openSlot={selection?.slot}
           theme={layout.theme}
+          historyCount={historyCount(layout)}
+          onRoseHistory={(name, on) => edit(setRoseHistory(layout, index, tile.id, name, on))}
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}
           onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
           onSlot={(slot, patch) => edit(updateSlot(layout, index, tile.id, slot, patch))}

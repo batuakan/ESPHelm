@@ -8,17 +8,19 @@ substitutions:
   signalk_port: "3000"
 
 packages:
-  hardware: !include ../legacy/modules/hardware/sdl.yaml
+  hardware: !include hardware/sdl.yaml
   fonts: !include fonts.yaml
 
 esphome:
   name: esphelm-sdl
 
 external_components:
-  # ESPHomeSignalK checkout next to this repository (see CLAUDE.md §3).
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
   - source:
-      type: local
-      path: ../../ESPHomeSignalK/components
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
     components: [signalk]
 
 signalk:

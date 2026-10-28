@@ -12,7 +12,7 @@ substitutions:
   font_small_size: "14"
 
 packages:
-  wifi: !include ../legacy/modules/base/wifi.yaml
+  wifi: !include wifi.yaml
   fonts: !include fonts.yaml
 
 esphome:
@@ -29,8 +29,10 @@ json:
 
 external_components:
   - source:
-      type: local
-      path: ../../ESPHomeSignalK/components
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
     components: [signalk]
   - source:
       type: local

@@ -20,3 +20,6 @@ dist/
 *.tsbuildinfo
 # Editor build output (npm run build)
 packages/plugin/public/
+
+# The static ESPHome apps live on in the ESPHelmv1 tag; a local copy may stay here
+/legacy/

@@ -126,9 +126,18 @@ async function main(): Promise<void> {
       (await tile1Value.getAttribute('class')) ?? '',
     );
 
-    // History (ADR-0018): value tiles show the "tap for history" mark; the drawer previews the
-    // display's popup, in its windows, and closes it again.
+    // History (ADR-0018, ADR-0019): off until switched on; then the tile shows the "tap for
+    // history" mark, the drawer counts what the layout records, and previews the display's
+    // popup in its windows.
     const mark = page.getByTestId('tile-tile-1').locator('.tile-history-mark');
+    const markBefore = await mark.count();
+    await tileDrawer.getByLabel('Tap for history').check();
+    const counted = (await tileDrawer.locator('.history-count').textContent()) ?? '';
+    check(
+      'history is off until switched on, then counted for the layout',
+      markBefore === 0 && /^Recording 1 value in this layout: fits every display/.test(counted),
+      counted,
+    );
     await tileDrawer.getByRole('button', { name: 'Preview graph' }).click();
     const popup = page.getByRole('dialog', { name: 'History preview' });
     await popup.waitFor();
@@ -160,10 +169,10 @@ async function main(): Promise<void> {
     await page.getByLabel('Search SignalK paths').fill('speedApparent');
     await page.getByRole('option', { name: /environment\.wind\.speedApparent/ }).click();
     await page.getByLabel('Label').fill('AWS');
-    await page.getByLabel('Tap for history').uncheck();
     check(
-      'turning history off removes the mark',
-      (await page.getByTestId('tile-tile-2').locator('.tile-history-mark').count()) === 0,
+      'a new value tile records nothing',
+      (await page.getByTestId('tile-tile-2').locator('.tile-history-mark').count()) === 0 &&
+        !(await page.getByLabel('Tap for history').isChecked()),
     );
 
     const handle = page.getByTestId('tile-tile-1').getByLabel('Resize');
@@ -250,8 +259,8 @@ async function main(): Promise<void> {
       JSON.stringify([tiles[0]?.color, tiles[0]?.zones]),
     );
     check(
-      'the display gets history off for the AWS tile only',
-      tiles[0]?.history === undefined && tiles[1]?.history === false,
+      'the display gets history on for the SOG tile only',
+      tiles[0]?.history === true && tiles[1]?.history === undefined,
       JSON.stringify([tiles[0]?.history, tiles[1]?.history]),
     );
     check('the display is notified with the new version', gotVersion, String(etag));
@@ -283,6 +292,41 @@ async function main(): Promise<void> {
       if (!roseLive) await page.waitForTimeout(250);
     }
     check('wind rose tile shows the live apparent wind and slot values', roseLive);
+    // The template records three of the rose's values; switch the depth corner off and the
+    // heading on. All four corners hold values, so there's no free corner for the mark (as on
+    // the display); the rose is still tappable. The preview has a button per recorded value.
+    await drawer.getByTestId('slot-section-topLeft').locator('summary').click();
+    await drawer.getByLabel('History of Top left corner').uncheck();
+    await drawer.getByTestId('rose-history').locator('summary').click();
+    const awaOn = await drawer.getByLabel('History of Apparent wind angle').isChecked();
+    await drawer.getByLabel('History of Heading').check();
+    const roseCount = (await drawer.locator('.history-count').textContent()) ?? '';
+    const roseMarks = await page
+      .getByTestId('rose-wind-rose')
+      .locator('.tile-history-mark')
+      .count();
+    check(
+      'the wind rose records the values switched on, counted with the rest',
+      awaOn &&
+        roseMarks === 0 &&
+        /^Recording 4 values in this layout: fits every display/.test(roseCount),
+      JSON.stringify({ awaOn, roseMarks, roseCount }),
+    );
+    await drawer.getByRole('button', { name: 'Preview graph' }).click();
+    const rosePopup = page.getByRole('dialog', { name: 'History preview' });
+    const valueButtons = await rosePopup
+      .getByRole('group', { name: 'Recorded values' })
+      .getByRole('button')
+      .allTextContents();
+    await rosePopup.getByRole('button', { name: 'HDG' }).click();
+    const hdgShown = (await rosePopup.locator('.history-caption').textContent()) === 'HDG';
+    await shot(page, '06-history-preview-rose');
+    await rosePopup.getByRole('button', { name: 'Close history' }).click();
+    check(
+      'the rose preview has a button per recorded value',
+      valueButtons.join('|') === 'Depth|AWA|HDG' && hdgShown,
+      valueButtons.join('|'),
+    );
     await shot(page, '04-desktop-night-wind-rose');
 
     await page.getByRole('button', { name: 'Add page' }).click();
@@ -299,6 +343,18 @@ async function main(): Promise<void> {
     await library.getByRole('button', { name: /Wind rose/ }).click();
     const hint = (await drawer.locator('.size-hint').textContent()) ?? '';
     check('one cell of a 2x2 grid on 720 still gets a full rose', /: full/.test(hint), hint);
+    // Recording its heading gives the rose the mark, at the same small size as on value tiles.
+    await drawer.getByTestId('rose-history').locator('summary').click();
+    await drawer.getByLabel('History of Heading').check();
+    const roseMark = await page
+      .getByTestId('rose-rose-1')
+      .locator('.tile-history-mark')
+      .boundingBox();
+    check(
+      'a wind rose that records shows the small history mark',
+      roseMark !== null && roseMark.width <= 24 && roseMark.height <= 12,
+      JSON.stringify(roseMark),
+    );
     await page.getByText('No problems').waitFor();
     await shot(page, '05-desktop-night-gauge-and-rose');
 
@@ -347,8 +403,23 @@ async function main(): Promise<void> {
             zones: [{ from: 9.6, to: 12, state: 'warn' }],
           }) &&
         JSON.stringify(rose) ===
-          JSON.stringify({ type: 'wind_rose', id: 'rose-1', x: 1, y: 0, w: 1, h: 1, slots: {} }),
+          JSON.stringify({
+            type: 'wind_rose',
+            id: 'rose-1',
+            x: 1,
+            y: 0,
+            w: 1,
+            h: 1,
+            slots: {},
+            history: ['heading'],
+          }),
       JSON.stringify(pages),
+    );
+    check(
+      "the display gets the wind rose's recorded values in their order",
+      JSON.stringify(pages[0]?.tiles[0]?.history) ===
+        JSON.stringify(['center3', 'apparentAngle', 'heading']),
+      JSON.stringify(pages[0]?.tiles[0]?.history),
     );
 
     // Start over from the large-display template: listed first for this 720x720 display.

@@ -317,6 +317,33 @@ void check_wind_rose(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
     data_item_fields(chk, kv.value().as<JsonObjectConst>(), kp, rose.slots[slot]);
     rose.has_slot[slot] = true;
   }
+  // The values that record (ADR-0019): known names, each once. A name whose slot is empty is
+  // allowed; it records nothing.
+  if (has(obj, "history")) {
+    const std::string hp = ptr + "/history";
+    if (!obj["history"].is<JsonArrayConst>()) {
+      chk.add(hp, "INVALID_TYPE");
+      return;
+    }
+    size_t k = 0;
+    bool duplicate = false;
+    for (JsonVariantConst v : obj["history"].as<JsonArrayConst>()) {
+      int key = -1;
+      for (int i = 0; v.is<const char *>() && i < RoseConfig::HISTORY_KEYS; i++) {
+        if (std::strcmp(v.as<const char *>(), ROSE_HISTORY_NAMES[i]) == 0)
+          key = i;
+      }
+      if (key < 0)
+        chk.add(hp + "/" + std::to_string(k), "INVALID_VALUE");
+      else if (rose.history[key])
+        duplicate = true;
+      else
+        rose.history[key] = true;
+      k++;
+    }
+    if (duplicate)
+      chk.add(hp, "INVALID_VALUE");
+  }
 }
 
 const char *const AUTOPILOT_MODES[] = {"auto", "wind", "route"};

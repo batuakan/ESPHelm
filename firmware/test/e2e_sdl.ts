@@ -722,8 +722,9 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw.screenshot('32-value-sizes', shots);
 
-    // 9g. Value history (ADR-0018): a tap on a value tile opens a graph of its recent values;
-    //     its close button brings the page back. Tiles record from boot on every page.
+    // 9g. Value history (ADR-0018, ADR-0019): a tap on a tile that records opens a graph of its
+    //     recent values; its close button brings the page back. Values record from boot on every
+    //     page, only when switched on (value tiles: history true; a wind rose: its history names).
     const history = fixture('valid/value-history.json');
     await json('PUT', '/plugins/esphelm/api/layouts/value-history', admin, history);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
@@ -731,19 +732,16 @@ async function main(): Promise<void> {
     });
     check(
       'history: the value history layout renders',
-      await fw.waitLog(/Showing fetched layout "value-history" \(2 pages/),
+      await fw.waitLog(/Showing fetched layout "value-history" \(3 pages/),
     );
     const tapTile = (tile: string, part = '') =>
       writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `${tile} ${part}`.trim());
     tapTile('hdg');
     await sleep(800);
-    check(
-      'history: a tile with history off opens nothing',
-      fw.count(/History of hdg opened/) === 0,
-    );
+    check('history: a tile without history opens nothing', fw.count(/History of hdg opened/) === 0);
     // The water temperature (page 2) never had a value: nothing to draw yet.
     writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
-    check('history: page 2', await fw.waitLog(/Page 2\/2 "Other"/));
+    check('history: page 2', await fw.waitLog(/Page 2\/3 "Other"/));
     tapTile('water');
     check(
       'history: a tap on a value tile opens its history',
@@ -754,7 +752,7 @@ async function main(): Promise<void> {
     tapTile('@history', 'close');
     check('history: the close button closes it', await fw.waitLog(/History of water closed/));
     writeFileSync(join(fw.workDir, 'esphelm_page_request'), '0');
-    await fw.waitLog(/Page 1\/2 "History"/, 15000, 2);
+    await fw.waitLog(/Page 1\/3 "History"/, 15000, 2);
     // Live recording: the SOG, sent every second, fills 5 s points while the popup is open.
     tapTile('sog');
     await fw.waitLog(/History of sog opened/);
@@ -766,12 +764,31 @@ async function main(): Promise<void> {
     clearInterval(sogTimer);
     tapTile('@history', 'close');
     await fw.waitLog(/History of sog closed/);
+    // The wind rose records the values it names, the same way.
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '2');
+    check('history: page 3, the wind roses', await fw.waitLog(/Page 3\/3 "Rose"/));
+    tapTile('wind2');
+    await sleep(800);
+    check('history: a wind rose without history opens nothing', fw.count(/History of wind2/) === 0);
+    tapTile('wind');
+    check(
+      'history: a tap on a wind rose opens its first recorded value',
+      await fw.waitLog(/History of wind\/center1 opened/),
+    );
+    const awsTimer = setInterval(() => publish({ 'environment.wind.speedApparent': 3.2 }), 1000);
+    check(
+      'history: the wind rose value records live values',
+      await fw.waitLog(/History of wind\/center1, 10 min: \d+ points, [2-9]\d* with values/, 20000),
+    );
+    clearInterval(awsTimer);
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of wind\/center1 closed/);
 
     // Goldens need a fixed curve: restart with the test hook seeding the SOG's history.
     await fw.stop();
-    fw.start({ ESPHELM_TEST_HISTORY: 'sog' });
+    fw.start({ ESPHELM_TEST_HISTORY: 'sog,hdg2,wind/center1,wind/apparentAngle' });
     check(
-      'history: restarted with a seeded SOG history',
+      'history: restarted with seeded histories',
       (await fw.waitLog(/Showing cached layout "value-history"/)) &&
         (await fw.waitLog(/ESPHELM_TEST_HISTORY: seeded sog/)),
     );
@@ -814,6 +831,46 @@ async function main(): Promise<void> {
     publish(historyPage);
     await sleep(1500);
     await fw.screenshot('34-history-page', shots); // the page as before the tap
+    // The wind rose: a mark on the one that records, none on the other; its popup has a button
+    // per recorded value, and the angles run across north without a jump.
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '2');
+    await fw.waitLog(/Page 3\/3 "Rose"/);
+    const rosePage = {
+      'environment.wind.angleApparent': -0.3, // 343°
+      'environment.wind.directionTrue': 5.0,
+      'navigation.headingTrue': 6.2, // 355°
+      'environment.wind.speedApparent': 6.2,
+      'environment.wind.speedTrue': 5.1,
+      'navigation.speedOverGround': 3.1,
+    };
+    publish(rosePage);
+    await sleep(1500);
+    await fw.screenshot('39-history-rose-page', shots);
+    tapTile('wind');
+    await fw.waitLog(/History of wind\/center1 opened/);
+    publish(rosePage);
+    await sleep(1000);
+    await fw.screenshot('40-history-rose', shots);
+    tapTile('@history', 'apparentAngle');
+    check(
+      'history: a wind rose value button shows that value',
+      await fw.waitLog(/History of wind\/apparentAngle, 10 min: 120 points/),
+    );
+    publish(rosePage);
+    await sleep(1000);
+    await fw.screenshot('41-history-rose-angle', shots);
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of wind\/apparentAngle closed/);
+    tapTile('hdg2');
+    check(
+      'history: a heading across north',
+      await fw.waitLog(/History of hdg2, 10 min: 120 points/),
+    );
+    publish(rosePage);
+    await sleep(1000);
+    await fw.screenshot('42-history-heading', shots);
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of hdg2 closed/);
     await fw.stop();
     fw.start();
     await fw.waitLog(/Showing cached layout "value-history"/);
@@ -896,16 +953,24 @@ async function main(): Promise<void> {
     // 12c. The history popup at 720 (offline, seeded SOG history).
     const history720 = readFileSync(join(FIXTURES, 'valid/value-history.json'), 'utf8');
     writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(history720, '"seed-history"'));
-    fw720.start({ ESPHELM_TEST_HISTORY: 'sog' });
+    fw720.start({ ESPHELM_TEST_HISTORY: 'sog,wind/center1,wind/apparentAngle' });
     check(
       '720 build shows the value history layout',
-      await fw720.waitLog(/Showing cached layout "value-history" \(2 pages/),
+      await fw720.waitLog(/Showing cached layout "value-history" \(3 pages/),
     );
     await sleep(1000);
     writeFileSync(join(work720, 'esphelm_tap_request'), 'sog');
     check('720 history popup opens', await fw720.waitLog(/History of sog opened/));
     await sleep(1000);
     await fw720.screenshot('720-05-history', shots);
+    writeFileSync(join(work720, 'esphelm_tap_request'), '@history close');
+    await fw720.waitLog(/History of sog closed/);
+    writeFileSync(join(work720, 'esphelm_page_request'), '2');
+    await fw720.waitLog(/Page 3\/3 "Rose"/);
+    writeFileSync(join(work720, 'esphelm_tap_request'), 'wind');
+    check('720 wind rose history opens', await fw720.waitLog(/History of wind\/center1 opened/));
+    await sleep(1000);
+    await fw720.screenshot('720-06-history-rose', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

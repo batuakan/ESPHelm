@@ -84,7 +84,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `gauge` | DataItem + `min`, `max`, `zones?` | round gauge with needle |
 | `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
-| `wind_rose` | `config?`, `slots` | see below |
+| `wind_rose` | `config?`, `slots`, `history?` | see below |
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
@@ -93,7 +93,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 - `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
 - `zones` (optional): `{ from?, to?, state }`, in display units. A value tile has no `min`/`max`, so a missing end is open: `{ "to": 2, "state": "alarm" }` means "2 or less". At least one end is required, and `from` must be below `to` when both are given (`INVALID_ZONE`). Both ends are included, and the last matching zone wins (`valueZoneState`).
 - The number is coloured, in this order: muted when stale; a matching zone's colour (at night a `normal` zone uses the text colour); the fixed `color`; the theme's text colour. Older firmware ignores both fields and shows the value uncoloured.
-- `history` (optional boolean, ADR-0018): a tap on the tile opens a graph of its recent values (10 min, 1 h and, on displays with PSRAM, 6 h), which the display records from boot. Absent means `true`; `false` turns it off. Older firmware ignores it.
+- `history` (optional boolean, ADR-0018, ADR-0019): `true` makes the display record the value from boot, and a tap on the tile opens a graph of it (10 min, 1 h and, on displays with PSRAM, 6 h). Absent or `false`: nothing records. Older firmware ignores it. Angles (units with a wrap range) average on the circle.
 
 ```json
 { "type": "value", "id": "depth", "x": 0, "y": 0, "w": 1, "h": 1,
@@ -109,6 +109,12 @@ A `wind_rose` tile draws a fixed design and exposes **named slots at predetermin
 | `center1`, `center2`, `center3` (stacked in the centre of the rose); `topLeft`, `topRight`, `bottomLeft`, `bottomRight` (in the tile's corners, outside the ring) | `apparentAngle` (default `environment.wind.angleApparent`), `trueDirection` (default `environment.wind.directionTrue`), `heading` (default `navigation.headingTrue`), `showTrueWind` (default `true`) |
 
 An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_DEFAULTS`, slot names as `TILE_SLOTS.wind_rose`.
+
+**History** (optional, ADR-0019): the values the rose records, e.g. `"history": ["center1", "apparentAngle"]`.
+- Names (`ROSE_HISTORY_KEYS`): the seven slots, then `apparentAngle`, `trueDirection`, `heading`.
+- An unknown or repeated name gives `INVALID_VALUE`; a name whose slot is empty records nothing.
+- A tap on the rose opens a graph with one button per recorded value. The angles record in degrees.
+- Every recorded value counts against the display's limit (`HISTORY.maxValuesPsram` 48, `maxValuesNoPsram` 6); `historyCount(layout)` counts them.
 
 **Size is the device's business.** The layout has no minimum span, because cell size depends on the grid and the screen. The device measures the cell it got (shorter side, in pixels) and draws one of three tiers, `WIND_ROSE_FIT` (generated into the firmware's `esphelm_sizes.h`):
 

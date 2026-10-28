@@ -11,6 +11,7 @@ import {
   movePage,
   removePage,
   renamePage,
+  setRoseHistory,
   setTileConfig,
   tilePaths,
   targetForPointer,
@@ -246,6 +247,23 @@ describe('pages', () => {
       tiles: [{ type: 'autopilot', id: 'pilot-2-ap', w: 1, h: 1 }],
     });
     expect(ok(page.layout)).toEqual([]);
+  });
+
+  it('switches wind-rose values on and off in their order, and drops an emptied slot', () => {
+    let l = addPage(base(), 'wind_rose').layout;
+    const id = 'wind-1-rose';
+    const rose = () => pageTiles(l.pages[1])[0] as Record<string, unknown>;
+    l = updateSlot(l, 1, id, 'center1', { path: 'navigation.speedOverGround', unit: 'kn' });
+    l = setRoseHistory(l, 1, id, 'heading', true);
+    l = setRoseHistory(l, 1, id, 'center1', true);
+    l = setRoseHistory(l, 1, id, 'center1', true);
+    expect(rose().history).toEqual(['center1', 'heading']);
+    expect(ok(l)).toEqual([]);
+    l = updateSlot(l, 1, id, 'center1', null);
+    expect(rose().history).toEqual(['heading']);
+    l = setRoseHistory(l, 1, id, 'heading', false);
+    expect(rose()).not.toHaveProperty('history');
+    expect(ok(l)).toEqual([]);
   });
 
   it('edits wind-rose slots and config on the tile', () => {

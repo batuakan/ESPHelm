@@ -215,6 +215,16 @@ void style_cell(lv_obj_t *cell, const Colors &c) {
   lv_obj_set_style_pad_all(cell, 10, LV_PART_MAIN);
 }
 
+lv_obj_t *make_history_mark(lv_obj_t *parent, const Colors &c) {
+  static const lv_point_precise_t MARK[] = {{0, 10}, {6, 4}, {12, 7}, {20, 0}};
+  lv_obj_t *mark = lv_line_create(parent);
+  lv_line_set_points(mark, MARK, 4);
+  lv_obj_set_style_line_width(mark, 2, LV_PART_MAIN);
+  lv_obj_set_style_line_rounded(mark, true, LV_PART_MAIN);
+  lv_obj_set_style_line_color(mark, c.muted, LV_PART_MAIN);
+  return mark;
+}
+
 // ---- factories ----
 
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env) {

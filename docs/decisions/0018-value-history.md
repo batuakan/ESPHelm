@@ -1,6 +1,6 @@
 # ADR-0018: Value history popup
 
-Status: **Accepted** (2026-10-28)
+Status: **Accepted** (2026-10-28). Changed in part by ADR-0019: nothing records unless switched on (`history: true`), the wind rose records too, and angles average on the circle.
 
 ## Context
 You asked for a graph of a value over time: tap a value tile, a popup shows how it changed, and a close button brings the page back.

@@ -1,4 +1,0 @@
-
-packages:
-  fonts: !include fonts_720.yaml
-  # fonts: !include fonts_480.yaml

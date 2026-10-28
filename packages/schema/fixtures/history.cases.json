@@ -1,0 +1,131 @@
+{
+  "description": "Value history on the circle (circularMean/unwrapAround in TS, esphelm::circular_mean/unwrap_around in C++). Display units; expected null: no mean. A mean lies in [wrap min, wrap max); an unwrapped value within half a turn of the centre, [centre - span/2, centre + span/2).",
+  "cases": [
+    {
+      "kind": "mean",
+      "values": [350, 10],
+      "wrap": [0, 360],
+      "expected": 0.0,
+      "note": "across north"
+    },
+    {
+      "kind": "mean",
+      "values": [10, 20, 30],
+      "wrap": [0, 360],
+      "expected": 20.0,
+      "note": "plain"
+    },
+    {
+      "kind": "mean",
+      "values": [359, 1],
+      "wrap": [0, 360],
+      "expected": 0.0,
+      "note": "just across north"
+    },
+    {
+      "kind": "mean",
+      "values": [180, 190],
+      "wrap": [0, 360],
+      "expected": 185.0,
+      "note": "south"
+    },
+    {
+      "kind": "mean",
+      "values": [90, 270],
+      "wrap": [0, 360],
+      "expected": null,
+      "note": "opposite: no direction"
+    },
+    {
+      "kind": "mean",
+      "values": [],
+      "wrap": [0, 360],
+      "expected": null,
+      "note": "none"
+    },
+    {
+      "kind": "mean",
+      "values": [0],
+      "wrap": [0, 360],
+      "expected": 0.0,
+      "note": "one"
+    },
+    {
+      "kind": "mean",
+      "values": [355, 0, 5, 10],
+      "wrap": [0, 360],
+      "expected": 2.5,
+      "note": "four across north"
+    },
+    {
+      "kind": "mean",
+      "values": [270, 300],
+      "wrap": [0, 360],
+      "expected": 285.0,
+      "note": "west"
+    },
+    {
+      "kind": "mean",
+      "values": [-170, 170],
+      "wrap": [-180, 180],
+      "expected": -180.0,
+      "note": "a -180..180 range across its ends"
+    },
+    {
+      "kind": "unwrap",
+      "v": 1,
+      "centre": 359,
+      "wrap": [0, 360],
+      "expected": 361,
+      "note": "just past north, centred before it"
+    },
+    {
+      "kind": "unwrap",
+      "v": 359,
+      "centre": 1,
+      "wrap": [0, 360],
+      "expected": -1,
+      "note": "just before north, centred after it"
+    },
+    {
+      "kind": "unwrap",
+      "v": 180,
+      "centre": 0,
+      "wrap": [0, 360],
+      "expected": -180,
+      "note": "half a turn: the upper end goes down"
+    },
+    {
+      "kind": "unwrap",
+      "v": 10,
+      "centre": 350,
+      "wrap": [0, 360],
+      "expected": 370,
+      "note": "ten past north"
+    },
+    {
+      "kind": "unwrap",
+      "v": 200,
+      "centre": 10,
+      "wrap": [0, 360],
+      "expected": -160,
+      "note": "far side"
+    },
+    {
+      "kind": "unwrap",
+      "v": 720,
+      "centre": 0,
+      "wrap": [0, 360],
+      "expected": 0,
+      "note": "two turns"
+    },
+    {
+      "kind": "unwrap",
+      "v": -30,
+      "centre": 10,
+      "wrap": [0, 360],
+      "expected": -30,
+      "note": "negative"
+    }
+  ]
+}

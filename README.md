@@ -24,7 +24,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
 
 I have always wanted to have a multi function display (MFD) on the electric panel of my sailboat, only to have my jaw drop at the very high prices.
 
-This project started as a collection of ESPHome recipes that together function as an MFD (they still live in [`legacy/`](legacy/), see [the original apps](#the-original-static-apps) below). It has since grown into a display whose screens you can change at any time from a browser, on the boat, from your phone.
+This project started as a collection of ESPHome recipes that together function as an MFD (they live on in the [`ESPHelmv1` tag](https://github.com/batuakan/ESPHelm/tree/ESPHelmv1/legacy), see [the original apps](#the-original-static-apps) below). It has since grown into a display whose screens you can change at any time from a browser, on the boat, from your phone.
 
 For this project I have chosen the [ESP32-P4 Smart 86 display from Waveshare](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) for its "classic" square look and its high resolution, high-performance, dual-core RISC-V architecture. ESP32-S3 boards with PSRAM and the smaller ESP32-C3 and C6 boards are targets too (the C3 build compiles; chart pages need PSRAM).
 
@@ -132,7 +132,7 @@ This project uses ESPHome as the "programming environment", a proven environment
 
 ## The original static apps
 
-These are the ESPHome YAML applications ESPHelm started with. They live in [`legacy/`](legacy/) and keep working; each is now also a template in the editor.
+These are the ESPHome YAML applications ESPHelm started with. They are no longer in `main`; they live on in the [`ESPHelmv1` tag](https://github.com/batuakan/ESPHelm/tree/ESPHelmv1/legacy), and each is now also a template in the editor.
 
 <p align="center">
  <img width="200px" src="/docs/images/weather.png">
@@ -145,6 +145,7 @@ These are the ESPHome YAML applications ESPHelm started with. They live in [`leg
 </p>
 
 ```bash
+git checkout ESPHelmv1
 esphome run legacy/MFD.yaml
 ```
 

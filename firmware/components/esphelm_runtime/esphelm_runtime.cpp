@@ -640,7 +640,7 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.can_put = [this]() { return this->signalk_->is_connected(); };
   env.psram = this->psram_;
   env.night = this->layout_.theme == esphelm::Theme::NIGHT;
-  env.has_history = [this](const std::string &id) { return this->history_.find(id) >= 0; };
+  env.has_history = [this](const std::string &key) { return this->history_.find(key) >= 0; };
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
   env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
@@ -757,7 +757,48 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
   }
 }
 
-// ---- Value history (ADR-0018) ----
+// ---- Value history (ADR-0018, ADR-0019) ----
+
+// Button text of a wind rose value without a label (ROSE_HISTORY_TITLES in packages/schema).
+static const char *const ROSE_HISTORY_TITLES[esphelm::RoseConfig::HISTORY_KEYS] = {
+    "Centre 1", "Centre 2", "Centre 3", "Top left", "Top right", "Bottom left", "Bottom right", "AWA", "TWD", "HDG"};
+
+/// The values of `tile` that ask to record, in the order of historySeries() in packages/schema:
+/// a value tile with history on, or a wind rose's `history` names whose slot is filled.
+static void tile_series(const esphelm::Tile &tile, std::vector<HistorySeries> &out) {
+  if (tile.type == esphelm::TileType::VALUE) {
+    if (tile.history)
+      out.push_back({tile.id, "", tile.data.label, tile.data, tile.zones, tile.color});
+    return;
+  }
+  if (tile.type != esphelm::TileType::WIND_ROSE || !tile.rose)
+    return;
+  const esphelm::RoseConfig &rose = *tile.rose;
+  for (int i = 0; i < esphelm::RoseConfig::HISTORY_KEYS; i++) {
+    if (!rose.history[i])
+      continue;
+    HistorySeries s;
+    s.key = tile.id + "/" + esphelm::ROSE_HISTORY_NAMES[i];
+    s.name = esphelm::ROSE_HISTORY_NAMES[i];
+    if (i < esphelm::RoseConfig::MAX_SLOTS) {
+      if (!rose.has_slot[i])
+        continue;
+      s.data = rose.slots[i];
+      s.title = s.data.label.empty() ? ROSE_HISTORY_TITLES[i] : s.data.label;
+    } else {
+      // The angles the rose draws, in degrees like its markers.
+      s.data.path = i == esphelm::RoseConfig::HISTORY_APPARENT ? rose.apparent_angle
+                    : i == esphelm::RoseConfig::HISTORY_TRUE   ? rose.true_direction
+                                                                 : rose.heading;
+      s.data.unit = esphelm::units::find_unit("deg");
+      s.data.decimals = 0;
+      s.title = ROSE_HISTORY_TITLES[i];
+    }
+    if (s.data.label.empty())
+      s.data.label = s.title;
+    out.push_back(std::move(s));
+  }
+}
 
 const esphelm::Tile *EsphelmRuntime::find_tile_(const std::string &id) const {
   for (const auto &page : this->layout_.pages) {
@@ -771,62 +812,86 @@ const esphelm::Tile *EsphelmRuntime::find_tile_(const std::string &id) const {
 
 void EsphelmRuntime::configure_history_() {
   std::vector<esphelm::ValueHistory::Spec> specs;
+  std::vector<HistorySeries> series;
   for (const auto &page : this->layout_.pages) {
-    for (const auto &tile : page.tiles) {
-      if (tile.type != esphelm::TileType::VALUE || !tile.history)
-        continue;
-      const uint32_t stale = tile.data.stale_after > 0 ? static_cast<uint32_t>(tile.data.stale_after * 1000)
-                                                       : this->stale_after_ms_;
-      specs.push_back({tile.id, tile.data.path, tile.data.unit, stale});
-    }
+    for (const auto &tile : page.tiles)
+      tile_series(tile, series);
+  }
+  for (const auto &s : series) {
+    const uint32_t stale =
+        s.data.stale_after > 0 ? static_cast<uint32_t>(s.data.stale_after * 1000) : this->stale_after_ms_;
+    specs.push_back({s.key, s.data.path, s.data.unit, stale});
   }
   std::vector<std::string> skipped;
   const int windows = this->psram_ ? esphelm::sizes::HISTORY_WINDOWS : esphelm::sizes::HISTORY_NO_PSRAM_WINDOWS;
-  const size_t max_tiles =
-      this->psram_ ? esphelm::sizes::HISTORY_MAX_TILES_PSRAM : esphelm::sizes::HISTORY_MAX_TILES_NO_PSRAM;
-  this->history_.configure(specs, millis(), windows, max_tiles, this->psram_, skipped);
+  const size_t max_values =
+      this->psram_ ? esphelm::sizes::HISTORY_MAX_VALUES_PSRAM : esphelm::sizes::HISTORY_MAX_VALUES_NO_PSRAM;
+  this->history_.configure(specs, millis(), windows, max_values, this->psram_, skipped);
   if (!skipped.empty()) {
     std::string ids;
     for (const auto &id : skipped)
       ids += (ids.empty() ? "" : ", ") + id;
-    ESP_LOGW(TAG, "No history for %u value tiles (limit %u on this display): %s", (unsigned) skipped.size(),
-             (unsigned) max_tiles, ids.c_str());
+    ESP_LOGW(TAG, "No history for %u values (limit %u on this display): %s", (unsigned) skipped.size(),
+             (unsigned) max_values, ids.c_str());
   }
-  ESP_LOGD(TAG, "History: %u value tiles, %u windows, %u bytes", (unsigned) this->history_.size(),
-           (unsigned) windows, (unsigned) this->history_.bytes());
+  ESP_LOGD(TAG, "History: %u values, %u windows, %u bytes", (unsigned) this->history_.size(), (unsigned) windows,
+           (unsigned) this->history_.bytes());
 #ifdef USE_HOST
-  // Test hook (SDL e2e goldens): a fixed curve with a gap for this tile, kept still.
+  // Test hook (SDL e2e goldens): a fixed curve with a gap for these values (comma separated keys),
+  // kept still. Angles cross north (350..10), plain values wave around 6.
   const char *seed = std::getenv("ESPHELM_TEST_HISTORY");
-  const int idx = seed != nullptr ? this->history_.find(seed) : -1;
-  if (idx >= 0) {
+  std::string keys = seed != nullptr ? seed : "";
+  while (!keys.empty()) {
+    const size_t comma = keys.find(',');
+    const std::string key = keys.substr(0, comma);
+    keys = comma == std::string::npos ? "" : keys.substr(comma + 1);
+    const int idx = this->history_.find(key);
+    if (idx < 0)
+      continue;
+    const bool angle = this->history_.circular(idx);
     for (int w = 0; w < this->history_.windows(); w++) {
       for (int k = 0; k < esphelm::sizes::HISTORY_POINTS; k++) {
-        float v = 6.0f + 1.5f * std::sin(k / (12.0f + 8.0f * w)) + 0.3f * std::sin(k / 2.5f);
+        const float wave = std::sin(k / (12.0f + 8.0f * w)) + 0.2f * std::sin(k / 2.5f);
+        float v = angle ? std::fmod(360.0f + 8.0f * wave, 360.0f) : 6.0f + 1.5f * wave;
+        const float spread = angle ? 2.0f : 0.2f;
         if (k >= 70 && k < 78)
           v = std::nanf("");
-        this->history_.push(idx, w, {v, v - 0.2f, v + 0.2f});
+        this->history_.push(idx, w, {v, v - spread, v + spread});
       }
     }
     this->history_.freeze(idx);
-    ESP_LOGI(TAG, "ESPHELM_TEST_HISTORY: seeded %s", seed);
+    ESP_LOGI(TAG, "ESPHELM_TEST_HISTORY: seeded %s", key.c_str());
   }
 #endif
-  // An open popup follows its tile into the new layout, or closes if the tile is gone.
+  // An open popup follows its tile into the new layout (on the same value if it still records),
+  // or closes if nothing of it records any more.
   if (this->popup_.is_open()) {
-    const esphelm::Tile *tile = this->find_tile_(this->popup_.tile_id());
-    if (tile != nullptr && this->history_.find(tile->id) >= 0)
-      this->popup_.open(*tile, this->theme_, this->alarms_.height());
-    else
+    const std::string key = this->popup_.key();
+    const std::string tile_id = this->popup_.tile_id();
+    if (!this->open_history_(tile_id, key))
       this->popup_.close();
   }
 }
 
-void EsphelmRuntime::open_history_(const std::string &tile_id) {
+bool EsphelmRuntime::open_history_(const std::string &tile_id, const std::string &key) {
   const esphelm::Tile *tile = this->find_tile_(tile_id);
-  if (tile == nullptr || this->history_.find(tile_id) < 0)
-    return;
-  this->popup_.open(*tile, this->theme_, this->alarms_.height());
+  if (tile == nullptr)
+    return false;
+  std::vector<HistorySeries> all, series;
+  tile_series(*tile, all);
+  size_t selected = 0;
+  for (auto &s : all) {
+    if (this->history_.find(s.key) < 0)
+      continue;  // over this display's limit
+    if (s.key == key)
+      selected = series.size();
+    series.push_back(std::move(s));
+  }
+  if (series.empty())
+    return false;
+  this->popup_.open(tile_id, std::move(series), selected, this->theme_, this->alarms_.height());
   this->alarms_.raise();
+  return true;
 }
 
 // ---- Status page ----

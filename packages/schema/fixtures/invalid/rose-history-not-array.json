@@ -1,0 +1,42 @@
+{
+  "description": "a wind rose's history is a list of names",
+  "expect": [
+    {
+      "code": "INVALID_TYPE",
+      "pointer": "/pages/0/tiles/0/history"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "wind_rose",
+            "id": "wind",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "slots": {
+              "center1": {
+                "path": "environment.wind.speedApparent",
+                "label": "AWS",
+                "unit": "kn"
+              }
+            },
+            "history": true
+          }
+        ]
+      }
+    ]
+  }
+}

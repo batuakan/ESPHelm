@@ -40,7 +40,7 @@ ESP32 display (ESPHome)
  ├─ esphelm_runtime (new)   layout client + cache (NVS) + layout engine + widget catalog
  ├─ EspHomeSignalK          existing external component; subscriptions + PUT.
  │                          Needs a runtime listener API + thread-safety fixes (ADR-0004).
- │                          Built from the local checkout ../ESPHomeSignalK (modules/base/signalk.yaml).
+ │                          Fetched from GitHub (batuakan/ESPHomeSignalK, ref main) by the firmware YAMLs.
  └─ ESPTiles                existing; used by chart/anchor page (local checkout ../ESPTiles)
 ```
 
@@ -73,7 +73,7 @@ ESPHelm/
 │   ├─ components/esphelm_runtime/
 │   ├─ components/sdl_screenshot/   # existing
 │   └─ esphelm.yaml          # base package using the runtime
-└─ legacy/                   # current static YAML apps, kept for reference and porting
+(legacy/ was removed from main; the static YAML apps live on in the ESPHelmv1 git tag)
 ```
 
 This is the *target*. Do not move existing files until Phase 0 findings are reviewed and the person approves a migration step.
@@ -84,7 +84,7 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 2. **Layout JSON is untrusted input on the device.** The firmware must validate every field, enforce size and count limits, and fall back to the **last known good** layout (or a built-in default page) on any error. A malformed layout must never boot-loop or crash the display. Safety-relevant displays on a boat must degrade gracefully.
 3. **Offline first.** The display must work with no server reachable, using the cached layout and showing stale-data indicators, not blank or frozen screens.
 4. **Vertical slices.** Each phase ends in something demonstrable end to end. Do not build the editor before the firmware can render one tile from live data.
-5. **No big-bang rewrites.** Existing static apps keep working until their widget equivalents are verified. Keep them under `legacy/` for reference.
+5. **No big-bang rewrites.** Existing static apps keep working until their widget equivalents are verified. They are no longer in `main`; the `ESPHelmv1` git tag keeps them (`legacy/`).
 6. **Resolution agnostic.** Layouts are grid-based. The firmware measures its own canvas at boot and must work at least on 480x480 and 720x720 (existing design goal). Never hard-code pixel positions in a layout.
 7. **Ask before irreversible or wide changes**: deleting/moving files, changing the schema's major version, adding heavyweight dependencies, changing license headers.
 
@@ -116,7 +116,7 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 
 ## 7. Widget catalog
 
-Rendered by the firmware: tiles `value` (optionally coloured: a named colour or zones by value, ADR-0016; text sized to the tile from a ladder of compiled fonts, ADR-0017; a tap opens a graph of its recent values, recorded on the display, ADR-0018), `gauge`, `bar`, `switch`, `position` (GPS position as text in four formats, defined once in `packages/schema/src/position.ts` and mirrored in `esphelm_position.h`), `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers) and `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
+Rendered by the firmware: tiles `value` (optionally coloured: a named colour or zones by value, ADR-0016; text sized to the tile from a ladder of compiled fonts, ADR-0017; a tap opens a graph of its recent values, recorded on the display when switched on, ADR-0018/0019), `gauge`, `bar`, `switch`, `position` (GPS position as text in four formats, defined once in `packages/schema/src/position.ts` and mirrored in `esphelm_position.h`), `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers; its values can record history, ADR-0019) and `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
 Every display also shows SignalK alarms (`notifications.*`) in a banner above the page (ADR-0014).
 Page kinds: `grid` and `chart` (5d, ADR-0012: SignalK chart tiles converted to RGB565 by the plugin, vessel and anchor watch, north up, PSRAM displays only).
 Later: maybe `compass` and `graph`; possibly a plugin bridge to SignalK's v2 Autopilot API; chart tiles cached on flash.
@@ -126,20 +126,19 @@ Weather/clock currently come from HomeAssistant; their future source is an open 
 
 Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, Node 22. The ESPHome CLI is `~/venv/bin/esphome` (not on PATH).
 
-- Validate the static apps: `~/venv/bin/esphome config legacy/{SDL_720,SDL_480,MFD}.yaml` (secrets in `legacy/secrets.yaml`)
-- Build: `~/venv/bin/esphome compile legacy/<file>.yaml` (both SDL configs share `legacy/.esphome/build/sdl2/`)
+- The static apps are no longer in `main`: check out the `ESPHelmv1` tag to validate or build them.
 - Run the host build: `.esphome/build/<name>/.pioenvs/<name>/program` (F11 saves `screenshot_YYYYMMDD_HHMMSS.bmp` in the CWD; needs an X display)
 - Dev SignalK: `PORT=3999 signalk-server -c <scratch-dir> --sample-nmea0183-data [--securityenabled]`. **Never run it without `-c`**: that uses the real `~/.signalk`.
 - TS packages (npm workspaces, from the repo root): `npm ci`, `npm run generate` (units TS/C++ + JSON Schemas; output is committed), `npm test` (includes a g++-built C++ units test), `npm run typecheck`, `npm run lint`, `npm run build`.
-- Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (symlink to `../legacy/secrets.yaml`). Reference: `docs/firmware-runtime.md`.
-- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 43 golden screenshots in `firmware/test/golden/`, including the autopilot flow and a chart page against stand-in plugins, alarms, display settings, the boot guard and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
+- Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (git-ignored: `wifi_ssid`, `wifi_password`, `signalk_host`). Reference: `docs/firmware-runtime.md`.
+- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 48 golden screenshots in `firmware/test/golden/`, including the autopilot flow and a chart page against stand-in plugins, alarms, display settings, the boot guard and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
 - ESPHomeSignalK unit tests: `../ESPHomeSignalK/tools/test_cpp.sh`.
 - Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
 
 - **Schema/plugin/editor:** unit tests (vitest or jest), type-check, lint, plus contract tests that load every fixture in `packages/schema/fixtures`.
 - **Plugin:** run against a local dev SignalK server with a sample-data/demo source so paths have live values. Test the REST endpoints with real HTTP calls (ETag/304 behavior included).
-- **Firmware:** `esphome config` for validation; `esphome compile` for build; **SDL host build** (`legacy/SDL_480.yaml`, `legacy/SDL_720.yaml`, `firmware/components/sdl_screenshot`) to render layouts on the desktop and capture screenshots. Use screenshots to verify visual output and for golden-image regression tests.
+- **Firmware:** `esphome config` for validation; `esphome compile` for build; **SDL host build** (`firmware/esphelm_sdl*.yaml`, `firmware/components/sdl_screenshot`) to render layouts on the desktop and capture screenshots. Use screenshots to verify visual output and for golden-image regression tests.
 - **Hardware:** the person will flash and test on the real display. When a change needs a hardware check, say exactly what to look for.
 
 Never claim something works unless you ran it. If you could not run a check (no toolchain, no network, no hardware), say so explicitly.
@@ -157,7 +156,7 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - Don't introduce a cloud dependency. Everything runs on the boat's LAN.
 - Don't add telemetry or phone-home behavior.
 - Don't commit secrets, tokens, Wi-Fi credentials, or personal SignalK URLs. Use `secrets.yaml` (gitignored) and example files.
-- Don't remove the existing static YAML apps or the SDL tooling.
+- Don't remove the SDL tooling. (The static YAML apps were removed from `main` on purpose; they live on in the `ESPHelmv1` tag.)
 - Don't weaken validation on the device to "make it work".
 
 ## 10. Working style

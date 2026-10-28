@@ -1,5 +1,5 @@
 // Host test of ValueHistory (value_history.cpp): bucketing, gaps, carry-forward, ring wrap and
-// keeping history across a reconfigure. Prints "N failures"; run by history.cpp.test.ts.
+// keeping history across a reconfigure, angles on the circle. Prints "N failures"; run by history.cpp.test.ts.
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -116,6 +116,42 @@ int main() {
 
   h.clear();
   CHECK(h.size() == 0 && h.find("sog") == -1);
+  // Angles average on the circle: 350 and 10 make a point at 0 that went 10 either way, and
+  // the 10 min point shows no jump across north.
+  {
+    const esphelm::units::UnitDef *deg = esphelm::units::find_unit("deg");
+    CHECK(deg != nullptr && deg->has_wrap);
+    ValueHistory a;
+    std::vector<std::string> sk;
+    a.configure({{"hdg", "navigation.headingTrue", deg, 10000}}, 0, 1, 4, false, sk);
+    CHECK(a.circular(0));
+    a.record(0, 350, 1000);
+    a.record(0, 10, 2000);
+    a.tick(p0);
+    CHECK(a.series(0, 0, out.data()) == 1);
+    CHECK(near(out[0].mean, 0) && near(out[0].min, -10) && near(out[0].max, 10));
+    a.record(0, 340, p0 + 1000);
+    a.record(0, 359, p0 + 2000);
+    a.tick(2 * p0);
+    a.series(0, 0, out.data());
+    CHECK(std::fabs(out[1].mean - 349.5f) < 1e-3f && near(out[1].min, 340) && near(out[1].max, 359));
+    // Opposite values cancel out: the point keeps the first; half a turn counts as going down.
+    a.record(0, 90, 2 * p0 + 1000);
+    a.record(0, 270, 2 * p0 + 2000);
+    a.tick(3 * p0);
+    a.series(0, 0, out.data());
+    CHECK(near(out[2].mean, 90) && near(out[2].min, -90) && near(out[2].max, 90));
+    // The same values without a unit average as plain numbers.
+    ValueHistory plain;
+    plain.configure({{"x", "a.b", nullptr, 10000}}, 0, 1, 4, false, sk);
+    CHECK(!plain.circular(0));
+    plain.record(0, 350, 1000);
+    plain.record(0, 10, 2000);
+    plain.tick(p0);
+    plain.series(0, 0, out.data());
+    CHECK(near(out[0].mean, 180));
+  }
+
   std::printf("%d failures\n", failures);
   return failures == 0 ? 0 : 1;
 }

@@ -97,9 +97,10 @@ struct WidgetEnv {
   bool psram{false};
   /// The layout's theme is night (charts are darkened and tinted red).
   bool night{false};
-  /// Whether a value tile records its history (ADR-0018), and opening its popup. A tap only asks
-  /// for it; the runtime opens it in loop(). Unset or false: the tile isn't tappable.
-  std::function<bool(const std::string &tile_id)> has_history;
+  /// Whether a value records its history (ADR-0018, ADR-0019): a value tile by its id, a wind
+  /// rose value by "<tile id>/<name>"; and opening a tile's popup. A tap only asks for it; the
+  /// runtime opens it in loop(). Unset or false: the tile isn't tappable.
+  std::function<bool(const std::string &key)> has_history;
   std::function<void(const std::string &tile_id)> open_history;
 };
 

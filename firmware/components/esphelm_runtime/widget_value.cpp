@@ -32,12 +32,7 @@ class ValueWidget : public Widget {
     if (env.has_history && env.open_history && env.has_history(tile.id)) {
       // Tap for the history popup (ADR-0018); a small sparkline mark bottom-left says so.
       open_history_ = env.open_history;
-      static const lv_point_precise_t MARK[] = {{0, 10}, {6, 4}, {12, 7}, {20, 0}};
-      mark_ = lv_line_create(cell);
-      lv_line_set_points(mark_, MARK, 4);
-      lv_obj_set_style_line_width(mark_, 2, LV_PART_MAIN);
-      lv_obj_set_style_line_rounded(mark_, true, LV_PART_MAIN);
-      lv_obj_set_style_line_color(mark_, env.colors.muted, LV_PART_MAIN);
+      mark_ = make_history_mark(cell, env.colors);
       lv_obj_align(mark_, LV_ALIGN_BOTTOM_LEFT, 0, -4);
       lv_obj_add_flag(cell, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_add_event_cb(

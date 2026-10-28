@@ -1,0 +1,157 @@
+# 2.8" Round Display Development Board, 480×480
+# waveshare-esp32-s3-touch-lcd-2.1c
+substitutions:
+  # esp32_hosted coprocessor firmware, relative to the top-level config dir
+  esp32_hosted_firmware: network_adapter_esp32c6.bin
+  # Screen Size
+  screen_height: 720
+  screen_width: 720
+  byte_order: little_endian
+  color_encoding: RGB565
+
+esphome:
+  min_version: 2026.1.1
+  project:
+    name: "Waveshare.ESP32-P4-86"
+    version: "1.0"    
+  # on_boot:
+  #   - priority: 0
+  #     then:
+  #       - delay: 10s
+  #       - logger.log: "Performing ESP32-Hosted firmware update check"
+  #       - lambda: id(esp32_hosted_update).perform(true);
+
+esp32:
+  board: esp32-p4-evboard
+  flash_size: 32Mb
+  cpu_frequency: 360MHz
+  framework:
+    type: esp-idf
+    # log_level: INFO
+    advanced:
+      enable_idf_experimental_features: yes
+    # sdkconfig_options:
+    #   CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+    #   CONFIG_SPIRAM_RODATA: y
+
+logger:
+  level: DEBUG
+  hardware_uart: UART0
+
+# api:
+
+json:
+
+psram:
+  # mode: octal
+  speed: 200MHz
+
+esp_ldo:
+  - channel: 3
+    voltage: 2.5V
+
+esp32_hosted:
+  active_high: true
+  variant: ESP32C6
+  reset_pin: GPIO54
+  cmd_pin: GPIO19
+  clk_pin: GPIO18
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+
+# http_request:
+
+update:
+  - platform: esp32_hosted
+    id: esp32_hosted_update
+    type: embedded
+    path: ${esp32_hosted_firmware}
+    sha256: 7868ed3949bcf5c0d64f212ab375919fe8c1d4424ca1f16074316294578fed83
+
+preferences:
+  flash_write_interval: 5min
+
+display:
+  - platform: mipi_dsi
+    model: WAVESHARE-P4-86-PANEL
+    reset_pin:
+      number: 27
+      inverted: false
+
+i2c:
+  sda: GPIO7
+  scl: GPIO8
+  scan: true
+  frequency: 400kHz
+  id: i2c_bus
+
+
+touchscreen:
+  platform: gt911
+  id: touchscreen_
+  # address: 0x14
+  on_release:
+    - if:
+        condition: lvgl.is_paused
+        then:
+          - logger.log: "LVGL resuming"
+          - lvgl.resume:
+          - lvgl.widget.redraw:
+          - light.turn_on: display_backlight
+
+output:
+  - platform: ledc
+    id: backlight_
+    pin: GPIO26
+    frequency: 100Hz
+    inverted: true
+    min_power: 0.0
+    max_power: 1 # To prevent overheating due to excessive lighting
+
+light:
+  - platform: monochromatic
+    name: "display_backlight"
+    output: backlight_
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+    on_turn_on:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - logger.log: "LVGL resuming by backlight on"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+    on_turn_off:
+      - if:
+          condition:
+            lambda: 'return id(display_timeout).state >= 0;'
+          then:
+            - logger.log: "Backlight off, pausing LVGL"
+            - lvgl.pause:
+
+number:
+  - platform: template
+    name: LVGL Screen timeout
+    optimistic: true
+    id: display_timeout
+    unit_of_measurement: "s"
+    initial_value: 45
+    restore_value: true
+    min_value: 10
+    max_value: 180
+    step: 5
+    mode: box
+
+lvgl:
+  id: lvgl_component
+  buffer_size: 100%
+  byte_order: little_endian
+
+  on_idle:
+    timeout: !lambda "return (id(display_timeout).state * 1000);"
+    then:
+      - logger.log: "LVGL is idle"
+      - light.turn_off: display_backlight
+      - lvgl.pause:

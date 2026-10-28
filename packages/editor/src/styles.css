@@ -442,7 +442,7 @@ select {
    in the display's own font so the fit matches (Roboto, Apache-2.0, shared with the firmware). */
 @font-face {
   font-family: 'ESPHelm Display';
-  src: url('../../../legacy/modules/assets/fonts/Roboto.ttf') format('truetype');
+  src: url('../../../firmware/fonts/Roboto.ttf') format('truetype');
   font-display: swap;
 }
 .tile.tile-type-value {
@@ -1334,6 +1334,16 @@ fieldset.modes {
   height: 10px;
   overflow: visible;
 }
+/* Inside a wind rose the mark keeps its size (.tile-graphic svg would stretch it). */
+.tile-graphic svg.tile-history-mark {
+  width: 20px;
+  height: 10px;
+  max-height: none;
+}
+.tile-history-mark.right {
+  left: auto;
+  right: 10px;
+}
 .tile-history-mark polyline {
   fill: none;
   stroke: var(--tile-muted);
@@ -1448,6 +1458,25 @@ fieldset.modes {
   color: var(--tile-muted);
   font-size: 14px;
   padding-left: 40px;
+}
+/* A wind rose's recorded values (ADR-0019), above the value like on the display. */
+.history-series {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.history-series button {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 18px;
+  background: var(--tile-bg);
+  color: var(--tile-muted);
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+.history-series button.on {
+  color: var(--tile-text);
+  border-color: var(--tile-text);
 }
 .history-windows {
   display: grid;

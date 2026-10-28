@@ -18,6 +18,7 @@ import {
   type Zone,
   valueZoneState,
   historyEnabled,
+  roseHistorySeries,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
@@ -209,14 +210,24 @@ export function TilePreview(props: {
             {tile.path ? formatValue(value, tile.unit, tile.decimals) : '--'}
           </span>
           <span className="tile-unit">{tile.unit ? UNITS[tile.unit].label : ''}</span>
-          {tile.type === 'value' && historyEnabled(tile) && (
-            <svg className="tile-history-mark" viewBox="0 0 20 10" role="img" aria-label="Has history">
-              <polyline points="1,9 6,4 12,7 19,1" />
-            </svg>
-          )}
+          {tile.type === 'value' && historyEnabled(tile) && <HistoryMark />}
         </>
       );
   }
+}
+
+/** The small sparkline that says a tap opens a history graph on the display. */
+function HistoryMark(props: { right?: boolean }) {
+  return (
+    <svg
+      className={`tile-history-mark ${props.right ? 'right' : ''}`}
+      viewBox="0 0 20 10"
+      role="img"
+      aria-label="Has history"
+    >
+      <polyline points="1,9 6,4 12,7 19,1" />
+    </svg>
+  );
 }
 
 /** Latitude over longitude, in the tile's format (the same text the display shows). */
@@ -389,6 +400,11 @@ export function WindRosePreview(props: {
       )}
       {/* Corners: shown on the display when they fit outside the ring (full tier only). */}
       {full && CORNER_SLOTS.map(slotButton)}
+      {/* Something records (ADR-0019): the mark in a free bottom corner, as on the display. */}
+      {roseHistorySeries(tile).length > 0 &&
+        !(full && tile.slots.bottomLeft && tile.slots.bottomRight) && (
+          <HistoryMark right={full && !!tile.slots.bottomLeft} />
+        )}
     </span>
   );
 }

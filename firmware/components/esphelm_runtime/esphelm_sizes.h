@@ -19,14 +19,14 @@ inline constexpr int AUTOPILOT_CONTROLS_HEIGHT = 220;
 inline constexpr int TEXT_COMPANION_PERCENT = 40;
 inline constexpr int TEXT_SAMPLE_DIGITS = 2;
 
-// Value history (ADR-0018): points per window, the windows, and the limits per board.
+// Value history (ADR-0018, ADR-0019): points per window, the windows, and how many values a board records.
 inline constexpr int HISTORY_POINTS = 120;
 inline constexpr int HISTORY_WINDOWS = 3;
 inline constexpr int HISTORY_WINDOW_SECONDS[HISTORY_WINDOWS] = {600, 3600, 21600};
 inline constexpr const char *HISTORY_WINDOW_LABELS[HISTORY_WINDOWS] = {"10 min", "1 h", "6 h"};
 inline constexpr int HISTORY_NO_PSRAM_WINDOWS = 2;
-inline constexpr int HISTORY_MAX_TILES_PSRAM = 48;
-inline constexpr int HISTORY_MAX_TILES_NO_PSRAM = 6;
+inline constexpr int HISTORY_MAX_VALUES_PSRAM = 48;
+inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = 6;
 
 }  // namespace sizes
 }  // namespace esphelm

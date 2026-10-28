@@ -144,6 +144,29 @@ class WindRoseWidget : public Widget {
       s.caption = make_label(s.box, env.fonts.small, colors_.text, caption);
       corners_.push_back(std::move(s));
     }
+
+    // Tap for the history popup (ADR-0019) when any of its values records; the mark goes in a
+    // free bottom corner (layout_done). The parts aren't clickable, so a tap lands on the cell.
+    for (lv_obj_t *o : {ring_, card_, center_})
+      lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    bool history = false;
+    for (int i = 0; env.has_history && env.open_history && i < esphelm::RoseConfig::HISTORY_KEYS; i++)
+      history = history || (cfg.history[i] && env.has_history(id_ + "/" + esphelm::ROSE_HISTORY_NAMES[i]));
+    if (history) {
+      open_history_ = env.open_history;
+      mark_ = make_history_mark(cell, colors_);
+      lv_obj_add_flag(cell, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_add_event_cb(
+          cell, [](lv_event_t *e) { static_cast<WindRoseWidget *>(lv_event_get_user_data(e))->tap(""); },
+          LV_EVENT_CLICKED, this);
+    } else {
+      lv_obj_remove_flag(cell, LV_OBJ_FLAG_CLICKABLE);
+    }
+  }
+
+  void tap(const std::string &part) override {
+    if (open_history_)
+      open_history_(id_);
   }
 
   const std::string &id() const override { return id_; }
@@ -161,6 +184,7 @@ class WindRoseWidget : public Widget {
   void layout_done() override {
     const int32_t d = std::min(lv_obj_get_content_width(area_), lv_obj_get_content_height(area_));
     layout_corners_(d);
+    place_mark_();
     // Size tiers (esphelm_sizes.h, shared with the editor's size hint).
     full_ = d >= esphelm::sizes::WIND_ROSE_FULL;
     const bool compact = !full_ && d >= esphelm::sizes::WIND_ROSE_COMPACT;
@@ -298,6 +322,23 @@ class WindRoseWidget : public Widget {
     lv_obj_t *box{nullptr};  // corner slots: the value and caption container
   };
 
+  /// The history mark in the bottom left corner, else the bottom right, else none.
+  void place_mark_() {
+    if (mark_ == nullptr)
+      return;
+    bool taken[2] = {false, false};  // bottom left, bottom right
+    for (const auto &s : corners_) {
+      if (s.corner >= 2 && !lv_obj_has_flag(s.box, LV_OBJ_FLAG_HIDDEN))
+        taken[s.corner - 2] = true;
+    }
+    if (taken[0] && taken[1]) {
+      lv_obj_add_flag(mark_, LV_OBJ_FLAG_HIDDEN);
+      return;
+    }
+    lv_obj_remove_flag(mark_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_align(mark_, taken[0] ? LV_ALIGN_BOTTOM_RIGHT : LV_ALIGN_BOTTOM_LEFT, 0, -4);
+  }
+
   /// Corner values sit outside the ring, in the tile's corners. Each shows only in the full tier
   /// and when its box (value in the label or small font, over its caption) clears the ring.
   void layout_corners_(int32_t d) {
@@ -389,6 +430,8 @@ class WindRoseWidget : public Widget {
   lv_obj_t *area_;
   bool show_true_{true};
   Binding apparent_, true_dir_, heading_;
+  lv_obj_t *mark_{nullptr};
+  std::function<void(const std::string &)> open_history_;
   bool apparent_stale_{true}, true_stale_{true}, heading_stale_{true};
   std::string heading_suffix_;
   lv_obj_t *ring_, *card_, *markers_, *center_, *heading_label_;

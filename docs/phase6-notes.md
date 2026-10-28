@@ -81,3 +81,20 @@ A tap on a value tile opens a graph of its recent values; only the close button 
   - SDL e2e: seven new goldens (480 day/night, 1 h window, collecting, under an alarm, the page after closing, 720), plus a live recording check through the log. Every golden with value tiles was re-recorded for the 66-pixel mark, and each diff was checked to be the mark only.
   - Editor e2e: the mock popup, history off, and `history: false` in the served layout.
 - **Not verified:** touch on the P4 (hardware step 18), PSRAM allocation and the C3's internal-RAM guard on real chips (both only compile), and a full 6 h recording (the windows were tested with the unit test and a seeded curve).
+
+## History per value, the wind rose, angles (2026-10-28, branch `feat/history-per-value`)
+Each value is switched on in the editor, so only chosen values take memory; the wind rose's values can record too (ADR-0019).
+- **Schema:** value tiles record with `history: true` only (absent is now off); the wind rose's `history` lists its recorded values; the limits count values (`HISTORY.maxValues*`). `historySeries`/`historyCount`, and `circularMean`/`unwrapAround` with shared cases (`fixtures/history.cases.json`). A few template values record.
+- **Firmware:**
+  - **Angles:** angles average on the circle (this fixed a jump at north on heading tiles too).
+  - **Rose values:** they record as `<tile>/<name>`. A tap on the rose opens the popup, which has value buttons; the mark goes in a free bottom corner.
+  - **Test hook:** `ESPHELM_TEST_HISTORY` takes a list of keys.
+- **Editor:** checkboxes per value (the rose's slots and angles), a memory counter, and value buttons in the preview.
+- **Tests:**
+  - **Units:** shared circular cases in TS and C++, circular points in the C++ history test, rose ops in the editor.
+  - **SDL e2e:**
+    - Five new goldens: the rose page, its popup, AWA across north, a heading across north, and the rose popup at 720.
+    - Sixteen goldens back to their pre-ADR-0018 images (0 changed pixels); `720-03` and `34` re-recorded (fewer marks; "1/3" in the footer).
+    - A live check that a rose value records.
+  - **Editor e2e:** off by default, the counter, the rose checkboxes, the preview's buttons, and the served `history` list.
+- **Not verified:** touch on the P4 (hardware step 18, extended), and real angles crossing north on the boat (only the seeded curve and unit tests).

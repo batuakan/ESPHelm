@@ -40,6 +40,8 @@ lv_style_t *zone_style(esphelm::ZoneState state, const Colors &colors, int32_t w
 int32_t to_steps(double v, double min, double max);
 /// A scale label: no decimals for spans of 20 or more, else one.
 void label_number(char *buf, size_t n, double v, double span);
+/// The small sparkline that says a tile opens a history graph (ADR-0018); the caller places it.
+lv_obj_t *make_history_mark(lv_obj_t *parent, const Colors &c);
 /// Tile background, radius and padding.
 void style_cell(lv_obj_t *cell, const Colors &c);
 

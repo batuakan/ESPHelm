@@ -20,9 +20,9 @@
           }
         },
         { "type": "autopilot", "id": "autopilot", "x": 2, "y": 0, "w": 2, "h": 2 },
-        { "type": "value", "id": "sog", "x": 0, "y": 2, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+        { "type": "value", "id": "sog", "x": 0, "y": 2, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "history": true },
         { "type": "value", "id": "stw", "x": 1, "y": 2, "w": 1, "h": 1, "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 1, "label": "STW" },
-        { "type": "value", "id": "depth", "x": 2, "y": 2, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" },
+        { "type": "value", "id": "depth", "x": 2, "y": 2, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth", "history": true },
         { "type": "value", "id": "cog", "x": 3, "y": 2, "w": 1, "h": 1, "path": "navigation.courseOverGroundTrue", "unit": "deg", "decimals": 0, "label": "COG" }
       ]
     }

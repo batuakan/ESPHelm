@@ -13,33 +13,33 @@ substitutions:
   font_small_size: "22"
 
 font:
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_digits_huge
     size: ${font_digits_huge_size}
     bpp: 4
     glyphs: ["0123456789.-"]
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_digits_large
     size: ${font_digits_large_size}
     bpp: 4
     glyphs: ["0123456789.-"]
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_huge
     size: ${font_huge_size}
     bpp: 4
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_value
     size: ${font_value_size}
     bpp: 4
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_medium
     size: ${font_medium_size}
     bpp: 4
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_label
     size: ${font_label_size}
     bpp: 4
-  - file: ../legacy/modules/assets/fonts/Roboto.ttf
+  - file: fonts/Roboto.ttf
     id: esphelm_font_small
     size: ${font_small_size}
     bpp: 4

@@ -99,9 +99,21 @@ void ValueHistory::record(size_t i, double value, uint32_t now) {
   e.last_ms = now;
   if (e.frozen)
     return;
+  const bool circ = circular_(e.spec);
   for (int w = 0; w < this->windows_; w++) {
     Window &win = e.win[w];
-    if (win.n == 0) {
+    if (circ) {
+      // min and max are kept as offsets from the first value, the shorter way round.
+      const units::UnitDef &u = *e.spec.unit;
+      if (win.n == 0)
+        win.first = v;
+      const float off = static_cast<float>(unwrap_around(v, win.first, u.wrap_min, u.wrap_max) - win.first);
+      win.min = win.n == 0 ? off : std::min(win.min, off);
+      win.max = win.n == 0 ? off : std::max(win.max, off);
+      const double turn = circular_turn(v, u.wrap_min, u.wrap_max);
+      win.sum_sin += std::sin(turn);
+      win.sum_cos += std::cos(turn);
+    } else if (win.n == 0) {
       win.min = v;
       win.max = v;
     } else {
@@ -122,7 +134,16 @@ void ValueHistory::append_(Window &w, const Point &p) {
 
 void ValueHistory::close_(Entry &e, Window &w, uint32_t end_ms) {
   Point p;
-  if (w.n > 0) {
+  if (w.n > 0 && circular_(e.spec)) {
+    const units::UnitDef &u = *e.spec.unit;
+    double mean = circular_from_sums(w.sum_sin, w.sum_cos, w.n, u.wrap_min, u.wrap_max);
+    if (mean != mean)
+      mean = w.first;  // they cancelled out: no direction, keep the first
+    // The mean as seen from the first value, to turn the offsets into angles around the mean.
+    const double near = unwrap_around(mean, w.first, u.wrap_min, u.wrap_max);
+    p = {static_cast<float>(mean), static_cast<float>(mean + (w.first + w.min - near)),
+         static_cast<float>(mean + (w.first + w.max - near))};
+  } else if (w.n > 0) {
     p = {static_cast<float>(w.sum / w.n), w.min, w.max};
   } else if (e.has_last && end_ms - e.last_ms <= e.spec.stale_ms) {
     // No value in this point but the last one is still fresh: SignalK may send only changes.
@@ -134,6 +155,8 @@ void ValueHistory::close_(Entry &e, Window &w, uint32_t end_ms) {
   append_(w, p);
   w.sum = 0;
   w.n = 0;
+  w.sum_sin = 0;
+  w.sum_cos = 0;
 }
 
 bool ValueHistory::tick(uint32_t now) {

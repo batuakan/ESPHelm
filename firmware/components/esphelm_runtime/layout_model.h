@@ -40,7 +40,16 @@ struct RoseConfig {
   std::string true_direction{"environment.wind.directionTrue"};
   std::string heading{"navigation.headingTrue"};
   bool show_true_wind{true};
+  // Which values record (ADR-0019), in ROSE_HISTORY_NAMES order: the slots, then the angles.
+  static constexpr int HISTORY_KEYS = MAX_SLOTS + 3;
+  static constexpr int HISTORY_APPARENT = MAX_SLOTS, HISTORY_TRUE = MAX_SLOTS + 1, HISTORY_HEADING = MAX_SLOTS + 2;
+  bool history[HISTORY_KEYS]{};
 };
+
+/// A wind rose's `history` names (ROSE_HISTORY_KEYS in packages/schema/src/tiles.ts).
+inline constexpr const char *ROSE_HISTORY_NAMES[RoseConfig::HISTORY_KEYS] = {
+    "center1",    "center2",     "center3",       "topLeft",       "topRight",
+    "bottomLeft", "bottomRight", "apparentAngle", "trueDirection", "heading"};
 
 /// Autopilot settings (only autopilot tiles carry them).
 struct AutopilotConfig {
@@ -60,7 +69,7 @@ struct Tile {
   double min{0}, max{0};
   std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf
   ValueColor color{ValueColor::NONE};  // value
-  bool history{true};                  // value: records its history, tap for the graph (ADR-0018)
+  bool history{false};                 // value: records its history, tap for the graph (ADR-0018/0019)
   Orientation orientation{Orientation::HORIZONTAL};
   // position (data.path defaults to navigation.position; data.decimals -1 = the format's default)
   position::Format position_format{position::Format::DDM};
