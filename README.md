@@ -63,7 +63,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🌊 Features
 
-- **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile; tap one for a graph of its last 10 min, 1 h or 6 h), gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice, and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
+- **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
+- **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
 - **Pages:** as many as you like, with page buttons in a footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
@@ -104,13 +105,26 @@ npm run build
 
 **Plugin and editor:** symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. (An npm / App Store package comes later.)
 
-**Firmware:** create `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`), then:
+**Firmware:** create `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`; it is git-ignored). The [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware](https://github.com/esphome/esp-hosted-firmware) (it is not in this repository). Then:
 
 ```bash
 esphome run firmware/esphelm_p4.yaml
 ```
 
 The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which is handy for trying layouts without a display. More in [`docs/firmware-runtime.md`](docs/firmware-runtime.md), [`docs/editor.md`](docs/editor.md) and [`docs/plugin-api.md`](docs/plugin-api.md).
+
+## 🛠️ Development
+
+```bash
+npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
+npm run typecheck
+npm run lint
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 48 golden screenshots
+npm run e2e:editor     # the editor in Chrome
+npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
+```
+
+The first `npm test` downloads ArduinoJson 7.4.3 into `firmware/test/.cache/` (set `ESPHELM_ARDUINOJSON` to a copy to work offline). The schema in `packages/schema` is the contract between plugin, editor and firmware; decisions are recorded in [`docs/decisions/`](docs/decisions/) and the layout format in [`docs/layout-schema.md`](docs/layout-schema.md).
 
 ## 🧭 Project Goals
 
@@ -130,150 +144,3 @@ This project uses ESPHome as the "programming environment", a proven environment
 - Reusable components are always preferred
 
 
-## The original static apps
-
-These are the ESPHome YAML applications ESPHelm started with. They are no longer in `main`; they live on in the [`ESPHelmv1` tag](https://github.com/batuakan/ESPHelm/tree/ESPHelmv1/legacy), and each is now also a template in the editor.
-
-<p align="center">
- <img width="200px" src="/docs/images/weather.png">
- <img width="200px" src="/docs/images/engine.png">
- <img width="200px" src="/docs/images/wind.png">
- <img width="200px" src="/docs/images/chart.png">
- <img width="200px" src="/docs/images/switchboard.png">
- <img width="200px" src="/docs/images/grid.png">
- <img width="200px" src="/docs/images/energy.png">
-</p>
-
-```bash
-git checkout ESPHelmv1
-esphome run legacy/MFD.yaml
-```
-
-Build and upload to your ESP device (with `secrets.yaml` next to the configs).
-
-### Weather and clock
-
-<img width="200px" src="/docs/images/weather.png">
-<img width="200px" src="/docs/images/forecast.png">
-
-
-Who doesn't need a stylish clock and weather forecast on their MFD!! This application displays the current time, current weather conditions and a 5 day forecast fetched from HomeAssistant showing: outlook, min/max temperature, wind direction, wind speed and gusts.
-
-Not ported to the runtime yet: where weather should come from is still an open question.
-
-### Wind
-
- <img width="200px" src="/docs/images/wind.png">
-
-Not much to say here, a wind instrument application showing:
-
-- SOG
-- TWS
-- AWS
-- True Heading
-- Compass rose
-- Apparent Wind Direction
-- True Wind Direction.
-
-Rotating the compass rose on ESP32 C3 takes a significant amount of resources, so comment it out if things get slow.
-
-
-### Engine
-
-<img width="200px" src="/docs/images/engine.png">
-
-A simple engine monitoring application, showing
-
-- engine rpm
-- temperature
-- oil pressure
-- fuel level
-
-
-
-### Energy
-
- <img width="200px" src="/docs/images/energy.png">
-
-A simple battery, solar, and shore power consumption contribution application showing
-
-- House battery state of charge
-- Shore power input in amp hours
-- Solar input in amp hours
-- House battery consumption in amp hours
-- House battery voltage in volts (blue indicator)
-- Engine battery voltage in volts (red indicator)
-
-### Grid
-
- <img width="200px" src="/docs/images/grid.png">
-
-A simple numeric display, if you don't want to see additional clutter, showing
-
-- Speed over ground
-- Apparent wind speed
-- True wind speed
-- Speed through water
-
-Modify according to your needs
-
-**TODO:**
-
-- [ ] It would be nice to see a graph of history behind the numeric values
-
-
-### Anchor Watch / Chart
-
- <img width="200px" src="/docs/images/chart.png">
-<img width="200px" src="/docs/images/anchor.png">
-
-A simple chart utilizing SignalK charts (mbtiles or proxied/cached charts) using the [chart-plugin](https://github.com/SignalK/charts-plugin) and [signalk-rgb565-proxy](https://github.com/batuakan/SignalKRGB565Proxy) plugins. chart-plugin provides the charts and fetches them from the remote server if needed. The rgb565 plugin decodes the image and converts it to raw pixel values in rgb565 16 bit format and sends them to the esp32, where they get stitched together and displayed in the viewport using the [ESPTiles](https://github.com/batuakan/ESPTiles) external esphome component. The application centers the vessel on the display.
-
-Additionally this application subscribes to anchor position and anchor maxRadius and displays an overlay over the chart showing the anchor swing area.
-
-The runtime's chart page does the same without the proxy plugin: the ESPHelm plugin converts the tiles itself.
-
-**TODO:**
-
-- [ ] Clean up the view when the anchor is pulled up. Hide the anchor icon and the circle.
-- [ ] Anchor view feels a little iffy as the data received for vessel position and anchor position is received asynchronously.
-- [ ] Display depth and current radius
-- [ ] Add GUI buttons to drop and pull the anchor
-
-### Autopilot
-
- <img width="200px" src="/docs/images/autopilot.png">
-
-This application utilizes the [signalk-autopilot](https://github.com/SignalK/signalk-autopilot) plugin, passes requests as PUT requests and subscribes to relevant topics to display data.
-
-One interesting extension to the autopilot would be a small esp32 based wireless remote for your autopilot with physical buttons and a small display.
-
-**WARNING** This application has not been tested with a real autopilot yet, only the simulated one provided by the autopilot plugin. The same goes for the runtime's autopilot tile.
-
-**TODO:**
-
-- [ ] Test using real autopilots
-- [ ] Would be nice to show a small nautical chart and the current leg of the route you are following
-
-### Switchboard
-
- <img width="200px" src="/docs/images/switchboard.png">
-
-Use the switchboard application to turn smart switches on and off. The application currently populates a list of switches, but you need to adjust them to your needs of course. The switches can control HomeAssistant switches, SignalK switches or switches on the esp32 itself such as relays. In the legacy app the control logic is not included yet; the runtime's switch tile sends SignalK PUT requests.
-
-
-## What is missing
-
-The following applications would be nice to have
-
-- [x] Engine monitoring
-  - [x] RPM
-  - [x] Oil Pressure
-  - [x] Various temperature measurements
-- [x] Alarms
-- [ ] Tanks monitoring
-  - [ ] Fresh Water
-  - [ ] Diesel
-  - [ ] Waste
-- [ ] Weather and clock in the runtime
-- [ ] Graphs of value history

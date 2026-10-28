@@ -26,3 +26,6 @@ packages/plugin/public/
 
 # ArduinoJson for the host C++ tests, fetched on first run (firmware/test/arduinojson.ts)
 firmware/test/.cache/
+
+# ESP32-C6 co-processor firmware for the P4 (download from esphome/esp-hosted-firmware, see README)
+firmware/network_adapter_esp32c6.bin
