@@ -1,0 +1,18 @@
+# Prettier only formats the TS workspace; ESPHome YAML and docs keep their own style.
+*
+!packages/
+!packages/**/
+!packages/**/*.ts
+!packages/**/*.json
+!*.json
+!firmware/
+!firmware/test/
+!firmware/test/*.ts
+!*.js
+package-lock.json
+packages/*/generated/
+packages/*/schema/
+packages/*/dist/
+packages/*/src/generated/
+packages/*/fixtures/
+packages/*/templates/

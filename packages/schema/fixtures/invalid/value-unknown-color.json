@@ -1,0 +1,37 @@
+{
+  "description": "Value tile colour not one of the names",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/pages/0/tiles/0/color"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "v",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "environment.depth.belowTransducer",
+            "unit": "m",
+            "color": "pink"
+          }
+        ]
+      }
+    ]
+  }
+}

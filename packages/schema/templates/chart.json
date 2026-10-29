@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "template-chart",
+  "name": "Chart and anchor watch",
+  "theme": "night",
+  "pages": [
+    { "kind": "chart", "id": "chart", "title": "Chart", "chart": "choose-a-chart", "zoom": 15, "anchor": true }
+  ]
+}

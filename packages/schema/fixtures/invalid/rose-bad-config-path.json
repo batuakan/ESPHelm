@@ -1,0 +1,28 @@
+{
+  "description": "Wind rose config path that is not a SignalK path",
+  "expect": [
+    {
+      "code": "INVALID_PATH",
+      "pointer": "/pages/0/tiles/0/config/heading"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": { "cols": 1, "rows": 1 },
+        "tiles": [
+          {
+            "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 1, "h": 1,
+            "config": { "heading": "not a path" },
+            "slots": {}
+          }
+        ]
+      }
+    ]
+  }
+}

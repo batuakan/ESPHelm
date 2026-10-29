@@ -1,0 +1,37 @@
+{
+  "name": "signalk-esphelm",
+  "version": "0.1.0",
+  "description": "ESPHelm: configure ESP32 SignalK displays at runtime. Stores layouts and serves them to devices.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-webapp",
+    "signalk-category-instruments"
+  ],
+  "files": [
+    "dist",
+    "public"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "e2e": "tsx scripts/e2e.ts"
+  },
+  "dependencies": {
+    "@esphelm/schema": "1.0.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@signalk/server-api": "2.33.0",
+    "@types/express": "4.17.25",
+    "@types/pngjs": "^6.0.5",
+    "express": "4.22.3"
+  },
+  "signalk": {
+    "displayName": "ESPHelm",
+    "appIcon": "./icon-192.png"
+  }
+}

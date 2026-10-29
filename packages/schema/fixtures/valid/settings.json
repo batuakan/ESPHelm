@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "id": "settings",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "main",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround"
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "second",
+      "title": "Second",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "stw",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedThroughWater"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "brightness": {
+      "day": 90,
+      "night": 12
+    },
+    "startPage": "second",
+    "autoTheme": "sun",
+    "autoThemePath": "environment.sun",
+    "screenTimeout": 120
+  }
+}

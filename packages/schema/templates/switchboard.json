@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "id": "template-switchboard",
+  "name": "Switchboard",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "switches",
+      "title": "Switches",
+      "grid": { "cols": 2, "rows": 4 },
+      "tiles": [
+        { "type": "switch", "id": "nav-lights", "x": 0, "y": 0, "w": 1, "h": 1, "path": "electrical.switches.navigationLights.state", "label": "Nav lights" },
+        { "type": "switch", "id": "anchor-light", "x": 1, "y": 0, "w": 1, "h": 1, "path": "electrical.switches.anchorLight.state", "label": "Anchor light" },
+        { "type": "switch", "id": "bilge-pump", "x": 0, "y": 1, "w": 1, "h": 1, "path": "electrical.switches.bilgePump.state", "label": "Bilge pump" },
+        { "type": "switch", "id": "water-pump", "x": 1, "y": 1, "w": 1, "h": 1, "path": "electrical.switches.freshWaterPump.state", "label": "Water pump" },
+        { "type": "switch", "id": "water-heater", "x": 0, "y": 2, "w": 1, "h": 1, "path": "electrical.switches.waterHeater.state", "label": "Water heater" },
+        { "type": "switch", "id": "cabin-lights", "x": 1, "y": 2, "w": 1, "h": 1, "path": "electrical.switches.cabinLights.state", "label": "Cabin lights" },
+        { "type": "switch", "id": "galley-lights", "x": 0, "y": 3, "w": 1, "h": 1, "path": "electrical.switches.galleyLights.state", "label": "Galley lights" },
+        { "type": "switch", "id": "deck-lights", "x": 1, "y": 3, "w": 1, "h": 1, "path": "electrical.switches.deckLights.state", "label": "Deck lights" }
+      ]
+    }
+  ]
+}

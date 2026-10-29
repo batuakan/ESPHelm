@@ -1,0 +1,53 @@
+{
+  "description": "recovery allows only skippedLayoutEtag",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/recovery/reason"
+    }
+  ],
+  "hello": {
+    "deviceId": "0c1d2e3f-4a5b-6c7d-0ba2-0c1d2e3f4a5b",
+    "fw": {
+      "version": "0.3.0"
+    },
+    "schema": {
+      "major": 1
+    },
+    "board": "waveshare-esp32-s3-touch-lcd-2.1c",
+    "display": {
+      "width": 480,
+      "height": 480,
+      "rotation": 0
+    },
+    "widgets": [
+      "value",
+      "gauge",
+      "bar",
+      "switch",
+      "wind_rose"
+    ],
+    "fonts": [
+      "tiny",
+      "scriptsize",
+      "small",
+      "normalsize",
+      "large",
+      "LARGE",
+      "Huge"
+    ],
+    "capacity": {
+      "psram": true,
+      "maxLayoutBytes": 131072,
+      "freeHeapBytes": 7500000
+    },
+    "capabilities": {
+      "touch": true,
+      "put": true
+    },
+    "recovery": {
+      "skippedLayoutEtag": "\"9b1d2e\"",
+      "reason": "panic"
+    }
+  }
+}

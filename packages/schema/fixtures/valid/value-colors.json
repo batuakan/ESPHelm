@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "id": "value-colors",
+  "name": "Value colours",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "colors",
+      "title": "Colours",
+      "grid": {
+        "cols": 3,
+        "rows": 3
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "v0",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Blue",
+          "color": "blue",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "v1",
+          "x": 1,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Green",
+          "color": "green",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "v2",
+          "x": 2,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Yellow",
+          "color": "yellow",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "v3",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Orange",
+          "color": "orange",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "v4",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Red",
+          "color": "red",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "v5",
+          "x": 2,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "Purple",
+          "color": "purple",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "depth",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "environment.depth.belowTransducer",
+          "label": "Depth",
+          "unit": "m",
+          "decimals": 1,
+          "zones": [
+            {
+              "to": 3,
+              "state": "warn"
+            },
+            {
+              "to": 2,
+              "state": "alarm"
+            }
+          ]
+        },
+        {
+          "type": "value",
+          "id": "volts",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.house.voltage",
+          "label": "House",
+          "unit": "V",
+          "decimals": 2,
+          "color": "blue",
+          "zones": [
+            {
+              "from": 11.8,
+              "to": 12.2,
+              "state": "warn"
+            },
+            {
+              "to": 11.8,
+              "state": "alarm"
+            },
+            {
+              "from": 14.8,
+              "state": "emergency"
+            }
+          ]
+        },
+        {
+          "type": "value",
+          "id": "temp",
+          "x": 2,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.temperature",
+          "label": "Engine",
+          "unit": "degC",
+          "zones": [
+            {
+              "from": 0,
+              "to": 95,
+              "state": "normal"
+            },
+            {
+              "from": 95,
+              "state": "alarm"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

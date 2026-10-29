@@ -1,0 +1,34 @@
+{
+  "name": "@esphelm/schema",
+  "version": "1.0.0",
+  "description": "ESPHelm layout contract: TypeBox schema, JSON Schema, validator and shared unit table",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./layout.schema.json": "./schema/layout.schema.json",
+    "./hello.schema.json": "./schema/hello.schema.json",
+    "./units.json": "./units.json"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "generated",
+    "units.json",
+    "fixtures",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "generate": "tsx scripts/generate.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "typebox": "1.3.36"
+  }
+}

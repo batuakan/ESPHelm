@@ -1,0 +1,35 @@
+{
+  "description": "Tile extends past the grid",
+  "expect": [
+    {
+      "code": "TILE_OUT_OF_GRID",
+      "pointer": "/pages/0/tiles/0"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "t",
+            "x": 1,
+            "y": 0,
+            "w": 2,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

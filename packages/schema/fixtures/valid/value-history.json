@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "id": "value-history",
+  "name": "Value history",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "history",
+      "title": "History",
+      "grid": {
+        "cols": 2,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "label": "SOG",
+          "unit": "kn",
+          "history": true
+        },
+        {
+          "type": "value",
+          "id": "depth",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "environment.depth.belowTransducer",
+          "label": "Depth",
+          "unit": "m",
+          "zones": [
+            {
+              "to": 3,
+              "state": "alarm"
+            },
+            {
+              "from": 3,
+              "to": 5,
+              "state": "warn"
+            }
+          ],
+          "history": true
+        },
+        {
+          "type": "value",
+          "id": "hdg",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.headingTrue",
+          "label": "HDG",
+          "unit": "deg",
+          "decimals": 0
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "other",
+      "title": "Other",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "water",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "environment.water.temperature",
+          "label": "Water",
+          "unit": "degC",
+          "history": true
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "rose",
+      "title": "Rose",
+      "grid": {
+        "cols": 3,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "wind_rose",
+          "id": "wind",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 2,
+          "slots": {
+            "center1": {
+              "path": "environment.wind.speedApparent",
+              "label": "AWS",
+              "unit": "kn"
+            },
+            "center2": {
+              "path": "environment.wind.speedTrue",
+              "label": "TWS",
+              "unit": "kn"
+            },
+            "bottomLeft": {
+              "path": "navigation.speedOverGround",
+              "label": "SOG",
+              "unit": "kn"
+            }
+          },
+          "history": [
+            "center1",
+            "bottomLeft",
+            "apparentAngle"
+          ]
+        },
+        {
+          "type": "wind_rose",
+          "id": "wind2",
+          "x": 2,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "slots": {
+            "center1": {
+              "path": "environment.wind.speedApparent",
+              "label": "AWS",
+              "unit": "kn"
+            }
+          }
+        },
+        {
+          "type": "value",
+          "id": "hdg2",
+          "x": 2,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.headingTrue",
+          "label": "HDG",
+          "unit": "deg",
+          "decimals": 0,
+          "history": true
+        }
+      ]
+    }
+  ]
+}

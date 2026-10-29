@@ -1,0 +1,35 @@
+{
+  "description": "Theme outside day/night",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/theme"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "dusk",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "sourceMap": false,
+    "paths": {
+      "@esphelm/schema": ["./packages/schema/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/scripts/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "vitest.config.ts",
+    "firmware/test/**/*.ts",
+    "packages/*/e2e/**/*.ts"
+  ],
+  "exclude": ["packages/editor/src/**", "packages/editor/test/**"]
+}

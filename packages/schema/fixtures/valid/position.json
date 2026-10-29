@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "id": "position",
+  "name": "GPS position",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "formats",
+      "title": "Position formats",
+      "grid": {
+        "cols": 2,
+        "rows": 3
+      },
+      "tiles": [
+        {
+          "type": "position",
+          "id": "pos-ddm",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1,
+          "label": "Position"
+        },
+        {
+          "type": "position",
+          "id": "pos-dms",
+          "x": 0,
+          "y": 1,
+          "w": 2,
+          "h": 1,
+          "label": "DMS",
+          "format": "dms"
+        },
+        {
+          "type": "position",
+          "id": "pos-dd",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "label": "DD",
+          "format": "dd",
+          "decimals": 4
+        },
+        {
+          "type": "position",
+          "id": "pos-decimal",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "label": "Decimal",
+          "format": "decimal",
+          "path": "navigation.position",
+          "staleAfter": 10
+        }
+      ]
+    }
+  ]
+}

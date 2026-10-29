@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "id": "template-wind",
+  "name": "Wind",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "wind",
+      "title": "Wind",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "history": ["center3", "topLeft", "apparentAngle"],
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" },
+            "topLeft": { "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" },
+            "topRight": { "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 1, "label": "STW" },
+            "bottomLeft": { "path": "navigation.courseOverGroundTrue", "unit": "deg", "decimals": 0, "label": "COG" },
+            "bottomRight": { "path": "environment.wind.angleApparent", "unit": "deg180", "decimals": 0, "label": "AWA" }
+          }
+        }
+      ]
+    }
+  ]
+}

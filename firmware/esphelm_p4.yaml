@@ -1,0 +1,63 @@
+# Runtime firmware for the Waveshare ESP32-P4-86 (720x720).
+#   ~/venv/bin/esphome run firmware/esphelm_p4.yaml
+# Needs firmware/secrets.yaml (wifi_ssid, wifi_password, signalk_host); it is git-ignored.
+substitutions:
+  screen_width: "720"
+  screen_height: "720"
+  font_digits_huge_size: "288"
+  font_digits_large_size: "192"
+  font_huge_size: "144"
+  font_value_size: "96"
+  font_medium_size: "64"
+  font_label_size: "42"
+  font_small_size: "28"
+  esp32_hosted_firmware: network_adapter_esp32c6.bin
+
+packages:
+  hardware: !include hardware/waveshare-esp32-p4-86.yaml
+  wifi: !include wifi.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-p4
+  friendly_name: "ESPHelm display"
+
+external_components:
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
+    components: [signalk]
+  - source:
+      type: local
+      path: components
+    components: [esphelm_runtime]
+
+signalk:
+  host: !secret signalk_host
+
+lvgl:
+  # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015), so the
+  # hardware package's fixed idle timeout is removed.
+  on_idle: !remove
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+esphelm_runtime:
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: waveshare-esp32-p4-86
+  backlight: display_backlight
+  touch: true

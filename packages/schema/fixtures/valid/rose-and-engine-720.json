@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "id": "rose-engine-720",
+  "name": "Wind and engine (720x720)",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "helm",
+      "title": "Helm",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "rose", "x": 0, "y": 0, "w": 2, "h": 2,
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" }
+          }
+        },
+        { "type": "value", "id": "depth", "x": 2, "y": 0, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" },
+        { "type": "value", "id": "stw", "x": 2, "y": 1, "w": 1, "h": 1, "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 1, "label": "STW" },
+        {
+          "type": "gauge", "id": "rpm", "x": 0, "y": 2, "w": 1, "h": 1,
+          "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM",
+          "min": 0, "max": 4000,
+          "zones": [{ "from": 3200, "to": 4000, "state": "alarm" }]
+        },
+        {
+          "type": "gauge", "id": "coolant", "x": 1, "y": 2, "w": 1, "h": 1,
+          "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
+          "min": 40, "max": 120,
+          "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
+        },
+        {
+          "type": "bar", "id": "oil", "x": 2, "y": 2, "w": 1, "h": 1,
+          "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil",
+          "min": 0, "max": 6, "orientation": "vertical",
+          "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "small-roses",
+      "title": "Small roses",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "rose-small", "x": 0, "y": 0, "w": 1, "h": 1,
+          "slots": {
+            "center1": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" }
+          }
+        },
+        {
+          "type": "wind_rose", "id": "rose-medium", "x": 1, "y": 0, "w": 2, "h": 2,
+          "config": { "showTrueWind": false },
+          "slots": {
+            "center1": { "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" }
+          }
+        }
+      ]
+    }
+  ]
+}

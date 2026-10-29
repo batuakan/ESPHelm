@@ -1,0 +1,17 @@
+{
+  "description": "A chart page names its chart",
+  "expect": [
+    {
+      "code": "MISSING_FIELD",
+      "pointer": "/pages/0/chart"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      { "kind": "chart", "id": "c" }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "sailing",
+  "name": "Sailing",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "wind",
+      "title": "Wind",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "config": { "showTrueWind": true },
+          "slots": {
+            "center1": { "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+            "center2": { "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+            "center3": { "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "nav",
+      "title": "Navigation",
+      "grid": { "cols": 2, "rows": 2 },
+      "tiles": [
+        { "type": "value", "id": "hdg", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.headingTrue", "unit": "deg", "decimals": 0, "label": "HDG °T" },
+        { "type": "value", "id": "awa", "x": 1, "y": 0, "w": 1, "h": 1, "path": "environment.wind.angleApparent", "unit": "deg180", "decimals": 0, "label": "AWA" },
+        { "type": "value", "id": "depth", "x": 0, "y": 1, "w": 2, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "wind-minimal",
+      "grid": { "cols": 1, "rows": 1 },
+      "tiles": [
+        {
+          "type": "wind_rose", "id": "wind-minimal-rose", "x": 0, "y": 0, "w": 1, "h": 1,
+          "slots": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "description": "decimals is 0 to 6",
+  "expect": [
+    {
+      "code": "OUT_OF_RANGE",
+      "pointer": "/pages/0/tiles/0/decimals"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "position",
+            "id": "pos",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "decimals": 7
+          }
+        ]
+      }
+    ]
+  }
+}

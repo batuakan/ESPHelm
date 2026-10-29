@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "id": "value-sizes",
+  "name": "Value sizes",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "sizes",
+      "title": "Sizes",
+      "grid": {
+        "cols": 4,
+        "rows": 4
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 0,
+          "w": 4,
+          "h": 2,
+          "path": "navigation.speedOverGround",
+          "label": "SOG",
+          "unit": "kn"
+        },
+        {
+          "type": "value",
+          "id": "depth",
+          "x": 0,
+          "y": 2,
+          "w": 2,
+          "h": 2,
+          "path": "environment.depth.belowTransducer",
+          "label": "Depth",
+          "unit": "m"
+        },
+        {
+          "type": "value",
+          "id": "rpm",
+          "x": 2,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.revolutions",
+          "label": "RPM",
+          "unit": "rpm",
+          "decimals": 0
+        },
+        {
+          "type": "value",
+          "id": "volts",
+          "x": 3,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.house.voltage",
+          "label": "House",
+          "unit": "V",
+          "decimals": 2
+        },
+        {
+          "type": "value",
+          "id": "temp",
+          "x": 2,
+          "y": 3,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.temperature",
+          "unit": "degC",
+          "decimals": 0
+        },
+        {
+          "type": "value",
+          "id": "hdg",
+          "x": 3,
+          "y": 3,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.headingTrue",
+          "label": "HDG",
+          "unit": "deg",
+          "decimals": 0
+        }
+      ]
+    }
+  ]
+}

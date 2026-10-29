@@ -1,0 +1,17 @@
+{
+  "description": "Chart config paths are SignalK paths",
+  "expect": [
+    {
+      "code": "INVALID_PATH",
+      "pointer": "/pages/0/config/anchorRadiusPath"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      { "kind": "chart", "id": "c", "chart": "x", "config": { "anchorRadiusPath": "navigation anchor" } }
+    ]
+  }
+}

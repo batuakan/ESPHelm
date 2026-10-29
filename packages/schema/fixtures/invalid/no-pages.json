@@ -1,0 +1,15 @@
+{
+  "description": "Empty pages array",
+  "expect": [
+    {
+      "code": "NO_PAGES",
+      "pointer": "/pages"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": []
+  }
+}

@@ -1,0 +1,27 @@
+# Runtime firmware on the desktop (SDL host build), 720x720 with the P4-86 font sizes.
+# Same as esphelm_sdl.yaml (test hooks included); used by firmware/test/e2e_sdl.ts to check
+# rendering at 720 (golden rule 6).
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl_720.yaml
+substitutions:
+  # Repeated here on purpose: `-s` on the command line only overrides this file's own
+  # substitutions, not those of the included esphelm_sdl.yaml.
+  signalk_host: "127.0.0.1"
+  signalk_port: "3000"
+  screen_width: "720"
+  screen_height: "720"
+  font_digits_huge_size: "288"
+  font_digits_large_size: "192"
+  font_huge_size: "144"
+  font_value_size: "96"
+  font_medium_size: "64"
+  font_label_size: "42"
+  font_small_size: "28"
+
+packages:
+  base: !include esphelm_sdl.yaml
+
+esphome:
+  name: esphelm-sdl-720
+
+esphelm_runtime:
+  board: sdl-720

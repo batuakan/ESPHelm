@@ -1,0 +1,190 @@
+{
+  "description": "Value-tile zone matching (valueZoneState in TS, esphelm::value_zone_state in C++). Display units; both ends included; a missing end is open; the last matching zone wins; null = no zone.",
+  "cases": [
+    {
+      "n": 5,
+      "zones": [
+        {
+          "to": 3,
+          "state": "warn"
+        },
+        {
+          "to": 2,
+          "state": "alarm"
+        }
+      ],
+      "expected": null,
+      "note": "no zone matches"
+    },
+    {
+      "n": 3,
+      "zones": [
+        {
+          "to": 3,
+          "state": "warn"
+        },
+        {
+          "to": 2,
+          "state": "alarm"
+        }
+      ],
+      "expected": "warn",
+      "note": "upper end included"
+    },
+    {
+      "n": 2.5,
+      "zones": [
+        {
+          "to": 3,
+          "state": "warn"
+        },
+        {
+          "to": 2,
+          "state": "alarm"
+        }
+      ],
+      "expected": "warn",
+      "note": ""
+    },
+    {
+      "n": 2,
+      "zones": [
+        {
+          "to": 3,
+          "state": "warn"
+        },
+        {
+          "to": 2,
+          "state": "alarm"
+        }
+      ],
+      "expected": "alarm",
+      "note": "overlap: the last matching zone wins"
+    },
+    {
+      "n": -40,
+      "zones": [
+        {
+          "to": 3,
+          "state": "warn"
+        },
+        {
+          "to": 2,
+          "state": "alarm"
+        }
+      ],
+      "expected": "alarm",
+      "note": "open lower end"
+    },
+    {
+      "n": 2,
+      "zones": [
+        {
+          "to": 2,
+          "state": "alarm"
+        },
+        {
+          "to": 3,
+          "state": "warn"
+        }
+      ],
+      "expected": "warn",
+      "note": "order matters"
+    },
+    {
+      "n": 14.8,
+      "zones": [
+        {
+          "from": 14.8,
+          "state": "emergency"
+        }
+      ],
+      "expected": "emergency",
+      "note": "lower end included"
+    },
+    {
+      "n": 1000000000.0,
+      "zones": [
+        {
+          "from": 14.8,
+          "state": "emergency"
+        }
+      ],
+      "expected": "emergency",
+      "note": "open upper end"
+    },
+    {
+      "n": 14.79,
+      "zones": [
+        {
+          "from": 14.8,
+          "state": "emergency"
+        }
+      ],
+      "expected": null,
+      "note": ""
+    },
+    {
+      "n": 12,
+      "zones": [
+        {
+          "from": 11.8,
+          "to": 12.2,
+          "state": "warn"
+        }
+      ],
+      "expected": "warn",
+      "note": ""
+    },
+    {
+      "n": 12.21,
+      "zones": [
+        {
+          "from": 11.8,
+          "to": 12.2,
+          "state": "warn"
+        }
+      ],
+      "expected": null,
+      "note": ""
+    },
+    {
+      "n": 95,
+      "zones": [
+        {
+          "from": 0,
+          "to": 95,
+          "state": "normal"
+        },
+        {
+          "from": 95,
+          "state": "alarm"
+        }
+      ],
+      "expected": "alarm",
+      "note": "shared edge: the later zone"
+    },
+    {
+      "n": 50,
+      "zones": [
+        {
+          "from": 0,
+          "to": 95,
+          "state": "normal"
+        },
+        {
+          "from": 95,
+          "state": "alarm"
+        }
+      ],
+      "expected": "normal",
+      "note": ""
+    },
+    {
+      "n": 0,
+      "zones": [],
+      "expected": null,
+      "note": "no zones"
+    }
+  ]
+}

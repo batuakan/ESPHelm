@@ -1,0 +1,225 @@
+{
+  "$comment": "Shared GPS position text cases, run by the TS tests (formatPosition) and a g++ test of the firmware (esphelm_position.h). Expected strings were worked out by hand and checked against an independent reference.",
+  "cases": [
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "ddm",
+      "expected": {
+        "lat": "60° 09.000' N",
+        "lon": "024° 57.000' E"
+      }
+    },
+    {
+      "value": {
+        "latitude": -33.8688,
+        "longitude": 151.2093
+      },
+      "format": "ddm",
+      "decimals": 3,
+      "expected": {
+        "lat": "33° 52.128' S",
+        "lon": "151° 12.558' E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 59.9999999,
+        "longitude": -1e-07
+      },
+      "format": "ddm",
+      "decimals": 3,
+      "expected": {
+        "lat": "60° 00.000' N",
+        "lon": "000° 00.000' W"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.9583
+      },
+      "format": "ddm",
+      "decimals": 0,
+      "expected": {
+        "lat": "60° 09' N",
+        "lon": "024° 57' E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 90,
+        "longitude": -180
+      },
+      "format": "ddm",
+      "expected": {
+        "lat": "90° 00.000' N",
+        "lon": "180° 00.000' W"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "dms",
+      "expected": {
+        "lat": "60° 09' 00.0\" N",
+        "lon": "024° 57' 00.0\" E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 51.477928,
+        "longitude": -0.001545
+      },
+      "format": "dms",
+      "decimals": 1,
+      "expected": {
+        "lat": "51° 28' 40.5\" N",
+        "lon": "000° 00' 05.6\" W"
+      }
+    },
+    {
+      "value": {
+        "latitude": 10.9999999,
+        "longitude": 0
+      },
+      "format": "dms",
+      "decimals": 1,
+      "expected": {
+        "lat": "11° 00' 00.0\" N",
+        "lon": "000° 00' 00.0\" E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "dd",
+      "expected": {
+        "lat": "60.15000° N",
+        "lon": "24.95000° E"
+      }
+    },
+    {
+      "value": {
+        "latitude": -12.3456789,
+        "longitude": 0
+      },
+      "format": "dd",
+      "decimals": 2,
+      "expected": {
+        "lat": "12.35° S",
+        "lon": "0.00° E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "decimal",
+      "expected": {
+        "lat": "60.150000",
+        "lon": "24.950000"
+      }
+    },
+    {
+      "value": {
+        "latitude": -33.8688,
+        "longitude": -1e-07
+      },
+      "format": "decimal",
+      "decimals": 6,
+      "expected": {
+        "lat": "-33.868800",
+        "lon": "0.000000"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "dd",
+      "decimals": 0,
+      "expected": {
+        "lat": "60° N",
+        "lon": "25° E"
+      }
+    },
+    {
+      "value": {
+        "latitude": 60.15,
+        "longitude": 24.95
+      },
+      "format": "dms",
+      "decimals": 0,
+      "expected": {
+        "lat": "60° 09' 00\" N",
+        "lon": "024° 57' 00\" E"
+      }
+    },
+    {
+      "value": null,
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {},
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {
+        "latitude": "60",
+        "longitude": 24
+      },
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {
+        "latitude": 60
+      },
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {
+        "latitude": 91,
+        "longitude": 0
+      },
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {
+        "latitude": 0,
+        "longitude": 180.5
+      },
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": {
+        "latitude": -90.0001,
+        "longitude": 0
+      },
+      "format": "ddm",
+      "expected": null
+    },
+    {
+      "value": [
+        60,
+        24
+      ],
+      "format": "ddm",
+      "expected": null
+    }
+  ]
+}

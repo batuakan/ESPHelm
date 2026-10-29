@@ -1,0 +1,45 @@
+{
+  "description": "Zone from not below to",
+  "expect": [
+    {
+      "code": "INVALID_ZONE",
+      "pointer": "/pages/0/tiles/0/zones/0"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "gauge",
+            "id": "g",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "propulsion.p0.revolutions",
+            "unit": "rpm",
+            "min": 0,
+            "max": 4000,
+            "zones": [
+              {
+                "from": 3000,
+                "to": 2000,
+                "state": "warn"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

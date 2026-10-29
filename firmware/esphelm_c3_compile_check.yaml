@@ -1,0 +1,76 @@
+# Compile-only check of the runtime on an ESP32-C3 (no PSRAM) with a 240x240 SPI display.
+# Not a supported board config: the pins are placeholders. Used to see that the runtime builds
+# and how much static RAM it leaves on the smallest target (CLAUDE.md §6).
+#   ~/venv/bin/esphome compile firmware/esphelm_c3_compile_check.yaml
+substitutions:
+  font_digits_huge_size: "112"
+  font_digits_large_size: "80"
+  font_huge_size: "56"
+  font_value_size: "40"
+  font_medium_size: "28"
+  font_label_size: "20"
+  font_small_size: "14"
+
+packages:
+  wifi: !include wifi.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-c3-check
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+logger:
+
+json:
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
+    components: [signalk]
+  - source:
+      type: local
+      path: components
+    components: [esphelm_runtime]
+
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+
+display:
+  - platform: mipi_spi
+    model: GC9A01A
+    cs_pin: GPIO10
+    dc_pin: GPIO2
+    reset_pin: GPIO3
+    auto_clear_enabled: false
+
+signalk:
+  host: !secret signalk_host
+
+lvgl:
+  buffer_size: 10%
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+esphelm_runtime:
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: esp32-c3-gc9a01-240
+  touch: false

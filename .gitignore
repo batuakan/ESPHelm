@@ -1,5 +1,31 @@
 # Gitignore settings for ESPHome
 # This is an example and may include too much for your use-case.
 # You can modify this file to suit your needs.
-/.esphome/
-/secrets.yaml
+.esphome/
+secrets.yaml
+
+# SignalK access token written by the host (SDL) build into the working directory
+token
+# Local scratch output
+/out.txt
+# SDL screenshots
+screenshot_*.bmp
+__pycache__/
+# FreeCAD backups
+*.FCBak
+
+# Node workspace
+node_modules/
+dist/
+*.tsbuildinfo
+# Editor build output (npm run build)
+packages/plugin/public/
+
+# The static ESPHome apps live on in the ESPHelmv1 tag; a local copy may stay here
+/legacy/
+
+# ArduinoJson for the host C++ tests, fetched on first run (firmware/test/arduinojson.ts)
+firmware/test/.cache/
+
+# ESP32-C6 co-processor firmware for the P4 (download from esphome/esp-hosted-firmware, see README)
+firmware/network_adapter_esp32c6.bin

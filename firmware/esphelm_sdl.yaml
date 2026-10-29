@@ -1,0 +1,94 @@
+# Runtime firmware on the desktop (SDL host build), 480x480.
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl.yaml
+# The SignalK token and the cached layout are stored in the working directory of the binary.
+substitutions:
+  screen_width: "480"
+  screen_height: "480"
+  signalk_host: "127.0.0.1"
+  signalk_port: "3000"
+
+packages:
+  hardware: !include hardware/sdl.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-sdl
+
+external_components:
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
+    components: [signalk]
+
+signalk:
+  host: ${signalk_host}
+  port: ${signalk_port}
+
+lvgl:
+  id: lvgl_component
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+esphelm_runtime:
+  id: esphelm_rt
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: sdl-480
+  touch: true
+
+# Test hooks for firmware/test/e2e_sdl.ts (files in the working directory):
+#   esphelm_shot_request  <path>     save a screenshot there
+#   esphelm_page_request  <index>    show that page (same as the footer buttons)
+#   esphelm_tap_request   <tile id> [button]  tap a tile (switches send a PUT; autopilot
+#                                    buttons: -10 -1 +1 +10 auto wind route standby)
+#   esphelm_exit_request             exit cleanly
+interval:
+  - interval: 250ms
+    then:
+      - lambda: |-
+          FILE *f = fopen("esphelm_shot_request", "r");
+          if (f != nullptr) {
+            char path[256] = {0};
+            if (fgets(path, sizeof(path), f) != nullptr) {
+              path[strcspn(path, "\r\n")] = 0;
+              id(my_screenshot)->take_screenshot(std::string(path));
+            }
+            fclose(f);
+            remove("esphelm_shot_request");
+          }
+          FILE *pg = fopen("esphelm_page_request", "r");
+          if (pg != nullptr) {
+            int page = 0;
+            if (fscanf(pg, "%d", &page) == 1)
+              id(esphelm_rt)->show_page(page);
+            fclose(pg);
+            remove("esphelm_page_request");
+          }
+          FILE *tp = fopen("esphelm_tap_request", "r");
+          if (tp != nullptr) {
+            char tile[64] = {0};
+            char part[16] = {0};
+            if (fscanf(tp, "%63s %15s", tile, part) >= 1)
+              id(esphelm_rt)->tap(std::string(tile), std::string(part));
+            fclose(tp);
+            remove("esphelm_tap_request");
+          }
+          FILE *x = fopen("esphelm_exit_request", "r");
+          if (x != nullptr) {
+            fclose(x);
+            remove("esphelm_exit_request");
+            exit(0);
+          }

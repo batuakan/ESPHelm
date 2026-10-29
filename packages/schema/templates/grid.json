@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "template-grid",
+  "name": "Speeds",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "speeds",
+      "title": "Speeds",
+      "grid": { "cols": 2, "rows": 2 },
+      "tiles": [
+        { "type": "value", "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG", "history": true },
+        { "type": "value", "id": "aws", "x": 1, "y": 0, "w": 1, "h": 1, "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" },
+        { "type": "value", "id": "tws", "x": 0, "y": 1, "w": 1, "h": 1, "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" },
+        { "type": "value", "id": "stw", "x": 1, "y": 1, "w": 1, "h": 1, "path": "navigation.speedThroughWater", "unit": "kn", "decimals": 1, "label": "STW" }
+      ]
+    }
+  ]
+}
