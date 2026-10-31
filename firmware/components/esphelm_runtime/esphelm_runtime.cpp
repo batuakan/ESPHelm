@@ -25,6 +25,11 @@ static const uint32_t POLL_INTERVAL_MS = 5 * 60 * 1000;  // fallback when a vers
 static const uint32_t LKG_AFTER_MS = 30 * 1000;      // rendered this long without trouble -> last known good
 static const uint32_t MAX_HELLO_BACKOFF_MS = 60 * 1000;
 static const unsigned MAX_BOOT_ATTEMPTS = 2;         // crashes while a cached layout was shown -> skip it
+// Zones from the server's metadata (ADR-0020). The server's throttle drops some meta deltas, so
+// the visible page's metadata is also read again at this interval.
+static const uint32_t META_READ_INTERVAL_MS = 60 * 1000;
+static const uint32_t META_DEBOUNCE_MS = 1000;
+static const size_t META_MAX_BODY = 4 * 1024;
 
 /// Did the previous boot end in a crash (rather than a power cut, OTA or a requested restart)?
 static bool crash_reset() {
@@ -106,6 +111,9 @@ void EsphelmRuntime::setup() {
     }
   });
 
+  // A hint that a path's metadata changed; it can be missed, so it is read again now and then too.
+  this->signalk_->add_meta_listener([this](const std::string &path) { this->on_meta_changed_(path); });
+
   // Offline first: show what we had before any network traffic. The boot guard first decides
   // whether the cached layout is the one that keeps crashing the display (ADR-0013).
   StoredLayout stored;
@@ -154,6 +162,7 @@ void EsphelmRuntime::loop() {
     // (Re)connected: re-announce and re-check the layout.
     this->hello_due_ = true;
     this->next_hello_ms_ = 0;
+    this->next_meta_read_ms_ = 0;
   }
   this->was_connected_ = connected;
 
@@ -166,6 +175,7 @@ void EsphelmRuntime::loop() {
     this->fetch_wanted_ = true;
     this->next_poll_ms_ = now + POLL_INTERVAL_MS;
   }
+  this->pump_meta_(now, authorized && connected);
 
   bool history_closed = false;
   if (this->has_layout_) {
@@ -285,6 +295,10 @@ void EsphelmRuntime::send_fetch_() {
 }
 
 void EsphelmRuntime::handle_result_(HttpResult &result) {
+  if (result.kind == RequestKind::META) {  // best effort: says nothing about the layout's connection
+    this->handle_meta_(result);
+    return;
+  }
   if (result.status == 0) {
     this->transport_error_ = result.error;
     ESP_LOGW(TAG, "%s request failed: %s",
@@ -403,6 +417,21 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
     }
   }
   this->layout_ = std::move(parsed.layout);
+  // Zones the server is known to have apply at once; what the layout no longer shows is forgotten.
+  this->meta_generation_++;
+  this->meta_queue_.clear();
+  std::map<std::string, std::vector<esphelm::ServerZone>> kept;
+  for (auto &p : this->layout_.pages) {
+    for (auto &t : p.tiles) {
+      t.own_zones = t.zones;
+      auto it = this->server_zones_.find(t.data.path);
+      if (it != this->server_zones_.end())
+        kept.insert(*it);
+    }
+  }
+  this->server_zones_ = std::move(kept);
+  this->apply_server_zones_();
+  this->zones_dirty_ = false;  // the page is built next
   this->configure_history_();
   // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
   // or what was chosen on the display, unless this layout brings another theme.
@@ -441,6 +470,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
     ESP_LOGW(TAG, "Could not cache the layout; it will not survive a reboot");
   ESP_LOGI(TAG, "Showing %s layout \"%s\" (%u pages, %u bytes, ETag %s)", origin, this->layout_.id.c_str(),
            (unsigned) this->layout_.pages.size(), (unsigned) body.size(), etag.c_str());
+  this->queue_meta_reads_();
   return true;
 }
 
@@ -671,6 +701,7 @@ void EsphelmRuntime::show_page(size_t index) {
     // Out of memory on that page: go back to the one that worked.
     this->build_page_(this->page_);
   }
+  this->queue_meta_reads_();
 }
 
 void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
@@ -755,6 +786,134 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
     if (this->history_.path(i) == path && display_number(value, this->history_.unit(i), v))
       this->history_.record(i, v, now);
   }
+}
+
+// ---- Zones from the server's metadata (ADR-0020) ----
+
+static bool has_zones(const esphelm::Tile &tile) {
+  return tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GAUGE ||
+         tile.type == esphelm::TileType::BAR;
+}
+
+bool EsphelmRuntime::on_visible_page_(const std::string &path) const {
+  if (!this->has_layout_ || this->page_ >= this->layout_.pages.size())
+    return false;
+  for (const auto &t : this->layout_.pages[this->page_].tiles) {
+    if (has_zones(t) && t.data.path == path)
+      return true;
+  }
+  return false;
+}
+
+void EsphelmRuntime::on_meta_changed_(const std::string &path) {
+  if (!this->on_visible_page_(path))
+    return;
+  ESP_LOGD(TAG, "Metadata of %s changed", path.c_str());
+  if (std::find(this->meta_queue_.begin(), this->meta_queue_.end(), path) == this->meta_queue_.end())
+    this->meta_queue_.push_back(path);
+  // The server may still be storing it, and a change often comes as several deltas.
+  this->meta_not_before_ms_ = millis() + META_DEBOUNCE_MS;
+}
+
+void EsphelmRuntime::queue_meta_reads_() {
+  this->meta_queue_.clear();
+  if (this->page_ >= this->layout_.pages.size())
+    return;
+  for (const auto &t : this->layout_.pages[this->page_].tiles) {
+    if (has_zones(t) && !t.data.path.empty() &&
+        std::find(this->meta_queue_.begin(), this->meta_queue_.end(), t.data.path) == this->meta_queue_.end())
+      this->meta_queue_.push_back(t.data.path);
+  }
+}
+
+void EsphelmRuntime::pump_meta_(uint32_t now, bool ready) {
+  if (!this->has_layout_)
+    return;
+  if (ready && now >= this->next_meta_read_ms_) {
+    this->next_meta_read_ms_ = now + META_READ_INTERVAL_MS;
+    this->queue_meta_reads_();
+  }
+  if (ready && !this->meta_in_flight_ && !this->meta_queue_.empty() && now >= this->meta_not_before_ms_) {
+    this->meta_path_ = this->meta_queue_.front();
+    this->meta_queue_.erase(this->meta_queue_.begin());
+    std::string url = this->meta_path_;
+    std::replace(url.begin(), url.end(), '.', '/');
+    HttpRequest req;
+    req.kind = RequestKind::META;
+    req.url = "http://" + this->signalk_->get_host() + ":" + std::to_string(this->signalk_->get_port()) +
+              "/signalk/v1/api/vessels/self/" + url + "/meta";
+    req.token = this->signalk_->get_token();
+    req.max_body = META_MAX_BODY;
+    req.tag = this->meta_generation_;
+    this->client_.submit(std::move(req));
+    this->meta_in_flight_ = true;
+  }
+  // Not under the popup or while asleep: they stay as they are, and the page catches up after.
+  if (this->zones_dirty_ && !this->popup_.is_open() && !this->asleep_) {
+    this->zones_dirty_ = false;
+    if (!this->build_page_(this->page_))
+      ESP_LOGW(TAG, "Out of memory rebuilding the page with new zones");
+  }
+}
+
+void EsphelmRuntime::handle_meta_(const HttpResult &result) {
+  this->meta_in_flight_ = false;
+  if (result.tag != this->meta_generation_)
+    return;  // read for an older layout
+  if (result.status == 200 && !result.truncated) {
+    std::vector<esphelm::ServerZone> zones;
+    if (esphelm::parse_meta_zones(result.body, zones)) {
+      if (zones.empty())
+        this->server_zones_.erase(this->meta_path_);
+      else
+        this->server_zones_[this->meta_path_] = std::move(zones);
+    } else {
+      ESP_LOGW(TAG, "Unreadable metadata for %s; keeping its zones", this->meta_path_.c_str());
+    }
+  } else if (result.status == 200) {
+    ESP_LOGW(TAG, "Metadata of %s is over %u bytes; keeping its zones", this->meta_path_.c_str(),
+             (unsigned) META_MAX_BODY);
+  } else if (result.status == 404) {
+    this->server_zones_.erase(this->meta_path_);  // the server has no metadata for it
+  } else {
+    // Transport error, 401, 5xx: says nothing about the zones. The next read tries again.
+    ESP_LOGD(TAG, "Metadata of %s not read (HTTP %d)", this->meta_path_.c_str(), result.status);
+  }
+  if (this->meta_queue_.empty() && this->apply_server_zones_())
+    this->zones_dirty_ = true;
+}
+
+bool EsphelmRuntime::apply_server_zones_() {
+  bool visible_changed = false;
+  for (size_t p = 0; p < this->layout_.pages.size(); p++) {
+    for (auto &t : this->layout_.pages[p].tiles) {
+      if (!has_zones(t))
+        continue;
+      std::vector<esphelm::Zone> zones;
+      auto it = this->server_zones_.find(t.data.path);
+      if (it != this->server_zones_.end()) {
+        const bool scale = t.type != esphelm::TileType::VALUE;
+        esphelm::server_zones_to_display(it->second, t.data.unit, scale ? &t.min : nullptr, scale ? &t.max : nullptr,
+                                         zones);
+      }
+      const bool from_server = !zones.empty();
+      if (!from_server)
+        zones = t.own_zones;
+      const bool same = zones.size() == t.zones.size() &&
+                        std::equal(zones.begin(), zones.end(), t.zones.begin(),
+                                   [](const esphelm::Zone &a, const esphelm::Zone &b) {
+                                     return a.from == b.from && a.to == b.to && a.state == b.state;
+                                   });
+      if (same)
+        continue;
+      ESP_LOGI(TAG, "Tile %s: %u zones, %s", t.id.c_str(), (unsigned) zones.size(),
+               from_server ? "from the server" : "its own");
+      t.zones = std::move(zones);
+      if (p == this->page_)
+        visible_changed = true;
+    }
+  }
+  return visible_changed;
 }
 
 // ---- Value history (ADR-0018, ADR-0019) ----
