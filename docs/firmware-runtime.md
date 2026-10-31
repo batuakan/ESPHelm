@@ -65,6 +65,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Layout with more than one page | a footer: `<` and `>` buttons (disabled at the ends) and "title n/m" |
+| Zones change in the server's metadata (ADR-0020) | within seconds (at most about a minute) the visible tiles use them, replacing their own; the page is rebuilt once, without a new layout |
 | A tap on a value tile or wind rose that records (ADR-0018, ADR-0019) | its history popup below the banner: a button per value for a rose, live value, min/max, a line graph of the last 10 min / 1 h / 6 h (6 h with PSRAM only; angles drawn around their mean so north doesn't jump), "Collecting..." until there are two points; only its close button closes it |
 | An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
 | Layout `settings` (ADR-0015) | the start page at boot and when the start page changes; the night theme while `environment.sun` is dusk or night (`autoTheme: sun`, the page is rebuilt); day/night brightness; after `screenTimeout` s without a touch (at least 10) the backlight goes off under a black cover that swallows the waking touch. An `alarm`/`emergency` switches it back on |
@@ -170,13 +171,14 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
 | `position` tile | ≈1.7 KB (four tiles = 6,640 B) |
 | `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
+| Zones from the server (ADR-0020) | 24 B per zone per tile that uses them, a second list of the layout's own zones, and one map entry per path with zones (SI, up to 16 zones); a transient 4 KB body per read. Nothing per value, nothing in flash |
 | Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,094 B (17.0 %), flash 3.31 MB (20.0 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,120 B of 321,296 B (34.9 %), flash 1.42 MB of 1.8 MB (77.4 %) |
+| P4 runtime firmware, static | RAM 98,190 B (17.0 %), flash 3.31 MB (20.1 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,216 B of 321,296 B (34.9 %), flash 1.43 MB of 1.8 MB (77.9 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -224,8 +226,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   20. **text sizes** (`fixtures/valid/value-sizes.json`): a full-width, a 2x2 and four single-cell value tiles at 480 with live values (the RPM "2400" steps down a size), and the same layout offline at 720
 
   21. **value history**: a tile without `history` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the wind roses (a mark on the one that records, a tap on the other does nothing, its first value recording live, the popup's value buttons, the apparent wind angle and a heading tile across north without a jump); the popup and a rose's popup at 720
+  21b. **zones from the server** (ADR-0020): zones put on the server replace a value tile's and a gauge's own and reach a bar without any, with no new layout fetched; a changed zone is followed; rubbish and an emptied list bring the tile's own back, pixel for pixel.
 
-  Forty-eight screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Fifty screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -279,3 +282,9 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - Page 3: the large rose shows the mark bottom-right (its bottom-left corner holds SOG); the small rose has none and a tap does nothing. Tap the large rose: buttons AWS, SOG, AWA; each switches the graph.
     - Sail or turn across north: the AWA and HDG2 graphs stay smooth, their labels read e.g. 350, 0, 10.
     - Check the log for `History: N values, 3 windows, … bytes` and that the free heap stays healthy.
+
+19. **Zones from the server (ADR-0020).** Show a value tile and a gauge with live values, then edit their path's zones in the SignalK admin UI (*Data Browser → Meta Data*).
+    - Within a few seconds, or about a minute at most, the tile's colour and the gauge's bands follow. The page redraws once; check that this isn't disturbing.
+    - The log says `Tile <id>: <n> zones, from the server`. No `Showing fetched layout` line comes with it.
+    - A value inside an alarm zone also brings the alarm banner, from the server's own notification.
+    - Remove the zones: the tile's own come back.

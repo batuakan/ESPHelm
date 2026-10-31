@@ -100,7 +100,7 @@ The device subscribes to that path over its existing SignalK WebSocket. The serv
 |---|---|---|
 | `GET /plugins/esphelm/api/widgets` | | `{ tiles, tileSlots: { wind_rose: [slot names] }, units, quantities }` |
 | `GET /plugins/esphelm/api/charts` | | `[{ identifier, name, format, tilemapUrl?, bounds?, supported, reason? }]` from the resources API (v1 or v2 shape); `supported` = raster PNG/JPEG `tilelayer` with a tile URL, otherwise `reason` says why (e.g. `WMS charts`, `webp tiles`) |
-| `GET /plugins/esphelm/api/paths` | | `[{ path, units, description, value, timestamp }]`: the server's self paths (`streambundle.getAvailablePaths()`), SignalK `meta.units`/description (`getMetadata`), and the latest value (`getSelfPath`), for the editor's path picker |
+| `GET /plugins/esphelm/api/paths` | | `[{ path, units, description, zones, value, timestamp }]`: the server's self paths (`streambundle.getAvailablePaths()`), SignalK `meta.units`/description/zones (`getMetadata`; `zones` as the server has them, in SI, or null), and the latest value (`getSelfPath`), for the editor's path picker |
 | `GET /plugins/esphelm/api/layouts` | | `[{ id, name, pages, bytes, etag, devices }]` |
 | `GET /plugins/esphelm/api/layouts/:id` | | the layout (`ETag` header) |
 | `PUT /plugins/esphelm/api/layouts/:id` | Layout | 200 `{ id, etag, bytes, warnings }`. 400 `INVALID_LAYOUT` (validator codes) or `ID_MISMATCH`. 409 `INCOMPATIBLE` if a device using it can't render the new version (nothing is saved). |
