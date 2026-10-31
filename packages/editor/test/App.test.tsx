@@ -17,8 +17,8 @@ function fakeServer(devices: Device[]) {
   const layouts = new Map<string, Layout>();
   const requests: { method: string; path: string; body?: unknown }[] = [];
   const paths: PathInfo[] = [
-    { path: 'navigation.speedOverGround', units: 'm/s', description: 'Speed over ground', value: 2.5, timestamp: null },
-    { path: 'environment.depth.belowTransducer', units: 'm', description: null, value: 12.4, timestamp: null },
+    { path: 'navigation.speedOverGround', units: 'm/s', description: 'Speed over ground', zones: null, value: 2.5, timestamp: null },
+    { path: 'environment.depth.belowTransducer', units: 'm', description: null, zones: null, value: 12.4, timestamp: null },
   ];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetchImpl = async (url: string, init?: RequestInit) => {

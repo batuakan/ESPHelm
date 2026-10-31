@@ -11,6 +11,8 @@ export interface PathInfo {
   /** SignalK meta.units (SI), e.g. "m/s"; null if the server has no metadata. */
   units: string | null;
   description: string | null;
+  /** SignalK meta.zones as the server has them (SI), for the editor (ADR-0020). */
+  zones: unknown;
   value: unknown;
   timestamp: string | null;
 }
@@ -95,13 +97,14 @@ export class Service {
   listPaths(): PathInfo[] {
     return [...this.host.streambundle.getAvailablePaths()].sort().map((path) => {
       const meta = this.host.getMetadata(`vessels.self.${path}`) as
-        { units?: unknown; description?: unknown } | undefined;
+        { units?: unknown; description?: unknown; zones?: unknown } | undefined;
       const node = this.host.getSelfPath(path) as
         { value?: unknown; timestamp?: unknown } | undefined;
       return {
         path,
         units: typeof meta?.units === 'string' ? meta.units : null,
         description: typeof meta?.description === 'string' ? meta.description : null,
+        zones: meta?.zones ?? null,
         value: node?.value ?? null,
         timestamp: typeof node?.timestamp === 'string' ? node.timestamp : null,
       };

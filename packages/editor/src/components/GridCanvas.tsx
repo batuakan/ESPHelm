@@ -23,6 +23,8 @@ interface Props {
   page: GridPage;
   aspect: number; // display width / height
   values: Map<string, unknown>;
+  /** meta.zones by path (ADR-0020). */
+  serverZones?: Map<string, unknown>;
   selectedId: string | undefined;
   selectedSlot?: SlotName;
   /** Size tier the display will draw a wind rose tile with. */
@@ -190,6 +192,7 @@ export function GridCanvas(props: Props) {
               <TilePreview
                 tile={tile}
                 values={values}
+                serverZones={props.serverZones}
                 roseTier={tile.type === 'wind_rose' ? props.roseTier(tile) : undefined}
                 autopilotTier={tile.type === 'autopilot' ? props.autopilotTier(tile) : undefined}
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}

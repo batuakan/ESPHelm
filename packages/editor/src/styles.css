@@ -978,6 +978,10 @@ select.zone-emergency {
 .field-row input {
   width: 100%;
 }
+.server-zones ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
 .zones {
   border: 1px solid var(--border);
   border-radius: 8px;
