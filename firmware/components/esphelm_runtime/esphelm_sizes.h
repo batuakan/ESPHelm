@@ -28,5 +28,8 @@ inline constexpr int HISTORY_NO_PSRAM_WINDOWS = 2;
 inline constexpr int HISTORY_MAX_VALUES_PSRAM = 48;
 inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = 6;
 
+// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
+inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
+
 }  // namespace sizes
 }  // namespace esphelm

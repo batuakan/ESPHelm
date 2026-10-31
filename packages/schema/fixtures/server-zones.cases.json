@@ -1,0 +1,161 @@
+{
+  "description": "SignalK meta.zones (SI) as a tile's zones in its display unit (serverZonesToDisplay in TS, esphelm::server_zones_to_display in C++). No range: a value tile, a missing end stays open. range: a gauge or bar.",
+  "cases": [
+    {
+      "note": "metres to feet, both ends",
+      "zones": [{ "lower": 0, "upper": 2, "state": "alarm" }],
+      "unit": "ft",
+      "expected": [{ "from": 0, "to": 6.561679790026246, "state": "alarm" }]
+    },
+    {
+      "note": "no unit: SI",
+      "zones": [{ "lower": 1.5, "upper": 3, "state": "warn" }],
+      "expected": [{ "from": 1.5, "to": 3, "state": "warn" }]
+    },
+    {
+      "note": "kelvin to celsius uses the offset",
+      "zones": [{ "lower": 373.15, "state": "alarm" }],
+      "unit": "degC",
+      "expected": [{ "from": 100, "state": "alarm" }]
+    },
+    {
+      "note": "value tile: a missing or null end stays open",
+      "zones": [
+        { "upper": 2, "state": "alarm" },
+        { "lower": 10, "upper": null, "state": "normal" }
+      ],
+      "expected": [
+        { "to": 2, "state": "alarm" },
+        { "from": 10, "state": "normal" }
+      ]
+    },
+    {
+      "note": "states: nominal and normal are normal, alert is warn",
+      "zones": [
+        { "lower": 0, "upper": 1, "state": "nominal" },
+        { "lower": 1, "upper": 2, "state": "normal" },
+        { "lower": 2, "upper": 3, "state": "alert" },
+        { "lower": 3, "upper": 4, "state": "warn" },
+        { "lower": 4, "upper": 5, "state": "alarm" },
+        { "lower": 5, "upper": 6, "state": "emergency" }
+      ],
+      "expected": [
+        { "from": 0, "to": 1, "state": "normal" },
+        { "from": 1, "to": 2, "state": "normal" },
+        { "from": 2, "to": 3, "state": "warn" },
+        { "from": 3, "to": 4, "state": "warn" },
+        { "from": 4, "to": 5, "state": "alarm" },
+        { "from": 5, "to": 6, "state": "emergency" }
+      ]
+    },
+    {
+      "note": "gauge: a missing end is the scale's end",
+      "zones": [
+        { "upper": 2, "state": "alarm" },
+        { "lower": 8, "state": "warn" }
+      ],
+      "range": { "min": 0, "max": 10 },
+      "expected": [
+        { "from": 0, "to": 2, "state": "alarm" },
+        { "from": 8, "to": 10, "state": "warn" }
+      ]
+    },
+    {
+      "note": "gauge: clipped to the scale, wholly outside dropped",
+      "zones": [
+        { "lower": -5, "upper": 2, "state": "alarm" },
+        { "lower": 8, "upper": 50, "state": "warn" },
+        { "lower": 20, "upper": 30, "state": "emergency" }
+      ],
+      "range": { "min": 0, "max": 10 },
+      "expected": [
+        { "from": 0, "to": 2, "state": "alarm" },
+        { "from": 8, "to": 10, "state": "warn" }
+      ]
+    },
+    {
+      "note": "gauge: the range is in display units",
+      "zones": [{ "lower": 0, "upper": 0.5, "state": "warn" }],
+      "unit": "pct",
+      "range": { "min": 0, "max": 100 },
+      "expected": [{ "from": 0, "to": 50, "state": "warn" }]
+    },
+    {
+      "note": "gauge: touching the scale's end only is dropped",
+      "zones": [{ "lower": 10, "state": "warn" }],
+      "range": { "min": 0, "max": 10 },
+      "expected": []
+    },
+    {
+      "note": "bad zones are dropped, good ones stay",
+      "zones": [
+        { "lower": 5, "upper": 1, "state": "warn" },
+        { "lower": 1, "upper": 1, "state": "warn" },
+        { "lower": "1", "upper": 2, "state": "warn" },
+        { "lower": 1, "upper": true, "state": "warn" },
+        { "state": "warn" },
+        { "lower": 1, "upper": 2, "state": "panic" },
+        { "lower": 1, "upper": 2 },
+        { "lower": 1, "upper": 2, "state": 3 },
+        "nonsense",
+        null,
+        { "lower": 1, "upper": 2, "state": "alarm" }
+      ],
+      "expected": [{ "from": 1, "to": 2, "state": "alarm" }]
+    },
+    {
+      "note": "the server stores an emptied list as null",
+      "zones": null,
+      "expected": []
+    },
+    { "note": "empty", "zones": [], "expected": [] },
+    { "note": "not a list", "zones": { "lower": 1 }, "expected": [] },
+    {
+      "note": "angles don't wrap: radians to degrees, past 360",
+      "zones": [{ "lower": 6.283185307179586, "upper": 7.853981633974483, "state": "warn" }],
+      "unit": "deg",
+      "expected": [{ "from": 360, "to": 450, "state": "warn" }]
+    },
+    {
+      "note": "only the first 16 usable zones count; the 17th is ignored",
+      "zones": [
+        { "lower": 0, "upper": 1, "state": "warn" },
+        { "state": "skipped, not usable" },
+        { "lower": 1, "upper": 2, "state": "warn" },
+        { "lower": 2, "upper": 3, "state": "warn" },
+        { "lower": 3, "upper": 4, "state": "warn" },
+        { "lower": 4, "upper": 5, "state": "warn" },
+        { "lower": 5, "upper": 6, "state": "warn" },
+        { "lower": 6, "upper": 7, "state": "warn" },
+        { "lower": 7, "upper": 8, "state": "warn" },
+        { "lower": 8, "upper": 9, "state": "warn" },
+        { "lower": 9, "upper": 10, "state": "warn" },
+        { "lower": 10, "upper": 11, "state": "warn" },
+        { "lower": 11, "upper": 12, "state": "warn" },
+        { "lower": 12, "upper": 13, "state": "warn" },
+        { "lower": 13, "upper": 14, "state": "warn" },
+        { "lower": 14, "upper": 15, "state": "warn" },
+        { "lower": 15, "upper": 16, "state": "alarm" },
+        { "lower": 16, "upper": 17, "state": "emergency" }
+      ],
+      "expected": [
+        { "from": 0, "to": 1, "state": "warn" },
+        { "from": 1, "to": 2, "state": "warn" },
+        { "from": 2, "to": 3, "state": "warn" },
+        { "from": 3, "to": 4, "state": "warn" },
+        { "from": 4, "to": 5, "state": "warn" },
+        { "from": 5, "to": 6, "state": "warn" },
+        { "from": 6, "to": 7, "state": "warn" },
+        { "from": 7, "to": 8, "state": "warn" },
+        { "from": 8, "to": 9, "state": "warn" },
+        { "from": 9, "to": 10, "state": "warn" },
+        { "from": 10, "to": 11, "state": "warn" },
+        { "from": 11, "to": 12, "state": "warn" },
+        { "from": 12, "to": 13, "state": "warn" },
+        { "from": 13, "to": 14, "state": "warn" },
+        { "from": 14, "to": 15, "state": "warn" },
+        { "from": 15, "to": 16, "state": "alarm" }
+      ]
+    }
+  ]
+}

@@ -303,6 +303,11 @@ export const HISTORY = {
   maxValuesNoPsram: 6,
 } as const;
 
+/** Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used. */
+export const SERVER_ZONES = {
+  maxPerPath: 16,
+} as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,

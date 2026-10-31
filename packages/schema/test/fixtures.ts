@@ -51,6 +51,21 @@ export interface ValueZoneCase {
   note: string;
 }
 
+export interface ServerZoneCase {
+  note: string;
+  zones: unknown;
+  unit?: string;
+  range?: { min: number; max: number };
+  expected: { from?: number; to?: number; state: string }[];
+}
+
+export function serverZoneCases(): ServerZoneCase[] {
+  const file = JSON.parse(readFileSync(join(FIXTURES, 'server-zones.cases.json'), 'utf8')) as {
+    cases: ServerZoneCase[];
+  };
+  return file.cases;
+}
+
 export function valueZoneCases(): ValueZoneCase[] {
   const file = JSON.parse(readFileSync(join(FIXTURES, 'value-zones.cases.json'), 'utf8')) as {
     cases: ValueZoneCase[];

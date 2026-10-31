@@ -198,6 +198,7 @@ function renderSizesHeader(
     maxValuesPsram: number;
     maxValuesNoPsram: number;
   },
+  serverZones: { maxPerPath: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -229,6 +230,9 @@ function renderSizesHeader(
     `inline constexpr int HISTORY_NO_PSRAM_WINDOWS = ${history.noPsramWindows};`,
     `inline constexpr int HISTORY_MAX_VALUES_PSRAM = ${history.maxValuesPsram};`,
     `inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = ${history.maxValuesNoPsram};`,
+    '',
+    "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
+    `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',
@@ -319,7 +323,8 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY } = await import('../src/tiles.js');
+  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY, SERVER_ZONES } =
+    await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -327,12 +332,19 @@ export async function renderAll(): Promise<Record<string, string>> {
     // Firmware copy of the same header (the ESPHome component cannot reach packages/).
     '../../firmware/components/esphelm_runtime/esphelm_units.h': renderUnitsHeader(units),
     'generated/units_cases.h': renderCasesHeader(cases),
-    'generated/esphelm_sizes.h': renderSizesHeader(WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY),
+    'generated/esphelm_sizes.h': renderSizesHeader(
+      WIND_ROSE_FIT,
+      AUTOPILOT_FIT,
+      TEXT_FIT,
+      HISTORY,
+      SERVER_ZONES,
+    ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
       AUTOPILOT_FIT,
       TEXT_FIT,
       HISTORY,
+      SERVER_ZONES,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

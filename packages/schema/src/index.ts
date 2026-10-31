@@ -2,6 +2,7 @@ export * from './primitives.js';
 export * from './tiles.js';
 export * from './position.js';
 export * from './valueZones.js';
+export * from './serverZones.js';
 export * from './textFit.js';
 export * from './history.js';
 export * from './pages.js';
