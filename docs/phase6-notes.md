@@ -98,3 +98,15 @@ Each value is switched on in the editor, so only chosen values take memory; the 
     - A live check that a rose value records.
   - **Editor e2e:** off by default, the counter, the rose checkboxes, the preview's buttons, and the served `history` list.
 - **Not verified:** touch on the P4 (hardware step 18, extended), and real angles crossing north on the boat (only the seeded curve and unit tests).
+
+## Zones from the server's metadata (ADR-0020)
+
+- **What:** value, gauge and bar tiles use the zones in a path's SignalK metadata, in place of their own, and follow them when they change on the server.
+- **ESPHomeSignalK:** `add_meta_listener` reports paths from `updates[].meta`.
+- **Firmware:** reads the visible page's metadata on the HTTP worker: on a layout or page change, on (re)connect, every 60 s, and 1 s after a meta delta. The page rebuilds once when its zones change. RAM only.
+- **Why also 60 s:** the server's `minPeriod` throttle dropped 25–40 % of meta deltas at the library's 200 ms default (2.17.2, 2.19.0, 2.26.0).
+- **Schema:** no layout change. `serverZonesToDisplay` with shared cases in TS and C++.
+- **Editor:** previews use the effective zones; the drawer lists the server's.
+- **Tests:** shared cases in TS and C++; `withServerZones`; `/api/paths` in the plugin e2e; preview and drawer in the editor e2e; SDL e2e with two new goldens (`49`, taken again after the zones are removed, and `50`).
+- **Not verified:** on the P4 (hardware step 19).
+

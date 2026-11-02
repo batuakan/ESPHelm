@@ -96,7 +96,7 @@ async function main(): Promise<void> {
       .getByRole('button', { name: /Value/ })
       .click();
     await page.getByLabel('Search SignalK paths').fill('speedOverGround');
-    await page.getByRole('option', { name: /navigation\.speedOverGround/ }).click();
+    await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
     check(
       'picking a speed path selects knots',
       (await page.getByLabel('Display unit').inputValue()) === 'kn',
@@ -123,6 +123,43 @@ async function main(): Promise<void> {
     check(
       'value colour and an open-ended zone colour the preview',
       blue && /value-zone-warn/.test((await tile1Value.getAttribute('class')) ?? ''),
+      (await tile1Value.getAttribute('class')) ?? '',
+    );
+    // Zones in the server's metadata (ADR-0020) replace the tile's own in the preview, and the
+    // drawer lists them. The editor refreshes its paths every 15 s. The server also raises its
+    // own notification for a value in such a zone, so path pickers list that path from here on.
+    const sogMeta = '/signalk/v1/api/vessels/self/navigation/speedOverGround/meta';
+    const putSogZones = async (zones: unknown[]) =>
+      (await sk.json('PUT', sogMeta, sk.admin, { value: { units: 'm/s', zones } })).status;
+    check(
+      'the server takes zones for SOG',
+      (await putSogZones([{ lower: 0, state: 'alarm' }])) === 202,
+    );
+    const serverZoneList = tileDrawer.getByRole('group', { name: 'Zones from the SignalK server' });
+    check(
+      'the drawer lists the zones from the server',
+      await serverZoneList
+        .waitFor({ timeout: 20000 })
+        .then(() => true)
+        .catch(() => false),
+      (await serverZoneList.textContent().catch(() => '')) ?? '',
+    );
+    check(
+      "the server's zones replace the tile's own in the preview",
+      /value-zone-alarm/.test((await tile1Value.getAttribute('class')) ?? ''),
+      (await tile1Value.getAttribute('class')) ?? '',
+    );
+    await putSogZones([]);
+    check(
+      "emptied on the server: the tile's own zone is back",
+      await serverZoneList
+        .waitFor({ state: 'detached', timeout: 20000 })
+        .then(() => true)
+        .catch(() => false),
+    );
+    check(
+      "the tile's own zone colours the preview again",
+      /value-zone-warn/.test((await tile1Value.getAttribute('class')) ?? ''),
       (await tile1Value.getAttribute('class')) ?? '',
     );
 
@@ -335,7 +372,7 @@ async function main(): Promise<void> {
     const library = page.getByRole('region', { name: 'Tiles' });
     await library.getByRole('button', { name: /Gauge/ }).click();
     await page.getByLabel('Search SignalK paths').fill('speedOverGround');
-    await page.getByRole('option', { name: /navigation\.speedOverGround/ }).click();
+    await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
     await page.getByLabel('Label').fill('SOG');
     await page.getByLabel('Maximum').fill('12');
     await page.getByRole('button', { name: 'Add zone' }).click();

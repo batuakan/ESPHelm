@@ -100,6 +100,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [devices, setDevices] = useState<Device[]>([]);
   const [paths, setPaths] = useState<PathInfo[]>([]);
+  const serverZones = useMemo(() => new Map(paths.map((p) => [p.path, p.zones])), [paths]);
   const [catalog, setCatalog] = useState<string[]>(Object.keys(TILE_TYPES));
   const [charts, setCharts] = useState<ChartInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>();
@@ -476,6 +477,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   page={grid}
                   aspect={aspectFor(device, layout)}
                   values={shownValues}
+                  serverZones={serverZones}
                   selectedId={tile?.id}
                   selectedSlot={selection?.slot}
                   roseTier={(t) => roseTier(tilePx(t))}

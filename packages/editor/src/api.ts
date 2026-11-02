@@ -19,6 +19,8 @@ export interface PathInfo {
   path: string;
   units: string | null;
   description: string | null;
+  /** SignalK meta.zones as the server has them (SI); see serverZonesToDisplay. */
+  zones: unknown;
   value: unknown;
   timestamp: string | null;
 }

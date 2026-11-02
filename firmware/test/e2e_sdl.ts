@@ -696,6 +696,162 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw.screenshot('31-value-colors-night', shots);
 
+    // 9e2. Zones from the server's metadata (ADR-0020): they replace a tile's own and follow the
+    //      server without a new layout. A value tile and a gauge with their own zones, a bar with
+    //      none. A read happens at most 60 s after a change even when the meta delta was dropped.
+    const zoneTiles = {
+      depth: 'environment.depth.belowTransducer',
+      sog: 'navigation.speedOverGround',
+      soc: 'electrical.batteries.house.capacity.stateOfCharge',
+    };
+    await json('PUT', '/plugins/esphelm/api/layouts/server-zones', admin, {
+      version: 1,
+      id: 'server-zones',
+      name: 'Server zones',
+      theme: 'day',
+      pages: [
+        {
+          kind: 'grid',
+          id: 'main',
+          title: 'Server zones',
+          grid: { cols: 2, rows: 2 },
+          tiles: [
+            {
+              id: 'depth',
+              type: 'value',
+              x: 0,
+              y: 0,
+              w: 1,
+              h: 1,
+              path: zoneTiles.depth,
+              unit: 'm',
+              label: 'Depth',
+              decimals: 1,
+              zones: [{ to: 1, state: 'warn' }],
+            },
+            {
+              id: 'sog',
+              type: 'gauge',
+              x: 1,
+              y: 0,
+              w: 1,
+              h: 2,
+              path: zoneTiles.sog,
+              unit: 'kn',
+              label: 'SOG',
+              decimals: 1,
+              min: 0,
+              max: 20,
+              zones: [{ from: 16, to: 20, state: 'alarm' }],
+            },
+            {
+              id: 'soc',
+              type: 'bar',
+              x: 0,
+              y: 1,
+              w: 1,
+              h: 1,
+              path: zoneTiles.soc,
+              unit: 'pct',
+              label: 'House',
+              decimals: 0,
+              min: 0,
+              max: 100,
+            },
+          ],
+        },
+      ],
+    });
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'server-zones',
+    });
+    check(
+      'server zones: the layout renders',
+      await fw.waitLog(/Showing fetched layout "server-zones"/),
+    );
+    const zoneValues = { [zoneTiles.depth]: 2.5, [zoneTiles.sog]: 5.0, [zoneTiles.soc]: 0.15 };
+    publish(zoneValues);
+    await sleep(2500);
+    check(
+      'server zones: none on the server, the tiles keep their own',
+      fw.count(/Tile (depth|sog|soc): \d+ zones/) === 0,
+    );
+    await fw.screenshot('49-server-zones-own', shots);
+    const metaOf = (path: string) =>
+      `/signalk/v1/api/vessels/self/${path.replaceAll('.', '/')}/meta`;
+    const putZones = async (path: string, units: string, zones: unknown[]) =>
+      (await json('PUT', metaOf(path), admin, { value: { units, zones } })).status;
+    const fetchedBefore = fw.count(/Showing fetched layout/);
+    check(
+      'server zones: the server takes them',
+      (await putZones(zoneTiles.depth, 'm', [
+        { upper: 3, state: 'alarm', message: 'Shallow water' },
+      ])) === 202 &&
+        (await putZones(zoneTiles.sog, 'm/s', [
+          { upper: 5.14, state: 'nominal' },
+          { lower: 5.14, upper: 7.72, state: 'alert' },
+          { lower: 7.72, state: 'alarm' },
+        ])) === 202 &&
+        (await putZones(zoneTiles.soc, 'ratio', [
+          { upper: 0.2, state: 'alarm', message: 'House battery low' },
+          { lower: 0.2, state: 'nominal' },
+        ])) === 202,
+    );
+    check(
+      'server zones: the value tile follows the server',
+      await fw.waitLog(/Tile depth: 1 zones, from the server/, 70000),
+    );
+    check(
+      'server zones: the gauge follows, clipped to its scale',
+      await fw.waitLog(/Tile sog: 3 zones, from the server/, 70000),
+    );
+    check(
+      'server zones: the bar without zones of its own follows too',
+      await fw.waitLog(/Tile soc: 2 zones, from the server/, 70000),
+    );
+    check(
+      'server zones: no new layout was fetched for that',
+      fw.count(/Showing fetched layout/) === fetchedBefore,
+    );
+    publish(zoneValues);
+    await sleep(2500);
+    await fw.screenshot('50-server-zones', shots);
+    // Changed on the server: followed again.
+    await putZones(zoneTiles.depth, 'm', [{ upper: 3, state: 'warn' }]);
+    check(
+      'server zones: a changed zone is followed',
+      await waitFor(() => fw.count(/Tile depth: 1 zones, from the server/) >= 2, 70000),
+    );
+    // Rubbish on the server (a meta delta is not validated): the tile's own zones, no crash.
+    ws.send(
+      JSON.stringify({
+        context: 'vessels.self',
+        updates: [
+          {
+            meta: [
+              { path: zoneTiles.depth, value: { zones: [{ lower: 'x', state: 'panic' }, 7] } },
+            ],
+          },
+        ],
+      }),
+    );
+    check(
+      "server zones: rubbish means the tile's own",
+      await fw.waitLog(/Tile depth: 1 zones, its own/, 70000),
+    );
+    // Emptied on the server (it stores null): the tile's own again. A clean server for what follows.
+    await putZones(zoneTiles.depth, 'm', []);
+    await putZones(zoneTiles.sog, 'm/s', []);
+    await putZones(zoneTiles.soc, 'ratio', []);
+    check(
+      "server zones: emptied means the tile's own",
+      (await fw.waitLog(/Tile sog: 1 zones, its own/, 70000)) &&
+        (await fw.waitLog(/Tile soc: 0 zones, its own/, 70000)),
+    );
+    publish(zoneValues);
+    await sleep(2500);
+    await fw.screenshot('49-server-zones-own', shots);
+
     // 9f. Text follows the tile size (ADR-0017): a full-width, a 2x2 and four single-cell value
     //     tiles; the RPM is wider than its sample ("88"), so it steps down a size.
     const sizes = fixture('valid/value-sizes.json');

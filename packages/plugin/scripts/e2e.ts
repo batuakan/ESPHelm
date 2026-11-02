@@ -66,6 +66,29 @@ async function main(): Promise<void> {
 
     r = await json('PUT', `/plugins/esphelm/api/layouts/${String(layout.id)}`, admin, layout);
     check('admin saves a layout', r.status === 200, JSON.stringify(r.body));
+
+    // Zones in SignalK metadata reach the editor's path list (ADR-0020), and a device can read them.
+    const zones = [{ upper: 3, state: 'alarm' }];
+    r = await json('PUT', '/signalk/v1/api/vessels/self/environment/depth/belowKeel/meta', admin, {
+      value: { units: 'm', zones },
+    });
+    check('the server takes zones for a path', r.status === 202, String(r.status));
+    await new Promise((res) => setTimeout(res, 500));
+    r = await json('GET', '/plugins/esphelm/api/paths', admin);
+    const listed = (r.body as unknown as { path: string; zones: unknown }[]).find(
+      (p) => p.path === 'environment.depth.belowKeel',
+    );
+    check(
+      "/api/paths carries a path's zones",
+      JSON.stringify(listed?.zones) === JSON.stringify(zones),
+      JSON.stringify(listed),
+    );
+    r = await json('GET', '/signalk/v1/api/vessels/self/environment/depth/belowKeel/meta', rw);
+    check(
+      'a device token reads the metadata',
+      r.status === 200 && JSON.stringify(r.body.zones) === JSON.stringify(zones),
+      `${r.status}`,
+    );
     r = await json('PUT', `/plugins/esphelm/api/layouts/${String(layout.id)}`, admin, {
       ...layout,
       theme: 'dusk',

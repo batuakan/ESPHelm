@@ -71,9 +71,9 @@ export async function startHarness(
       timestamp: '2026-10-24T12:00:02.000Z',
     },
   };
-  const skMeta: Record<string, { units?: string; description?: string }> = {
+  const skMeta: Record<string, { units?: string; description?: string; zones?: unknown }> = {
     'navigation.speedOverGround': { units: 'm/s', description: 'Speed over ground' },
-    'environment.depth.belowTransducer': { units: 'm' },
+    'environment.depth.belowTransducer': { units: 'm', zones: [{ upper: 3, state: 'alarm' }] },
   };
   // Like signalk-server: deltas pass the plugin's input handler before they reach the model.
   // Only notifications are kept in the model, so /api/paths stays as above.

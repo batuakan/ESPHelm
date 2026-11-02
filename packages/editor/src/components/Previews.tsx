@@ -17,6 +17,7 @@ import {
   type ValueTile,
   type Zone,
   valueZoneState,
+  serverZonesToDisplay,
   historyEnabled,
   roseHistorySeries,
 } from '@esphelm/schema';
@@ -41,6 +42,24 @@ function arc(cx: number, cy: number, r: number, from: number, to: number): strin
   const [x1, y1] = polar(cx, cy, r, from);
   const [x2, y2] = polar(cx, cy, r, to);
   return `M${x1} ${y1}A${r} ${r} 0 ${to - from > 180 ? 1 : 0} 1 ${x2} ${y2}`;
+}
+
+/**
+ * The tile as the display draws it (ADR-0020): the server's zones for its path replace its own,
+ * unless none of them is usable. `serverZones` holds meta.zones by path.
+ */
+export function withServerZones<T extends Tile>(tile: T, serverZones: Map<string, unknown> | undefined): T {
+  if (!serverZones) return tile;
+  const t: Tile = tile;
+  if (t.type === 'value') {
+    const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit);
+    return zones.length > 0 ? { ...tile, zones } : tile;
+  }
+  if (t.type === 'gauge' || t.type === 'bar') {
+    const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit, { min: t.min, max: t.max });
+    return zones.length > 0 ? { ...tile, zones } : tile;
+  }
+  return tile;
 }
 
 /**
@@ -180,8 +199,11 @@ export function TilePreview(props: {
   autopilotTier?: AutopilotTier;
   selectedSlot?: SlotName;
   onSelectSlot?(slot: SlotName): void;
+  /** meta.zones by path (ADR-0020). */
+  serverZones?: Map<string, unknown>;
 }) {
-  const { tile, values } = props;
+  const { values } = props;
+  const tile = withServerZones(props.tile, props.serverZones);
   if (tile.type === 'autopilot')
     return <AutopilotPreview tile={tile} values={values} tier={props.autopilotTier ?? 'controls'} />;
   if (tile.type === 'wind_rose')

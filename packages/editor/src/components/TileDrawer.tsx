@@ -16,6 +16,7 @@ import {
   HISTORY,
   historyEnabled,
   roseHistorySeries,
+  serverZonesToDisplay,
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
@@ -42,6 +43,7 @@ import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
 import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
 import { HistoryPreview, type PreviewSeries } from './HistoryPreview';
+import { withServerZones } from './Previews';
 
 const LABEL_RE = new RegExp(LABEL_PATTERN, 'u');
 const ZONE_STATES: Zone['state'][] = ['normal', 'warn', 'alarm', 'emergency'];
@@ -469,6 +471,7 @@ function ValueHistoryField(props: {
   value: unknown;
   theme: Layout['theme'];
   count: HistoryCount;
+  serverZones: Map<string, unknown>;
   onChange(p: Patch): void;
 }) {
   const { tile } = props;
@@ -496,7 +499,7 @@ function ValueHistoryField(props: {
                   caption: tile.label || tile.path,
                   unit: tile.unit,
                   decimals: tile.decimals,
-                  zones: tile.zones,
+                  zones: withServerZones(tile, props.serverZones).zones,
                   value: props.value,
                 },
               ]
@@ -507,8 +510,26 @@ function ValueHistoryField(props: {
   );
 }
 
+/** The zones the display takes from the server for this tile (ADR-0020); nothing if none. */
+function ServerZones(props: { zones: ValueZone[]; unit?: string }) {
+  if (props.zones.length === 0) return null;
+  const bound = (v: number | undefined) => (v === undefined ? 'no limit' : String(Math.round(v * 100) / 100));
+  return (
+    <div className="server-zones" role="group" aria-label="Zones from the SignalK server">
+      <small className="hint">From the SignalK server, these replace the zones below:</small>
+      <ul>
+        {props.zones.map((z, i) => (
+          <li key={i}>
+            {bound(z.from)} to {bound(z.to)} {props.unit ?? ''}: {z.state}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** A value tile's fixed colour and its colour-by-value zones (display units). */
-function ValueColorFields(props: { tile: ValueTile; onChange(p: Patch): void }) {
+function ValueColorFields(props: { tile: ValueTile; serverZones: unknown; onChange(p: Patch): void }) {
   const { tile, onChange } = props;
   const zones = tile.zones ?? [];
   return (
@@ -542,6 +563,7 @@ function ValueColorFields(props: { tile: ValueTile; onChange(p: Patch): void }) 
           In {tile.unit ?? 'the value as received'}; leave a bound empty for no limit. The last
           matching row wins, over the colour above.
         </small>
+        <ServerZones zones={serverZonesToDisplay(props.serverZones, tile.unit)} unit={tile.unit} />
         <ZoneList
           zones={zones}
           openEnds
@@ -554,9 +576,14 @@ function ValueColorFields(props: { tile: ValueTile; onChange(p: Patch): void }) 
 }
 
 /** Min/max, zones and (bars) orientation, in display units. */
-function RangeFields(props: { tile: Tile & { min: number; max: number }; onChange(p: Patch): void }) {
+function RangeFields(props: {
+  tile: Tile & { min: number; max: number };
+  serverZones: unknown;
+  onChange(p: Patch): void;
+}) {
   const { tile, onChange } = props;
   const zones: Zone[] = tile.type === 'gauge' || tile.type === 'bar' ? (tile.zones ?? []) : [];
+  const unit = tile.type === 'gauge' || tile.type === 'bar' ? tile.unit : undefined;
   const setZones = (next: Zone[]) => onChange({ zones: next.length > 0 ? next : undefined });
   return (
     <>
@@ -595,6 +622,10 @@ function RangeFields(props: { tile: Tile & { min: number; max: number }; onChang
       )}
       <fieldset className="zones">
         <legend>Zones</legend>
+        <ServerZones
+          zones={serverZonesToDisplay(props.serverZones, unit, { min: tile.min, max: tile.max })}
+          unit={unit}
+        />
         <ZoneList
           zones={zones}
           onChange={(next) => setZones(next as Zone[])}
@@ -1016,15 +1047,26 @@ export function TileDrawer(
             onChange={onChange}
           />
           {(tile.type === 'gauge' || tile.type === 'bar') && (
-            <RangeFields tile={tile} onChange={onChange} />
+            <RangeFields
+              tile={tile}
+              serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
+              onChange={onChange}
+            />
           )}
-          {tile.type === 'value' && <ValueColorFields tile={tile} onChange={onChange} />}
+          {tile.type === 'value' && (
+            <ValueColorFields
+              tile={tile}
+              serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
+              onChange={onChange}
+            />
+          )}
           {tile.type === 'value' && (
             <ValueHistoryField
               tile={tile}
               value={tile.path ? props.values.get(tile.path) : undefined}
               theme={props.theme ?? 'day'}
               count={props.historyCount}
+              serverZones={new Map(props.paths.map((p) => [p.path, p.zones]))}
               onChange={onChange}
             />
           )}

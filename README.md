@@ -66,6 +66,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 ## 🌊 Features
 
 - **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar, switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), and an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY).
+- **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge or bar tile's own zones, and the display follows them when they change on the server.
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
 - **Pages:** as many as you like, with page buttons in a footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
@@ -121,7 +122,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 48 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 50 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

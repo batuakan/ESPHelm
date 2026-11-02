@@ -67,7 +67,8 @@ struct Tile {
   DataItem data;  // switch tiles use data.path and data.label only
   // gauge / bar
   double min{0}, max{0};
-  std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf
+  std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf; the server's if it has any
+  std::vector<Zone> own_zones;  // the layout's, used when the server has none (ADR-0020)
   ValueColor color{ValueColor::NONE};  // value
   bool history{false};                 // value: records its history, tap for the graph (ADR-0018/0019)
   Orientation orientation{Orientation::HORIZONTAL};

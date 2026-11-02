@@ -8,6 +8,7 @@
 // All LVGL work happens in loop(); HTTP runs on LayoutClient's worker.
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,6 +22,7 @@
 #endif
 
 #include "alarms.h"
+#include "esphelm_server_zones.h"
 #include "history_popup.h"
 #include "layout_client.h"
 #include "layout_model.h"
@@ -86,6 +88,13 @@ class EsphelmRuntime : public Component {
   /// Open the popup for a tile's recorded values, on `key` if it is one of them; false if none.
   bool open_history_(const std::string &tile_id, const std::string &key = "");
   const esphelm::Tile *find_tile_(const std::string &id) const;
+  // Zones from the server's metadata (ADR-0020)
+  void on_meta_changed_(const std::string &path);
+  bool on_visible_page_(const std::string &path) const;
+  void queue_meta_reads_();
+  void pump_meta_(uint32_t now, bool ready);
+  void handle_meta_(const HttpResult &result);
+  bool apply_server_zones_();
   void update_status_();
   void show_status_(const std::string &headline, const std::string &detail);
   void send_hello_();
@@ -113,6 +122,16 @@ class EsphelmRuntime : public Component {
   esphelm::ValueHistory history_;
   HistoryPopup popup_;
   std::string history_wanted_;  // a tile with history was tapped: open its popup in loop()
+  // Zones from the server's metadata (ADR-0020), in SI, by path; in RAM only. The visible page's
+  // paths are read one at a time, on the HTTP worker.
+  std::map<std::string, std::vector<esphelm::ServerZone>> server_zones_;
+  std::vector<std::string> meta_queue_;
+  std::string meta_path_;      // being read
+  bool meta_in_flight_{false};
+  uint32_t meta_generation_{0};  // a new layout: answers to older reads no longer count
+  uint32_t meta_not_before_ms_{0};
+  uint32_t next_meta_read_ms_{0};
+  bool zones_dirty_{false};  // the visible page's zones changed: rebuild it in loop()
   Fonts fonts_;
   LayoutStore store_;
   LayoutClient client_;
