@@ -127,6 +127,8 @@ npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```
 
+CI (`.github/workflows/ci.yml`) runs all of these on GitHub. Images are in Git LFS, so clone with `git-lfs` installed. The firmware's desktop build needs SDL2, OpenSSL, zlib and [IXWebSocket](https://github.com/machinezone/IXWebSocket) in `/usr/local`.
+
 The first `npm test` downloads ArduinoJson 7.4.3 into `firmware/test/.cache/` (set `ESPHELM_ARDUINOJSON` to a copy to work offline). The schema in `packages/schema` is the contract between plugin, editor and firmware; decisions are recorded in [`docs/decisions/`](docs/decisions/) and the layout format in [`docs/layout-schema.md`](docs/layout-schema.md).
 
 ## 🧭 Project Goals
