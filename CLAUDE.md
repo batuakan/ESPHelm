@@ -137,6 +137,8 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 - Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
 
+- **CI:** `.github/workflows/ci.yml` runs unit tests, types, lint and the plugin and editor e2e (`checks`), and the SDL firmware e2e under `xvfb-run` (`firmware-sdl`). P4 and C3 compiles aren't in CI yet. The SDL host build needs `libixwebsocket` in `/usr/local`, built from source.
+
 - **Schema/plugin/editor:** unit tests (vitest or jest), type-check, lint, plus contract tests that load every fixture in `packages/schema/fixtures`.
 - **Plugin:** run against a local dev SignalK server with a sample-data/demo source so paths have live values. Test the REST endpoints with real HTTP calls (ETag/304 behavior included).
 - **Firmware:** `esphome config` for validation; `esphome compile` for build; **SDL host build** (`firmware/esphelm_sdl*.yaml`, `firmware/components/sdl_screenshot`) to render layouts on the desktop and capture screenshots. Use screenshots to verify visual output and for golden-image regression tests.

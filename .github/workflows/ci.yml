@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SIGNALK_SERVER_VERSION: '2.26.0'
+
+jobs:
+  # Unit tests, types, lint, and the plugin and editor against a real signalk-server.
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm i -g signalk-server@${{ env.SIGNALK_SERVER_VERSION }}
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Plugin end to end
+        run: npm run e2e -w signalk-esphelm
+      - name: Editor end to end
+        run: npm run e2e:editor
+        env:
+          TMPDIR: ${{ runner.temp }}
+      - name: Keep the editor screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-screenshots
+          path: ${{ runner.temp }}/esphelm-editor-shots-*
+          if-no-files-found: ignore
+
+  # The firmware's SDL build against a real signalk-server, with the golden screenshots.
+  firmware-sdl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true # the golden screenshots
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the SDL build's libraries and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libssl-dev zlib1g-dev cmake xvfb
+      - name: Cache IXWebSocket
+        id: ixwebsocket
+        uses: actions/cache@v4
+        with:
+          path: ~/ixwebsocket
+          key: ixwebsocket-v11.4.6-${{ runner.os }}-ubuntu-24.04
+      - name: Build IXWebSocket
+        if: steps.ixwebsocket.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch v11.4.6 https://github.com/machinezone/IXWebSocket "$RUNNER_TEMP/ixws"
+          cmake -S "$RUNNER_TEMP/ixws" -B "$RUNNER_TEMP/ixws/build" -DUSE_TLS=1 -DUSE_OPEN_SSL=1 \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/ixwebsocket"
+          cmake --build "$RUNNER_TEMP/ixws/build" --parallel
+          cmake --install "$RUNNER_TEMP/ixws/build"
+      - name: Install IXWebSocket
+        run: |
+          # The ESPHome host build looks in /usr/local.
+          sudo cp -r "$HOME/ixwebsocket/include/." /usr/local/include/
+          sudo cp -r "$HOME"/ixwebsocket/lib*/. /usr/local/lib/
+      - name: Install ESPHome
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install esphome==2026.9.1 pillow
+      - name: Cache the PlatformIO packages and the build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.esphome
+          key: firmware-sdl-${{ hashFiles('firmware/**/*.yaml', 'firmware/components/**') }}
+          restore-keys: firmware-sdl-
+      - run: npm ci
+      - run: npm i -g signalk-server@${{ env.SIGNALK_SERVER_VERSION }}
+      - run: npm run build
+      - name: Firmware end to end
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a -s "-screen 0 1280x1024x24" npm run e2e:sdl
+        env:
+          ESPHOME: ${{ runner.temp }}/venv/bin/esphome
+          PYTHON: ${{ runner.temp }}/venv/bin/python
+          TMPDIR: ${{ runner.temp }}/e2e
+      - name: Keep the screenshots and firmware logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-sdl
+          path: ${{ runner.temp }}/e2e/esphelm-fw-*
+          if-no-files-found: ignore
