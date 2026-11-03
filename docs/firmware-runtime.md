@@ -173,12 +173,13 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
 | Zones from the server (ADR-0020) | 24 B per zone per tile that uses them, a second list of the layout's own zones, and one map entry per path with zones (SI, up to 16 zones); a transient 4 KB body per read. Nothing per value, nothing in flash |
 | Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
+| `graph` tile (ADR-0021) | its recorded value (the row below) and, while its page is shown, ≈8.8 KB of LVGL objects with its 1.9 KB point buffer (four graphs with two zones = 35,152 B) |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,190 B (17.0 %), flash 3.31 MB (20.1 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,216 B of 321,296 B (34.9 %), flash 1.43 MB of 1.8 MB (77.9 %) |
+| P4 runtime firmware, static | RAM 98,190 B (17.0 %), flash 3.32 MB (20.1 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,216 B of 321,296 B (34.9 %), flash 1.44 MB of 1.8 MB (78.3 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -227,8 +228,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   21. **value history**: a tile without `history` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the wind roses (a mark on the one that records, a tap on the other does nothing, its first value recording live, the popup's value buttons, the apparent wind angle and a heading tile across north without a jump); the popup and a rose's popup at 720
   21b. **zones from the server** (ADR-0020): zones put on the server replace a value tile's and a gauge's own and reach a bar without any, with no new layout fetched; a changed zone is followed; rubbish and an emptied list bring the tile's own back, pixel for pixel.
+  21c. **graph tiles** (ADR-0021, `fixtures/valid/graph.json`): a live SOG becomes a line on its tile; with seeded curves, a 2x2 depth graph with a zone band, a fixed-range SOG, a heading across north and a 6 h barometer without axis labels, by day and at night; a tap opens the popup on its value; the same page offline at 720
 
-  Fifty screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Fifty-three screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -288,3 +290,9 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The log says `Tile <id>: <n> zones, from the server`. No `Showing fetched layout` line comes with it.
     - A value inside an alarm zone also brings the alarm banner, from the server's own notification.
     - Remove the zones: the tile's own come back.
+
+20. **Graph tiles (ADR-0021).** Assign `packages/schema/fixtures/valid/graph.json` with a live depth, SOG, heading and pressure.
+    - Each graph shows "Collecting..." for about 10 s after the layout arrives, then its line fills from the right. The page doesn't stutter every 5 s when points close.
+    - The depth graph has its y range, "-10 m" and "now"; the small HDG and Baro tiles show the line only.
+    - Turning across north, the HDG line stays smooth.
+    - Tap a graph: the history popup opens on that value.
