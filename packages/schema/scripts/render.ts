@@ -199,6 +199,7 @@ function renderSizesHeader(
     maxValuesNoPsram: number;
   },
   serverZones: { maxPerPath: number },
+  graph: { axisHeight: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -230,6 +231,9 @@ function renderSizesHeader(
     `inline constexpr int HISTORY_NO_PSRAM_WINDOWS = ${history.noPsramWindows};`,
     `inline constexpr int HISTORY_MAX_VALUES_PSRAM = ${history.maxValuesPsram};`,
     `inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = ${history.maxValuesNoPsram};`,
+    '',
+    '// Graph tile (ADR-0021): content box height in pixels from which it shows its axis labels.',
+    `inline constexpr int GRAPH_AXIS_HEIGHT = ${graph.axisHeight};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -323,7 +327,7 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY, SERVER_ZONES } =
+  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY, SERVER_ZONES, GRAPH_FIT } =
     await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
@@ -338,6 +342,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       TEXT_FIT,
       HISTORY,
       SERVER_ZONES,
+      GRAPH_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -345,6 +350,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       TEXT_FIT,
       HISTORY,
       SERVER_ZONES,
+      GRAPH_FIT,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

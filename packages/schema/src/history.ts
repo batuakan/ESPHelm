@@ -1,12 +1,19 @@
 import type { Layout } from './layout.js';
 import type { UnitId } from './primitives.js';
-import { HISTORY, WIND_ROSE_DEFAULTS, type RoseHistoryKey, type WindRoseTile } from './tiles.js';
+import {
+  GRAPH_WINDOWS,
+  HISTORY,
+  WIND_ROSE_DEFAULTS,
+  type GraphTile,
+  type RoseHistoryKey,
+  type WindRoseTile,
+} from './tiles.js';
 import { WRAP_EPSILON } from './units.js';
 
 /**
  * Value history helpers (ADR-0018, ADR-0019), mirrored in the firmware (value_history.h and
  * the history popup). Nothing records unless switched on: `history: true` on a value tile, or
- * the names in a wind rose's `history`.
+ * the names in a wind rose's `history`. A graph tile always records (ADR-0021).
  */
 
 /** Whether a value tile records its history (absent means off). */
@@ -71,7 +78,7 @@ export function historySeries(layout: Pick<Layout, 'pages'>): HistorySeries[] {
   for (const page of layout.pages) {
     if (page.kind === 'chart') continue;
     for (const tile of page.tiles) {
-      if (tile.type === 'value' && historyEnabled(tile)) {
+      if ((tile.type === 'value' && historyEnabled(tile)) || tile.type === 'graph') {
         out.push({
           key: tile.id,
           tileId: tile.id,
@@ -99,6 +106,16 @@ export function historyCount(layout: Pick<Layout, 'pages'>): {
     fitsPsram: count <= HISTORY.maxValuesPsram,
     fitsNoPsram: count <= HISTORY.maxValuesNoPsram,
   };
+}
+
+/**
+ * The window a graph tile draws, as an index into HISTORY.windows: its `window` (10m when
+ * absent), the longest the display keeps when it has fewer (6h without PSRAM is 1h). Mirrored
+ * by the graph widget (widget_graph.cpp).
+ */
+export function graphWindowIndex(tile: Pick<GraphTile, 'window'>, psram: boolean): number {
+  const wanted = GRAPH_WINDOWS.indexOf(tile.window ?? '10m');
+  return Math.min(wanted, (psram ? HISTORY.windows.length : HISTORY.noPsramWindows) - 1);
 }
 
 /** Text for a time `seconds` ago on the graph's time axis: minutes below 2 h, else hours. */

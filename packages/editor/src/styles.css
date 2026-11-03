@@ -465,6 +465,54 @@ select {
 .tile-type-value .tile-unit {
   font-size: var(--tile-caption-size, 13px);
 }
+/* Graph tiles (ADR-0021): the caption is the tile label, the value sits right of it, the line
+   fills the rest; y range left of it and the window below when the display has room. */
+.graph-preview {
+  grid-row: 2 / 4;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr auto;
+  min-height: 0;
+  gap: 2px 4px;
+}
+.graph-value {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  max-width: 55%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+}
+.graph-y,
+.graph-x {
+  font-size: 11px;
+  color: var(--tile-muted);
+  font-variant-numeric: tabular-nums;
+}
+.graph-plot {
+  grid-column: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.graph-preview:not(.with-axis) .graph-plot {
+  grid-column: 1 / 3;
+  grid-row: 1 / 3;
+}
+.graph-x {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+}
 .resize-handle {
   position: absolute;
   right: 0;
@@ -1308,16 +1356,20 @@ fieldset.modes {
 .tile-value.value-color-purple {
   color: var(--value-purple);
 }
-.tile-value.value-zone-normal {
+.tile-value.value-zone-normal,
+.graph-value.value-zone-normal {
   color: var(--value-zone-normal);
 }
-.tile-value.value-zone-warn {
+.tile-value.value-zone-warn,
+.graph-value.value-zone-warn {
   color: var(--zone-warn);
 }
-.tile-value.value-zone-alarm {
+.tile-value.value-zone-alarm,
+.graph-value.value-zone-alarm {
   color: var(--zone-alarm);
 }
-.tile-value.value-zone-emergency {
+.tile-value.value-zone-emergency,
+.graph-value.value-zone-emergency {
   color: var(--zone-emergency);
 }
 .color-swatch {

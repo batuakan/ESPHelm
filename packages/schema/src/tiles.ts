@@ -98,6 +98,42 @@ export const BarTile = Type.Object(
   { additionalProperties: false },
 );
 
+/**
+ * Graph windows, the keys of HISTORY.windows in order (the popup's buttons use the same keys).
+ * Boards without PSRAM keep only the first HISTORY.noPsramWindows; a longer window falls back to
+ * the longest they keep.
+ */
+export const GraphWindow = Type.Union(
+  [Type.Literal('10m'), Type.Literal('1h'), Type.Literal('6h')],
+  { description: 'The time the graph covers. Absent: 10m. 6h only with PSRAM, else 1h.' },
+);
+export type GraphWindow = Type.Static<typeof GraphWindow>;
+export const GRAPH_WINDOWS = GraphWindow.anyOf.map((l) => l.const) as GraphWindow[];
+
+/**
+ * Line graph of a value's recent history (ADR-0021). It always records: the value counts against
+ * HISTORY's limits like a value tile with `history: true`. A tap opens the history popup.
+ */
+export const GraphTile = Type.Object(
+  {
+    type: Type.Literal('graph'),
+    ...Placement,
+    ...DataItem.properties,
+    window: Type.Optional(GraphWindow),
+    min: Type.Optional(
+      Type.Number({ description: 'Fixed bottom of the y axis, in display units; needs max.' }),
+    ),
+    max: Type.Optional(
+      Type.Number({
+        description:
+          'Fixed top of the y axis; needs min, must be greater. Absent: follows the data.',
+      }),
+    ),
+    zones: Type.Optional(Type.Array(ValueZone)),
+  },
+  { additionalProperties: false },
+);
+
 /** Boolean SignalK path: shows its state and sends a PUT to the same path when tapped. */
 export const SwitchTile = Type.Object(
   {
@@ -303,6 +339,13 @@ export const HISTORY = {
   maxValuesNoPsram: 6,
 } as const;
 
+/**
+ * Graph tile (ADR-0021): content box height in device pixels from which it shows its y labels
+ * and time label (else only the header and the line). Generated into esphelm_sizes.h; the
+ * editor's preview uses the same number.
+ */
+export const GRAPH_FIT = { axisHeight: 120 } as const;
+
 /** Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used. */
 export const SERVER_ZONES = {
   maxPerPath: 16,
@@ -317,6 +360,7 @@ export const TILE_TYPES = {
   position: PositionTile,
   wind_rose: WindRoseTile,
   autopilot: AutopilotTile,
+  graph: GraphTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -333,6 +377,7 @@ export const Tile = Type.Union([
   PositionTile,
   WindRoseTile,
   AutopilotTile,
+  GraphTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -341,4 +386,5 @@ export type SwitchTile = Type.Static<typeof SwitchTile>;
 export type PositionTile = Type.Static<typeof PositionTile>;
 export type WindRoseTile = Type.Static<typeof WindRoseTile>;
 export type AutopilotTile = Type.Static<typeof AutopilotTile>;
+export type GraphTile = Type.Static<typeof GraphTile>;
 export type Tile = Type.Static<typeof Tile>;

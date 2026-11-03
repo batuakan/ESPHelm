@@ -110,3 +110,21 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Tests:** shared cases in TS and C++; `withServerZones`; `/api/paths` in the plugin e2e; preview and drawer in the editor e2e; SDL e2e with two new goldens (`49`, taken again after the zones are removed, and `50`).
 - **Not verified:** on the P4 (hardware step 19).
 
+
+## Graph tile (ADR-0021, branch `feat/graph-tile`)
+
+- **What:** a `graph` tile draws one window (10 min, 1 h or 6 h) of a value's recorded history on the page, with an optional fixed y range and zone bands. A tap opens the history popup.
+- **Schema:** the `graph` tile type (`window`, `min`/`max` both or neither, value zones), `GRAPH_WINDOWS`, `GRAPH_FIT`, `graphWindowIndex()`. `historySeries()` includes graph tiles, which always record.
+- **Firmware:**
+  - **Widget:** `widget_graph.cpp`. It reads `ValueHistory` through `WidgetEnv::history` and redraws when a point of its window closes (`ValueHistory::appended()`).
+  - **Shared code:** the popup's range and unwrap logic moved to `prepare_graph()`.
+  - **Server zones:** they apply with the value tile rules.
+  - **Hello:** it lists `graph`.
+- **Editor:** a *Graph* library item (2x1), drawer fields (window, fixed range, zones, history counter, preview), a size hint for the axis labels, and an SVG preview.
+- **Tests:**
+  - **Schema and parser:** schema fixtures; C++ parser cases.
+  - **Firmware history:** `prepare_graph()` and `appended()` in the g++ history test.
+  - **Plugin:** the catalog and the compat refusal.
+  - **Editor:** an App test and a browser e2e step.
+  - **SDL e2e:** a live depth line, and three new goldens (`51`, `52`, `720-07`). All 50 existing goldens are unchanged, including every popup image.
+- **Not verified:** on the P4 (hardware step 20), and the C3's internal-RAM limit with graphs on a real chip.

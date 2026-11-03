@@ -381,42 +381,13 @@ void HistoryPopup::refresh_chart_() {
   const size_t n = idx >= 0 ? this->history_->series(idx, this->window_, this->points_) : 0;
   // Angles: around the window's mean on the circle, so a line across north doesn't jump.
   this->circular_ = idx >= 0 && this->history_->circular(idx);
-  if (this->circular_) {
-    const esphelm::units::UnitDef &u = *this->history_->unit(idx);
-    double s = 0, c = 0;
-    uint32_t count = 0;
-    for (size_t k = 0; k < n; k++) {
-      if (this->points_[k].gap())
-        continue;
-      const double turn = esphelm::circular_turn(this->points_[k].mean, u.wrap_min, u.wrap_max);
-      s += std::sin(turn);
-      c += std::cos(turn);
-      count++;
-    }
-    const double centre = esphelm::circular_from_sums(s, c, count, u.wrap_min, u.wrap_max);
-    for (size_t k = 0; centre == centre && k < n; k++) {
-      auto &p = this->points_[k];
-      if (p.gap())
-        continue;
-      const float shift =
-          static_cast<float>(esphelm::unwrap_around(p.mean, centre, u.wrap_min, u.wrap_max) - p.mean);
-      p = {p.mean + shift, p.min + shift, p.max + shift};
-    }
-  }
-  float mn = 0, mx = 0;
-  size_t valid = 0;
-  for (size_t k = 0; k < n; k++) {
-    const auto &p = this->points_[k];
-    if (p.gap())
-      continue;
-    mn = valid == 0 ? p.min : std::min(mn, p.min);
-    mx = valid == 0 ? p.max : std::max(mx, p.max);
-    valid++;
-  }
+  const esphelm::GraphRange r =
+      esphelm::prepare_graph(this->points_, n, this->circular_, idx >= 0 ? this->history_->unit(idx) : nullptr);
+  const float mn = r.mn, mx = r.mx;
   const int N = esphelm::sizes::HISTORY_POINTS;
   ESP_LOGD(TAG, "History of %s, %s: %u points, %u with values", this->cur_().key.c_str(),
-           esphelm::sizes::HISTORY_WINDOW_LABELS[this->window_], (unsigned) n, (unsigned) valid);
-  if (valid < 2) {
+           esphelm::sizes::HISTORY_WINDOW_LABELS[this->window_], (unsigned) n, (unsigned) r.valid);
+  if (r.valid < 2) {
     for (int k = 0; k < N; k++)
       this->chart_y_[k] = LV_CHART_POINT_NONE;
     lv_obj_remove_flag(this->collecting_, LV_OBJ_FLAG_HIDDEN);
@@ -429,14 +400,8 @@ void HistoryPopup::refresh_chart_() {
     return;
   }
   lv_obj_add_flag(this->collecting_, LV_OBJ_FLAG_HIDDEN);
-  const double span = static_cast<double>(mx) - mn;
-  if (span < 1e-6) {
-    this->lo_ = mn - 1.0;
-    this->hi_ = mx + 1.0;
-  } else {
-    this->lo_ = mn - span * 0.1;
-    this->hi_ = mx + span * 0.1;
-  }
+  this->lo_ = r.lo;
+  this->hi_ = r.hi;
   const int d = this->cur_().data.decimals >= 0 ? std::min<int>(this->cur_().data.decimals, 3) : 1;
   this->scale_ = 1;
   for (int k = 0; k < d; k++)

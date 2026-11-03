@@ -2,7 +2,8 @@
 // with live value and SI units), display unit (only units that fit the path's quantity),
 // decimals, label, stale timeout. Gauges and bars add range, zones and orientation; wind roses
 // have their slots, source paths and the true-wind toggle. Value tiles and wind rose values can
-// record their history (ADR-0018, ADR-0019), with a count of what the layout records.
+// record their history (ADR-0018, ADR-0019), with a count of what the layout records. Graph
+// tiles (ADR-0021) add their window, an optional fixed range and zones; they always record.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   AUTOPILOT_DEFAULTS,
@@ -13,6 +14,7 @@ import {
   POSITION_FORMAT_NAMES,
   POSITION_FORMATS,
   formatPosition,
+  GRAPH_WINDOWS,
   HISTORY,
   historyEnabled,
   roseHistorySeries,
@@ -26,6 +28,8 @@ import {
   type AutopilotTile,
   type ChartPage,
   type DataItem,
+  type GraphTile,
+  type GraphWindow,
   type Layout,
   type PositionFormat,
   type PositionTile,
@@ -575,6 +579,112 @@ function ValueColorFields(props: { tile: ValueTile; serverZones: unknown; onChan
   );
 }
 
+const GRAPH_WINDOW_TEXT: Record<GraphWindow, string> = {
+  '10m': '10 min',
+  '1h': '1 h',
+  '6h': '6 h (displays with PSRAM; 1 h on C3/C6)',
+};
+
+/**
+ * A graph's window, its optional fixed y axis and its zones (ADR-0021). It always records, so it
+ * counts against the history limits.
+ */
+function GraphFields(props: {
+  tile: GraphTile;
+  value: unknown;
+  theme: Layout['theme'];
+  count: HistoryCount;
+  serverZones: Map<string, unknown>;
+  onChange(p: Patch): void;
+}) {
+  const { tile, onChange } = props;
+  const fixed = tile.min !== undefined || tile.max !== undefined;
+  return (
+    <>
+      <label className="field">
+        <span>Window</span>
+        <select
+          value={tile.window ?? '10m'}
+          onChange={(e) => onChange({ window: e.target.value === '10m' ? undefined : e.target.value })}
+          aria-label="Window"
+        >
+          {GRAPH_WINDOWS.map((w) => (
+            <option key={w} value={w}>
+              {GRAPH_WINDOW_TEXT[w]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={fixed}
+          onChange={(e) =>
+            onChange(e.target.checked ? { min: 0, max: 10 } : { min: undefined, max: undefined })
+          }
+          aria-label="Fixed range"
+        />
+        Fixed range (else it follows the values)
+      </label>
+      {fixed && (
+        <div className="field-row">
+          <label className="field">
+            <span>Min</span>
+            <input
+              type="number"
+              value={tile.min === undefined ? '' : String(tile.min)}
+              onChange={(e) => onChange({ min: numberOrUndefined(e.target.value) })}
+              aria-label="Minimum"
+            />
+          </label>
+          <label className="field">
+            <span>Max</span>
+            <input
+              type="number"
+              value={tile.max === undefined ? '' : String(tile.max)}
+              onChange={(e) => onChange({ max: numberOrUndefined(e.target.value) })}
+              aria-label="Maximum"
+            />
+          </label>
+        </div>
+      )}
+      <fieldset className="zones">
+        <legend>Zones</legend>
+        <small className="hint">
+          In {tile.unit ?? 'the value as received'}; shown as bands behind the line, and they colour
+          the value. Leave a bound empty for no limit.
+        </small>
+        <ServerZones
+          zones={serverZonesToDisplay(props.serverZones.get(tile.path), tile.unit)}
+          unit={tile.unit}
+        />
+        <ZoneList
+          zones={tile.zones ?? []}
+          openEnds
+          onChange={(next) => onChange({ zones: next.length > 0 ? next : undefined })}
+          newZone={() => ({ to: 0, state: 'alarm' })}
+        />
+      </fieldset>
+      <p className="hint">The display records this value from the moment it starts.</p>
+      <HistoryCounter count={props.count} />
+      <HistoryPreviewButton
+        theme={props.theme}
+        series={[
+          {
+            key: tile.id,
+            title: tile.label || tile.path,
+            caption: tile.label || tile.path,
+            unit: tile.unit,
+            decimals: tile.decimals,
+            zones: withServerZones(tile, props.serverZones).zones,
+            value: props.value,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
 /** Min/max, zones and (bars) orientation, in display units. */
 function RangeFields(props: {
   tile: Tile & { min: number; max: number };
@@ -1059,6 +1169,19 @@ export function TileDrawer(
               serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
               onChange={onChange}
             />
+          )}
+          {tile.type === 'graph' && (
+            <>
+              {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
+              <GraphFields
+                tile={tile}
+                value={tile.path ? props.values.get(tile.path) : undefined}
+                theme={props.theme ?? 'day'}
+                count={props.historyCount}
+                serverZones={new Map(props.paths.map((p) => [p.path, p.zones]))}
+                onChange={onChange}
+              />
+            </>
           )}
           {tile.type === 'value' && (
             <ValueHistoryField

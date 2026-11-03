@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "id": "graph",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "graphs",
+      "grid": {
+        "cols": 2,
+        "rows": 4
+      },
+      "tiles": [
+        {
+          "type": "graph",
+          "id": "depth",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 2,
+          "path": "environment.depth.belowTransducer",
+          "unit": "m",
+          "decimals": 1,
+          "label": "Depth",
+          "zones": [
+            {
+              "to": 3,
+              "state": "alarm"
+            },
+            {
+              "from": 3,
+              "to": 5,
+              "state": "warn"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "id": "sog",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 2,
+          "path": "navigation.speedOverGround",
+          "unit": "kn",
+          "label": "SOG",
+          "window": "1h",
+          "min": 0,
+          "max": 10
+        },
+        {
+          "type": "graph",
+          "id": "hdg",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.headingTrue",
+          "unit": "deg",
+          "decimals": 0,
+          "label": "HDG"
+        },
+        {
+          "type": "graph",
+          "id": "baro",
+          "x": 1,
+          "y": 3,
+          "w": 1,
+          "h": 1,
+          "path": "environment.outside.pressure",
+          "unit": "hPa",
+          "decimals": 0,
+          "label": "Baro",
+          "window": "6h",
+          "staleAfter": 120
+        }
+      ],
+      "title": "Graphs"
+    }
+  ]
+}

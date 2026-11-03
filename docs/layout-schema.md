@@ -86,10 +86,11 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
 | `wind_rose` | `config?`, `slots`, `history?` | see below |
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
+| `graph` | DataItem + `window?`, `min?`, `max?`, `zones?` (value zones) | line graph of the value's recent history, see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
-**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge` and `bar` tile on that path, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
+**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
 
 ### Value tile colours (ADR-0016)
 - `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
@@ -168,6 +169,27 @@ GPS position as text: latitude over longitude. The display picks the largest fon
 
 There's no `unit` (`UNKNOWN_FIELD`); `POSITION_DEFAULTS` has the defaults.
 
+### Graph tiles
+A line graph of a value's recent history (ADR-0021): the caption and live value on top, the window's points below, the newest on the right. The display records the value itself from boot, as for a value tile with `history: true`, and a tap opens the history popup on it.
+
+| Field | Notes |
+|---|---|
+| DataItem | `path`, `unit`, `decimals`, `label`, `staleAfter`, as for a value tile |
+| `window` | `10m` (default), `1h` or `6h` (`GRAPH_WINDOWS`). A display without PSRAM keeps only 10 min and 1 h, so `6h` shows 1 h there (`graphWindowIndex()`) |
+| `min`, `max` | optional, both or neither (`INVALID_RANGE`): a fixed y axis in display units, `min` below `max`. Absent: the axis follows the points (their extent plus 10 % each side). A fixed axis clips the line at its edges |
+| `zones` | optional value zones, `{ from?, to?, state }` as on a value tile: faint bands behind the line, and they colour the live value. The server's zones replace them (ADR-0020) |
+
+- **It always records:** there's no `history` field (`UNKNOWN_FIELD`). Every graph counts against the display's limit (`HISTORY.maxValuesPsram` 48, `maxValuesNoPsram` 6) in `historySeries()` order. A graph over the limit shows "No history on this display".
+- **Axis labels:** from `GRAPH_FIT.axisHeight` (120 px) of content height, the tile also shows its y range and the window's start ("-10 m") and "now". Smaller tiles draw the line only. The editor's size hint says which.
+- **Angles** (units with a wrap range) are drawn around their circular mean, so a line across north doesn't jump, unless the axis is fixed: then they stay in the unit's range. Zone bands aren't drawn for angles around their mean.
+- Older firmware doesn't list `graph` in its hello `widgets`, so the plugin refuses to assign such a layout to it (`UNSUPPORTED_WIDGET`).
+
+```json
+{ "type": "graph", "id": "depth", "x": 0, "y": 0, "w": 2, "h": 1,
+  "path": "environment.depth.belowTransducer", "unit": "m", "label": "Depth",
+  "window": "1h", "zones": [{ "to": 3, "state": "alarm" }] }
+```
+
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
 
@@ -221,8 +243,8 @@ Brightness needs a backlight the firmware can dim (`capabilities.backlight` in t
 | `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use) |
 | `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
 | `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
-| `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max` |
-| `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value-tile zone with neither `from` nor `to` |
+| `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max`; a graph with only one of `min`/`max`, or `min` not below `max` |
+| `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value or graph zone with neither `from` nor `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
 | `UNKNOWN_PAGE` | semantic | `settings.startPage` isn't a page of the layout |
 

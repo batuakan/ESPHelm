@@ -246,7 +246,7 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["rotation"] = 0;
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
-  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot"})
+  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph"})
     doc["widgets"].add(w);
   if (this->psram_)
     doc["widgets"].add("chart");
@@ -671,6 +671,7 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.psram = this->psram_;
   env.night = this->layout_.theme == esphelm::Theme::NIGHT;
   env.has_history = [this](const std::string &key) { return this->history_.find(key) >= 0; };
+  env.history = &this->history_;
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
   env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
@@ -792,7 +793,7 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
 
 static bool has_zones(const esphelm::Tile &tile) {
   return tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GAUGE ||
-         tile.type == esphelm::TileType::BAR;
+         tile.type == esphelm::TileType::BAR || tile.type == esphelm::TileType::GRAPH;
 }
 
 bool EsphelmRuntime::on_visible_page_(const std::string &path) const {
@@ -892,7 +893,8 @@ bool EsphelmRuntime::apply_server_zones_() {
       std::vector<esphelm::Zone> zones;
       auto it = this->server_zones_.find(t.data.path);
       if (it != this->server_zones_.end()) {
-        const bool scale = t.type != esphelm::TileType::VALUE;
+        // A graph takes them as a value tile does: open ends; its bands are cut to the axis it draws.
+        const bool scale = t.type == esphelm::TileType::GAUGE || t.type == esphelm::TileType::BAR;
         esphelm::server_zones_to_display(it->second, t.data.unit, scale ? &t.min : nullptr, scale ? &t.max : nullptr,
                                          zones);
       }
@@ -923,10 +925,11 @@ static const char *const ROSE_HISTORY_TITLES[esphelm::RoseConfig::HISTORY_KEYS] 
     "Centre 1", "Centre 2", "Centre 3", "Top left", "Top right", "Bottom left", "Bottom right", "AWA", "TWD", "HDG"};
 
 /// The values of `tile` that ask to record, in the order of historySeries() in packages/schema:
-/// a value tile with history on, or a wind rose's `history` names whose slot is filled.
+/// a value tile with history on, a graph tile (it always records, ADR-0021), or a wind rose's
+/// `history` names whose slot is filled.
 static void tile_series(const esphelm::Tile &tile, std::vector<HistorySeries> &out) {
-  if (tile.type == esphelm::TileType::VALUE) {
-    if (tile.history)
+  if (tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GRAPH) {
+    if (tile.history || tile.type == esphelm::TileType::GRAPH)
       out.push_back({tile.id, "", tile.data.label, tile.data, tile.zones, tile.color});
     return;
   }

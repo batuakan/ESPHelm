@@ -1,0 +1,36 @@
+{
+  "description": "window is 10m, 1h or 6h",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/pages/0/tiles/0/window"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "graph",
+            "id": "g",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "environment.depth.belowTransducer",
+            "window": "24h"
+          }
+        ]
+      }
+    ]
+  }
+}

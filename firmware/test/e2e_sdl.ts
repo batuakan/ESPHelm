@@ -1028,8 +1028,65 @@ async function main(): Promise<void> {
     tapTile('@history', 'close');
     await fw.waitLog(/History of hdg2 closed/);
     await fw.stop();
-    fw.start();
+    fw.start(); // without the seeded (frozen) histories
     await fw.waitLog(/Showing cached layout "value-history"/);
+    await fw.waitLog(/Sending hello/, 15000);
+
+    // 9h. Graph tiles (ADR-0021): they always record, draw their window on the page and open the
+    //     popup on a tap. Live first: depth (10 min window, 5 s points) sent every second becomes
+    //     a line on its tile.
+    const graphs = fixture('valid/graph.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/graph', admin, graphs);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'graph' });
+    check(
+      'graph: the graph layout renders',
+      await fw.waitLog(/Showing fetched layout "graph" \(1 pages/),
+    );
+    const graphTimer = setInterval(
+      () => publish({ 'environment.depth.belowTransducer': 4.2 }),
+      1000,
+    );
+    check(
+      'graph: live values become a line on the tile',
+      await fw.waitLog(/Graph depth: drawing \d+ points, [2-9]\d* with values/, 25000),
+    );
+    clearInterval(graphTimer);
+    // Goldens need fixed curves: restart with the test hook seeding every graph.
+    await fw.stop();
+    fw.start({ ESPHELM_TEST_HISTORY: 'depth,sog,hdg,baro' });
+    check(
+      'graph: restarted with seeded graphs',
+      (await fw.waitLog(/Showing cached layout "graph"/)) &&
+        (await fw.waitLog(/ESPHELM_TEST_HISTORY: seeded baro/)),
+    );
+    await fw.waitLog(/Sending hello/, 15000);
+    const graphPage = {
+      'environment.depth.belowTransducer': 4.2, // in the warn zone (3..5)
+      'navigation.speedOverGround': 3.1, // 6.0 kn
+      'navigation.headingTrue': 0.05, // 3°
+      'environment.outside.pressure': 101320, // 1013 hPa
+    };
+    publish(graphPage);
+    await sleep(1500);
+    await fw.screenshot('51-graph-page', shots);
+    tapTile('sog');
+    check(
+      'graph: a tap opens the history popup on its value',
+      await fw.waitLog(/History of sog opened/),
+    );
+    tapTile('@history', 'close');
+    await fw.waitLog(/History of sog closed/);
+    tapTile('@theme');
+    await sleep(800); // the page is rebuilt in the new theme before the values come
+    publish(graphPage);
+    await sleep(1500);
+    await fw.screenshot('52-graph-night', shots);
+    tapTile('@theme');
+    await sleep(800);
+
+    await fw.stop();
+    fw.start();
+    await fw.waitLog(/Showing cached layout "graph"/);
     await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
@@ -1127,6 +1184,18 @@ async function main(): Promise<void> {
     check('720 wind rose history opens', await fw720.waitLog(/History of wind\/center1 opened/));
     await sleep(1000);
     await fw720.screenshot('720-06-history-rose', shots);
+    await fw720.stop();
+
+    // 12d. Graph tiles at 720 (offline, seeded): larger header and labels, the same curves.
+    const graph720 = readFileSync(join(FIXTURES, 'valid/graph.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(graph720, '"seed-graph"'));
+    fw720.start({ ESPHELM_TEST_HISTORY: 'depth,sog,hdg,baro' });
+    check(
+      '720 build shows the graph layout',
+      await fw720.waitLog(/Showing cached layout "graph" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-07-graph', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

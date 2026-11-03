@@ -112,6 +112,12 @@ class ValueHistory {
   /// Points of window `window` of entry `i`, oldest first, into `out` (HISTORY_POINTS long).
   /// Returns how many there are; fewer than HISTORY_POINTS until the window has filled.
   size_t series(size_t i, int window, Point *out) const;
+  /// How many points window `window` of entry `i` has had appended so far: a graph redraws when
+  /// it changes. 0 for an unknown entry or window.
+  uint32_t appended(size_t i, int window) const {
+    return i < this->entries_.size() && window >= 0 && window < this->windows_ ? this->entries_[i].win[window].appended
+                                                                              : 0;
+  }
   /// Bytes the buffers take.
   size_t bytes() const;
 
@@ -124,6 +130,7 @@ class ValueHistory {
     Point *ring{nullptr};
     uint16_t head{0};   // next slot to write
     uint16_t count{0};  // points written, up to HISTORY_POINTS
+    uint32_t appended{0};  // points written in all
     uint32_t start_ms{0};  // when the open point began
     double sum{0};
     uint32_t n{0};
@@ -148,5 +155,18 @@ class ValueHistory {
   std::vector<Entry> entries_;
   int windows_{0};
 };
+
+/// What a graph draws of a window's points (the history popup and the graph tile).
+struct GraphRange {
+  size_t valid{0};        // points with a value
+  float mn{0}, mx{0};     // lowest min and highest max of those points
+  double lo{0}, hi{1};    // the y axis: mn..mx plus 10 % each side, or +-1 around a flat line
+};
+
+/// Prepares `n` points of one window for drawing: angles (`circular`, with `unit`'s wrap range)
+/// are moved by whole turns to within half a turn of their circular mean, so a line across north
+/// doesn't jump; then the points' extent and the y axis. Fewer than two points with a value:
+/// nothing to draw (`valid` says how many).
+GraphRange prepare_graph(ValueHistory::Point *points, size_t n, bool circular, const units::UnitDef *unit);
 
 }  // namespace esphelm

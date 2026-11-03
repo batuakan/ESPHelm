@@ -14,7 +14,8 @@
   },
   "widgets": [
     "value",
-    "bar"
+    "bar",
+    "graph"
   ],
   "capacity": {
     "psram": false,

@@ -14,7 +14,7 @@
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION };
+enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
 /// Value tile colour names (schema VALUE_COLORS); the theme decides the actual colour.
@@ -51,6 +51,9 @@ inline constexpr const char *ROSE_HISTORY_NAMES[RoseConfig::HISTORY_KEYS] = {
     "center1",    "center2",     "center3",       "topLeft",       "topRight",
     "bottomLeft", "bottomRight", "apparentAngle", "trueDirection", "heading"};
 
+/// A graph's `window` names, in HISTORY window order (GRAPH_WINDOWS in packages/schema/src/tiles.ts).
+inline constexpr const char *GRAPH_WINDOWS[] = {"10m", "1h", "6h"};
+
 /// Autopilot settings (only autopilot tiles carry them).
 struct AutopilotConfig {
   std::vector<AutopilotMode> modes{AutopilotMode::AUTO, AutopilotMode::WIND, AutopilotMode::ROUTE};
@@ -65,8 +68,10 @@ struct Tile {
   std::string id;
   uint16_t x, y, w, h;
   DataItem data;  // switch tiles use data.path and data.label only
-  // gauge / bar
+  // gauge / bar; graph when has_range (its fixed y axis)
   double min{0}, max{0};
+  bool has_range{false};
+  uint8_t graph_window{0};  // graph: index of its `window` in GRAPH_WINDOWS (the display may keep fewer)
   std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf; the server's if it has any
   std::vector<Zone> own_zones;  // the layout's, used when the server has none (ADR-0020)
   ValueColor color{ValueColor::NONE};  // value

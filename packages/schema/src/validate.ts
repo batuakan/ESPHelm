@@ -239,7 +239,20 @@ function validateSemantics(layout: Layout): ValidationError[] {
         }
         placed.push({ x: tile.x, y: tile.y, w: tile.w, h: tile.h, j });
       }
-      if (tile.type === 'value') {
+      if (tile.type === 'graph' && (tile.min !== undefined || tile.max !== undefined)) {
+        // A fixed y range needs both ends, the top above the bottom.
+        if (tile.min === undefined || tile.max === undefined || !(tile.min < tile.max)) {
+          errors.push({
+            pointer: `${tbase}/${tile.min === undefined ? 'min' : 'max'}`, // the missing end, else max
+            code: 'INVALID_RANGE',
+            message:
+              tile.min === undefined || tile.max === undefined
+                ? 'a fixed range needs both min and max'
+                : `max (${tile.max}) must be greater than min (${tile.min})`,
+          });
+        }
+      }
+      if (tile.type === 'value' || tile.type === 'graph') {
         // Open-ended ranges: at least one end, and from below to when both are given.
         (tile.zones ?? []).forEach((zone, k) => {
           const zp = `${tbase}/zones/${k}`;

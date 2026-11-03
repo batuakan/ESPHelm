@@ -5,6 +5,8 @@ import {
   ageLabel,
   axisLabels,
   circularMean,
+  GRAPH_WINDOWS,
+  graphWindowIndex,
   HISTORY,
   historyCount,
   historyEnabled,
@@ -72,6 +74,24 @@ describe('value history', () => {
       unit: 'kn',
     });
     expect(historyCount(layout)).toEqual({ count: 7, fitsPsram: true, fitsNoPsram: false });
+  });
+
+  it('records every graph tile, with or without history', () => {
+    const series = historySeries(readValid('graph.json'));
+    expect(series.map((s) => [s.key, s.title, s.unit])).toEqual([
+      ['depth', 'Depth', 'm'],
+      ['sog', 'SOG', 'kn'],
+      ['hdg', 'HDG', 'deg'],
+      ['baro', 'Baro', 'hPa'],
+    ]);
+  });
+
+  it('draws a graph in its window, or the longest one the display keeps', () => {
+    expect(GRAPH_WINDOWS).toHaveLength(HISTORY.windows.length);
+    expect(graphWindowIndex({}, true)).toBe(0);
+    expect(graphWindowIndex({ window: '1h' }, false)).toBe(1);
+    expect(graphWindowIndex({ window: '6h' }, true)).toBe(2);
+    expect(graphWindowIndex({ window: '6h' }, false)).toBe(HISTORY.noPsramWindows - 1);
   });
 
   it('skips a rose value whose slot is empty', () => {

@@ -20,6 +20,7 @@
     "position",
     "wind_rose",
     "autopilot",
+    "graph",
     "chart"
   ],
   "fonts": [

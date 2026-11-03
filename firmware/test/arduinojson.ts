@@ -30,7 +30,9 @@ export function arduinoJsonSrc(): string {
   if (existsSync(join(src, 'ArduinoJson.h'))) return src;
 
   mkdirSync(CACHE, { recursive: true });
-  const tmp = `${dir}.partial`;
+  // The C++ tests run in parallel workers, and each may get here: every one clones into its own
+  // directory, and the first to finish provides the cache.
+  const tmp = `${dir}.partial-${process.pid}`;
   rmSync(tmp, { recursive: true, force: true });
   try {
     execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', `v${VERSION}`, URL, tmp], {
@@ -40,12 +42,21 @@ export function arduinoJsonSrc(): string {
     if (got !== COMMIT) throw new Error(`v${VERSION} is ${got}, expected ${COMMIT}`);
   } catch (e) {
     rmSync(tmp, { recursive: true, force: true });
+    if (existsSync(join(src, 'ArduinoJson.h'))) return src; // another worker finished it
     throw new Error(
       `Could not fetch ArduinoJson ${VERSION} from ${URL}: ${(e as Error).message}\n` +
         'Offline? Set ESPHELM_ARDUINOJSON to a directory that holds ArduinoJson.h (7.4.x).',
     );
   }
-  rmSync(dir, { recursive: true, force: true });
-  renameSync(tmp, dir);
+  const ready = () => existsSync(join(src, 'ArduinoJson.h'));
+  // A leftover without the header (an interrupted older run) is replaced; a finished one is kept.
+  if (!ready()) rmSync(dir, { recursive: true, force: true });
+  try {
+    if (!ready()) renameSync(tmp, dir);
+  } catch (e) {
+    if (!ready()) throw e; // not just another worker renaming first
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
   return src;
 }

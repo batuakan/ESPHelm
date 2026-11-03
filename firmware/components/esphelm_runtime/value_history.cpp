@@ -128,6 +128,7 @@ void ValueHistory::record(size_t i, double value, uint32_t now) {
 void ValueHistory::append_(Window &w, const Point &p) {
   w.ring[w.head] = p;
   w.head = static_cast<uint16_t>((w.head + 1) % sizes::HISTORY_POINTS);
+  w.appended++;
   if (w.count < sizes::HISTORY_POINTS)
     w.count++;
 }
@@ -199,6 +200,49 @@ size_t ValueHistory::series(size_t i, int window, Point *out) const {
 
 size_t ValueHistory::bytes() const {
   return this->entries_.size() * static_cast<size_t>(this->windows_) * sizes::HISTORY_POINTS * sizeof(Point);
+}
+
+GraphRange prepare_graph(ValueHistory::Point *points, size_t n, bool circular, const units::UnitDef *unit) {
+  if (circular && unit != nullptr) {
+    double s = 0, c = 0;
+    uint32_t count = 0;
+    for (size_t k = 0; k < n; k++) {
+      if (points[k].gap())
+        continue;
+      const double turn = circular_turn(points[k].mean, unit->wrap_min, unit->wrap_max);
+      s += std::sin(turn);
+      c += std::cos(turn);
+      count++;
+    }
+    const double centre = circular_from_sums(s, c, count, unit->wrap_min, unit->wrap_max);
+    for (size_t k = 0; centre == centre && k < n; k++) {
+      auto &p = points[k];
+      if (p.gap())
+        continue;
+      const float shift = static_cast<float>(unwrap_around(p.mean, centre, unit->wrap_min, unit->wrap_max) - p.mean);
+      p = {p.mean + shift, p.min + shift, p.max + shift};
+    }
+  }
+  GraphRange r;
+  for (size_t k = 0; k < n; k++) {
+    const auto &p = points[k];
+    if (p.gap())
+      continue;
+    r.mn = r.valid == 0 ? p.min : std::min(r.mn, p.min);
+    r.mx = r.valid == 0 ? p.max : std::max(r.mx, p.max);
+    r.valid++;
+  }
+  if (r.valid < 2)
+    return r;
+  const double span = static_cast<double>(r.mx) - r.mn;
+  if (span < 1e-6) {
+    r.lo = r.mn - 1.0;
+    r.hi = r.mx + 1.0;
+  } else {
+    r.lo = r.mn - span * 0.1;
+    r.hi = r.mx + span * 0.1;
+  }
+  return r;
 }
 
 }  // namespace esphelm

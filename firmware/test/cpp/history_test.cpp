@@ -150,6 +150,28 @@ int main() {
     plain.tick(p0);
     plain.series(0, 0, out.data());
     CHECK(near(out[0].mean, 180));
+    CHECK(plain.appended(0, 0) == 1 && plain.appended(0, 1) == 0 && plain.appended(1, 0) == 0);
+  }
+
+  {
+    // Graph preparation (popup and graph tile): extent, 10 % margin, a flat line, too few points.
+    using P = ValueHistory::Point;
+    const float nan = std::nanf("");
+    P pts[4] = {{5, 4, 6}, {nan, nan, nan}, {8, 7, 9}, {6, 6, 6}};
+    esphelm::GraphRange r = esphelm::prepare_graph(pts, 4, false, nullptr);
+    CHECK(r.valid == 3 && near(r.mn, 4) && near(r.mx, 9));
+    CHECK(std::fabs(r.lo - 3.5) < 1e-9 && std::fabs(r.hi - 9.5) < 1e-9);
+    P flat[2] = {{3, 3, 3}, {3, 3, 3}};
+    r = esphelm::prepare_graph(flat, 2, false, nullptr);
+    CHECK(near(static_cast<float>(r.lo), 2) && near(static_cast<float>(r.hi), 4));
+    P one[2] = {{3, 3, 3}, {nan, nan, nan}};
+    CHECK(esphelm::prepare_graph(one, 2, false, nullptr).valid == 1);
+    // Angles across north are moved next to their mean (0): 350 and 10 become -10 and 10.
+    const esphelm::units::UnitDef *deg = esphelm::units::find_unit("deg");
+    P north[2] = {{350, 349, 351}, {10, 9, 11}};
+    r = esphelm::prepare_graph(north, 2, true, deg);
+    CHECK(near(north[0].mean, -10) && near(north[0].min, -11) && near(north[1].mean, 10));
+    CHECK(near(r.mn, -11) && near(r.mx, 11));
   }
 
   std::printf("%d failures\n", failures);

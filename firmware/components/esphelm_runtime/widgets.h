@@ -16,6 +16,7 @@
 #include "lvgl.h"
 #include "layout_client.h"
 #include "layout_model.h"
+#include "value_history.h"
 
 namespace esphome {
 namespace esphelm_runtime {
@@ -102,6 +103,8 @@ struct WidgetEnv {
   /// runtime opens it in loop(). Unset or false: the tile isn't tappable.
   std::function<bool(const std::string &key)> has_history;
   std::function<void(const std::string &tile_id)> open_history;
+  /// The recorded values, read by graph tiles (ADR-0021). Lives as long as the layout.
+  const esphelm::ValueHistory *history{nullptr};
 };
 
 class Widget {
