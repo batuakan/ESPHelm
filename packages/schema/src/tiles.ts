@@ -134,6 +134,66 @@ export const GraphTile = Type.Object(
   { additionalProperties: false },
 );
 
+/** What a heading tape can mark besides the heading (ADR-0022). */
+export const HeadingTapeMarker = Type.Union([
+  Type.Literal('cog'),
+  Type.Literal('bearing'),
+  Type.Literal('target'),
+]);
+export type HeadingTapeMarker = Type.Static<typeof HeadingTapeMarker>;
+export const HEADING_TAPE_MARKERS = HeadingTapeMarker.anyOf.map(
+  (l) => l.const,
+) as HeadingTapeMarker[];
+
+/**
+ * Heading tape (ADR-0022): a compass strip that scrolls with the heading under a fixed centre
+ * line, with markers for course over ground, the bearing to the next waypoint and the autopilot
+ * target. Whole degrees, so it takes no unit or decimals.
+ */
+export const HeadingTapeTile = Type.Object(
+  {
+    type: Type.Literal('heading_tape'),
+    ...Placement,
+    label: Type.Optional(Label),
+    span: Type.Optional(
+      Type.Integer({
+        minimum: 30,
+        maximum: 180,
+        description: 'Degrees visible across the tape. Absent: 90.',
+      }),
+    ),
+    markers: Type.Optional(
+      Type.Array(HeadingTapeMarker, {
+        uniqueItems: true,
+        description: 'Which markers it draws (each only while fresh). Absent: all three.',
+      }),
+    ),
+    config: Type.Optional(
+      Type.Object(
+        {
+          headingPath: Type.Optional(SkPath),
+          cogPath: Type.Optional(SkPath),
+          bearingPath: Type.Optional(SkPath),
+          targetPath: Type.Optional(SkPath),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    staleAfter: DataItem.properties.staleAfter,
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted heading tape fields (standard SignalK paths, all true). */
+export const HEADING_TAPE_DEFAULTS = {
+  span: 90,
+  markers: ['cog', 'bearing', 'target'] as readonly HeadingTapeMarker[],
+  headingPath: 'navigation.headingTrue',
+  cogPath: 'navigation.courseOverGroundTrue',
+  bearingPath: 'navigation.course.calcValues.bearingTrue',
+  targetPath: 'steering.autopilot.target',
+} as const;
+
 /** Boolean SignalK path: shows its state and sends a PUT to the same path when tapped. */
 export const SwitchTile = Type.Object(
   {
@@ -346,6 +406,13 @@ export const HISTORY = {
  */
 export const GRAPH_FIT = { axisHeight: 120 } as const;
 
+/**
+ * Heading tape (ADR-0022), in device pixels: minor (5°) ticks are drawn when they are at least
+ * `minorTickPx` apart, and every 10° is labelled when 10° is at least `label10Px` (else every
+ * 30°). Generated into esphelm_sizes.h; headingTape.ts and the editor's preview use them.
+ */
+export const HEADING_TAPE_FIT = { minorTickPx: 6, label10Px: 40 } as const;
+
 /** Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used. */
 export const SERVER_ZONES = {
   maxPerPath: 16,
@@ -361,6 +428,7 @@ export const TILE_TYPES = {
   wind_rose: WindRoseTile,
   autopilot: AutopilotTile,
   graph: GraphTile,
+  heading_tape: HeadingTapeTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -378,6 +446,7 @@ export const Tile = Type.Union([
   WindRoseTile,
   AutopilotTile,
   GraphTile,
+  HeadingTapeTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -387,4 +456,5 @@ export type PositionTile = Type.Static<typeof PositionTile>;
 export type WindRoseTile = Type.Static<typeof WindRoseTile>;
 export type AutopilotTile = Type.Static<typeof AutopilotTile>;
 export type GraphTile = Type.Static<typeof GraphTile>;
+export type HeadingTapeTile = Type.Static<typeof HeadingTapeTile>;
 export type Tile = Type.Static<typeof Tile>;

@@ -246,7 +246,7 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["rotation"] = 0;
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
-  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph"})
+  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape"})
     doc["widgets"].add(w);
   if (this->psram_)
     doc["widgets"].add("chart");

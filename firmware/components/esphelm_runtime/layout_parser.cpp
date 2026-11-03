@@ -402,6 +402,64 @@ void check_autopilot(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
   }
 }
 
+void check_heading_tape(Checker &chk, JsonObjectConst obj, const std::string &ptr, HeadingTapeConfig &tape) {
+  long long span;
+  if (int_field(chk, obj, ptr, "span", false, 30, 180, span))
+    tape.span = static_cast<int>(span);
+  if (has(obj, "markers")) {
+    JsonVariantConst markers = obj["markers"];
+    const std::string mp = ptr + "/markers";
+    if (!markers.is<JsonArrayConst>()) {
+      chk.add(mp, "INVALID_TYPE");
+    } else {
+      for (bool &m : tape.markers)
+        m = false;
+      std::vector<std::string> seen;
+      bool duplicate = false;
+      size_t k = 0;
+      for (JsonVariantConst m : markers.as<JsonArrayConst>()) {
+        const std::string ip = mp + "/" + std::to_string(k++);
+        // uniqueItems compares whole values, whatever their type.
+        std::string text;
+        serializeJson(m, text);
+        for (const auto &t : seen)
+          duplicate = duplicate || t == text;
+        seen.push_back(text);
+        if (!m.is<const char *>()) {
+          // Ajv reports the per-branch type failure and the anyOf failure.
+          chk.add(ip, "INVALID_TYPE");
+          chk.add(ip, "INVALID_VALUE");
+          continue;
+        }
+        int found = -1;
+        for (int i = 0; i < HeadingTapeConfig::MARKERS; i++) {
+          if (std::strcmp(m.as<const char *>(), HEADING_TAPE_MARKER_NAMES[i]) == 0)
+            found = i;
+        }
+        if (found < 0)
+          chk.add(ip, "INVALID_VALUE");
+        else
+          tape.markers[found] = true;
+      }
+      if (duplicate)
+        chk.add(mp, "INVALID_VALUE");
+    }
+  }
+  if (has(obj, "config")) {
+    JsonVariantConst config = obj["config"];
+    const std::string cp = ptr + "/config";
+    if (!config.is<JsonObjectConst>()) {
+      chk.add(cp, "INVALID_TYPE");
+    } else {
+      JsonObjectConst c = config.as<JsonObjectConst>();
+      string_field(chk, c, cp, "headingPath", false, StrKind::PATH, tape.heading_path);
+      string_field(chk, c, cp, "cogPath", false, StrKind::PATH, tape.paths[HeadingTapeConfig::COG]);
+      string_field(chk, c, cp, "bearingPath", false, StrKind::PATH, tape.paths[HeadingTapeConfig::BEARING]);
+      string_field(chk, c, cp, "targetPath", false, StrKind::PATH, tape.paths[HeadingTapeConfig::TARGET]);
+    }
+  }
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -421,6 +479,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::POSITION;
   } else if (t != nullptr && std::strcmp(t, "graph") == 0) {
     tile.type = TileType::GRAPH;
+  } else if (t != nullptr && std::strcmp(t, "heading_tape") == 0) {
+    tile.type = TileType::HEADING_TAPE;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -443,6 +503,20 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     auto ap = std::make_shared<AutopilotConfig>();
     check_autopilot(chk, obj, ptr, *ap);
     tile.autopilot = std::move(ap);
+    return;
+  }
+  if (tile.type == TileType::HEADING_TAPE) {
+    string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
+    double stale;
+    if (number_field(chk, obj, ptr, "staleAfter", false, stale)) {
+      if (!(stale > 0))
+        chk.add(ptr + "/staleAfter", "OUT_OF_RANGE");
+      else
+        tile.data.stale_after = static_cast<float>(stale);
+    }
+    auto tape = std::make_shared<HeadingTapeConfig>();
+    check_heading_tape(chk, obj, ptr, *tape);
+    tile.tape = std::move(tape);
     return;
   }
   if (tile.type == TileType::WIND_ROSE) {

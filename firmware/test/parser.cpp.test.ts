@@ -81,6 +81,22 @@ const mutations: { name: string; doc: unknown }[] = [
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
   { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },
   { name: 'value colour of the wrong type', doc: withTile({ color: 1 }) },
+  {
+    name: 'heading tape span of the wrong type',
+    doc: withTile({ type: 'heading_tape', span: '90' }),
+  },
+  {
+    name: 'heading tape markers: not strings, and not an array',
+    doc: withTile({ type: 'heading_tape', markers: [1, 'cog'] }),
+  },
+  {
+    name: 'heading tape markers not an array',
+    doc: withTile({ type: 'heading_tape', markers: 'cog' }),
+  },
+  {
+    name: 'heading tape with a zero stale time',
+    doc: withTile({ type: 'heading_tape', staleAfter: 0 }),
+  },
   { name: 'graph window of the wrong type', doc: withTile({ type: 'graph', window: 10 }) },
   { name: 'graph with only max', doc: withTile({ type: 'graph', max: 5 }) },
   { name: 'graph min of the wrong type', doc: withTile({ type: 'graph', min: '0', max: 5 }) },

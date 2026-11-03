@@ -3,7 +3,8 @@
 // decimals, label, stale timeout. Gauges and bars add range, zones and orientation; wind roses
 // have their slots, source paths and the true-wind toggle. Value tiles and wind rose values can
 // record their history (ADR-0018, ADR-0019), with a count of what the layout records. Graph
-// tiles (ADR-0021) add their window, an optional fixed range and zones; they always record.
+// tiles (ADR-0021) add their window, an optional fixed range and zones; they always record. Heading
+// tapes (ADR-0022) have their span, markers and paths.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   AUTOPILOT_DEFAULTS,
@@ -15,6 +16,8 @@ import {
   POSITION_FORMATS,
   formatPosition,
   GRAPH_WINDOWS,
+  HEADING_TAPE_DEFAULTS,
+  HEADING_TAPE_MARKERS,
   HISTORY,
   historyEnabled,
   roseHistorySeries,
@@ -30,6 +33,8 @@ import {
   type DataItem,
   type GraphTile,
   type GraphWindow,
+  type HeadingTapeMarker,
+  type HeadingTapeTile,
   type Layout,
   type PositionFormat,
   type PositionTile,
@@ -45,7 +50,7 @@ import {
 } from '@esphelm/schema';
 import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
-import { WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import { headingTapeSettings, WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
 import { HistoryPreview, type PreviewSeries } from './HistoryPreview';
 import { withServerZones } from './Previews';
 
@@ -993,6 +998,100 @@ function AutopilotFields(
   );
 }
 
+const TAPE_MARKERS: {
+  key: HeadingTapeMarker;
+  name: string;
+  shape: string;
+  path: 'cogPath' | 'bearingPath' | 'targetPath';
+}[] = [
+  { key: 'cog', name: 'Course over ground', shape: 'triangle, C', path: 'cogPath' },
+  { key: 'bearing', name: 'Bearing to the next waypoint', shape: 'diamond, W', path: 'bearingPath' },
+  { key: 'target', name: 'Autopilot target', shape: 'notch, A', path: 'targetPath' },
+];
+
+/** True or magnetic, from a path's name; undefined when it doesn't say. */
+const north = (path: string) => (/Magnetic/.test(path) ? 'magnetic' : /True/.test(path) ? 'true' : undefined);
+
+/** A heading tape's caption, heading path, span and markers (ADR-0022). */
+function HeadingTapeFields(
+  props: Common & { tile: HeadingTapeTile; onChange(patch: Patch): void; onConfig(patch: Patch): void },
+) {
+  const { tile } = props;
+  const t = headingTapeSettings(tile);
+  const config = tile.config ?? {};
+  const toggle = (m: HeadingTapeMarker, on: boolean) => {
+    // Keep the canonical order; all three (the default) is stored as "no markers field".
+    const next = HEADING_TAPE_MARKERS.filter((x) => (x === m ? on : t.markers.includes(x)));
+    props.onChange({ markers: next.length === HEADING_TAPE_MARKERS.length ? undefined : next });
+  };
+  const headingNorth = north(t.headingPath);
+  const mixed = t.markers.filter((m) => {
+    const n = north(t.paths[m]);
+    return n !== undefined && headingNorth !== undefined && n !== headingNorth;
+  });
+  return (
+    <>
+      <LabelField label={tile.label ?? ''} placeholder="e.g. Heading" onChange={props.onChange} />
+      <PathPicker
+        path={config.headingPath ?? ''}
+        paths={props.paths}
+        values={props.values}
+        label="Heading"
+        placeholder={`default: ${HEADING_TAPE_DEFAULTS.headingPath}`}
+        onPick={(path) => props.onConfig({ headingPath: path || undefined })}
+      />
+      <label className="field">
+        <span>Span (degrees across the tape)</span>
+        <input
+          type="number"
+          min={30}
+          max={180}
+          step={10}
+          placeholder={String(HEADING_TAPE_DEFAULTS.span)}
+          value={tile.span !== undefined ? String(tile.span) : ''}
+          onChange={(e) => props.onChange({ span: numberOrUndefined(e.target.value) })}
+          aria-label="Span"
+        />
+      </label>
+      <fieldset className="modes">
+        <legend>Markers</legend>
+        {TAPE_MARKERS.map(({ key, name, shape, path }) => (
+          <div key={key}>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={t.markers.includes(key)}
+                onChange={(e) => toggle(key, e.target.checked)}
+                aria-label={name}
+              />
+              {name} ({shape})
+            </label>
+            {t.markers.includes(key) && (
+              <PathPicker
+                path={config[path] ?? ''}
+                paths={props.paths}
+                values={props.values}
+                label={`${name} path`}
+                placeholder={`default: ${HEADING_TAPE_DEFAULTS[path]}`}
+                onPick={(p) => props.onConfig({ [path]: p || undefined })}
+              />
+            )}
+          </div>
+        ))}
+        <small className="hint">A marker shows only while its value is fresh, and as an arrow at the edge when it's off the tape.</small>
+      </fieldset>
+      {mixed.length > 0 && (
+        <p className="warn tape-north">
+          The heading is {headingNorth}; the{' '}
+          {mixed.map((m) => TAPE_MARKERS.find((x) => x.key === m)?.name.toLowerCase()).join(' and ')} isn't, so
+          it will be off by the magnetic variation.
+        </p>
+      )}
+      <StaleField staleAfter={tile.staleAfter} onChange={props.onChange} />
+    </>
+  );
+}
+
 const CHART_PATHS: { key: keyof Omit<typeof CHART_DEFAULTS, 'zoom' | 'anchor'>; label: string; anchor?: boolean }[] =
   [
     { key: 'positionPath', label: 'Position' },
@@ -1128,6 +1227,15 @@ export function TileDrawer(
           paths={props.paths}
           values={props.values}
           onChange={onChange}
+          onClose={props.onClose}
+        />
+      ) : tile.type === 'heading_tape' ? (
+        <HeadingTapeFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          onChange={onChange}
+          onConfig={props.onConfig}
           onClose={props.onClose}
         />
       ) : tile.type === 'wind_rose' ? (

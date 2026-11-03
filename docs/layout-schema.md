@@ -87,6 +87,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `wind_rose` | `config?`, `slots`, `history?` | see below |
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
 | `graph` | DataItem + `window?`, `min?`, `max?`, `zones?` (value zones) | line graph of the value's recent history, see below |
+| `heading_tape` | `label?`, `span?`, `markers?`, `config?`, `staleAfter?` | compass strip that scrolls with the heading, see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
@@ -188,6 +189,28 @@ A line graph of a value's recent history (ADR-0021): the caption and live value 
 { "type": "graph", "id": "depth", "x": 0, "y": 0, "w": 2, "h": 1,
   "path": "environment.depth.belowTransducer", "unit": "m", "label": "Depth",
   "window": "1h", "zones": [{ "to": 3, "state": "alarm" }] }
+```
+
+### Heading tape tiles
+A compass strip that scrolls with the heading under a fixed centre line, with the heading as a number above it (ADR-0022). Whole degrees: there's no `unit` or `decimals` (`UNKNOWN_FIELD`). The number gets "T" or "M" from the heading path, as on the wind rose.
+
+| Field | Notes |
+|---|---|
+| `label` | optional caption |
+| `span` | degrees across the tape, an integer 30–180 (`OUT_OF_RANGE`); default 90 |
+| `markers` | which markers to draw: `cog`, `bearing`, `target`, each at most once (`INVALID_VALUE`). Absent: all three; `[]`: none |
+| `config` | the paths, all optional: `headingPath` (default `navigation.headingTrue`), `cogPath` (`navigation.courseOverGroundTrue`), `bearingPath` (`navigation.course.calcValues.bearingTrue`, the next waypoint), `targetPath` (`steering.autopilot.target`) |
+| `staleAfter` | seconds, as for other tiles |
+
+- **Markers:** COG is a triangle under the tape ("C"), the waypoint bearing a diamond ("W"), the autopilot target a notch above it ("A"). A marker shows only while its value is fresh, so without a route or an autopilot those just don't appear. A marker beyond the tape's edge is drawn as an arrow at that edge, on the side of the shorter turn.
+- **Ticks** (`tapeMarks()` in `headingTape.ts`, mirrored by the firmware's `esphelm_heading_tape.h`, shared cases in `fixtures/heading-tape.cases.json`): every 30° major and labelled (N, E, S, W at the cardinal points), every 10° medium, every 5° minor where they're at least `HEADING_TAPE_FIT.minorTickPx` apart; every 10° labelled where 10° is at least `HEADING_TAPE_FIT.label10Px` wide.
+- **True and magnetic aren't converted.** Each marker is drawn at its own value, so a magnetic heading with true markers puts them off by the magnetic variation. Keep the paths alike; the editor warns when they differ.
+- Defaults are exported as `HEADING_TAPE_DEFAULTS`, marker names as `HEADING_TAPE_MARKERS`.
+
+```json
+{ "type": "heading_tape", "id": "hdg", "x": 0, "y": 0, "w": 2, "h": 1,
+  "label": "Heading", "span": 60, "markers": ["cog", "target"],
+  "config": { "headingPath": "navigation.headingMagnetic" } }
 ```
 
 ### Autopilot tiles

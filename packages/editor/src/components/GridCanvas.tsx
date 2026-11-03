@@ -33,6 +33,8 @@ interface Props {
   autopilotTier(tile: Tile): AutopilotTier;
   /** Whether a graph tile has room for its axis labels on the display (GRAPH_FIT). */
   graphAxis(tile: Tile): boolean;
+  /** A tile's content width on the display, in pixels (heading tapes draw ticks for it). */
+  tileWidth(tile: Tile): number;
   /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
   textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
@@ -187,7 +189,7 @@ export function GridCanvas(props: Props) {
               <span className="tile-label">
                 {tile.type === 'wind_rose'
                   ? ''
-                  : tile.type === 'autopilot' || tile.type === 'position'
+                  : tile.type === 'autopilot' || tile.type === 'position' || tile.type === 'heading_tape'
                     ? (tile.label ?? '')
                     : tile.label || (tile.path ? '' : 'Pick a path')}
               </span>
@@ -198,6 +200,7 @@ export function GridCanvas(props: Props) {
                 roseTier={tile.type === 'wind_rose' ? props.roseTier(tile) : undefined}
                 autopilotTier={tile.type === 'autopilot' ? props.autopilotTier(tile) : undefined}
                 graphAxis={tile.type === 'graph' ? props.graphAxis(tile) : undefined}
+                tapeWidth={tile.type === 'heading_tape' ? props.tileWidth(tile) : undefined}
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />

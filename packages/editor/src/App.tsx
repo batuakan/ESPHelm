@@ -484,6 +484,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   roseTier={(t) => roseTier(tilePx(t))}
                   autopilotTier={(t) => autopilotTier(tileBox(t))}
                   graphAxis={(t) => tileBox(t).height >= GRAPH_FIT.axisHeight}
+                  tileWidth={(t) => tileBox(t).width}
                   textSize={(t) =>
                     t.type === 'value'
                       ? valueTextSize(

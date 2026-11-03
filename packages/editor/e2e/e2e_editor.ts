@@ -696,6 +696,37 @@ async function main(): Promise<void> {
       JSON.stringify(servedGraph),
     );
 
+    // A heading tape (ADR-0022) on a new page: the sample data's heading on the tape, COG only.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page' }).click();
+    await page.getByRole('button', { name: /^Heading tape/ }).click();
+    const tapeDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await tapeDrawer.getByRole('checkbox', { name: 'Bearing to the next waypoint' }).uncheck();
+    await tapeDrawer.getByRole('checkbox', { name: 'Autopilot target' }).uncheck();
+    await page.waitForTimeout(1500); // live values
+    const tapeText =
+      (await page
+        .getByTestId(/^tape-/)
+        .first()
+        .locator('.tape-number')
+        .textContent()) ?? '';
+    await shot(page, '12-desktop-heading-tape');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withTape = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const servedTape = (withTape.body.pages as { tiles?: Record<string, unknown>[] }[])
+      .flatMap((p) => p.tiles ?? [])
+      .find((t) => t.type === 'heading_tape');
+    check(
+      'a heading tape previews the heading and the display gets it with COG only',
+      /^(\d+°T|--)$/.test(tapeText) && JSON.stringify(servedTape?.markers) === '["cog"]',
+      `${tapeText} ${JSON.stringify(servedTape)}`,
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

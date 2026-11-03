@@ -1084,9 +1084,56 @@ async function main(): Promise<void> {
     tapTile('@theme');
     await sleep(800);
 
+    // 9i. Heading tapes (ADR-0022): a tape across north with COG right of centre, the autopilot
+    //     target left of it and the waypoint bearing beyond the left edge; a magnetic tape with a
+    //     60 degree span; a 1x1 tape with no markers. Then a turn, a stale marker, and night.
+    const tapes = fixture('valid/heading-tape.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/heading-tape', admin, tapes);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'heading-tape',
+    });
+    check(
+      'heading tape: the layout renders',
+      await fw.waitLog(/Showing fetched layout "heading-tape" \(1 pages/),
+    );
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+    const tapeValues = (heading: number) => ({
+      'navigation.headingTrue': rad(heading),
+      'navigation.headingMagnetic': rad(heading - 3),
+      'navigation.courseOverGroundTrue': rad(heading + 15),
+      'navigation.course.calcValues.bearingTrue': rad(heading - 60),
+      'steering.autopilot.target': rad(heading - 10),
+    });
+    publish(tapeValues(355));
+    await sleep(1500);
+    await fw.screenshot('53-heading-tape', shots);
+    publish(tapeValues(20));
+    await sleep(1500);
+    await fw.screenshot('54-heading-tape-turned', shots);
+    // The 'wide' tape goes stale after 10 s: keep its heading and COG fresh, not its target.
+    const freshTimer = setInterval(() => {
+      const v = tapeValues(20);
+      publish({
+        'navigation.headingTrue': v['navigation.headingTrue'],
+        'navigation.headingMagnetic': v['navigation.headingMagnetic'],
+        'navigation.courseOverGroundTrue': v['navigation.courseOverGroundTrue'],
+        'navigation.course.calcValues.bearingTrue': v['navigation.course.calcValues.bearingTrue'],
+      });
+    }, 1000);
+    await sleep(12000);
+    await fw.screenshot('55-heading-tape-stale-target', shots);
+    clearInterval(freshTimer);
+    tapTile('@theme');
+    await sleep(800);
+    publish(tapeValues(355));
+    await sleep(1500);
+    await fw.screenshot('56-heading-tape-night', shots);
+    tapTile('@theme');
+    await sleep(800);
+
     await fw.stop();
     fw.start();
-    await fw.waitLog(/Showing cached layout "graph"/);
+    await fw.waitLog(/Showing cached layout "heading-tape"/);
     await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
@@ -1196,6 +1243,18 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-07-graph', shots);
+    await fw720.stop();
+
+    // 12e. Heading tapes at 720, offline: stale, so muted, "--" and no markers.
+    const tape720 = readFileSync(join(FIXTURES, 'valid/heading-tape.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(tape720, '"seed-tape"'));
+    fw720.start();
+    check(
+      '720 build shows the heading tape layout',
+      await fw720.waitLog(/Showing cached layout "heading-tape" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-08-heading-tape', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

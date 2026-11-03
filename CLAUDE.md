@@ -116,11 +116,11 @@ This is the *target*. Do not move existing files until Phase 0 findings are revi
 
 ## 7. Widget catalog
 
-Rendered by the firmware: tiles `value` (optionally coloured: a named colour or zones by value, ADR-0016; text sized to the tile from a ladder of compiled fonts, ADR-0017; a tap opens a graph of its recent values, recorded on the display when switched on, ADR-0018/0019), `gauge`, `bar`, `switch`, `position` (GPS position as text in four formats, defined once in `packages/schema/src/position.ts` and mirrored in `esphelm_position.h`), `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers; its values can record history, ADR-0019) `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline) and `graph` (a line graph of a value's recent history, always recorded on the display; window, optional fixed range, zone bands; ADR-0021). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
+Rendered by the firmware: tiles `value` (optionally coloured: a named colour or zones by value, ADR-0016; text sized to the tile from a ladder of compiled fonts, ADR-0017; a tap opens a graph of its recent values, recorded on the display when switched on, ADR-0018/0019), `gauge`, `bar`, `switch`, `position` (GPS position as text in four formats, defined once in `packages/schema/src/position.ts` and mirrored in `esphelm_position.h`), `wind_rose` (a tile since 5b, ADR-0010; sized by the device in pixel tiers; its values can record history, ADR-0019) `autopilot` (5c; safety rules in ADR-0011: confirm to engage, one-tap standby, course changes only while engaged, status only when small or offline), `graph` (a line graph of a value's recent history, always recorded on the display; window, optional fixed range, zone bands; ADR-0021) and `heading_tape` (a compass strip that scrolls with the heading, with COG, waypoint bearing and autopilot target markers; geometry shared in `packages/schema/src/headingTape.ts` and `esphelm_heading_tape.h`; ADR-0022). Starter layouts porting the legacy apps, plus denser `-720` layouts for large displays, are in `packages/schema/templates/`.
 Every display also shows SignalK alarms (`notifications.*`) in a banner above the page (ADR-0014).
 Zones in the server's metadata replace the zones of `value`, `gauge`, `bar` and `graph` tiles; the display reads and follows them (ADR-0020).
 Page kinds: `grid` and `chart` (5d, ADR-0012: SignalK chart tiles converted to RGB565 by the plugin, vessel and anchor watch, north up, PSRAM displays only).
-Later: maybe `compass`; possibly a plugin bridge to SignalK's v2 Autopilot API; chart tiles cached on flash.
+Later: possibly a plugin bridge to SignalK's v2 Autopilot API; chart tiles cached on flash.
 Weather/clock currently come from HomeAssistant; their future source is an open question (see section 11).
 
 ## 8. Verification (you must be able to check your own work)
@@ -132,7 +132,7 @@ Toolchain (verified in Phase 0): ESPHome 2026.9.1, LVGL 9.5.0, ESP-IDF 5.5.5, No
 - Dev SignalK: `PORT=3999 signalk-server -c <scratch-dir> --sample-nmea0183-data [--securityenabled]`. **Never run it without `-c`**: that uses the real `~/.signalk`.
 - TS packages (npm workspaces, from the repo root): `npm ci`, `npm run generate` (units TS/C++ + JSON Schemas; output is committed), `npm test` (includes a g++-built C++ units test), `npm run typecheck`, `npm run lint`, `npm run build`.
 - Runtime firmware: `~/venv/bin/esphome compile firmware/esphelm_sdl.yaml` (desktop), `firmware/esphelm_p4.yaml` (P4-86), `firmware/esphelm_c3_compile_check.yaml` (compile-only). P4/C3 need `firmware/secrets.yaml` (git-ignored: `wifi_ssid`, `wifi_password`, `signalk_host`). Reference: `docs/firmware-runtime.md`.
-- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 53 golden screenshots in `firmware/test/golden/`, including the autopilot flow and a chart page against stand-in plugins, alarms, display settings, the boot guard and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
+- Firmware end to end: `npm run build && npm run e2e:sdl` (SDL build against a real signalk-server on port 3993, 58 golden screenshots in `firmware/test/golden/`, including the autopilot flow and a chart page against stand-in plugins, alarms, display settings, the boot guard and offline 720×720 renders via `firmware/esphelm_sdl_720.yaml`; `UPDATE_GOLDEN=1` re-records, review them by eye). Needs an X display.
 - ESPHomeSignalK unit tests: `../ESPHomeSignalK/tools/test_cpp.sh`.
 - Editor: `npm run dev -w @esphelm/editor` (Vite, proxies to `ESPHELM_SIGNALK`, default http://localhost:3000); served by SignalK at `/signalk-esphelm/` after `npm run build`. Browser e2e: `npm run build && npm run e2e:editor` (installed Google Chrome via playwright-core; `CHROME=` to override). Reference: `docs/editor.md`.
 - Plugin end to end: `npm run build && npm run e2e -w signalk-esphelm` (real signalk-server with security on, throwaway config dir, real tokens). `SIGNALK_SERVER=/path/to/bin/signalk-server` selects an install; three exist on this machine (2.17.2 on PATH, 2.19.0 in /usr/local, 2.26.0 in ~/node_modules).
@@ -150,6 +150,7 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - Builds and type-checks cleanly.
 - Tests added or updated and passing.
 - Fixtures and `docs/layout-schema.md` updated if the schema changed.
+- `README.md` updated for a new feature: the feature list, any counts or status it changes, and a screenshot in the gallery (a reviewed SDL golden copied to `docs/images/`).
 - Failure modes considered (bad JSON, server down, path missing, value stale).
 - Short summary: what changed, how it was verified, what is *not* verified.
 

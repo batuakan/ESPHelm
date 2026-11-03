@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "id": "heading-tape",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "tapes",
+      "title": "Heading",
+      "grid": {
+        "cols": 2,
+        "rows": 3
+      },
+      "tiles": [
+        {
+          "type": "heading_tape",
+          "id": "tape",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1,
+          "label": "Heading"
+        },
+        {
+          "type": "heading_tape",
+          "id": "wide",
+          "x": 0,
+          "y": 1,
+          "w": 2,
+          "h": 1,
+          "span": 60,
+          "markers": [
+            "cog",
+            "target"
+          ],
+          "config": {
+            "headingPath": "navigation.headingMagnetic",
+            "targetPath": "steering.autopilot.target"
+          },
+          "staleAfter": 10
+        },
+        {
+          "type": "heading_tape",
+          "id": "small",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "span": 120,
+          "markers": []
+        },
+        {
+          "type": "value",
+          "id": "cog",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.courseOverGroundTrue",
+          "unit": "deg",
+          "decimals": 0,
+          "label": "COG"
+        }
+      ]
+    }
+  ]
+}

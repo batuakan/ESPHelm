@@ -15,7 +15,8 @@
   "widgets": [
     "value",
     "bar",
-    "graph"
+    "graph",
+    "heading_tape"
   ],
   "capacity": {
     "psram": false,

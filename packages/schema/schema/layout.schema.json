@@ -1739,6 +1739,114 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "heading_tape"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        },
+                        "span": {
+                          "type": "integer",
+                          "minimum": 30,
+                          "maximum": 180,
+                          "description": "Degrees visible across the tape. Absent: 90."
+                        },
+                        "markers": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "cog"
+                              },
+                              {
+                                "type": "string",
+                                "const": "bearing"
+                              },
+                              {
+                                "type": "string",
+                                "const": "target"
+                              }
+                            ]
+                          },
+                          "uniqueItems": true,
+                          "description": "Which markers it draws (each only while fresh). Absent: all three."
+                        },
+                        "config": {
+                          "type": "object",
+                          "properties": {
+                            "headingPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "cogPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "bearingPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "targetPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "staleAfter": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Seconds without an update before the value is shown as stale."
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   ]
                 },
