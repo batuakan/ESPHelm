@@ -91,6 +91,7 @@ std::unique_ptr<Widget> make_autopilot_widget(lv_obj_t *cell, const esphelm::Til
 std::unique_ptr<Widget> make_wind_rose_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_position_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_graph_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_heading_tape_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
 }  // namespace esphelm_runtime
 }  // namespace esphome
