@@ -26,6 +26,10 @@ import {
   HISTORY,
   tapeMarks,
   tapeX,
+  centerZeroSpan,
+  centerZeroText,
+  centerZeroTick,
+  type CenterZeroSides,
   type HeadingTapeMarker,
   type HeadingTapeTile,
 } from '@esphelm/schema';
@@ -93,10 +97,35 @@ function zoneFor(n: number | undefined, zones: Zone[] | undefined): string {
 const GAUGE_START = 225;
 const GAUGE_SWEEP = 270;
 
+/**
+ * A centre-zero scale (ADR-0023): the drawn range (-M..M, else min..max), the value clamped to
+ * min..max, its text with unit and side, and the fill's colour class.
+ */
+function scaleOf(tile: Extract<Tile, { type: 'gauge' | 'bar' }>, value: unknown, n: number | undefined) {
+  const cz = tile.centerZero === true;
+  const m = cz ? centerZeroSpan(tile.min, tile.max) : 0;
+  const lo = cz ? -m : tile.min;
+  const hi = cz ? m : tile.max;
+  const v = n === undefined ? undefined : Math.min(tile.max, Math.max(tile.min, n));
+  const sides: CenterZeroSides = tile.sides ?? 'portStarboard';
+  const unit = tile.unit ? UNITS[tile.unit].label : '';
+  let text = `${formatValue(value, tile.unit, tile.decimals)} ${unit}`;
+  if (cz && n !== undefined) {
+    const t = centerZeroText(n, tile.decimals, sides);
+    text = `${t.text} ${unit}${t.side ? ` ${t.side}` : ''}`;
+  }
+  const side = sides === 'plusMinus' ? 'plus' : (v ?? 0) < 0 ? 'port' : 'stbd';
+  return { cz, m, lo, hi, v, sides, text, side };
+}
+
 function GaugePreview({ tile, value }: { tile: Extract<Tile, { type: 'gauge' }>; value: unknown }) {
   const n = displayNumber(value, tile);
-  const at = (v: number) => GAUGE_START + GAUGE_SWEEP * clamp01((v - tile.min) / (tile.max - tile.min || 1));
-  const [nx, ny] = polar(50, 52, 34, n === undefined ? GAUGE_START : at(n));
+  const s = scaleOf(tile, value, n);
+  const at = (v: number) => GAUGE_START + GAUGE_SWEEP * clamp01((v - s.lo) / (s.hi - s.lo || 1));
+  const [nx, ny] = polar(50, 52, 34, s.v === undefined ? (s.cz ? at(0) : GAUGE_START) : at(s.v));
+  // P and S in the top corners, outside the ring, as on the display.
+  const [px, py] = [8, 12];
+  const [sx, sy] = [92, 12];
   return (
     <span className="tile-graphic">
       <svg viewBox="0 0 100 100" className="gauge" aria-hidden>
@@ -104,30 +133,76 @@ function GaugePreview({ tile, value }: { tile: Extract<Tile, { type: 'gauge' }>;
         {(tile.zones ?? []).map((z, i) => (
           <path key={i} className={`zone zone-${z.state}`} d={arc(50, 52, 40, at(z.from), at(z.to))} />
         ))}
-        {n !== undefined && <line className="needle" x1={50} y1={52} x2={nx} y2={ny} />}
+        {s.cz && s.v !== undefined && s.v !== 0 && (
+          <path
+            className={`cz-fill side-${s.side}`}
+            d={s.v > 0 ? arc(50, 52, 40, at(0), at(s.v)) : arc(50, 52, 40, at(s.v), at(0))}
+          />
+        )}
+        {s.cz && <line className="cz-zero" x1={50} y1={8} x2={50} y2={16} />}
+        {s.cz && (
+          <>
+            <text x={50} y={24} className="cz-tick">
+              {centerZeroTick(0, s.m, s.sides)}
+            </text>
+            {s.sides === 'portStarboard' && (
+              <>
+                <text x={px} y={py} className="cz-end side-port">
+                  P
+                </text>
+                <text x={sx} y={sy} className="cz-end side-stbd">
+                  S
+                </text>
+              </>
+            )}
+          </>
+        )}
+        {s.v !== undefined && <line className="needle" x1={50} y1={52} x2={nx} y2={ny} />}
         <text x={50} y={94} className="gauge-value">
-          {formatValue(value, tile.unit, tile.decimals)} {tile.unit ? UNITS[tile.unit].label : ''}
+          {s.text}
         </text>
       </svg>
     </span>
   );
 }
 
+/** The state of the last zone `n` falls in (a bar's fill), if any. */
+function zoneMatch(n: number | undefined, zones: Zone[] | undefined): Zone['state'] | undefined {
+  let state: Zone['state'] | undefined;
+  if (n !== undefined) for (const z of zones ?? []) if (n >= z.from && n <= z.to) state = z.state;
+  return state;
+}
+
 function BarPreview({ tile, value }: { tile: Extract<Tile, { type: 'bar' }>; value: unknown }) {
   const n = displayNumber(value, tile);
-  const pct = n === undefined ? 0 : 100 * clamp01((n - tile.min) / (tile.max - tile.min || 1));
+  const s = scaleOf(tile, value, n);
+  const pct = s.v === undefined ? (s.cz ? 50 : 0) : 100 * clamp01((s.v - s.lo) / (s.hi - s.lo || 1));
   const vertical = tile.orientation === 'vertical';
+  // Centre zero fills from the middle; a matching zone's colour wins over the side's.
+  const from = s.cz ? Math.min(pct, 50) : 0;
+  const size = s.cz ? Math.abs(pct - 50) : pct;
+  const zone = zoneMatch(s.v, tile.zones);
+  const fill = s.cz && !zone ? `side-${s.side}` : `zone-${zone ?? zoneFor(n, tile.zones)}`;
   return (
     <span className={`tile-graphic bar ${vertical ? 'vertical' : ''}`}>
       <span className="bar-track">
         <span
-          className={`bar-fill zone-${zoneFor(n, tile.zones)}`}
-          style={vertical ? { height: `${pct}%` } : { width: `${pct}%` }}
+          className={`bar-fill ${fill}`}
+          style={
+            vertical
+              ? { height: `${size}%`, bottom: `${from}%` }
+              : { width: `${size}%`, left: `${from}%` }
+          }
         />
+        {s.cz && <span className={`bar-zero ${vertical ? 'vertical' : ''}`} />}
+        {s.cz && (
+          <>
+            <span className="bar-end start">{s.sides === 'portStarboard' ? 'P' : '-'}</span>
+            <span className="bar-end end">{s.sides === 'portStarboard' ? 'S' : '+'}</span>
+          </>
+        )}
       </span>
-      <span className="bar-value">
-        {formatValue(value, tile.unit, tile.decimals)} {tile.unit ? UNITS[tile.unit].label : ''}
-      </span>
+      <span className="bar-value">{s.text}</span>
     </span>
   );
 }

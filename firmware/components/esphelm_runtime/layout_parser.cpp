@@ -263,6 +263,7 @@ void data_item_fields(Checker &chk, JsonObjectConst obj, const std::string &ptr,
 
 const char *const ZONE_STATES[] = {"normal", "warn", "alarm", "emergency"};
 const char *const ORIENTATIONS[] = {"horizontal", "vertical"};
+const char *const CENTER_ZERO_SIDES[] = {"portStarboard", "plusMinus"};
 const char *const THEMES[] = {"day", "night"};
 // Same order as position::Format.
 const char *const POSITION_FORMATS[] = {"ddm", "dms", "dd", "decimal"};
@@ -600,6 +601,17 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
       }
     }
   }
+  if (tile.type == TileType::GAUGE || tile.type == TileType::BAR) {
+    if (has(obj, "centerZero")) {
+      if (!obj["centerZero"].is<bool>())
+        chk.add(ptr + "/centerZero", "INVALID_TYPE");
+      else
+        tile.center_zero = obj["centerZero"].as<bool>();
+    }
+    int sides = enum_field(chk, obj, ptr, "sides", false, CENTER_ZERO_SIDES, 2);
+    if (sides >= 0)
+      tile.sides = static_cast<center_zero::Sides>(sides);
+  }
   if (tile.type == TileType::BAR) {
     int o = enum_field(chk, obj, ptr, "orientation", false, ORIENTATIONS, 2);
     if (o >= 0)
@@ -809,6 +821,8 @@ void check_semantics(Checker &chk, const Layout &layout) {
             chk.add(tp + "/zones/" + std::to_string(k), "INVALID_ZONE");
         }
       }
+      if ((t.type == TileType::GAUGE || t.type == TileType::BAR) && t.center_zero && !(t.min < 0 && t.max > 0))
+        chk.add(tp + "/min", "INVALID_RANGE");
       if (t.type == TileType::GAUGE || t.type == TileType::BAR) {
         if (!(t.min < t.max)) {
           chk.add(tp + "/max", "INVALID_RANGE");

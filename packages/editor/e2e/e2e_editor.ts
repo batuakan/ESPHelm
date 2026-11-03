@@ -727,6 +727,33 @@ async function main(): Promise<void> {
       `${tapeText} ${JSON.stringify(servedTape)}`,
     );
 
+    // A centre-zero gauge (ADR-0023) on a new page: plus/minus, sent to the display.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page' }).click();
+    await page.getByRole('button', { name: /^Gauge/ }).click();
+    const czDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await czDrawer.getByLabel('Search SignalK paths').fill('speedOverGround');
+    await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
+    await czDrawer.getByLabel('Centre zero').check();
+    await czDrawer.getByLabel('Sides').selectOption('plusMinus');
+    await page.waitForTimeout(1500); // live values
+    await shot(page, '13-desktop-center-zero');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withCz = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const servedCz = (withCz.body.pages as { tiles?: Record<string, unknown>[] }[])
+      .flatMap((p) => p.tiles ?? [])
+      .find((t) => t.type === 'gauge' && t.centerZero === true);
+    check(
+      'a centre-zero gauge reaches the display with a symmetric range and plus/minus',
+      servedCz?.sides === 'plusMinus' && Number(servedCz.min) < 0 && Number(servedCz.max) > 0,
+      JSON.stringify(servedCz),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

@@ -95,3 +95,14 @@ export interface TapeCases {
 export const TAPE_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'heading-tape.cases.json'), 'utf8'),
 ) as TapeCases;
+
+/** Centre-zero text cases (ADR-0023), shared by the TS and C++ tests. */
+export interface CenterZeroCases {
+  text: { n: number; decimals?: number; sides: string; expected: { text: string; side: string } }[];
+  ticks: { v: number; m: number; sides: string; expected: string }[];
+  spans: { min: number; max: number; expected: number }[];
+}
+
+export const CENTER_ZERO_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'center-zero.cases.json'), 'utf8'),
+) as CenterZeroCases;

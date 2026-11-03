@@ -81,8 +81,8 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `type` | Extra fields | Notes |
 |---|---|---|
 | `value` | DataItem + `color?`, `zones?` (value zones), `history?` | big number + label + unit; the number coloured by a fixed colour or by value (below); a tap opens its history graph |
-| `gauge` | DataItem + `min`, `max`, `zones?` | round gauge with needle |
-| `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`) | tank level, SoC |
+| `gauge` | DataItem + `min`, `max`, `zones?`, `centerZero?`, `sides?` | round gauge with needle; centre zero below |
+| `bar` | DataItem + `min`, `max`, `zones?`, `orientation?` (`horizontal` / `vertical`), `centerZero?`, `sides?` | tank level, SoC; centre zero below |
 | `switch` | `path`, `label?` | boolean path: shows state, sends a PUT to the same path when tapped. Takes no `unit`. |
 | `wind_rose` | `config?`, `slots`, `history?` | see below |
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
@@ -92,6 +92,23 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
 **Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
+
+### Centre-zero gauges and bars (ADR-0023)
+For values either side of zero: rudder angle, heel, rate of turn, battery current, trim.
+- `centerZero` (optional boolean): the scale is centred on zero and fills from zero to the value. It needs `min < 0 < max` (`INVALID_RANGE` on `/min`).
+- **Symmetric scale:** it is drawn from −M to M, with M the larger of |min| and |max| (`centerZeroSpan()`). `min` and `max` still clamp the value and bound the zones.
+- `sides` (optional): `portStarboard` (default) or `plusMinus`. Without `centerZero` it has no effect.
+  - **portStarboard:** the magnitude and P or S ("12 ° P"), filled red to port and green to starboard.
+  - **plusMinus:** signed ("+8.2 A"), one colour. A vertical bar has positive up.
+- **Text:** `centerZeroText()` and `centerZeroTick()` in `centerZero.ts`, mirrored by the firmware's `esphelm_center_zero.h`, with shared cases in `fixtures/center-zero.cases.json`. A value that rounds to zero has no side or sign.
+- **Angles:** use `deg180` (−180…180), not `deg`, which wraps to 0–360.
+- Older firmware ignores both fields and draws a plain gauge or bar.
+
+```json
+{ "type": "gauge", "id": "rudder", "x": 0, "y": 0, "w": 1, "h": 1,
+  "path": "steering.rudderAngle", "unit": "deg180", "decimals": 0, "label": "Rudder",
+  "min": -35, "max": 35, "centerZero": true }
+```
 
 ### Value tile colours (ADR-0016)
 - `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
@@ -266,7 +283,7 @@ Brightness needs a backlight the firmware can dim (`capabilities.backlight` in t
 | `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use) |
 | `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
 | `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
-| `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max`; a graph with only one of `min`/`max`, or `min` not below `max` |
+| `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max`; a centre-zero gauge/bar whose range doesn't cross zero; a graph with only one of `min`/`max`, or `min` not below `max` |
 | `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value or graph zone with neither `from` nor `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
 | `UNKNOWN_PAGE` | semantic | `settings.startPage` isn't a page of the layout |
