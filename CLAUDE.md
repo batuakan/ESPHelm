@@ -150,6 +150,7 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - Builds and type-checks cleanly.
 - Tests added or updated and passing.
 - Fixtures and `docs/layout-schema.md` updated if the schema changed.
+- `README.md` updated for a new feature: the feature list, any counts or status it changes, and a screenshot in the gallery (a reviewed SDL golden copied to `docs/images/`).
 - Failure modes considered (bad JSON, server down, path missing, value stale).
 - Short summary: what changed, how it was verified, what is *not* verified.
 
