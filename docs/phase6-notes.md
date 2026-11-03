@@ -128,3 +128,15 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Editor:** an App test and a browser e2e step.
   - **SDL e2e:** a live depth line, and three new goldens (`51`, `52`, `720-07`). All 50 existing goldens are unchanged, including every popup image.
 - **Not verified:** on the P4 (hardware step 20), and the C3's internal-RAM limit with graphs on a real chip.
+
+## Heading tape (ADR-0022, branch `feat/heading-tape`, on top of `feat/graph-tile`)
+
+- **What:** a `heading_tape` tile, a compass strip that scrolls with the heading. It has markers for COG, the bearing to the next waypoint and the autopilot target (an arrow at the edge when off the tape).
+- **Schema:** the tile type (`span`, `markers`, `config` paths, `staleAfter`), `HEADING_TAPE_DEFAULTS`, `HEADING_TAPE_FIT`, and the shared geometry `tapeMarks()`/`tapeX()` with `heading-tape.cases.json` (TS and g++).
+- **Firmware:** `widget_heading_tape.cpp` draws the tape in a draw callback (four LVGL objects) and redraws on half a degree, at most every 250 ms.
+- **Editor:**
+  - **Library:** a *Heading tape* item (2x1).
+  - **Drawer:** the span, the markers with their paths, and a true/magnetic warning.
+  - **Preview:** an SVG drawn from the shared geometry for the tile's width on the display.
+- **Fixed on the way:** the ArduinoJson fetch for the C++ tests raced between parallel workers (PR #4's CI failure). Each worker now clones into its own directory.
+- **Not verified:** on the P4 (hardware step 21), and true/magnetic conversion, which is left out by design.
