@@ -664,6 +664,38 @@ async function main(): Promise<void> {
       String(posText),
     );
 
+    // A graph tile (ADR-0021) next to it: the live SOG, its 1 h window, sent to the display.
+    await page.getByRole('button', { name: /^Graph/ }).click();
+    const graphDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await graphDrawer.getByLabel('Search SignalK paths').fill('speedOverGround');
+    await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
+    await graphDrawer.getByLabel('Window').selectOption('1h');
+    await page.waitForTimeout(1500); // live values
+    const graphTile = page.getByTestId(/^tile-graph-/).first();
+    const graphHint = (await graphDrawer.locator('.size-hint').textContent()) ?? '';
+    check(
+      'a graph tile previews its line and says what fits',
+      (await graphTile.getByRole('img', { name: 'Graph' }).isVisible()) &&
+        /^About \d+×\d+ px on this display: the line/.test(graphHint),
+      graphHint,
+    );
+    await shot(page, '11-desktop-graph-tile');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withGraph = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const servedGraph = (withGraph.body.pages as { tiles?: Record<string, unknown>[] }[])
+      .flatMap((p) => p.tiles ?? [])
+      .find((t) => t.type === 'graph');
+    check(
+      'the display gets the graph tile with its window',
+      servedGraph?.path === 'navigation.speedOverGround' && servedGraph.window === '1h',
+      JSON.stringify(servedGraph),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

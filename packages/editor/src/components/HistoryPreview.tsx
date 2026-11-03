@@ -40,8 +40,29 @@ export function exampleCurve(base: number, w: number, amp = Math.max(Math.abs(ba
   );
 }
 
+/**
+ * SVG polyline points (a 100x100 box, the newest on the right) of each run of points between
+ * gaps, for a y axis from `lo` to `hi`. Points outside it are drawn at its edge, as the graph
+ * tile does with a fixed axis.
+ */
+export function chartRuns(points: readonly (number | null)[], lo: number, hi: number): string[] {
+  const y = (v: number) => ((hi - Math.min(hi, Math.max(lo, v))) / (hi - lo)) * 100;
+  const runs: string[] = [];
+  let run: string[] = [];
+  points.forEach((p, k) => {
+    if (p === null) {
+      if (run.length > 1) runs.push(run.join(' '));
+      run = [];
+    } else {
+      run.push(`${((k / (HISTORY.points - 1)) * 100).toFixed(2)},${y(p).toFixed(2)}`);
+    }
+  });
+  if (run.length > 1) runs.push(run.join(' '));
+  return runs;
+}
+
 /** Into the wrap range, rounded first so that 359.96 reads 0 (as the display's axis labels). */
-function wrapped(v: number, wrap: Wrap, decimals: number): number {
+export function wrapped(v: number, wrap: Wrap, decimals: number): number {
   const s = 10 ** decimals;
   const r = Math.round(v * s) / s;
   const span = wrap[1] - wrap[0];
@@ -101,18 +122,7 @@ export function HistoryPreview(props: {
   const lo = min - pad;
   const hi = max + pad;
   const y = (v: number) => ((hi - v) / (hi - lo)) * 100;
-  // One polyline per run of points between gaps.
-  const runs: string[] = [];
-  let run: string[] = [];
-  points.forEach((p, k) => {
-    if (p === null) {
-      if (run.length > 1) runs.push(run.join(' '));
-      run = [];
-    } else {
-      run.push(`${((k / (HISTORY.points - 1)) * 100).toFixed(2)},${y(p).toFixed(2)}`);
-    }
-  });
-  if (run.length > 1) runs.push(run.join(' '));
+  const runs = chartRuns(points, lo, hi);
   const fmt = (v: number) => v.toFixed(decimals);
   const axis = (v: number) => fmt(wrap ? wrapped(v, wrap, decimals) : v);
   const windows = HISTORY.windows;

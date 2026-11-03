@@ -31,6 +31,8 @@ interface Props {
   roseTier(tile: Tile): RoseTier;
   /** Whether the display will show an autopilot tile's buttons. */
   autopilotTier(tile: Tile): AutopilotTier;
+  /** Whether a graph tile has room for its axis labels on the display (GRAPH_FIT). */
+  graphAxis(tile: Tile): boolean;
   /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
   textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
@@ -195,6 +197,7 @@ export function GridCanvas(props: Props) {
                 serverZones={props.serverZones}
                 roseTier={tile.type === 'wind_rose' ? props.roseTier(tile) : undefined}
                 autopilotTier={tile.type === 'autopilot' ? props.autopilotTier(tile) : undefined}
+                graphAxis={tile.type === 'graph' ? props.graphAxis(tile) : undefined}
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />

@@ -6,6 +6,7 @@ import {
   CHART_DEFAULTS,
   DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
   DEFAULT_FONT_LINE_HEIGHTS,
+  GRAPH_FIT,
   TEMPLATES,
   TILE_TYPES,
   historyCount,
@@ -482,6 +483,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   selectedSlot={selection?.slot}
                   roseTier={(t) => roseTier(tilePx(t))}
                   autopilotTier={(t) => autopilotTier(tileBox(t))}
+                  graphAxis={(t) => tileBox(t).height >= GRAPH_FIT.axisHeight}
                   textSize={(t) =>
                     t.type === 'value'
                       ? valueTextSize(
@@ -581,7 +583,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
               ? sizeHint(tilePx(tile), !!device)
               : tile.type === 'autopilot'
                 ? autopilotHint(tileBox(tile), !!device)
-                : undefined
+                : tile.type === 'graph'
+                  ? graphHint(tileBox(tile), !!device)
+                  : undefined
           }
           openSlot={selection?.slot}
           theme={layout.theme}
@@ -609,6 +613,15 @@ function sizeHint(px: number, known: boolean): string {
 function autopilotHint(box: { width: number; height: number }, known: boolean): string {
   const where = known ? 'on this display' : 'on a 480×480 display';
   return `About ${box.width}×${box.height} px ${where}: ${AUTOPILOT_TIER_TEXT[autopilotTier(box)]}.`;
+}
+
+function graphHint(box: { width: number; height: number }, known: boolean): string {
+  const where = known ? 'on this display' : 'on a 480×480 display';
+  const what =
+    box.height >= GRAPH_FIT.axisHeight
+      ? 'the line with its range and time labels'
+      : `the line only; ${GRAPH_FIT.axisHeight} px high or more shows its range and time labels`;
+  return `About ${box.width}×${box.height} px ${where}: ${what}.`;
 }
 
 function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined, layout: Layout) {

@@ -155,6 +155,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, slots: {} };
     case 'autopilot':
       return { type, ...place };
+    case 'graph':
+      return { type, ...place, path: '' };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -162,7 +164,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
 
 /**
  * Add a tile to page `index` at `at` (or the first free cell). Tiles are 1x1, except wind
- * roses, which take 2x2 when that fits there.
+ * roses and autopilots, which take 2x2, and positions and graphs, which take 2x1, when that fits
+ * there.
  */
 export function addTile(
   layout: Layout,
@@ -181,15 +184,17 @@ export function addTile(
         ? 'pilot'
         : type === 'position'
           ? 'pos'
-          : 'tile';
+          : type === 'graph'
+            ? 'graph'
+            : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
   const big = type === 'wind_rose' || type === 'autopilot';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
-  } else if (type === 'position' && fits(page, { ...cell, w: 2, h: 1 })) {
-    tile.w = 2; // two text lines read better wide
+  } else if ((type === 'position' || type === 'graph') && fits(page, { ...cell, w: 2, h: 1 })) {
+    tile.w = 2; // two text lines, or a time axis, read better wide
   }
   return {
     id,

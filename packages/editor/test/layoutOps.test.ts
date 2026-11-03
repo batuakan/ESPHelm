@@ -1,4 +1,10 @@
-import { TEMPLATES, validateLayout, type GridPage, type Layout } from '@esphelm/schema';
+import {
+  TEMPLATES,
+  historyCount,
+  validateLayout,
+  type GridPage,
+  type Layout,
+} from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
 import {
   pageTiles,
@@ -438,5 +444,17 @@ describe('position tiles', () => {
     l = addTile(l, 0, 'value', { x: 1, y: 0 })!.layout;
     const r = addTile(l, 0, 'position', { x: 0, y: 0 })!;
     expect(page(r.layout).tiles.find((t) => t.type === 'position')).toMatchObject({ w: 1, h: 1 });
+  });
+});
+
+describe('graph tiles', () => {
+  it('start 2x1 with an empty path, and subscribe to it once picked', () => {
+    const r = addTile(newLayoutFor(device), 0, 'graph')!;
+    const tile = page(r.layout).tiles[0]!;
+    expect(tile).toEqual({ type: 'graph', id: 'graph-1', x: 0, y: 0, w: 2, h: 1, path: '' });
+    const picked = updateTile(r.layout, 0, 'graph-1', { path: 'navigation.speedOverGround' });
+    expect(tilePaths(page(picked).tiles[0]!)).toEqual(['navigation.speedOverGround']);
+    expect(validateLayout(picked).ok).toBe(true);
+    expect(historyCount(picked).count).toBe(1);
   });
 });

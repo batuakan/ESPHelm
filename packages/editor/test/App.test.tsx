@@ -35,7 +35,7 @@ function fakeServer(devices: Device[]) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -422,6 +422,50 @@ describe('editor', { timeout: 20000 }, () => {
     await screen.findByText(/Sent to/);
     expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
       tiles: [{ type: 'position', id: 'pos-1', w: 2, h: 1, label: 'Position', format: 'dms', decimals: 2 }],
+    });
+  });
+
+  it('adds a graph tile: window, fixed range, a zone, the history counter, and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Graph/ }));
+    fireEvent.change(screen.getByLabelText('Search SignalK paths'), { target: { value: 'depth' } });
+    fireEvent.click(screen.getByRole('option', { name: /environment.depth.belowTransducer/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    within(drawer).getByText(/Recording 1 value in this layout/);
+    live.emit('environment.depth.belowTransducer', 2.5);
+    const tile = screen.getByTestId('tile-graph-1');
+    within(tile).getByRole('img', { name: 'Graph' });
+    expect(within(tile).getByText('2.5 m').className).not.toMatch(/value-zone/);
+
+    fireEvent.change(within(drawer).getByLabelText('Window'), { target: { value: '1h' } });
+    fireEvent.click(within(drawer).getByLabelText('Fixed range'));
+    fireEvent.change(within(drawer).getByLabelText('Maximum'), { target: { value: '20' } });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Add zone' }));
+    fireEvent.change(within(drawer).getByLabelText('Zone 1 to'), { target: { value: '3' } });
+    // At 2.5 m the value is in the alarm zone.
+    expect(within(tile).getByText('2.5 m').className).toMatch(/value-zone-alarm/);
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [
+        {
+          type: 'graph',
+          id: 'graph-1',
+          w: 2,
+          h: 1,
+          path: 'environment.depth.belowTransducer',
+          unit: 'm',
+          window: '1h',
+          min: 0,
+          max: 20,
+          zones: [{ to: 3, state: 'alarm' }],
+        },
+      ],
     });
   });
 

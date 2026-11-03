@@ -15,13 +15,18 @@ import {
   type Tile,
   type WindRoseTile,
   type ValueTile,
+  type GraphTile,
   type Zone,
   valueZoneState,
   serverZonesToDisplay,
   historyEnabled,
   roseHistorySeries,
+  axisLabels,
+  graphWindowIndex,
+  HISTORY,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
+import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
@@ -51,7 +56,7 @@ function arc(cx: number, cy: number, r: number, from: number, to: number): strin
 export function withServerZones<T extends Tile>(tile: T, serverZones: Map<string, unknown> | undefined): T {
   if (!serverZones) return tile;
   const t: Tile = tile;
-  if (t.type === 'value') {
+  if (t.type === 'value' || t.type === 'graph') {
     const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit);
     return zones.length > 0 ? { ...tile, zones } : tile;
   }
@@ -201,6 +206,8 @@ export function TilePreview(props: {
   onSelectSlot?(slot: SlotName): void;
   /** meta.zones by path (ADR-0020). */
   serverZones?: Map<string, unknown>;
+  /** Graph only: whether the display has room for its axis labels (GRAPH_FIT). */
+  graphAxis?: boolean;
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -217,6 +224,8 @@ export function TilePreview(props: {
       />
     );
   if (tile.type === 'position') return <PositionPreview tile={tile} values={values} />;
+  if (tile.type === 'graph')
+    return <GraphPreview tile={tile} values={values} axis={props.graphAxis ?? true} />;
   const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':
@@ -236,6 +245,71 @@ export function TilePreview(props: {
         </>
       );
   }
+}
+
+/**
+ * A graph tile (ADR-0021): the live value top right (its caption is the tile label), an example
+ * curve around it in the tile's window, zone bands, and, when the display has room, the y range
+ * and the window's start. The display draws what it recorded itself, so the curve is only an
+ * example, as in the history mock.
+ */
+export function GraphPreview(props: { tile: GraphTile; values: Map<string, unknown>; axis: boolean }) {
+  const { tile } = props;
+  const value = tile.path ? props.values.get(tile.path) : undefined;
+  const win = graphWindowIndex(tile, true);
+  const decimals = tile.decimals ?? 1;
+  const wrap = tile.unit ? UNITS[tile.unit].wrap : undefined;
+  const fixed = tile.min !== undefined && tile.max !== undefined;
+  // With a fixed axis an angle stays in its range, as its labels are (the display does the same).
+  const points = previewPoints({ key: tile.id, title: '', caption: '', unit: tile.unit, value }, win).map((p) =>
+    p === null || !fixed || !wrap ? p : p - (wrap[1] - wrap[0]) * Math.floor((p - wrap[0]) / (wrap[1] - wrap[0])),
+  );
+  const shown = points.filter((p): p is number => p !== null);
+  const min = Math.min(...shown);
+  const max = Math.max(...shown);
+  const pad = (max - min) * 0.1 || 1;
+  const lo = fixed ? tile.min! : min - pad;
+  const hi = fixed ? tile.max! : max + pad;
+  const y = (v: number) => ((hi - v) / (hi - lo)) * 100;
+  const axisText = (v: number) => (wrap && !fixed ? wrapped(v, wrap, decimals) : v).toFixed(decimals);
+  const n = displayNumber(value, tile);
+  const state = n === undefined ? undefined : valueZoneState(n, tile.zones);
+  const unit = tile.unit ? UNITS[tile.unit].label : '';
+  const [start] = axisLabels(HISTORY.windows[win]!.seconds);
+  return (
+    <span className={`graph-preview ${props.axis ? 'with-axis' : ''}`}>
+      <span className={`graph-value ${state ? `value-zone-${state}` : ''}`}>
+        {tile.path ? formatValue(value, tile.unit, tile.decimals) : '--'}
+        {unit && ` ${unit}`}
+      </span>
+      {props.axis && (
+        <span className="graph-y" aria-hidden>
+          <span>{axisText(hi)}</span>
+          <span>{axisText(lo)}</span>
+        </span>
+      )}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="graph-plot" role="img" aria-label="Graph">
+        {!(wrap && !fixed) &&
+          (tile.zones ?? []).map((z, i) => {
+            const top = Math.min(z.to ?? Infinity, hi);
+            const bottom = Math.max(z.from ?? -Infinity, lo);
+            if (!(bottom < top)) return null;
+            return (
+              <rect key={i} x={0} width={100} y={y(top)} height={y(bottom) - y(top)} className={`history-band zone-${z.state}`} />
+            );
+          })}
+        {chartRuns(points, lo, hi).map((r, i) => (
+          <polyline key={i} points={r} className="history-line" />
+        ))}
+      </svg>
+      {props.axis && (
+        <span className="graph-x" aria-hidden>
+          <span>{start}</span>
+          <span>now</span>
+        </span>
+      )}
+    </span>
+  );
 }
 
 /** The small sparkline that says a tap opens a history graph on the display. */
