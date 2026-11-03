@@ -200,6 +200,7 @@ function renderSizesHeader(
   },
   serverZones: { maxPerPath: number },
   graph: { axisHeight: number },
+  tape: { minorTickPx: number; label10Px: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -234,6 +235,10 @@ function renderSizesHeader(
     '',
     '// Graph tile (ADR-0021): content box height in pixels from which it shows its axis labels.',
     `inline constexpr int GRAPH_AXIS_HEIGHT = ${graph.axisHeight};`,
+    '',
+    '// Heading tape (ADR-0022): minor ticks from this spacing, every 10 degrees labelled from this width.',
+    `inline constexpr int HEADING_TAPE_MINOR_TICK_PX = ${tape.minorTickPx};`,
+    `inline constexpr int HEADING_TAPE_LABEL10_PX = ${tape.label10Px};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -327,8 +332,15 @@ export async function renderAll(): Promise<Record<string, string>> {
   // Imported lazily: these modules depend on the generated units table.
   const { Layout } = await import('../src/layout.js');
   const { Hello } = await import('../src/hello.js');
-  const { WIND_ROSE_FIT, AUTOPILOT_FIT, TEXT_FIT, HISTORY, SERVER_ZONES, GRAPH_FIT } =
-    await import('../src/tiles.js');
+  const {
+    WIND_ROSE_FIT,
+    AUTOPILOT_FIT,
+    TEXT_FIT,
+    HISTORY,
+    SERVER_ZONES,
+    GRAPH_FIT,
+    HEADING_TAPE_FIT,
+  } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -343,6 +355,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       HISTORY,
       SERVER_ZONES,
       GRAPH_FIT,
+      HEADING_TAPE_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -351,6 +364,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       HISTORY,
       SERVER_ZONES,
       GRAPH_FIT,
+      HEADING_TAPE_FIT,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

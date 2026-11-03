@@ -48,6 +48,13 @@ const ICONS: Record<string, JSX.Element> = {
       <path d="M5 13l3.5-4 3 2.5L17 5" />
     </svg>
   ),
+  heading_tape: (
+    <svg viewBox="0 0 20 20">
+      <rect x="2" y="6" width="16" height="9" rx="2" />
+      <path d="M5 6v3M8 6v2M12 6v2M15 6v3" />
+      <path d="M10 3v14" />
+    </svg>
+  ),
   wind_rose: (
     <svg viewBox="0 0 20 20">
       <circle cx="10" cy="10" r="7.5" />
@@ -64,6 +71,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   switch: { title: 'Switch' },
   position: { title: 'Position' },
   graph: { title: 'Graph' },
+  heading_tape: { title: 'Heading tape' },
   wind_rose: { title: 'Wind rose' },
   autopilot: { title: 'Autopilot' },
 };

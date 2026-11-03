@@ -24,10 +24,14 @@ import {
   axisLabels,
   graphWindowIndex,
   HISTORY,
+  tapeMarks,
+  tapeX,
+  type HeadingTapeMarker,
+  type HeadingTapeTile,
 } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
-import { CENTER_SLOTS, CORNER_SLOTS, type SlotName } from '../layoutOps';
+import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
@@ -208,6 +212,8 @@ export function TilePreview(props: {
   serverZones?: Map<string, unknown>;
   /** Graph only: whether the display has room for its axis labels (GRAPH_FIT). */
   graphAxis?: boolean;
+  /** Heading tape only: its width on the display, in pixels (the ticks depend on it). */
+  tapeWidth?: number;
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -226,6 +232,8 @@ export function TilePreview(props: {
   if (tile.type === 'position') return <PositionPreview tile={tile} values={values} />;
   if (tile.type === 'graph')
     return <GraphPreview tile={tile} values={values} axis={props.graphAxis ?? true} />;
+  if (tile.type === 'heading_tape')
+    return <HeadingTapePreview tile={tile} values={values} width={props.tapeWidth ?? 440} />;
   const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':
@@ -308,6 +316,84 @@ export function GraphPreview(props: { tile: GraphTile; values: Map<string, unkno
           <span>now</span>
         </span>
       )}
+    </span>
+  );
+}
+
+const TAPE_LETTERS: Record<HeadingTapeMarker, string> = { cog: 'C', bearing: 'W', target: 'A' };
+
+/**
+ * A heading tape (ADR-0022) from the same geometry as the display (tapeMarks, tapeX): the heading
+ * above, the ticks and labels for the tile's width on the display, the centre line and the
+ * markers (COG triangle, waypoint diamond, target notch; arrows at the edge when off the tape).
+ */
+export function HeadingTapePreview(props: {
+  tile: HeadingTapeTile;
+  values: Map<string, unknown>;
+  width: number;
+}) {
+  const t = headingTapeSettings(props.tile);
+  const deg = (path: string) => {
+    const v = props.values.get(path);
+    return typeof v === 'number' && Number.isFinite(v) ? toDisplay(v, 'deg') : undefined;
+  };
+  const heading = deg(t.headingPath);
+  const suffix = /Magnetic/.test(t.headingPath) ? 'M' : /True/.test(t.headingPath) ? 'T' : '';
+  const W = Math.max(props.width, 40);
+  const H = 60;
+  const s = 8;
+  const ticks = heading === undefined ? [] : tapeMarks(heading, t.span, W);
+  return (
+    <span className="tape-preview" data-testid={`tape-${props.tile.id}`}>
+      <span className={`tape-number ${heading === undefined ? 'stale' : ''}`}>
+        {heading === undefined ? '--' : `${Math.round(heading) % 360}°${suffix}`}
+      </span>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="tape-plot" role="img" aria-label="Heading tape">
+        <rect x={0} y={0} width={W} height={H} rx={6} className="tape-band" />
+        {ticks.map((k) => {
+          const len = k.kind === 'major' ? H * 0.3 : k.kind === 'medium' ? H * 0.2 : H * 0.125;
+          return (
+            <g key={`${k.deg}-${k.x}`}>
+              <line x1={k.x} x2={k.x} y1={0} y2={len} className={`tape-tick ${k.kind}`} />
+              {k.label && (
+                <text x={k.x} y={H * 0.62} className="tape-label">
+                  {k.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {heading !== undefined &&
+          t.markers.map((m) => {
+            const v = deg(t.paths[m]);
+            if (v === undefined) return null;
+            const p = tapeX(v, heading, t.span, W);
+            const x = Math.min(Math.max(p.x, s), W - s);
+            const bottom = H - 2;
+            const shape =
+              p.off !== 0
+                ? (() => {
+                    const tip = p.off < 0 ? 2 : W - 2;
+                    const back = tip - p.off * s * 1.4;
+                    const cy = bottom - s * 0.7;
+                    return `${tip},${cy} ${back},${cy - s * 0.7} ${back},${cy + s * 0.7}`;
+                  })()
+                : m === 'cog'
+                  ? `${x},${bottom - s * 1.6} ${x - s},${bottom} ${x + s},${bottom}`
+                  : m === 'bearing'
+                    ? `${x},${bottom - 2 * s} ${x - s * 0.8},${bottom - s} ${x},${bottom} ${x + s * 0.8},${bottom - s}`
+                    : `${x},${s * 1.4} ${x - s},0 ${x + s},0`;
+            return (
+              <g key={m} className={`tape-marker ${m}`}>
+                <polygon points={shape} />
+                <text x={p.off === 0 ? x + s * 1.6 : p.off < 0 ? s * 2.6 : W - s * 2.6} y={m === 'target' ? s * 1.4 : bottom}>
+                  {TAPE_LETTERS[m]}
+                </text>
+              </g>
+            );
+          })}
+        <line x1={W / 2} x2={W / 2} y1={0} y2={H} className={`tape-lubber ${heading === undefined ? 'stale' : ''}`} />
+      </svg>
     </span>
   );
 }

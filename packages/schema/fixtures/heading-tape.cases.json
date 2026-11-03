@@ -1,0 +1,700 @@
+{
+  "description": "Heading tape geometry (ADR-0022): tapeMarks() and tapeX() in src/headingTape.ts and esphelm_heading_tape.h must both reproduce these; x to 0.001 px.",
+  "marks": [
+    {
+      "note": "north up, wide: minors and every 10 degrees labelled",
+      "heading": 0,
+      "span": 90,
+      "width": 440,
+      "expected": [
+        {
+          "deg": 315,
+          "x": 0,
+          "kind": "minor"
+        },
+        {
+          "deg": 320,
+          "x": 24.444,
+          "kind": "medium",
+          "label": "320"
+        },
+        {
+          "deg": 325,
+          "x": 48.889,
+          "kind": "minor"
+        },
+        {
+          "deg": 330,
+          "x": 73.333,
+          "kind": "major",
+          "label": "330"
+        },
+        {
+          "deg": 335,
+          "x": 97.778,
+          "kind": "minor"
+        },
+        {
+          "deg": 340,
+          "x": 122.222,
+          "kind": "medium",
+          "label": "340"
+        },
+        {
+          "deg": 345,
+          "x": 146.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 350,
+          "x": 171.111,
+          "kind": "medium",
+          "label": "350"
+        },
+        {
+          "deg": 355,
+          "x": 195.556,
+          "kind": "minor"
+        },
+        {
+          "deg": 0,
+          "x": 220,
+          "kind": "major",
+          "label": "N"
+        },
+        {
+          "deg": 5,
+          "x": 244.444,
+          "kind": "minor"
+        },
+        {
+          "deg": 10,
+          "x": 268.889,
+          "kind": "medium",
+          "label": "10"
+        },
+        {
+          "deg": 15,
+          "x": 293.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 20,
+          "x": 317.778,
+          "kind": "medium",
+          "label": "20"
+        },
+        {
+          "deg": 25,
+          "x": 342.222,
+          "kind": "minor"
+        },
+        {
+          "deg": 30,
+          "x": 366.667,
+          "kind": "major",
+          "label": "30"
+        },
+        {
+          "deg": 35,
+          "x": 391.111,
+          "kind": "minor"
+        },
+        {
+          "deg": 40,
+          "x": 415.556,
+          "kind": "medium",
+          "label": "40"
+        },
+        {
+          "deg": 45,
+          "x": 440,
+          "kind": "minor"
+        }
+      ]
+    },
+    {
+      "note": "across north, narrow: labels every 30 degrees",
+      "heading": 355.4,
+      "span": 90,
+      "width": 200,
+      "expected": [
+        {
+          "deg": 315,
+          "x": 10.222,
+          "kind": "minor"
+        },
+        {
+          "deg": 320,
+          "x": 21.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 325,
+          "x": 32.444,
+          "kind": "minor"
+        },
+        {
+          "deg": 330,
+          "x": 43.556,
+          "kind": "major",
+          "label": "330"
+        },
+        {
+          "deg": 335,
+          "x": 54.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 340,
+          "x": 65.778,
+          "kind": "medium"
+        },
+        {
+          "deg": 345,
+          "x": 76.889,
+          "kind": "minor"
+        },
+        {
+          "deg": 350,
+          "x": 88,
+          "kind": "medium"
+        },
+        {
+          "deg": 355,
+          "x": 99.111,
+          "kind": "minor"
+        },
+        {
+          "deg": 0,
+          "x": 110.222,
+          "kind": "major",
+          "label": "N"
+        },
+        {
+          "deg": 5,
+          "x": 121.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 10,
+          "x": 132.444,
+          "kind": "medium"
+        },
+        {
+          "deg": 15,
+          "x": 143.556,
+          "kind": "minor"
+        },
+        {
+          "deg": 20,
+          "x": 154.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 25,
+          "x": 165.778,
+          "kind": "minor"
+        },
+        {
+          "deg": 30,
+          "x": 176.889,
+          "kind": "major",
+          "label": "30"
+        },
+        {
+          "deg": 35,
+          "x": 188,
+          "kind": "minor"
+        },
+        {
+          "deg": 40,
+          "x": 199.111,
+          "kind": "medium"
+        }
+      ]
+    },
+    {
+      "note": "too narrow for minor ticks",
+      "heading": 10,
+      "span": 120,
+      "width": 100,
+      "expected": [
+        {
+          "deg": 310,
+          "x": 0,
+          "kind": "medium"
+        },
+        {
+          "deg": 320,
+          "x": 8.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 330,
+          "x": 16.667,
+          "kind": "major",
+          "label": "330"
+        },
+        {
+          "deg": 340,
+          "x": 25,
+          "kind": "medium"
+        },
+        {
+          "deg": 350,
+          "x": 33.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 0,
+          "x": 41.667,
+          "kind": "major",
+          "label": "N"
+        },
+        {
+          "deg": 10,
+          "x": 50,
+          "kind": "medium"
+        },
+        {
+          "deg": 20,
+          "x": 58.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 30,
+          "x": 66.667,
+          "kind": "major",
+          "label": "30"
+        },
+        {
+          "deg": 40,
+          "x": 75,
+          "kind": "medium"
+        },
+        {
+          "deg": 50,
+          "x": 83.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 60,
+          "x": 91.667,
+          "kind": "major",
+          "label": "60"
+        },
+        {
+          "deg": 70,
+          "x": 100,
+          "kind": "medium"
+        }
+      ]
+    },
+    {
+      "note": "a 30 degree span on a small tape",
+      "heading": 87,
+      "span": 30,
+      "width": 120,
+      "expected": [
+        {
+          "deg": 75,
+          "x": 12,
+          "kind": "minor"
+        },
+        {
+          "deg": 80,
+          "x": 32,
+          "kind": "medium",
+          "label": "80"
+        },
+        {
+          "deg": 85,
+          "x": 52,
+          "kind": "minor"
+        },
+        {
+          "deg": 90,
+          "x": 72,
+          "kind": "major",
+          "label": "E"
+        },
+        {
+          "deg": 95,
+          "x": 92,
+          "kind": "minor"
+        },
+        {
+          "deg": 100,
+          "x": 112,
+          "kind": "medium",
+          "label": "100"
+        }
+      ]
+    },
+    {
+      "note": "the widest span: ticks stop at the edges",
+      "heading": 180,
+      "span": 180,
+      "width": 300,
+      "expected": [
+        {
+          "deg": 90,
+          "x": 0,
+          "kind": "major",
+          "label": "E"
+        },
+        {
+          "deg": 95,
+          "x": 8.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 100,
+          "x": 16.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 105,
+          "x": 25,
+          "kind": "minor"
+        },
+        {
+          "deg": 110,
+          "x": 33.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 115,
+          "x": 41.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 120,
+          "x": 50,
+          "kind": "major",
+          "label": "120"
+        },
+        {
+          "deg": 125,
+          "x": 58.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 130,
+          "x": 66.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 135,
+          "x": 75,
+          "kind": "minor"
+        },
+        {
+          "deg": 140,
+          "x": 83.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 145,
+          "x": 91.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 150,
+          "x": 100,
+          "kind": "major",
+          "label": "150"
+        },
+        {
+          "deg": 155,
+          "x": 108.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 160,
+          "x": 116.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 165,
+          "x": 125,
+          "kind": "minor"
+        },
+        {
+          "deg": 170,
+          "x": 133.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 175,
+          "x": 141.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 180,
+          "x": 150,
+          "kind": "major",
+          "label": "S"
+        },
+        {
+          "deg": 185,
+          "x": 158.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 190,
+          "x": 166.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 195,
+          "x": 175,
+          "kind": "minor"
+        },
+        {
+          "deg": 200,
+          "x": 183.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 205,
+          "x": 191.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 210,
+          "x": 200,
+          "kind": "major",
+          "label": "210"
+        },
+        {
+          "deg": 215,
+          "x": 208.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 220,
+          "x": 216.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 225,
+          "x": 225,
+          "kind": "minor"
+        },
+        {
+          "deg": 230,
+          "x": 233.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 235,
+          "x": 241.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 240,
+          "x": 250,
+          "kind": "major",
+          "label": "240"
+        },
+        {
+          "deg": 245,
+          "x": 258.333,
+          "kind": "minor"
+        },
+        {
+          "deg": 250,
+          "x": 266.667,
+          "kind": "medium"
+        },
+        {
+          "deg": 255,
+          "x": 275,
+          "kind": "minor"
+        },
+        {
+          "deg": 260,
+          "x": 283.333,
+          "kind": "medium"
+        },
+        {
+          "deg": 265,
+          "x": 291.667,
+          "kind": "minor"
+        },
+        {
+          "deg": 270,
+          "x": 300,
+          "kind": "major",
+          "label": "W"
+        }
+      ]
+    },
+    {
+      "note": "a heading between ticks keeps them on whole degrees",
+      "heading": 241.7,
+      "span": 60,
+      "width": 330,
+      "expected": [
+        {
+          "deg": 215,
+          "x": 18.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 220,
+          "x": 45.65,
+          "kind": "medium",
+          "label": "220"
+        },
+        {
+          "deg": 225,
+          "x": 73.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 230,
+          "x": 100.65,
+          "kind": "medium",
+          "label": "230"
+        },
+        {
+          "deg": 235,
+          "x": 128.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 240,
+          "x": 155.65,
+          "kind": "major",
+          "label": "240"
+        },
+        {
+          "deg": 245,
+          "x": 183.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 250,
+          "x": 210.65,
+          "kind": "medium",
+          "label": "250"
+        },
+        {
+          "deg": 255,
+          "x": 238.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 260,
+          "x": 265.65,
+          "kind": "medium",
+          "label": "260"
+        },
+        {
+          "deg": 265,
+          "x": 293.15,
+          "kind": "minor"
+        },
+        {
+          "deg": 270,
+          "x": 320.65,
+          "kind": "major",
+          "label": "W"
+        }
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "note": "on the centre",
+      "value": 120,
+      "heading": 120,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 200,
+        "off": 0
+      }
+    },
+    {
+      "note": "right of centre across north",
+      "value": 10,
+      "heading": 350,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 288.889,
+        "off": 0
+      }
+    },
+    {
+      "note": "left of centre across north",
+      "value": 340,
+      "heading": 5,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 88.889,
+        "off": 0
+      }
+    },
+    {
+      "note": "exactly on the right edge",
+      "value": 45,
+      "heading": 0,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 400,
+        "off": 0
+      }
+    },
+    {
+      "note": "off the right edge",
+      "value": 100,
+      "heading": 0,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 400,
+        "off": 1
+      }
+    },
+    {
+      "note": "off the right edge, the shorter way round (170 degrees)",
+      "value": 200,
+      "heading": 30,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 400,
+        "off": 1
+      }
+    },
+    {
+      "note": "off the left edge (130 degrees to port)",
+      "value": 260,
+      "heading": 30,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 0,
+        "off": -1
+      }
+    },
+    {
+      "note": "behind the boat is off the left edge (half a turn counts as left)",
+      "value": 180,
+      "heading": 0,
+      "span": 90,
+      "width": 400,
+      "expected": {
+        "x": 0,
+        "off": -1
+      }
+    }
+  ]
+}

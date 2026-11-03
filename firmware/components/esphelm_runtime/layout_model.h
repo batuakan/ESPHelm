@@ -14,7 +14,7 @@
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH };
+enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH, HEADING_TAPE };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
 /// Value tile colour names (schema VALUE_COLORS); the theme decides the actual colour.
@@ -63,6 +63,22 @@ struct AutopilotConfig {
   std::string heading_path{"navigation.headingMagnetic"};
 };
 
+/// Heading tape settings (only heading_tape tiles carry them; ADR-0022). The caption is the
+/// tile's data.label, its stale time data.stale_after.
+struct HeadingTapeConfig {
+  // HEADING_TAPE_MARKERS order: cog, bearing, target
+  static constexpr int MARKERS = 3;
+  static constexpr int COG = 0, BEARING = 1, TARGET = 2;
+  int span{90};
+  bool markers[MARKERS]{true, true, true};
+  std::string heading_path{"navigation.headingTrue"};
+  std::string paths[MARKERS]{"navigation.courseOverGroundTrue", "navigation.course.calcValues.bearingTrue",
+                             "steering.autopilot.target"};
+};
+
+/// A heading tape's `markers` names (HEADING_TAPE_MARKERS in packages/schema/src/tiles.ts).
+inline constexpr const char *HEADING_TAPE_MARKER_NAMES[HeadingTapeConfig::MARKERS] = {"cog", "bearing", "target"};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -83,6 +99,8 @@ struct Tile {
   std::shared_ptr<const RoseConfig> rose;
   // autopilot (data.label is its caption)
   std::shared_ptr<const AutopilotConfig> autopilot;
+  // heading_tape
+  std::shared_ptr<const HeadingTapeConfig> tape;
 };
 
 /// A grid page (the only page kind in v1).

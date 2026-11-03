@@ -458,3 +458,24 @@ describe('graph tiles', () => {
     expect(historyCount(picked).count).toBe(1);
   });
 });
+
+describe('heading tape tiles', () => {
+  it('start 2x1, and subscribe to the heading and every marker until some are switched off', () => {
+    const r = addTile(newLayoutFor(device), 0, 'heading_tape')!;
+    const tile = page(r.layout).tiles[0]!;
+    expect(tile).toEqual({ type: 'heading_tape', id: 'tape-1', x: 0, y: 0, w: 2, h: 1 });
+    expect(tilePaths(tile)).toEqual([
+      'navigation.headingTrue',
+      'navigation.courseOverGroundTrue',
+      'navigation.course.calcValues.bearingTrue',
+      'steering.autopilot.target',
+    ]);
+    let l = updateTile(r.layout, 0, 'tape-1', { markers: ['cog'] });
+    l = setTileConfig(l, 0, 'tape-1', { headingPath: 'navigation.headingMagnetic' });
+    expect(tilePaths(page(l).tiles[0]!)).toEqual([
+      'navigation.headingMagnetic',
+      'navigation.courseOverGroundTrue',
+    ]);
+    expect(validateLayout(l).ok).toBe(true);
+  });
+});

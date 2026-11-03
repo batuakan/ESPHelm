@@ -72,3 +72,26 @@ export function valueZoneCases(): ValueZoneCase[] {
   };
   return file.cases;
 }
+
+/** Heading tape geometry cases (ADR-0022), shared by the TS and C++ tests. */
+export interface TapeCases {
+  marks: {
+    note: string;
+    heading: number;
+    span: number;
+    width: number;
+    expected: { deg: number; x: number; kind: string; label?: string }[];
+  }[];
+  markers: {
+    note: string;
+    value: number;
+    heading: number;
+    span: number;
+    width: number;
+    expected: { x: number; off: number };
+  }[];
+}
+
+export const TAPE_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'heading-tape.cases.json'), 'utf8'),
+) as TapeCases;

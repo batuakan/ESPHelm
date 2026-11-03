@@ -16,6 +16,10 @@ import {
   type WindRoseTile,
   ROSE_HISTORY_KEYS,
   type RoseHistoryKey,
+  HEADING_TAPE_DEFAULTS,
+  HEADING_TAPE_MARKERS,
+  type HeadingTapeMarker,
+  type HeadingTapeTile,
 } from '@esphelm/schema';
 
 export interface Rect {
@@ -94,6 +98,27 @@ function withRose(
   }));
 }
 
+/** A heading tape's settings with the defaults filled in (HEADING_TAPE_DEFAULTS). */
+export function headingTapeSettings(tile: HeadingTapeTile): {
+  span: number;
+  markers: HeadingTapeMarker[];
+  headingPath: string;
+  paths: Record<HeadingTapeMarker, string>;
+} {
+  const d = HEADING_TAPE_DEFAULTS;
+  const c = tile.config ?? {};
+  return {
+    span: tile.span ?? d.span,
+    markers: HEADING_TAPE_MARKERS.filter((m) => (tile.markers ?? d.markers).includes(m)),
+    headingPath: c.headingPath ?? d.headingPath,
+    paths: {
+      cog: c.cogPath ?? d.cogPath,
+      bearing: c.bearingPath ?? d.bearingPath,
+      target: c.targetPath ?? d.targetPath,
+    },
+  };
+}
+
 /** SignalK paths a tile shows (what the live preview subscribes to). */
 export function tilePaths(tile: Tile): string[] {
   if (tile.type === 'autopilot') {
@@ -102,6 +127,10 @@ export function tilePaths(tile: Tile): string[] {
     return [cfg.statePath, cfg.targetPath, cfg.headingPath];
   }
   if (tile.type === 'position') return [tile.path ?? POSITION_DEFAULTS.path];
+  if (tile.type === 'heading_tape') {
+    const t = headingTapeSettings(tile);
+    return [t.headingPath, ...t.markers.map((m) => t.paths[m])];
+  }
   if (tile.type !== 'wind_rose') return [tile.path];
   const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   return [
@@ -157,6 +186,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place };
     case 'graph':
       return { type, ...place, path: '' };
+    case 'heading_tape':
+      return { type, ...place };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -164,8 +195,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
 
 /**
  * Add a tile to page `index` at `at` (or the first free cell). Tiles are 1x1, except wind
- * roses and autopilots, which take 2x2, and positions and graphs, which take 2x1, when that fits
- * there.
+ * roses and autopilots, which take 2x2, and positions, graphs and heading tapes, which take 2x1,
+ * when that fits there.
  */
 export function addTile(
   layout: Layout,
@@ -186,15 +217,20 @@ export function addTile(
           ? 'pos'
           : type === 'graph'
             ? 'graph'
-            : 'tile';
+            : type === 'heading_tape'
+              ? 'tape'
+              : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
   const big = type === 'wind_rose' || type === 'autopilot';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
-  } else if ((type === 'position' || type === 'graph') && fits(page, { ...cell, w: 2, h: 1 })) {
-    tile.w = 2; // two text lines, or a time axis, read better wide
+  } else if (
+    (type === 'position' || type === 'graph' || type === 'heading_tape') &&
+    fits(page, { ...cell, w: 2, h: 1 })
+  ) {
+    tile.w = 2; // two text lines, a time axis or a compass strip read better wide
   }
   return {
     id,
@@ -476,7 +512,11 @@ export function setTileConfig(
   return withGrid(layout, index, (p) => ({
     ...p,
     tiles: p.tiles.map((t) => {
-      if (t.id !== id || (t.type !== 'wind_rose' && t.type !== 'autopilot')) return t;
+      if (
+        t.id !== id ||
+        (t.type !== 'wind_rose' && t.type !== 'autopilot' && t.type !== 'heading_tape')
+      )
+        return t;
       const config = merge<Record<string, unknown>>(t.config ?? {}, patch);
       return Object.keys(config).length > 0
         ? ({ ...t, config } as Tile)

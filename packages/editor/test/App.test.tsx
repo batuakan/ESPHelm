@@ -35,7 +35,7 @@ function fakeServer(devices: Device[]) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -464,6 +464,56 @@ describe('editor', { timeout: 20000 }, () => {
           min: 0,
           max: 20,
           zones: [{ to: 3, state: 'alarm' }],
+        },
+      ],
+    });
+  });
+
+  it('adds a heading tape: live heading, markers, the true/magnetic hint, and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Heading tape/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect(live.paths()).toEqual([
+      'navigation.headingTrue',
+      'navigation.courseOverGroundTrue',
+      'navigation.course.calcValues.bearingTrue',
+      'steering.autopilot.target',
+    ]);
+    const preview = screen.getByTestId('tape-tape-1');
+    expect(within(preview).getByText('--')).toBeTruthy();
+    live.emit('navigation.headingTrue', (355 * Math.PI) / 180);
+    live.emit('navigation.courseOverGroundTrue', (10 * Math.PI) / 180);
+    within(preview).getByText('355°T');
+    within(preview).getByText('N'); // north is on the tape
+    expect(preview.querySelector('.tape-marker.cog')).not.toBeNull();
+    expect(preview.querySelector('.tape-marker.bearing')).toBeNull(); // no value: not drawn
+
+    fireEvent.click(within(drawer).getByLabelText('Bearing to the next waypoint'));
+    fireEvent.click(within(drawer).getByLabelText('Autopilot target'));
+    fireEvent.change(within(drawer).getByLabelText('Span'), { target: { value: '60' } });
+    expect(within(drawer).queryByText(/off by the magnetic variation/)).toBeNull();
+    // A magnetic heading with a true COG: the drawer says they disagree.
+    const headingSearch = within(drawer).getByLabelText('Search Heading');
+    fireEvent.change(headingSearch, { target: { value: 'navigation.headingMagnetic' } });
+    fireEvent.keyDown(headingSearch, { key: 'Enter' });
+    within(drawer).getByText(/The heading is magnetic; the course over ground isn't/);
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [
+        {
+          type: 'heading_tape',
+          id: 'tape-1',
+          w: 2,
+          h: 1,
+          span: 60,
+          markers: ['cog'],
+          config: { headingPath: 'navigation.headingMagnetic' },
         },
       ],
     });

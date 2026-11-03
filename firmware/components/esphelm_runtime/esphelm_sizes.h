@@ -31,6 +31,10 @@ inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = 6;
 // Graph tile (ADR-0021): content box height in pixels from which it shows its axis labels.
 inline constexpr int GRAPH_AXIS_HEIGHT = 120;
 
+// Heading tape (ADR-0022): minor ticks from this spacing, every 10 degrees labelled from this width.
+inline constexpr int HEADING_TAPE_MINOR_TICK_PX = 6;
+inline constexpr int HEADING_TAPE_LABEL10_PX = 40;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

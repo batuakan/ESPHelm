@@ -19,7 +19,8 @@
     "switch",
     "position",
     "wind_rose",
-    "graph"
+    "graph",
+    "heading_tape"
   ],
   "fonts": [
     "tiny",
