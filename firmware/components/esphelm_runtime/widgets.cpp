@@ -244,6 +244,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return make_switch_widget(cell, tile, env);
     case esphelm::TileType::POSITION:
       return make_position_widget(cell, tile, env);
+    case esphelm::TileType::GRAPH:
+      return make_graph_widget(cell, tile, env);
     case esphelm::TileType::VALUE:
     default:
       return make_value_widget(cell, tile, env);
