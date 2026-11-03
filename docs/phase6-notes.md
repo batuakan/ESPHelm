@@ -139,4 +139,4 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Drawer:** the span, the markers with their paths, and a true/magnetic warning.
   - **Preview:** an SVG drawn from the shared geometry for the tile's width on the display.
 - **Fixed on the way:** the ArduinoJson fetch for the C++ tests raced between parallel workers (PR #4's CI failure). Each worker now clones into its own directory.
-- **Not verified:** on the P4 (hardware step 21), and true/magnetic conversion, which is left out by design.
+- **P4:** checked on the hardware on 2026-11-03 (hardware step 21): it looks right. True/magnetic conversion is left out by design.
