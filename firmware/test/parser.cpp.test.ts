@@ -81,6 +81,19 @@ const mutations: { name: string; doc: unknown }[] = [
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
   { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },
   { name: 'value colour of the wrong type', doc: withTile({ color: 1 }) },
+  { name: 'graph window of the wrong type', doc: withTile({ type: 'graph', window: 10 }) },
+  { name: 'graph with only max', doc: withTile({ type: 'graph', max: 5 }) },
+  { name: 'graph min of the wrong type', doc: withTile({ type: 'graph', min: '0', max: 5 }) },
+  {
+    name: 'graph zones with open ends and an inverted one',
+    doc: withTile({
+      type: 'graph',
+      zones: [
+        { to: 2, state: 'alarm' },
+        { from: 5, to: 4, state: 'warn' },
+      ],
+    }),
+  },
   {
     name: 'value zones of the wrong types',
     doc: withTile({ zones: [{ from: '1', state: 'warn' }, { to: 2, state: 'loud' }, 'x'] }),

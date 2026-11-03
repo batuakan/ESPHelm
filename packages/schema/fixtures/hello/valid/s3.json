@@ -18,7 +18,8 @@
     "bar",
     "switch",
     "position",
-    "wind_rose"
+    "wind_rose",
+    "graph"
   ],
   "fonts": [
     "tiny",

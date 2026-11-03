@@ -28,6 +28,9 @@ inline constexpr int HISTORY_NO_PSRAM_WINDOWS = 2;
 inline constexpr int HISTORY_MAX_VALUES_PSRAM = 48;
 inline constexpr int HISTORY_MAX_VALUES_NO_PSRAM = 6;
 
+// Graph tile (ADR-0021): content box height in pixels from which it shows its axis labels.
+inline constexpr int GRAPH_AXIS_HEIGHT = 120;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

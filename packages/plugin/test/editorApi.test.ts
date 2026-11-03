@@ -132,6 +132,21 @@ describe('devices', () => {
     );
   });
 
+  it('refuses a graph layout for firmware without the graph tile', async () => {
+    const older: Hello = { ...p4, widgets: p4.widgets.filter((w) => w !== 'graph') };
+    await register(older);
+    await api('PUT', '/layouts/graph', fixture<Layout>('valid/graph.json'));
+    const res = await api('PUT', `/devices/${p4.deviceId}`, { layoutId: 'graph' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      devices: [
+        { errors: [{ code: 'UNSUPPORTED_WIDGET', message: 'device cannot render: graph' }] },
+      ],
+    });
+    await register(p4); // current firmware lists it
+    expect((await api('PUT', `/devices/${p4.deviceId}`, { layoutId: 'graph' })).status).toBe(200);
+  });
+
   it('refuses a layout edit that would break a device using it', async () => {
     await register(c3);
     const valueOnly: Layout = { ...minimal, id: 'c3' };
@@ -220,6 +235,7 @@ describe('widget catalog', () => {
       'position',
       'wind_rose',
       'autopilot',
+      'graph',
     ]);
     expect(body.tileSlots).toEqual({
       wind_rose: [

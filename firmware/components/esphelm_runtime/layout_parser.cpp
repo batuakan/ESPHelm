@@ -419,6 +419,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::AUTOPILOT;
   } else if (t != nullptr && std::strcmp(t, "position") == 0) {
     tile.type = TileType::POSITION;
+  } else if (t != nullptr && std::strcmp(t, "graph") == 0) {
+    tile.type = TileType::GRAPH;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -474,8 +476,18 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     return;
   }
   data_item_fields(chk, obj, ptr, tile.data);
-  const bool value = tile.type == TileType::VALUE;
-  if (value) {
+  // Value and graph zones may leave an end open (no min/max to fall back on).
+  const bool value = tile.type == TileType::VALUE || tile.type == TileType::GRAPH;
+  if (tile.type == TileType::GRAPH) {
+    int w = enum_field(chk, obj, ptr, "window", false, GRAPH_WINDOWS, 3);
+    if (w >= 0)
+      tile.graph_window = static_cast<uint8_t>(w);
+    // A fixed y axis needs both ends; a missing one stays NaN, and the semantic checks report it.
+    tile.min = tile.max = std::nan("");
+    number_field(chk, obj, ptr, "min", false, tile.min);
+    number_field(chk, obj, ptr, "max", false, tile.max);
+    tile.has_range = has(obj, "min") || has(obj, "max");
+  } else if (tile.type == TileType::VALUE) {
     int c = enum_field(chk, obj, ptr, "color", false, VALUE_COLORS, 6);
     if (c >= 0)
       tile.color = static_cast<ValueColor>(c);
@@ -713,7 +725,9 @@ void check_semantics(Checker &chk, const Layout &layout) {
         }
         placed.push_back(j);
       }
-      if (t.type == TileType::VALUE) {
+      if (t.type == TileType::GRAPH && t.has_range && !(t.min < t.max))
+        chk.add(tp + (std::isnan(t.min) ? "/min" : "/max"), "INVALID_RANGE");  // the missing end, else max
+      if (t.type == TileType::VALUE || t.type == TileType::GRAPH) {
         for (size_t k = 0; k < t.zones.size(); k++) {
           const Zone &z = t.zones[k];
           // Missing ends are infinite: both infinite means neither was given.
