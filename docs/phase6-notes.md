@@ -140,3 +140,20 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Preview:** an SVG drawn from the shared geometry for the tile's width on the display.
 - **Fixed on the way:** the ArduinoJson fetch for the C++ tests raced between parallel workers (PR #4's CI failure). Each worker now clones into its own directory.
 - **P4:** checked on the hardware on 2026-11-03 (hardware step 21): it looks right. True/magnetic conversion is left out by design.
+
+## Centre-zero gauges and bars (ADR-0023, branch `feat/center-zero`)
+
+- **What:** `centerZero` and `sides` on gauges and bars, for values either side of zero.
+  - **Scale:** symmetric −M…M; `min`/`max` still clamp the value.
+  - **Fill:** from zero, red/green by side, or one colour for plus/minus.
+  - **Labels:** P/S or −/+ at the ends.
+- **Schema:** the two fields, `INVALID_RANGE` when the range doesn't cross zero, and the shared text (`centerZero.ts` / `esphelm_center_zero.h`, `center-zero.cases.json`, halves rounded up on both sides).
+- **Firmware:**
+  - **Gauge:** an `lv_arc` fill (LVGL `arc` enabled).
+  - **Bar:** LVGL's symmetrical bar mode.
+- **Editor:**
+  - **Drawer:** the *Centre zero* checkbox (it makes the range cross zero, and `deg` becomes `deg180`) and *Sides*.
+  - **Preview:** draws the same.
+  - **Problems list:** now words range problems by tile.
+- **Changed from the plan:** `sides` without `centerZero` is ignored rather than refused, since a cross-field `INVALID_VALUE` would split the JSON Schema from the validator.
+- **Not verified:** on the P4 (hardware step 22).

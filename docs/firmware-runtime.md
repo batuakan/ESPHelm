@@ -174,13 +174,14 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Zones from the server (ADR-0020) | 24 B per zone per tile that uses them, a second list of the layout's own zones, and one map entry per path with zones (SI, up to 16 zones); a transient 4 KB body per read. Nothing per value, nothing in flash |
 | Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
 | `graph` tile (ADR-0021) | its recorded value (the row below) and, while its page is shown, ≈8.8 KB of LVGL objects with its 1.9 KB point buffer (four graphs with two zones = 35,152 B) |
+| centre-zero gauge / bar (ADR-0023) | one more LVGL arc (gauge) or line (bar) and two labels for the ends |
 | `heading_tape` tile (ADR-0022) | four LVGL objects; the ticks are drawn in its draw callback from a stack list (at most 37) |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,302 B (17.1 %), flash 3.33 MB (20.2 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,328 B of 321,296 B (35.0 %), flash 1.44 MB of 1.8 MB (78.7 %) |
+| P4 runtime firmware, static | RAM 98,302 B (17.1 %), flash 3.34 MB (20.2 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,328 B of 321,296 B (35.0 %), flash 1.45 MB of 1.8 MB (79.2 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -231,8 +232,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21b. **zones from the server** (ADR-0020): zones put on the server replace a value tile's and a gauge's own and reach a bar without any, with no new layout fetched; a changed zone is followed; rubbish and an emptied list bring the tile's own back, pixel for pixel.
   21c. **graph tiles** (ADR-0021, `fixtures/valid/graph.json`): a live SOG becomes a line on its tile; with seeded curves, a 2x2 depth graph with a zone band, a fixed-range SOG, a heading across north and a 6 h barometer without axis labels, by day and at night; a tap opens the popup on its value; the same page offline at 720
   21d. **heading tapes** (ADR-0022, `fixtures/valid/heading-tape.json`): three tapes at 480 with live values (across north, COG right of centre, the target left, the waypoint bearing off the left edge; a magnetic 60° tape; a 1x1 tape without markers), a turn to 20°, a marker gone stale on its own, night; and offline at 720 (muted, "--", no markers)
+  21e. **centre-zero gauges and bars** (ADR-0023, `fixtures/valid/center-zero.json`): a rudder and a rate of turn (port/starboard), a house current (−50…20, plus/minus) and a vertical start current, with live values one way, then the other way round, and at night; offline at 720 (no fill, "--")
 
-  Fifty-eight screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Sixty-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -304,3 +306,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The COG triangle sits where the plotter draws COG. With a route active, the waypoint diamond points the way to steer; off the tape it's an arrow at the edge on the side of the shorter turn.
     - The magnetic tape shows "M" after its number.
     - At night all markers are red; check that their shapes can still be told apart.
+
+22. **Centre-zero gauges and bars (ADR-0023).** Assign `packages/schema/fixtures/valid/center-zero.json` with a live rudder angle and battery currents if you have them.
+    - The rudder needle and its fill follow the helm smoothly; the fill is red to port and green to starboard, and the value reads e.g. "12 ° P".
+    - The house current bar fills left of the middle when discharging ("-30.0 A") and right when charging, and never past 20.
+    - At night all fills are red; check that P and S (and − and +) can still be told apart.
