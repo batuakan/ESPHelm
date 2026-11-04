@@ -237,7 +237,7 @@ void SettingsPanel::build_() {
   if (this->tab_ == Tab::SETTINGS)
     this->build_settings_(body, inner_w, btn_h);
   else
-    this->build_info_(body, inner_w, gap, line_small);
+    this->build_info_(body, inner_w, line_small);
 }
 
 void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
@@ -306,14 +306,13 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
   }
 }
 
-void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t gap, int32_t line_small) {
+void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t line_small) {
   const Colors c = colors_for(this->state_.theme);
   const lv_font_t *small = this->fonts_.small;
-  // Per section a heading, the names and the values (one label each, line by line). Two
-  // columns of sections on a large screen, else one under the other.
-  const int32_t col_w = w >= 600 ? (w - gap) / 2 : w;
-  lv_obj_set_flex_flow(body, LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_style_pad_column(body, gap, LV_PART_MAIN);
+  // Per section a heading, the names and the values (one label each, line by line), one section
+  // under the other; it scrolls. (Two columns at 720 cut too many values short.)
+  const int32_t col_w = w;
+  lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(body, line_small / 2, LV_PART_MAIN);
   if (this->fill_)
     this->fill_(this->rows_);

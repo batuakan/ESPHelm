@@ -1437,7 +1437,7 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw720.screenshot('720-10-clock', shots);
 
-    // 12h. The settings panel at 720: its Settings tab, and the Info tab in two columns.
+    // 12h. The settings panel at 720: its Settings tab, and the Info tab.
     writeFileSync(join(work720, 'esphelm_tap_request'), '@menu');
     check('720 build opens the settings panel', await fw720.waitLog(/Settings opened/));
     await sleep(1000);

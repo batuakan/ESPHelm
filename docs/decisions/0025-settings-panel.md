@@ -21,7 +21,7 @@ Your choices:
   - **Editor:** the preview and its size hints reserve the strip on every layout.
 - **The panel** (`settings_panel.cpp`) opens from the menu button.
   - **Placement:** a full-screen sheet below the alarm banner, like the history popup. It closes only with its close button.
-  - **Tabs** (added after the first P4 check, at your request): *Settings* for the controls and *Info* for the information, with the close button beside them. It opens on *Settings*. Only the tab shown is built. On *Info* the sections sit in two columns at 720, one under the other (scrolling) at 480.
+  - **Tabs** (added after the first P4 check, at your request): *Settings* for the controls and *Info* for the information, with the close button beside them. It opens on *Settings*. Only the tab shown is built. On *Info* the sections sit one under the other and scroll, on every screen (two columns at 720 cut too many values short).
   - **Settings tab:**
     - *Brightness*, a slider for the theme shown. Day is 5–100 %, night 1–100 %, as in the schema. It dims live and is saved when let go. Without a backlight the value is only logged, like the layout's brightness.
     - *Theme:* *Day*, *Night* or *Auto*, where *Auto* is the layout's theme or the sun (`autoTheme`).

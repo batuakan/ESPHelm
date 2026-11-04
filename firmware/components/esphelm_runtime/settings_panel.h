@@ -68,7 +68,7 @@ class SettingsPanel {
   }
   void build_();
   void build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h);
-  void build_info_(lv_obj_t *body, int32_t w, int32_t gap, int32_t line_small);
+  void build_info_(lv_obj_t *body, int32_t w, int32_t line_small);
   void refresh_info_();
   void style_choices_();
 

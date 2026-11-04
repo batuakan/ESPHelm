@@ -99,7 +99,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
   - **Format:** a self-checking record, `v=1;th=…;bd=…;bn=…` plus the layout values they were chosen against.
   - **Read:** before the first layout, so they survive a reboot. A record that doesn't parse or has a value out of range is ignored.
   - **Dropped:** when a layout brings a different `theme`/`autoTheme` (theme choice) or `brightness.day`/`.night` (that override), and a day/night choice when the sun changes. The first sun value after a boot is not a change.
-- **Information** (the *Info* tab, two columns of sections at 720) is refreshed once a second while it shows.
+- **Information** (the *Info* tab, one column of sections that scrolls) is refreshed once a second while it shows.
   - **Display:** id, board, firmware, screen, uptime, free memory (internal, and PSRAM). Free memory is not on the host.
   - **Network:** Wi-Fi and signal (`USE_WIFI`), IP (`USE_NETWORK`).
   - **SignalK:** server, stream, deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
@@ -245,7 +245,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); switching the theme on the display (`esphelm_tap_request @theme`) from night to day holds while the sun stays down and is handed back to `autoTheme` at sunrise
 
-  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and in two columns at 720); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
+  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and at 720); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
 
   18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
