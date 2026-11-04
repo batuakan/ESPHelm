@@ -12,7 +12,16 @@ class GaugeWidget : public Widget {
  public:
   GaugeWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
       : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), min_(tile.min), max_(tile.max),
-        sample_(value_sample(tile.data.decimals)) {
+        center_zero_(tile.center_zero), sides_(tile.sides), sample_(value_sample(tile.data.decimals)) {
+    // Centre zero (ADR-0023): the scale is symmetric, -M..M, so zero sits at 12 o'clock; min and
+    // max still clamp the value.
+    lo_ = min_;
+    hi_ = max_;
+    if (center_zero_) {
+      const double m = esphelm::center_zero::span(min_, max_);
+      lo_ = -m;
+      hi_ = m;
+    }
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
@@ -27,10 +36,15 @@ class GaugeWidget : public Widget {
     lv_scale_set_major_tick_every(scale_, 5);
     lv_scale_set_label_show(scale_, true);
     // Tick labels in display units (the scale itself runs 0..1000).
-    const double span = max_ - min_;
+    const double span = hi_ - lo_;
     for (int i = 0; i < 5; i++) {
+      const double v = lo_ + span * i / 4.0;
+      if (center_zero_) {
+        tick_text_[i] = esphelm::center_zero::tick(v, hi_, sides_);
+        continue;
+      }
       char buf[16];
-      label_number(buf, sizeof(buf), min_ + span * i / 4.0, span);
+      label_number(buf, sizeof(buf), v, span);
       tick_text_[i] = buf;
     }
     for (int i = 0; i < 5; i++)
@@ -48,8 +62,26 @@ class GaugeWidget : public Widget {
     lv_obj_set_style_arc_width(scale_, 2, LV_PART_MAIN);
     for (const auto &z : tile.zones) {
       lv_scale_section_t *section = lv_scale_add_section(scale_);
-      lv_scale_set_section_range(scale_, section, to_steps(z.from, min_, max_), to_steps(z.to, min_, max_));
+      lv_scale_set_section_range(scale_, section, to_steps(z.from, lo_, hi_), to_steps(z.to, lo_, hi_));
       lv_scale_set_section_style_main(scale_, section, zone_style(z.state, env.colors, 8));
+    }
+    if (center_zero_) {
+      // The fill from zero to the value, on the ring (LVGL draws a symmetrical arc from its middle).
+      fill_ = lv_arc_create(scale_);
+      lv_obj_remove_flag(fill_, LV_OBJ_FLAG_CLICKABLE);
+      lv_arc_set_bg_angles(fill_, 135, 45);
+      lv_arc_set_range(fill_, 0, SCALE_STEPS);
+      lv_arc_set_mode(fill_, LV_ARC_MODE_SYMMETRICAL);
+      lv_arc_set_value(fill_, SCALE_STEPS / 2);
+      lv_obj_set_style_arc_opa(fill_, LV_OPA_TRANSP, LV_PART_MAIN);
+      lv_obj_set_style_arc_rounded(fill_, false, LV_PART_INDICATOR);
+      lv_obj_set_style_bg_opa(fill_, LV_OPA_TRANSP, LV_PART_KNOB);
+      lv_obj_set_style_pad_all(fill_, 0, LV_PART_KNOB);
+      lv_obj_set_style_pad_all(fill_, 0, LV_PART_MAIN);
+      if (sides_ == esphelm::center_zero::Sides::PORT_STARBOARD) {
+        side_labels_[0] = make_label(cell, env.fonts.small, env.colors.port, "P");
+        side_labels_[1] = make_label(cell, env.fonts.small, env.colors.starboard, "S");
+      }
     }
     needle_ = lv_line_create(scale_);
     lv_obj_set_style_line_width(needle_, 4, LV_PART_MAIN);
@@ -84,7 +116,24 @@ class GaugeWidget : public Widget {
     // Small gauge: tick labels would collide with the caption and value; keep the ticks.
     lv_scale_set_label_show(scale_, !small);
     lv_scale_set_total_tick_count(scale_, small ? 11 : 21);
-    lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), b_.has_number ? to_steps(b_.number, min_, max_) : 0);
+    lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), needle_steps_());
+    if (fill_ != nullptr) {
+      lv_obj_set_size(fill_, d, d);
+      lv_obj_center(fill_);
+      lv_obj_set_style_arc_width(fill_, std::max<int32_t>(4, d / 24), LV_PART_INDICATOR);
+    }
+    for (int i = 0; i < 2; i++) {
+      if (side_labels_[i] == nullptr)
+        continue;
+      // In the top corners of the gauge's square, outside the ring: no needle or value reaches
+      // there. Hidden on tiny gauges.
+      if (small) {
+        lv_obj_add_flag(side_labels_[i], LV_OBJ_FLAG_HIDDEN);
+        continue;
+      }
+      lv_obj_remove_flag(side_labels_[i], LV_OBJ_FLAG_HIDDEN);
+      lv_obj_align_to(side_labels_[i], scale_, i == 0 ? LV_ALIGN_TOP_LEFT : LV_ALIGN_TOP_RIGHT, 0, 0);
+    }
     if (!b_.stale_shown)
       b_.dirty = true;  // show the value (and needle) again at the new size
   }
@@ -97,13 +146,21 @@ class GaugeWidget : public Widget {
     if (!b_.due(now, stale))
       return;
     const bool live = !stale && b_.has_number;
-    if (set_text(value_, shown_, (stale ? "--" : b_.text) + suffix_))
+    std::string text = (stale ? "--" : b_.text) + suffix_;
+    if (center_zero_ && live)
+      text = center_zero_label(b_.number, b_.item.decimals, sides_, suffix_);
+    if (set_text(value_, shown_, text))
       lv_obj_align_to(value_, scale_, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_text_color(value_, live ? colors_.text : colors_.muted, LV_PART_MAIN);
     lv_obj_set_style_line_color(needle_, live ? colors_.text : colors_.muted, LV_PART_MAIN);
     if (b_.has_number) {
       const int32_t d = lv_obj_get_width(scale_);
-      lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), to_steps(b_.number, min_, max_));
+      lv_scale_set_line_needle_value(scale_, needle_, -(d / 7), needle_steps_());
+    }
+    if (fill_ != nullptr) {
+      // A stale value keeps no fill: only the needle, muted, says where it was.
+      lv_arc_set_value(fill_, live ? needle_steps_() : SCALE_STEPS / 2);
+      lv_obj_set_style_arc_color(fill_, center_zero_color(colors_, sides_, b_.number), LV_PART_INDICATOR);
     }
   }
 
@@ -112,10 +169,22 @@ class GaugeWidget : public Widget {
   Colors colors_;
   Fonts fonts_;
   lv_obj_t *cell_;
+  /// The needle's (and the fill's) position: the value clamped to min..max, on the drawn scale.
+  int32_t needle_steps_() const {
+    if (!b_.has_number)
+      return center_zero_ ? SCALE_STEPS / 2 : 0;
+    return to_steps(std::clamp(b_.number, min_, max_), lo_, hi_);
+  }
+
   double min_, max_;
+  double lo_, hi_;  // the drawn scale: min..max, or -M..M centred on zero
+  bool center_zero_;
+  esphelm::center_zero::Sides sides_;
   std::string sample_;
   Binding b_;
   lv_obj_t *scale_;
+  lv_obj_t *fill_{nullptr};
+  lv_obj_t *side_labels_[2]{};
   lv_obj_t *needle_;
   lv_obj_t *caption_;
   lv_obj_t *value_;

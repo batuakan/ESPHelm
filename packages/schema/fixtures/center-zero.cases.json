@@ -1,0 +1,195 @@
+{
+  "description": "Centre-zero text (ADR-0023): centerZeroText(), centerZeroTick() and centerZeroSpan() in src/centerZero.ts and esphelm_center_zero.h must both reproduce these.",
+  "text": [
+    {
+      "n": 12.04,
+      "decimals": 0,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "12",
+        "side": "S"
+      }
+    },
+    {
+      "n": -12.04,
+      "decimals": 0,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "12",
+        "side": "P"
+      }
+    },
+    {
+      "n": -3.46,
+      "decimals": 1,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "3.5",
+        "side": "P"
+      }
+    },
+    {
+      "n": 0.04,
+      "decimals": 1,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "0.0",
+        "side": ""
+      }
+    },
+    {
+      "n": -0.04,
+      "decimals": 1,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "0.0",
+        "side": ""
+      }
+    },
+    {
+      "n": 0,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "0.0",
+        "side": ""
+      }
+    },
+    {
+      "n": 8.24,
+      "sides": "plusMinus",
+      "expected": {
+        "text": "+8.2",
+        "side": ""
+      }
+    },
+    {
+      "n": -3,
+      "decimals": 1,
+      "sides": "plusMinus",
+      "expected": {
+        "text": "-3.0",
+        "side": ""
+      }
+    },
+    {
+      "n": -0.02,
+      "decimals": 1,
+      "sides": "plusMinus",
+      "expected": {
+        "text": "0.0",
+        "side": ""
+      }
+    },
+    {
+      "n": 125.6,
+      "decimals": 0,
+      "sides": "plusMinus",
+      "expected": {
+        "text": "+126",
+        "side": ""
+      }
+    },
+    {
+      "n": -1.234,
+      "decimals": 2,
+      "sides": "plusMinus",
+      "expected": {
+        "text": "-1.23",
+        "side": ""
+      }
+    },
+    {
+      "n": 2.25,
+      "decimals": 1,
+      "sides": "portStarboard",
+      "expected": {
+        "text": "2.3",
+        "side": "S"
+      }
+    }
+  ],
+  "ticks": [
+    {
+      "v": -35,
+      "m": 35,
+      "sides": "portStarboard",
+      "expected": "35"
+    },
+    {
+      "v": -17.5,
+      "m": 35,
+      "sides": "portStarboard",
+      "expected": "18"
+    },
+    {
+      "v": 0,
+      "m": 35,
+      "sides": "portStarboard",
+      "expected": "0"
+    },
+    {
+      "v": 17.5,
+      "m": 35,
+      "sides": "plusMinus",
+      "expected": "+18"
+    },
+    {
+      "v": -50,
+      "m": 50,
+      "sides": "plusMinus",
+      "expected": "-50"
+    },
+    {
+      "v": -2.5,
+      "m": 5,
+      "sides": "plusMinus",
+      "expected": "-2.5"
+    },
+    {
+      "v": 2.5,
+      "m": 5,
+      "sides": "portStarboard",
+      "expected": "2.5"
+    },
+    {
+      "v": 0,
+      "m": 5,
+      "sides": "plusMinus",
+      "expected": "0.0"
+    },
+    {
+      "v": 12.5,
+      "m": 25,
+      "sides": "portStarboard",
+      "expected": "13"
+    },
+    {
+      "v": -12.5,
+      "m": 25,
+      "sides": "plusMinus",
+      "expected": "-13"
+    }
+  ],
+  "spans": [
+    {
+      "min": -35,
+      "max": 35,
+      "expected": 35
+    },
+    {
+      "min": -50,
+      "max": 20,
+      "expected": 50
+    },
+    {
+      "min": -5,
+      "max": 30,
+      "expected": 30
+    },
+    {
+      "min": -0.5,
+      "max": 0.25,
+      "expected": 0.5
+    }
+  ]
+}

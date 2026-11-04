@@ -652,10 +652,15 @@ function describeProblem(
   pointer: string,
   target: ReturnType<typeof targetForPointer>,
 ): string {
+  const page = target ? layout.pages[target.page] : undefined;
+  const tile = page?.kind === 'grid' ? page.tiles.find((t) => t.id === target?.tileId) : undefined;
   const text = /^\/pages\/\d+\/chart$/.test(pointer)
     ? 'choose a chart'
-    : (PROBLEM_TEXT[code] ?? `${code} at ${pointer}`);
-  const page = target ? layout.pages[target.page] : undefined;
+    : code === 'INVALID_RANGE' && tile?.type === 'graph' && (tile.min === undefined || tile.max === undefined)
+      ? 'a fixed range needs both min and max'
+      : code === 'INVALID_RANGE' && pointer.endsWith('/min') && 'centerZero' in (tile ?? {})
+        ? 'a centre-zero scale needs min below 0 and max above 0'
+        : (PROBLEM_TEXT[code] ?? `${code} at ${pointer}`);
   const where = [
     layout.pages.length > 1 && page ? (page.title ?? page.id) : undefined,
     target?.tileId,

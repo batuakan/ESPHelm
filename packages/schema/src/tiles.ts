@@ -69,10 +69,29 @@ export const ValueTile = Type.Object(
   { additionalProperties: false },
 );
 
+/** What the two sides of a centre-zero scale mean (ADR-0023). */
+export const CenterZeroSides = Type.Union([
+  Type.Literal('portStarboard'),
+  Type.Literal('plusMinus'),
+]);
+export type CenterZeroSides = Type.Static<typeof CenterZeroSides>;
+
 const Scale = {
   min: Type.Number({ description: 'Scale start, in display units.' }),
   max: Type.Number({ description: 'Scale end, in display units; must be greater than min.' }),
   zones: Type.Optional(Type.Array(Zone)),
+  centerZero: Type.Optional(
+    Type.Boolean({
+      description:
+        'Centre the scale on zero and fill from zero to the value (ADR-0023); needs min < 0 < max.',
+    }),
+  ),
+  sides: Type.Optional(
+    Type.Union(CenterZeroSides.anyOf, {
+      description:
+        'With centerZero: portStarboard (P/S, red/green; the default) or plusMinus (signed, one colour). Without centerZero it has no effect.',
+    }),
+  ),
 };
 
 /** Round gauge with a needle and optional zones. */

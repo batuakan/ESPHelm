@@ -97,6 +97,18 @@ const mutations: { name: string; doc: unknown }[] = [
     name: 'heading tape with a zero stale time',
     doc: withTile({ type: 'heading_tape', staleAfter: 0 }),
   },
+  {
+    name: 'centre zero of the wrong type',
+    doc: withTile({ type: 'gauge', min: -10, max: 10, centerZero: 'yes' }),
+  },
+  {
+    name: 'centre zero on a scale that does not cross zero, with sides of the wrong type',
+    doc: withTile({ type: 'bar', min: -10, max: -2, centerZero: true, sides: 3 }),
+  },
+  {
+    name: 'centre zero with min above max',
+    doc: withTile({ type: 'gauge', min: 10, max: -10, centerZero: true }),
+  },
   { name: 'graph window of the wrong type', doc: withTile({ type: 'graph', window: 10 }) },
   { name: 'graph with only max', doc: withTile({ type: 'graph', max: 5 }) },
   { name: 'graph min of the wrong type', doc: withTile({ type: 'graph', min: '0', max: 5 }) },

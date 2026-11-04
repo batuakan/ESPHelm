@@ -435,6 +435,23 @@
                             },
                             "additionalProperties": false
                           }
+                        },
+                        "centerZero": {
+                          "type": "boolean",
+                          "description": "Centre the scale on zero and fill from zero to the value (ADR-0023); needs min < 0 < max."
+                        },
+                        "sides": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "portStarboard"
+                            },
+                            {
+                              "type": "string",
+                              "const": "plusMinus"
+                            }
+                          ],
+                          "description": "With centerZero: portStarboard (P/S, red/green; the default) or plusMinus (signed, one colour). Without centerZero it has no effect."
                         }
                       },
                       "additionalProperties": false
@@ -601,6 +618,23 @@
                             },
                             "additionalProperties": false
                           }
+                        },
+                        "centerZero": {
+                          "type": "boolean",
+                          "description": "Centre the scale on zero and fill from zero to the value (ADR-0023); needs min < 0 < max."
+                        },
+                        "sides": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "portStarboard"
+                            },
+                            {
+                              "type": "string",
+                              "const": "plusMinus"
+                            }
+                          ],
+                          "description": "With centerZero: portStarboard (P/S, red/green; the default) or plusMinus (signed, one colour). Without centerZero it has no effect."
                         },
                         "orientation": {
                           "anyOf": [

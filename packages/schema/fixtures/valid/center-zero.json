@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "id": "center-zero",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "cz",
+      "title": "Centre zero",
+      "grid": {
+        "cols": 2,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "gauge",
+          "id": "rudder",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "steering.rudderAngle",
+          "unit": "deg180",
+          "decimals": 0,
+          "label": "Rudder",
+          "min": -35,
+          "max": 35,
+          "centerZero": true,
+          "zones": [
+            {
+              "from": -35,
+              "to": -30,
+              "state": "warn"
+            },
+            {
+              "from": 30,
+              "to": 35,
+              "state": "warn"
+            }
+          ]
+        },
+        {
+          "type": "gauge",
+          "id": "rot",
+          "x": 1,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.rateOfTurn",
+          "unit": "degpm",
+          "decimals": 0,
+          "label": "ROT",
+          "min": -60,
+          "max": 60,
+          "centerZero": true,
+          "sides": "portStarboard"
+        },
+        {
+          "type": "bar",
+          "id": "house",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.house.current",
+          "unit": "A",
+          "decimals": 1,
+          "label": "House",
+          "min": -50,
+          "max": 20,
+          "centerZero": true,
+          "sides": "plusMinus"
+        },
+        {
+          "type": "bar",
+          "id": "start",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.start.current",
+          "unit": "A",
+          "decimals": 1,
+          "label": "Start",
+          "min": -10,
+          "max": 10,
+          "orientation": "vertical",
+          "centerZero": true,
+          "sides": "plusMinus"
+        }
+      ]
+    }
+  ]
+}

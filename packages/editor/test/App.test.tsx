@@ -285,6 +285,36 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('makes a gauge centre zero: symmetric range, side text, plus/minus, and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /Gauge/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    fireEvent.change(screen.getByLabelText('Maximum'), { target: { value: '10' } });
+    fireEvent.click(screen.getByLabelText('Centre zero'));
+    expect((screen.getByLabelText('Minimum') as HTMLInputElement).value).toBe('-10');
+    await screen.findByText('No problems');
+    const tile = screen.getByTestId('tile-tile-1');
+    live.emit('navigation.speedOverGround', -2.5); // -4.9 kn: port side
+    within(tile).getByText('4.9 kn P');
+    expect(tile.querySelector('.cz-fill.side-port')).not.toBeNull();
+    fireEvent.change(screen.getByLabelText('Sides'), { target: { value: 'plusMinus' } });
+    within(tile).getByText('-4.9 kn');
+    // Min not below zero: the layout is refused.
+    fireEvent.change(screen.getByLabelText('Minimum'), { target: { value: '0' } });
+    await screen.findByText(/centre-zero scale needs min below 0/);
+    fireEvent.change(screen.getByLabelText('Minimum'), { target: { value: '-10' } });
+    await screen.findByText('No problems');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [{ type: 'gauge', min: -10, max: 10, centerZero: true, sides: 'plusMinus' }],
+    });
+  });
+
   it('starts from a template after confirming', async () => {
     const server = fakeServer([device('adopted')]);
     render(<App api={server.api} live={fakeLive().factory} />);

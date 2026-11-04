@@ -1,6 +1,6 @@
 // Tile settings drawer. A DataItem (a tile or a wind-rose slot) gets: SignalK path (searchable,
 // with live value and SI units), display unit (only units that fit the path's quantity),
-// decimals, label, stale timeout. Gauges and bars add range, zones and orientation; wind roses
+// decimals, label, stale timeout. Gauges and bars add range, zones, centre zero (ADR-0023) and orientation; wind roses
 // have their slots, source paths and the true-wind toggle. Value tiles and wind rose values can
 // record their history (ADR-0018, ADR-0019), with a count of what the layout records. Graph
 // tiles (ADR-0021) add their window, an optional fixed range and zones; they always record. Heading
@@ -722,6 +722,48 @@ function RangeFields(props: {
           />
         </label>
       </div>
+      {(tile.type === 'gauge' || tile.type === 'bar') && (
+        <>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={tile.centerZero === true}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? {
+                        centerZero: true,
+                        // A centre-zero scale crosses zero; an angle needs -180..180 to go negative.
+                        ...(tile.min >= 0 ? { min: -Math.abs(tile.max) } : {}),
+                        ...(tile.unit === 'deg' ? { unit: 'deg180' } : {}),
+                      }
+                    : { centerZero: undefined, sides: undefined },
+                )
+              }
+              aria-label="Centre zero"
+            />
+            Centre zero: fill from zero, for values either side of it (rudder, heel, current)
+          </label>
+          {tile.centerZero && (
+            <label className="field">
+              <span>Sides</span>
+              <select
+                value={tile.sides ?? 'portStarboard'}
+                onChange={(e) =>
+                  onChange({ sides: e.target.value === 'portStarboard' ? undefined : e.target.value })
+                }
+                aria-label="Sides"
+              >
+                <option value="portStarboard">Port / starboard (P and S, red and green)</option>
+                <option value="plusMinus">Plus / minus (signed)</option>
+              </select>
+              <small className="hint">
+                The scale is drawn symmetric around zero, out to the larger of min and max.
+              </small>
+            </label>
+          )}
+        </>
+      )}
       {tile.type === 'bar' && (
         <label className="field">
           <span>Orientation</span>

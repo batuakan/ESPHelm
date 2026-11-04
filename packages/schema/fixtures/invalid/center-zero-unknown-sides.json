@@ -1,0 +1,40 @@
+{
+  "description": "sides are portStarboard or plusMinus",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/pages/0/tiles/0/sides"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "gauge",
+            "id": "rudder",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "steering.rudderAngle",
+            "unit": "deg180",
+            "min": -35,
+            "max": 35,
+            "centerZero": true,
+            "sides": "leftRight"
+          }
+        ]
+      }
+    ]
+  }
+}

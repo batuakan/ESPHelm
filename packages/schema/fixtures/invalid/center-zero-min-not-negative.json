@@ -1,0 +1,39 @@
+{
+  "description": "a centre-zero scale needs min below 0 and max above 0",
+  "expect": [
+    {
+      "code": "INVALID_RANGE",
+      "pointer": "/pages/0/tiles/0/min"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "gauge",
+            "id": "rudder",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "steering.rudderAngle",
+            "unit": "deg180",
+            "min": 0,
+            "max": 35,
+            "centerZero": true
+          }
+        ]
+      }
+    ]
+  }
+}

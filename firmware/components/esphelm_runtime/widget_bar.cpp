@@ -1,6 +1,8 @@
 // The bar tile. Shared helpers: widget_common.h.
 #include "widget_common.h"
 
+#include <algorithm>
+
 #include "esphome/core/hal.h"
 
 namespace esphome {
@@ -10,7 +12,8 @@ class BarWidget : public Widget {
  public:
   BarWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
       : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), min_(tile.min), max_(tile.max),
-        zones_(tile.zones), sample_(value_sample(tile.data.decimals)) {
+        zones_(tile.zones), center_zero_(tile.center_zero), sides_(tile.sides),
+        sample_(value_sample(tile.data.decimals)) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
     b_.last_value_ms = millis();
@@ -20,13 +23,42 @@ class BarWidget : public Widget {
     lv_obj_t *caption = make_label(cell, env.fonts.small, env.colors.muted, tile.data.label);
     lv_obj_align(caption, LV_ALIGN_TOP_LEFT, 0, 0);
     bar_ = lv_bar_create(cell);
-    lv_bar_set_range(bar_, 0, SCALE_STEPS);
+    if (center_zero_) {
+      // Centre zero (ADR-0023): a symmetric -M..M scale, filled from the middle.
+      lv_bar_set_range(bar_, -SCALE_STEPS, SCALE_STEPS);
+      lv_bar_set_mode(bar_, LV_BAR_MODE_SYMMETRICAL);
+      half_ = esphelm::center_zero::span(min_, max_);
+    } else {
+      lv_bar_set_range(bar_, 0, SCALE_STEPS);
+    }
     lv_bar_set_orientation(bar_, vertical ? LV_BAR_ORIENTATION_VERTICAL : LV_BAR_ORIENTATION_HORIZONTAL);
     lv_obj_set_style_bg_color(bar_, env.colors.background, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar_, env.colors.muted, LV_PART_INDICATOR);
     lv_obj_set_style_radius(bar_, 6, LV_PART_MAIN);
     lv_obj_set_style_radius(bar_, 6, LV_PART_INDICATOR);
+    if (center_zero_) {
+      // The zero line across the middle, and what each end means.
+      zero_ = lv_obj_create(bar_);
+      lv_obj_remove_style_all(zero_);
+      lv_obj_set_style_bg_color(zero_, env.colors.text, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(zero_, LV_OPA_COVER, LV_PART_MAIN);
+      if (vertical)
+        lv_obj_set_size(zero_, lv_pct(100), 2);
+      else
+        lv_obj_set_size(zero_, 2, lv_pct(100));
+      lv_obj_center(zero_);
+      const bool ps = sides_ == esphelm::center_zero::Sides::PORT_STARBOARD;
+      ends_[0] = make_label(bar_, env.fonts.small, env.colors.muted, ps ? "P" : "-");
+      ends_[1] = make_label(bar_, env.fonts.small, env.colors.muted, ps ? "S" : "+");
+      if (vertical) {
+        lv_obj_align(ends_[0], LV_ALIGN_BOTTOM_MID, 0, -2);
+        lv_obj_align(ends_[1], LV_ALIGN_TOP_MID, 0, 2);
+      } else {
+        lv_obj_align(ends_[0], LV_ALIGN_LEFT_MID, 6, 0);
+        lv_obj_align(ends_[1], LV_ALIGN_RIGHT_MID, -6, 0);
+      }
+    }
     value_ = make_label(cell, env.fonts.label, env.colors.muted, "--");
     const bool has_unit = tile.data.unit != nullptr && tile.data.unit->label[0] != '\0';
     if (vertical) {
@@ -78,16 +110,24 @@ class BarWidget : public Widget {
     if (!b_.due(now, stale))
       return;
     const bool live = !stale && b_.has_number;
-    set_text(value_, shown_, (stale ? "--" : b_.text) + suffix_);
+    std::string text = (stale ? "--" : b_.text) + suffix_;
+    if (center_zero_ && live)
+      text = center_zero_label(b_.number, b_.item.decimals, sides_, suffix_);
+    set_text(value_, shown_, text);
     lv_obj_set_style_text_color(value_, live ? colors_.text : colors_.muted, LV_PART_MAIN);
     lv_color_t fill = colors_.muted;
     if (live) {
-      fill = colors_.zone[0];
+      // A matching zone wins; else the side's colour (centre zero) or the normal zone colour.
+      fill = center_zero_ ? center_zero_color(colors_, sides_, b_.number) : colors_.zone[0];
       for (const auto &z : zones_) {
         if (b_.number >= z.from && b_.number <= z.to)
           fill = colors_.zone[static_cast<int>(z.state)];
       }
-      lv_bar_set_value(bar_, to_steps(b_.number, min_, max_), LV_ANIM_OFF);
+      const double v = std::clamp(b_.number, min_, max_);
+      lv_bar_set_value(bar_, center_zero_ ? to_steps(v, -half_, half_) * 2 - SCALE_STEPS : to_steps(v, min_, max_),
+                       LV_ANIM_OFF);
+    } else if (center_zero_) {
+      lv_bar_set_value(bar_, 0, LV_ANIM_OFF);  // stale: no fill, the zero line stays
     }
     lv_obj_set_style_bg_color(bar_, fill, LV_PART_INDICATOR);
   }
@@ -99,6 +139,11 @@ class BarWidget : public Widget {
   lv_obj_t *cell_;
   double min_, max_;
   std::vector<esphelm::Zone> zones_;
+  bool center_zero_;
+  esphelm::center_zero::Sides sides_;
+  double half_{0};  // centre zero: the scale runs -half_..half_
+  lv_obj_t *zero_{nullptr};
+  lv_obj_t *ends_[2]{};
   std::string sample_;
   bool vertical_{false};
   Binding b_;

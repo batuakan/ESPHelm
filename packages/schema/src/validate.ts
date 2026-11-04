@@ -271,6 +271,17 @@ function validateSemantics(layout: Layout): ValidationError[] {
           }
         });
       }
+      if (
+        (tile.type === 'gauge' || tile.type === 'bar') &&
+        tile.centerZero &&
+        !(tile.min < 0 && tile.max > 0)
+      ) {
+        errors.push({
+          pointer: `${tbase}/min`,
+          code: 'INVALID_RANGE',
+          message: 'a centre-zero scale needs min below 0 and max above 0',
+        });
+      }
       if (tile.type === 'gauge' || tile.type === 'bar') {
         if (!(tile.min < tile.max)) {
           errors.push({

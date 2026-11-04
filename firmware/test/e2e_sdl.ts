@@ -1131,9 +1131,41 @@ async function main(): Promise<void> {
     tapTile('@theme');
     await sleep(800);
 
+    // 9j. Centre-zero gauges and bars (ADR-0023): a rudder and a rate of turn (port/starboard),
+    //     a house current and a vertical start current (plus/minus); then the other way round,
+    //     and night. The house bar's scale is -50..50 although its max is 20.
+    const centerZero = fixture('valid/center-zero.json');
+    await json('PUT', '/plugins/esphelm/api/layouts/center-zero', admin, centerZero);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: 'center-zero',
+    });
+    check(
+      'centre zero: the layout renders',
+      await fw.waitLog(/Showing fetched layout "center-zero" \(1 pages/),
+    );
+    const czValues = (rudder: number, rotPerMin: number, house: number, start: number) => ({
+      'steering.rudderAngle': rad(rudder),
+      'navigation.rateOfTurn': rad(rotPerMin) / 60,
+      'electrical.batteries.house.current': house,
+      'electrical.batteries.start.current': start,
+    });
+    publish(czValues(-12, 20, 8, -3.2));
+    await sleep(1500);
+    await fw.screenshot('57-center-zero', shots);
+    publish(czValues(25, -45, -30, 6.5));
+    await sleep(1500);
+    await fw.screenshot('58-center-zero-other-side', shots);
+    tapTile('@theme');
+    await sleep(800);
+    publish(czValues(-12, 20, 8, -3.2));
+    await sleep(1500);
+    await fw.screenshot('59-center-zero-night', shots);
+    tapTile('@theme');
+    await sleep(800);
+
     await fw.stop();
     fw.start();
-    await fw.waitLog(/Showing cached layout "heading-tape"/);
+    await fw.waitLog(/Showing cached layout "center-zero"/);
     await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
@@ -1255,6 +1287,18 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-08-heading-tape', shots);
+    await fw720.stop();
+
+    // 12f. Centre-zero gauges and bars at 720, offline: stale, so no fill and "--".
+    const cz720 = readFileSync(join(FIXTURES, 'valid/center-zero.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(cz720, '"seed-cz"'));
+    fw720.start();
+    check(
+      '720 build shows the centre-zero layout',
+      await fw720.waitLog(/Showing cached layout "center-zero" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-09-center-zero', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

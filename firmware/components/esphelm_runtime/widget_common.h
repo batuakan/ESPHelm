@@ -42,6 +42,20 @@ int32_t to_steps(double v, double min, double max);
 void label_number(char *buf, size_t n, double v, double span);
 /// The small sparkline that says a tile opens a history graph (ADR-0018); the caller places it.
 lv_obj_t *make_history_mark(lv_obj_t *parent, const Colors &c);
+/// Fill colour of a centre-zero value (ADR-0023): port red or starboard green by side, or the
+/// accent for plus/minus. At night the theme makes them all red (port bright, starboard dim).
+inline lv_color_t center_zero_color(const Colors &c, esphelm::center_zero::Sides sides, double v) {
+  if (sides == esphelm::center_zero::Sides::PLUS_MINUS)
+    return c.accent;
+  return v < 0 ? c.port : c.starboard;
+}
+/// A centre-zero value's text with its unit and side: "12 ° S", "+8.2 A".
+inline std::string center_zero_label(double v, int decimals, esphelm::center_zero::Sides sides,
+                                     const std::string &unit_suffix) {
+  const char *side;
+  const std::string text = esphelm::center_zero::text(v, decimals, sides, side);
+  return text + unit_suffix + (side[0] != '\0' ? std::string(" ") + side : std::string());
+}
 /// Tile background, radius and padding.
 void style_cell(lv_obj_t *cell, const Colors &c);
 

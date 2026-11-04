@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "esphelm_center_zero.h"
 #include "esphelm_position.h"
 #include "esphelm_units.h"
 #include "esphelm_value_zones.h"
@@ -93,6 +94,9 @@ struct Tile {
   ValueColor color{ValueColor::NONE};  // value
   bool history{false};                 // value: records its history, tap for the graph (ADR-0018/0019)
   Orientation orientation{Orientation::HORIZONTAL};
+  // gauge / bar: centred on zero, filled from zero to the value (ADR-0023)
+  bool center_zero{false};
+  center_zero::Sides sides{center_zero::Sides::PORT_STARBOARD};
   // position (data.path defaults to navigation.position; data.decimals -1 = the format's default)
   position::Format position_format{position::Format::DDM};
   // wind_rose; shared so that copying a layout stays cheap and other tiles stay small
