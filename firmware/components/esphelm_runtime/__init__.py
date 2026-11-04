@@ -29,7 +29,7 @@ CONF_TIME_ID = "time_id"
 
 # LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
 # links against it for image needles).
-LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image", "chart", "arc")
+LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image", "chart", "arc", "slider")
 
 esphelm_ns = cg.esphome_ns.namespace("esphelm_runtime")
 EsphelmRuntime = esphelm_ns.class_("EsphelmRuntime", cg.Component)

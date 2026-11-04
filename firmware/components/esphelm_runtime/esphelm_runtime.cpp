@@ -69,16 +69,20 @@ void EsphelmRuntime::setup() {
   this->compute_capacity_();
   this->renderer_.set_fonts(this->fonts_);
   this->renderer_.set_navigation([this](int step) { this->pending_step_ += step; });
-  this->renderer_.set_theme_toggle([this]() { this->theme_toggle_wanted_ = true; });
+  this->renderer_.set_menu([this]() { this->menu_wanted_ = true; });
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
   this->tiles_.start();
   const char *clock_test = std::getenv("ESPHELM_TEST_CLOCK");
   this->clock_frozen_ = clock_test != nullptr && std::strcmp(clock_test, "frozen") == 0;
+  const char *info_test = std::getenv("ESPHELM_TEST_INFO");
+  this->info_fixed_ = info_test != nullptr && std::strcmp(info_test, "fixed") == 0;
 
   this->popup_.set_fonts(this->fonts_);
   this->popup_.set_history(&this->history_);
+  this->panel_.set_fonts(this->fonts_);
+  this->panel_.set_info([this](std::vector<InfoRow> &rows) { this->fill_info_(rows); });
 
   // Alarms (ADR-0014): every notification, whatever the layout shows.
   this->alarms_.set_fonts(this->fonts_);
@@ -116,6 +120,15 @@ void EsphelmRuntime::setup() {
 
   // A hint that a path's metadata changed; it can be missed, so it is read again now and then too.
   this->signalk_->add_meta_listener([this](const std::string &path) { this->on_meta_changed_(path); });
+
+  // Brightness and theme chosen on the display (ADR-0025), before the first layout is shown.
+  StoredLayout prefs;
+  if (this->store_.load(Slot::PREFS, prefs)) {
+    if (prefs.etag == "prefs" && esphelm::decode_prefs(prefs.body, this->prefs_))
+      ESP_LOGI(TAG, "Display choices: %s", prefs.body.c_str());
+    else
+      ESP_LOGW(TAG, "Saved display choices are not valid; ignoring them");
+  }
 
   // Offline first: show what we had before any network traffic. The boot guard first decides
   // whether the cached layout is the one that keeps crashing the display (ADR-0013).
@@ -186,6 +199,13 @@ void EsphelmRuntime::loop() {
       this->theme_toggle_wanted_ = false;
       this->toggle_theme_();
     }
+    if (this->menu_wanted_) {
+      this->menu_wanted_ = false;
+      if (!this->panel_.is_open() && !this->asleep_) {
+        this->panel_.open(this->panel_state_(), this->alarms_.height());
+        this->alarms_.raise();
+      }
+    }
     if (this->pending_step_ != 0) {
       const int target = static_cast<int>(this->page_) + this->pending_step_;
       this->pending_step_ = 0;
@@ -231,6 +251,7 @@ void EsphelmRuntime::loop() {
   // The popup sits below the banner too, and the banner stays in front of it.
   if (this->popup_.tick(now, history_closed, this->theme_, this->alarms_.height()))
     this->alarms_.raise();
+  this->tick_panel_(now);
 }
 
 // ---- Network ----
@@ -440,9 +461,11 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->zones_dirty_ = false;  // the page is built next
   this->configure_history_();
   // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
-  // or what was chosen on the display, unless this layout brings another theme.
-  if (this->layout_.theme != this->base_theme_)
-    this->manual_theme_ = -1;
+  // or what was chosen on the display, unless this layout brings other values for it (ADR-0025).
+  if (esphelm::reconcile_prefs(this->prefs_, this->layout_.settings, this->layout_.theme)) {
+    ESP_LOGI(TAG, "The layout's display settings changed; dropping what was chosen on the display");
+    this->save_prefs_();
+  }
   this->base_theme_ = this->layout_.theme;
   if (this->layout_.settings.auto_theme_path != this->sun_path_)
     this->sun_night_ = -1;  // a different source: unknown until its value arrives
@@ -471,6 +494,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->status_key_.clear();
   this->etag_ = etag;
   this->body_ = body;
+  this->layout_origin_ = origin;
   this->shown_at_ = millis();
   this->lkg_saved_ = false;
   if (persist && !this->store_.save(Slot::CURRENT, {etag, body}))
@@ -492,8 +516,12 @@ bool EsphelmRuntime::has_backlight_() const {
 }
 
 esphelm::Theme EsphelmRuntime::effective_theme_() const {
-  if (this->manual_theme_ >= 0)
-    return static_cast<esphelm::Theme>(this->manual_theme_);
+  if (this->prefs_.theme >= 0)
+    return static_cast<esphelm::Theme>(this->prefs_.theme);
+  return this->automatic_theme_();
+}
+
+esphelm::Theme EsphelmRuntime::automatic_theme_() const {
   if (this->layout_.settings.auto_theme == esphelm::AutoTheme::SUN && this->sun_night_ == 1)
     return esphelm::Theme::NIGHT;
   return this->base_theme_;
@@ -521,10 +549,13 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
   const int8_t night = std::strcmp(sun, "dusk") == 0 || std::strcmp(sun, "night") == 0 ? 1 : 0;
   if (night == this->sun_night_)
     return;
+  // The first value after a boot or a new source is no change: a saved choice stays.
+  const bool changed = this->sun_night_ >= 0;
   this->sun_night_ = night;
-  if (this->manual_theme_ >= 0) {
+  if (changed && this->prefs_.theme >= 0) {
     ESP_LOGI(TAG, "Sun: %s, back to the automatic theme", sun);
-    this->manual_theme_ = -1;
+    this->prefs_.theme = -1;
+    this->save_prefs_();
   }
   if (!this->has_layout_)
     return;
@@ -539,21 +570,52 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
 }
 
 void EsphelmRuntime::toggle_theme_() {
+  // The other theme; back to automatic when that is what the layout would show anyway.
   const esphelm::Theme theme =
       this->layout_.theme == esphelm::Theme::NIGHT ? esphelm::Theme::DAY : esphelm::Theme::NIGHT;
-  ESP_LOGI(TAG, "Theme switched on the display: %s", theme == esphelm::Theme::NIGHT ? "night" : "day");
-  this->manual_theme_ = static_cast<int8_t>(theme);
+  this->set_theme_choice_(theme == this->automatic_theme_() ? -1 : static_cast<int8_t>(theme));
+}
+
+void EsphelmRuntime::set_theme_choice_(int8_t choice) {
+  if (choice == this->prefs_.theme)
+    return;
+  this->prefs_.theme = choice;
+  this->prefs_.set_base(this->layout_.settings, this->base_theme_);
+  this->save_prefs_();
+  const esphelm::Theme theme = this->effective_theme_();
+  if (choice < 0)
+    ESP_LOGI(TAG, "Theme on the display: automatic (%s)", theme == esphelm::Theme::NIGHT ? "night" : "day");
+  else
+    ESP_LOGI(TAG, "Theme switched on the display: %s", theme == esphelm::Theme::NIGHT ? "night" : "day");
+  this->show_theme_();
+}
+
+void EsphelmRuntime::show_theme_() {
+  const esphelm::Theme theme = this->effective_theme_();
+  if (!this->has_layout_ || theme == this->layout_.theme)
+    return;
   this->layout_.theme = theme;
   this->theme_ = theme;
   this->build_page_(this->page_);
   this->apply_brightness_();
 }
 
+int EsphelmRuntime::brightness_percent_() const {
+  const esphelm::Settings &s = this->layout_.settings;
+  if (this->theme_ == esphelm::Theme::NIGHT)
+    return this->prefs_.brightness_night >= 0 ? this->prefs_.brightness_night : s.brightness_night;
+  return this->prefs_.brightness_day >= 0 ? this->prefs_.brightness_day : s.brightness_day;
+}
+
+void EsphelmRuntime::save_prefs_() {
+  if (!this->store_.save(Slot::PREFS, {"prefs", esphelm::encode_prefs(this->prefs_)}))
+    ESP_LOGW(TAG, "Could not save the display choices; they will not survive a reboot");
+}
+
 void EsphelmRuntime::apply_brightness_() {
   if (this->asleep_)
     return;
-  const esphelm::Settings &s = this->layout_.settings;
-  const int percent = this->theme_ == esphelm::Theme::NIGHT ? s.brightness_night : s.brightness_day;
+  const int percent = this->brightness_percent_();
   if (percent == this->applied_brightness_)
     return;
   this->applied_brightness_ = percent;
@@ -596,13 +658,15 @@ void EsphelmRuntime::check_sleep_(uint32_t now) {
   if (this->asleep_ || !this->has_layout_ || timeout == 0)
     return;
   const uint32_t after_ms = std::max<uint32_t>(timeout, 10) * 1000;
-  if (lv_display_get_inactive_time(nullptr) >= after_ms)
+  if (lv_display_get_inactive_time(nullptr) >= after_ms) {
+    ESP_LOGI(TAG, "Screen off after %u s without a touch", (unsigned) (after_ms / 1000));
     this->sleep_();
+  }
 }
 
 void EsphelmRuntime::sleep_() {
-  ESP_LOGI(TAG, "Screen off after %u s without a touch", (unsigned) std::max<uint32_t>(this->layout_.settings.screen_timeout, 10));
   this->asleep_ = true;
+  this->panel_.close();  // waking shows the page
   // A black cover on the system layer (above the alarm banner) catches the first touch, so
   // waking the screen never presses a button underneath.
   if (this->sleep_cover_ == nullptr) {
@@ -770,6 +834,8 @@ void EsphelmRuntime::set_clock_(int64_t utc, const char *source) {
   this->clock_utc_ = utc;
   this->clock_ms_ = millis();
   this->clock_set_ = true;
+  if (this->clock_source_ != source)
+    this->clock_source_ = source;
   if (had && std::llabs(before - utc) <= 2)
     return;  // a routine update
   char time_buf[9], date_buf[16];
@@ -818,6 +884,168 @@ void EsphelmRuntime::wake_(const char *why) {
     lv_obj_add_flag(this->sleep_cover_, LV_OBJ_FLAG_HIDDEN);
   this->applied_brightness_ = -1;
   this->apply_brightness_();
+}
+
+// ---- Settings panel (ADR-0025) ----
+
+SettingsPanel::State EsphelmRuntime::panel_state_() const {
+  SettingsPanel::State s;
+  s.theme = this->theme_;
+  s.choice = this->prefs_.theme;
+  s.brightness = this->brightness_percent_();
+  s.min_brightness = this->theme_ == esphelm::Theme::NIGHT ? esphelm::PREFS_MIN_NIGHT : esphelm::PREFS_MIN_DAY;
+  s.can_sleep = this->layout_.settings.screen_timeout > 0;
+  return s;
+}
+
+void EsphelmRuntime::tick_panel_(uint32_t now) {
+  if (!this->panel_.is_open())
+    return;
+  if (this->panel_.tick(now, this->panel_state_(), this->alarms_.height()))
+    this->alarms_.raise();
+  int8_t choice;
+  if (this->panel_.take_choice(choice))
+    this->set_theme_choice_(choice);
+  int percent;
+  bool done;
+  if (this->panel_.take_brightness(percent, done)) {
+    const bool night = this->theme_ == esphelm::Theme::NIGHT;
+    (night ? this->prefs_.brightness_night : this->prefs_.brightness_day) = static_cast<int16_t>(percent);
+    this->prefs_.set_base(this->layout_.settings, this->base_theme_);
+    this->apply_brightness_();
+    if (done) {
+      ESP_LOGI(TAG, "Brightness chosen on the display: %d %% (%s)", percent, night ? "night" : "day");
+      this->save_prefs_();
+    }
+  }
+  if (this->panel_.take_sleep()) {
+    ESP_LOGI(TAG, "Screen off from the settings");
+    this->panel_.close();
+    this->sleep_();
+  }
+  this->panel_.take_close();
+}
+
+/// "3 d 04:05:06", or "04:05:06" under a day.
+static std::string uptime_text(uint64_t seconds) {
+  char buf[32];
+  const unsigned d = static_cast<unsigned>(seconds / 86400);
+  const unsigned hms = static_cast<unsigned>(seconds % 86400);
+  if (d > 0)
+    std::snprintf(buf, sizeof(buf), "%u d %02u:%02u:%02u", d, hms / 3600, hms / 60 % 60, hms % 60);
+  else
+    std::snprintf(buf, sizeof(buf), "%02u:%02u:%02u", hms / 3600, hms / 60 % 60, hms % 60);
+  return buf;
+}
+
+void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows) const {
+  char buf[48];
+  const uint32_t now = millis();
+  lv_display_t *disp = lv_display_get_default();
+
+  rows.push_back({"Display", "Id", this->device_id_});
+  rows.push_back({nullptr, "Board", this->board_});
+  rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
+  std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
+                (int) lv_display_get_vertical_resolution(disp));
+  rows.push_back({nullptr, "Screen", buf});
+  rows.push_back({nullptr, "Up", uptime_text(millis_64() / 1000)});
+  const size_t up = rows.size() - 1;
+#ifdef USE_ESP32_FRAMEWORK_ESP_IDF
+  const unsigned internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
+  if (this->psram_)
+    std::snprintf(buf, sizeof(buf), "%u KB, PSRAM %u KB", internal,
+                  (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+  else
+    std::snprintf(buf, sizeof(buf), "%u KB", internal);
+  rows.push_back({nullptr, "Free memory", buf});
+#endif
+
+#if defined(USE_WIFI) || defined(USE_NETWORK)
+  rows.push_back({"Network", "Wi-Fi", "-"});
+#ifdef USE_WIFI
+  if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_connected()) {
+    char ssid[wifi::SSID_BUFFER_SIZE];
+    rows.back().value = wifi::global_wifi_component->wifi_ssid_to(ssid);
+    std::snprintf(buf, sizeof(buf), "%d dBm", wifi::global_wifi_component->wifi_rssi());
+    rows.push_back({nullptr, "Signal", buf});
+  } else {
+    rows.back().value = "not connected";
+    rows.push_back({nullptr, "Signal", "-"});
+  }
+#endif
+  std::string ip = "-";
+#ifdef USE_NETWORK
+  for (const auto &addr : network::get_ip_addresses()) {
+    char ip_buf[network::IP_ADDRESS_BUFFER_SIZE];
+    if (addr.is_ip4() && std::strcmp(addr.str_to(ip_buf), "0.0.0.0") != 0) {
+      ip = ip_buf;
+      break;
+    }
+  }
+#endif
+  rows.push_back({nullptr, "IP", ip});
+#endif
+
+  const std::string &host = this->signalk_->get_host();
+  rows.push_back({"SignalK", "Server",
+                  host.empty() ? std::string("searching") : host + ":" + std::to_string(this->signalk_->get_port())});
+  const char *stream;
+  switch (this->signalk_->access_state()) {
+    case signalk::SignalKAccessState::PENDING_APPROVAL:
+      stream = "waiting for approval";
+      break;
+    case signalk::SignalKAccessState::DENIED:
+      stream = "access denied";
+      break;
+    default:
+      stream = this->signalk_->is_stream_connected() ? "connected" : "not connected";
+  }
+  rows.push_back({nullptr, "Stream", stream});
+  rows.push_back({nullptr, "Deltas", std::to_string(this->signalk_->deltas_received())});
+  rows.push_back({nullptr, "Dropped", std::to_string(this->signalk_->messages_dropped())});
+  const uint32_t last = this->signalk_->last_delta_ms();
+  if (last == 0)
+    rows.push_back({nullptr, "Last delta", "-"});
+  else
+    rows.push_back({nullptr, "Last delta", uptime_text((now - last) / 1000) + " ago"});
+  rows.push_back({nullptr, "Paths", std::to_string(this->signalk_->subscribed_paths())});
+
+  static const char *const STATES[] = {"unknown", "not adopted", "no layout", "adopted"};
+  rows.push_back({"Layout", "Name", this->has_layout_ ? this->layout_.id : std::string("-")});
+  std::string version = this->etag_;
+  version.erase(std::remove(version.begin(), version.end(), '"'), version.end());
+  rows.push_back({nullptr, "Version", version.empty() ? std::string("-") : version});
+  rows.push_back({nullptr, "From", this->has_layout_ ? this->layout_origin_ : "-"});
+  rows.push_back({nullptr, "Pages", std::to_string(this->has_layout_ ? this->layout_.pages.size() : 0)});
+  rows.push_back({nullptr, "Plugin", STATES[static_cast<int>(this->server_state_)]});
+
+  int64_t utc;
+  if (this->utc_now_(utc)) {
+    char time_buf[9], date_buf[16];
+    const char *suffix;
+    esphelm::wallclock::time_text(utc, false, true, time_buf, sizeof(time_buf), suffix);
+    esphelm::wallclock::date_text(utc, esphelm::wallclock::DateFormat::YMD, date_buf, sizeof(date_buf));
+    std::snprintf(buf, sizeof(buf), "%s %s", date_buf, time_buf);
+    rows.push_back({"Clock", "UTC", buf});
+    rows.push_back({nullptr, "From", this->clock_source_});
+  } else {
+    // As many rows either way: the panel builds its labels once.
+    rows.push_back({"Clock", "UTC", "not set"});
+    rows.push_back({nullptr, "From", "-"});
+  }
+  const std::string &zone = this->layout_.settings.time_zone_name;
+  rows.push_back({nullptr, "Time zone", zone.empty() ? std::string("UTC") : zone});
+  if (this->info_fixed_) {
+    rows[up].value = "test";
+    for (size_t i = up + 1; i < rows.size(); i++) {
+      static const char *const CHANGING[] = {"Free memory", "Signal", "Deltas", "Dropped", "Last delta", "UTC"};
+      for (const char *n : CHANGING) {
+        if (std::strcmp(rows[i].name, n) == 0)
+          rows[i].value = "test";
+      }
+    }
+  }
 }
 
 // ---- Boot guard (ADR-0013) ----
@@ -911,8 +1139,18 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
     this->popup_.tap(part);
     return;
   }
-  if (tile_id == "@theme") {  // the footer title held down
+  if (tile_id == "@theme") {  // day/night, as the panel's buttons would
     this->theme_toggle_wanted_ = true;
+    return;
+  }
+  if (tile_id == "@menu") {  // the footer's menu button
+    lv_display_trigger_activity(nullptr);  // as a touch would
+    this->menu_wanted_ = true;
+    return;
+  }
+  if (tile_id == "@settings") {  // the settings panel's controls: close, day, night, auto, sleep, brightness=N
+    lv_display_trigger_activity(nullptr);
+    this->panel_.tap(part);
     return;
   }
   if (tile_id == "@screen") {  // a touch on the switched-off screen
@@ -922,8 +1160,8 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
       lv_display_trigger_activity(nullptr);
     return;
   }
-  if (this->popup_.is_open()) {
-    ESP_LOGW(TAG, "tap: %s is under the history popup", tile_id.c_str());
+  if (this->popup_.is_open() || this->panel_.is_open()) {
+    ESP_LOGW(TAG, "tap: %s is under the %s", tile_id.c_str(), this->popup_.is_open() ? "history popup" : "settings");
     return;
   }
   for (auto &w : this->widgets_) {
@@ -950,6 +1188,7 @@ void EsphelmRuntime::clear_layout_() {
   if (this->asleep_)
     this->wake_("no layout");
   this->popup_.close();
+  this->panel_.close();
   this->history_.clear();
   this->widgets_.clear();
   this->has_layout_ = false;
