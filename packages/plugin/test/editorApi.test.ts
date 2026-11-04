@@ -254,6 +254,7 @@ describe('widget catalog', () => {
       'autopilot',
       'graph',
       'heading_tape',
+      'clock',
     ]);
     expect(body.tileSlots).toEqual({
       wind_rose: [

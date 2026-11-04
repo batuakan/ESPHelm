@@ -754,6 +754,45 @@ async function main(): Promise<void> {
       JSON.stringify(servedCz),
     );
 
+    // A clock (ADR-0024) on a new page, Stockholm time and the clock screen saver.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page' }).click();
+    await page.getByRole('button', { name: /^Clock/ }).click();
+    const clockDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    await clockDrawer.getByRole('checkbox', { name: '12-hour clock' }).check();
+    const clockText =
+      (await page
+        .getByTestId(/^clock-/)
+        .first()
+        .textContent()) ?? '';
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    const clockSettings = page.getByRole('complementary', { name: 'Display settings' });
+    await clockSettings.getByLabel('Time zone').selectOption('Europe/Stockholm');
+    await clockSettings.getByLabel('Screen timeout').selectOption('300');
+    await clockSettings.getByLabel('Screen saver', { exact: true }).selectOption('both');
+    await shot(page, '14-desktop-clock-settings');
+    await save.click();
+    await page.getByRole('status').filter({ hasText: 'Sent to' }).last().waitFor();
+    const withClock = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    const servedClock = (withClock.body.pages as { tiles?: Record<string, unknown>[] }[])
+      .flatMap((p) => p.tiles ?? [])
+      .find((t) => t.type === 'clock');
+    const servedSettings = withClock.body.settings as Record<string, unknown> | undefined;
+    check(
+      'a clock previews the time and the display gets it with the zone rule and the screen saver',
+      /\d{1,2}:\d\d(AM|PM)/.test(clockText) &&
+        servedClock?.hour12 === true &&
+        JSON.stringify(servedSettings?.timeZone) ===
+          '{"name":"Europe/Stockholm","posix":"<+01>-1<+02>,M3.5.0,M10.5.0/3"}' &&
+        servedSettings?.screenSaver === 'both' &&
+        servedSettings.screenTimeout === 300,
+      `${clockText} ${JSON.stringify(servedClock)} ${JSON.stringify(servedSettings)}`,
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

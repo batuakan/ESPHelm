@@ -2,6 +2,11 @@
 // SDL screenshots in firmware/test/golden). Values arrive in SI and are converted like the
 // firmware does.
 import {
+  CLOCK_DEFAULTS,
+  clockDate,
+  clockTime,
+  localOffset,
+  type ClockTile,
   AUTOPILOT_DEFAULTS,
   POSITION_DEFAULTS,
   UNITS,
@@ -33,6 +38,7 @@ import {
   type HeadingTapeMarker,
   type HeadingTapeTile,
 } from '@esphelm/schema';
+import { useEffect, useState } from 'react';
 import { formatValue } from '../format';
 import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
@@ -289,6 +295,8 @@ export function TilePreview(props: {
   graphAxis?: boolean;
   /** Heading tape only: its width on the display, in pixels (the ticks depend on it). */
   tapeWidth?: number;
+  /** Clock only: the layout's time zone as a POSIX rule (settings.timeZone.posix); absent: UTC. */
+  timeZone?: string;
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -309,6 +317,7 @@ export function TilePreview(props: {
     return <GraphPreview tile={tile} values={values} axis={props.graphAxis ?? true} />;
   if (tile.type === 'heading_tape')
     return <HeadingTapePreview tile={tile} values={values} width={props.tapeWidth ?? 440} />;
+  if (tile.type === 'clock') return <ClockPreview tile={tile} timeZone={props.timeZone} />;
   const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':
@@ -488,6 +497,42 @@ function HistoryMark(props: { right?: boolean }) {
 }
 
 /** Latitude over longitude, in the tile's format (the same text the display shows). */
+/** Unix seconds now, updated every second. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/**
+ * A clock tile (ADR-0024): this computer's time in the layout's zone (or UTC), written as the
+ * display writes it (clock.ts). The display shows "--" until it has a time from SignalK or
+ * its board.
+ */
+export function ClockPreview(props: { tile: ClockTile; timeZone?: string; now?: number }) {
+  const { tile } = props;
+  const ticking = useNow();
+  const utc = props.now ?? ticking;
+  const show = tile.show ?? CLOCK_DEFAULTS.show;
+  const local = utc + (tile.utc || !props.timeZone ? 0 : localOffset(props.timeZone, utc));
+  const time = clockTime(local, tile.hour12 ?? false, tile.seconds ?? false);
+  const date = clockDate(local, tile.dateFormat ?? CLOCK_DEFAULTS.dateFormat);
+  return (
+    <span className={`tile-clock shows-${show}`} data-testid={`clock-${tile.id}`}>
+      {show !== 'date' && (
+        <span className="clock-time">
+          {time.text}
+          {time.suffix && <small className="clock-suffix">{time.suffix}</small>}
+        </span>
+      )}
+      {show !== 'time' && <span className="clock-date">{date}</span>}
+    </span>
+  );
+}
+
 export function PositionPreview(props: { tile: PositionTile; values: Map<string, unknown> }) {
   const { tile } = props;
   const text = formatPosition(

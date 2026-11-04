@@ -1383,6 +1383,29 @@ fieldset.modes {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* Clock tiles (ADR-0024): the time large, AM/PM and the date in the caption size. */
+.tile-clock {
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.clock-time {
+  font-size: clamp(20px, 6vmin, 52px);
+}
+.clock-suffix {
+  margin-left: 0.3em;
+  font-size: 0.4em;
+}
+.clock-date {
+  font-size: clamp(12px, 2.6vmin, 22px);
+}
+.tile-clock.shows-date .clock-date {
+  font-size: clamp(16px, 4.4vmin, 36px);
+}
 .format-choice span {
   display: grid;
   gap: 2px;

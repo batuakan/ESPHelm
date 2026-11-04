@@ -40,6 +40,7 @@ import {
   pageTiles,
   updateChartPage,
   updateSettings,
+  withBrowserTimeZone,
   updateSlot,
   updateTile,
   type SlotName,
@@ -243,7 +244,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     if (!layout) return;
     const r = addTile(layout, index, type, at);
     if (!r) return edit(null, 'No free cell there. Make the grid bigger or move a tile.');
-    edit(r.layout);
+    // A first clock gets this computer's time zone, so it shows what the clock on the wall does.
+    edit(type === 'clock' ? withBrowserTimeZone(r.layout) : r.layout);
     setSelection({ id: r.id });
   };
 
@@ -485,6 +487,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   autopilotTier={(t) => autopilotTier(tileBox(t))}
                   graphAxis={(t) => tileBox(t).height >= GRAPH_FIT.axisHeight}
                   tileWidth={(t) => tileBox(t).width}
+                  timeZone={layout.settings?.timeZone?.posix}
                   textSize={(t) =>
                     t.type === 'value'
                       ? valueTextSize(
@@ -656,6 +659,8 @@ function describeProblem(
   const tile = page?.kind === 'grid' ? page.tiles.find((t) => t.id === target?.tileId) : undefined;
   const text = /^\/pages\/\d+\/chart$/.test(pointer)
     ? 'choose a chart'
+    : pointer.startsWith('/settings/timeZone')
+      ? 'the time zone is not one the display can read: pick it again in Display settings'
     : code === 'INVALID_RANGE' && tile?.type === 'graph' && (tile.min === undefined || tile.max === undefined)
       ? 'a fixed range needs both min and max'
       : code === 'INVALID_RANGE' && pointer.endsWith('/min') && 'centerZero' in (tile ?? {})

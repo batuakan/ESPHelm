@@ -3,6 +3,7 @@
 // operations take the index of the page they work on. Ids are unique across the whole layout
 // (pages and tiles share one namespace, like the validator's DUPLICATE_ID check).
 import {
+  posixTz,
   AUTOPILOT_DEFAULTS,
   POSITION_DEFAULTS,
   WIND_ROSE_DEFAULTS,
@@ -127,6 +128,7 @@ export function tilePaths(tile: Tile): string[] {
     return [cfg.statePath, cfg.targetPath, cfg.headingPath];
   }
   if (tile.type === 'position') return [tile.path ?? POSITION_DEFAULTS.path];
+  if (tile.type === 'clock') return []; // the display's own clock
   if (tile.type === 'heading_tape') {
     const t = headingTapeSettings(tile);
     return [t.headingPath, ...t.markers.map((m) => t.paths[m])];
@@ -188,6 +190,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, path: '' };
     case 'heading_tape':
       return { type, ...place };
+    case 'clock':
+      return { type, ...place, show: 'both' };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -219,7 +223,9 @@ export function addTile(
             ? 'graph'
             : type === 'heading_tape'
               ? 'tape'
-              : 'tile';
+              : type === 'clock'
+                ? 'clock'
+                : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
   const big = type === 'wind_rose' || type === 'autopilot';
@@ -416,6 +422,28 @@ export function updateSettings(
   const { settings: _old, ...rest } = layout;
   void _old;
   return Object.keys(merged).length > 0 ? { ...rest, settings: merged as Settings } : rest;
+}
+
+/** settings.timeZone for IANA zone `name` (ADR-0024): its POSIX rule as of this year. */
+export function timeZoneSetting(name: string): NonNullable<Settings['timeZone']> {
+  return { name, posix: posixTz(name, new Date().getUTCFullYear()) };
+}
+
+/** This computer's IANA zone, or undefined when the browser doesn't say. */
+export function browserTimeZone(): string | undefined {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return zone && zone !== 'UTC' && /^[A-Za-z0-9_+/-]{1,64}$/.test(zone) ? zone : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The layout with this computer's time zone if it has none yet (when its first clock is added). */
+export function withBrowserTimeZone(layout: Layout): Layout {
+  const zone = browserTimeZone();
+  if (layout.settings?.timeZone || zone === undefined) return layout;
+  return updateSettings(layout, { timeZone: timeZoneSetting(zone) });
 }
 
 /** Drop a start page that is no longer a page of the layout (it would be UNKNOWN_PAGE). */

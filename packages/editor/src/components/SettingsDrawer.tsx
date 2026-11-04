@@ -1,6 +1,14 @@
 // Display settings (ADR-0015): carried by the layout and sent with Save & send, like the theme.
-import { SETTINGS_DEFAULTS, type Layout, type Settings } from '@esphelm/schema';
+import { useMemo } from 'react';
+import {
+  clockTime,
+  localOffset,
+  SETTINGS_DEFAULTS,
+  type Layout,
+  type Settings,
+} from '@esphelm/schema';
 import type { PathInfo } from '../api';
+import { browserTimeZone, timeZoneSetting } from '../layoutOps';
 import { Drawer, PathPicker } from './TileDrawer';
 
 /** Screen timeout choices in seconds (0 = never). */
@@ -14,6 +22,28 @@ const TIMEOUTS: { s: number; label: string }[] = [
   { s: 1800, label: '30 min' },
   { s: 3600, label: '1 hour' },
 ];
+
+const SCREEN_SAVERS: { key: NonNullable<Settings['screenSaver']>; label: string }[] = [
+  { key: 'off', label: 'Off: the screen goes dark' },
+  { key: 'time', label: 'The time' },
+  { key: 'date', label: 'The date' },
+  { key: 'both', label: 'The time and date' },
+];
+
+/** Every IANA zone the browser knows, UTC first (none: only the browser's own). */
+function zoneNames(): string[] {
+  const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
+  const all = intl.supportedValuesOf?.('timeZone') ?? [browserTimeZone()].filter((z): z is string => !!z);
+  return all.filter((z) => z !== 'UTC');
+}
+
+/** "UTC+01:00" for an offset in seconds east of UTC. */
+function utcOffset(east: number): string {
+  const a = Math.abs(east);
+  const hh = String(Math.floor(a / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((a % 3600) / 60)).padStart(2, '0');
+  return `UTC${east < 0 ? '-' : '+'}${hh}:${mm}`;
+}
 
 type SettingsPatch = Omit<Partial<Settings>, 'brightness'> & {
   brightness?: Partial<NonNullable<Settings['brightness']>>;
@@ -35,6 +65,13 @@ export function SettingsDrawer(props: {
   const auto = (s.autoTheme ?? SETTINGS_DEFAULTS.autoTheme) === 'sun';
   const sunPath = s.autoThemePath ?? SETTINGS_DEFAULTS.autoThemePath;
   const sunNow = props.values.get(sunPath);
+  const zones = useMemo(zoneNames, []);
+  const zone = s.timeZone;
+  const nowUtc = Math.floor(Date.now() / 1000);
+  const offset = zone ? localOffset(zone.posix, nowUtc) : 0;
+  const saver = s.screenSaver ?? SETTINGS_DEFAULTS.screenSaver;
+  const saverBrightness = s.screenSaverBrightness ?? SETTINGS_DEFAULTS.screenSaverBrightness;
+  const clockPath = s.clockPath ?? SETTINGS_DEFAULTS.clockPath;
   const timeouts = TIMEOUTS.some((t) => t.s === timeout)
     ? TIMEOUTS
     : [...TIMEOUTS, { s: timeout, label: `${timeout} s` }].sort((a, b) => a.s - b.s);
@@ -151,6 +188,89 @@ export function SettingsDrawer(props: {
           for a display you only look at.
         </small>
       </label>
+      {timeout > 0 && (
+        <div className="settings-sub">
+          <label className="field">
+            <span>Screen saver</span>
+            <select
+              value={saver}
+              onChange={(e) =>
+                props.onChange({ screenSaver: e.target.value === 'off' ? undefined : (e.target.value as Settings['screenSaver']) })
+              }
+              aria-label="Screen saver"
+            >
+              {SCREEN_SAVERS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <small className="hint">
+              Instead of turning off, the screen shows the clock faintly. Until the display knows
+              the time, it goes dark.
+            </small>
+          </label>
+          {saver !== 'off' && props.backlight && (
+            <label className="field">
+              <span>
+                Brightness while it shows <output>{saverBrightness} %</output>
+              </span>
+              <input
+                type="range"
+                min={1}
+                max={30}
+                step={1}
+                value={saverBrightness}
+                onChange={(e) => props.onChange({ screenSaverBrightness: Number(e.target.value) })}
+                aria-label="Screen saver brightness"
+              />
+            </label>
+          )}
+        </div>
+      )}
+
+      <fieldset className="settings-group">
+        <legend>Clock</legend>
+        <label className="field">
+          <span>Time zone</span>
+          <select
+            value={zone?.name ?? ''}
+            onChange={(e) =>
+              props.onChange({ timeZone: e.target.value ? timeZoneSetting(e.target.value) : undefined })
+            }
+            aria-label="Time zone"
+          >
+            <option value="">UTC</option>
+            {zone && !zones.includes(zone.name) && <option value={zone.name}>{zone.name}</option>}
+            {zones.map((z) => (
+              <option key={z} value={z}>
+                {z.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <small className="hint">
+            Now {clockTime(nowUtc + offset, false, false).text} ({utcOffset(offset)}). The display
+            follows summer time by itself, offline too. Clocks and the screen saver use it.
+          </small>
+        </label>
+        <PathPicker
+          label="Time from"
+          path={clockPath}
+          paths={props.paths}
+          values={props.values}
+          onPick={(path) =>
+            props.onChange({
+              clockPath: path && path !== SETTINGS_DEFAULTS.clockPath ? path : undefined,
+            })
+          }
+        />
+        <small className="hint">
+          {typeof props.values.get(clockPath) === 'string'
+            ? `Now: ${String(props.values.get(clockPath))}. `
+            : 'No value yet: a GPS gives navigation.datetime. '}
+          A display whose firmware has NTP or HomeAssistant time uses that when SignalK has none.
+        </small>
+      </fieldset>
     </Drawer>
   );
 }

@@ -35,7 +35,7 @@ function fakeServer(devices: Device[]) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -546,6 +546,46 @@ describe('editor', { timeout: 20000 }, () => {
           config: { headingPath: 'navigation.headingMagnetic' },
         },
       ],
+    });
+  });
+
+  it('adds a clock: no paths, its formats, a time zone and the screen saver, and saves them', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Clock/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect(live.paths()).toEqual([]); // the display's own clock
+    const preview = screen.getByTestId('clock-clock-1');
+    expect(preview.querySelector('.clock-time')?.textContent).toMatch(/^\d\d:\d\d$/);
+    expect(preview.querySelector('.clock-date')?.textContent).toMatch(/^\d{4}-\d\d-\d\d$/);
+    fireEvent.click(within(drawer).getByLabelText('12-hour clock'));
+    fireEvent.click(within(drawer).getByLabelText('Wed 4 Nov'));
+    expect(preview.querySelector('.clock-suffix')?.textContent).toMatch(/^(AM|PM)$/);
+    expect(preview.querySelector('.clock-date')?.textContent).toMatch(/^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
+    const settings = screen.getByRole('complementary', { name: 'Display settings' });
+    expect(within(settings).queryByLabelText('Screen saver')).toBeNull(); // only with a timeout
+    fireEvent.change(within(settings).getByLabelText('Screen timeout'), { target: { value: '120' } });
+    fireEvent.change(within(settings).getByLabelText('Screen saver'), { target: { value: 'both' } });
+    fireEvent.change(within(settings).getByLabelText('Screen saver brightness'), { target: { value: '8' } });
+    fireEvent.change(within(settings).getByLabelText('Time zone'), { target: { value: 'Europe/Stockholm' } });
+    within(settings).getByText(/\(UTC\+0[12]:00\)/);
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    const saved = server.layouts.get(`display-${p4.deviceId}`)!;
+    expect(saved.pages[0]).toMatchObject({
+      tiles: [{ type: 'clock', id: 'clock-1', w: 1, h: 1, show: 'both', hour12: true, dateFormat: 'weekday' }],
+    });
+    expect(saved.settings).toEqual({
+      screenTimeout: 120,
+      screenSaver: 'both',
+      screenSaverBrightness: 8,
+      timeZone: { name: 'Europe/Stockholm', posix: '<+01>-1<+02>,M3.5.0,M10.5.0/3' },
     });
   });
 

@@ -29,8 +29,10 @@ import {
   removeTile,
   resizeTile,
   setGrid,
+  timeZoneSetting,
   updateSettings,
   updateTile,
+  withBrowserTimeZone,
 } from '../src/layoutOps';
 
 const device = { id: '3A2B1C0D-ef01-2345-0ba2-a1b2c3d4e5f6', name: 'Helm' };
@@ -477,5 +479,23 @@ describe('heading tape tiles', () => {
       'navigation.courseOverGroundTrue',
     ]);
     expect(validateLayout(l).ok).toBe(true);
+  });
+});
+
+describe('clock tiles', () => {
+  it('start 1x1 with the time and date, and subscribe to nothing', () => {
+    const r = addTile(newLayoutFor(device), 0, 'clock')!;
+    const tile = page(r.layout).tiles[0]!;
+    expect(tile).toEqual({ type: 'clock', id: 'clock-1', x: 0, y: 0, w: 1, h: 1, show: 'both' });
+    expect(tilePaths(tile)).toEqual([]);
+    expect(validateLayout(r.layout).ok).toBe(true);
+  });
+
+  it('store a time zone as its name and POSIX rule, and keep a zone already chosen', () => {
+    const zone = timeZoneSetting('America/New_York');
+    expect(zone).toEqual({ name: 'America/New_York', posix: '<-05>5<-04>,M3.2.0,M11.1.0' });
+    const l = updateSettings(newLayoutFor(device), { timeZone: zone });
+    expect(validateLayout(addTile(l, 0, 'clock')!.layout).ok).toBe(true);
+    expect(withBrowserTimeZone(l).settings?.timeZone).toEqual(zone);
   });
 });

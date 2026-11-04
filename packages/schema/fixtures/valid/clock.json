@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "id": "clock",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "clocks",
+      "title": "Clock",
+      "grid": {
+        "cols": 2,
+        "rows": 3
+      },
+      "tiles": [
+        {
+          "type": "clock",
+          "id": "local",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1,
+          "show": "both",
+          "label": "Local"
+        },
+        {
+          "type": "clock",
+          "id": "twelve",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "hour12": true,
+          "seconds": true,
+          "label": "12 h"
+        },
+        {
+          "type": "clock",
+          "id": "utc",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "utc": true,
+          "show": "both",
+          "dateFormat": "dmy"
+        },
+        {
+          "type": "clock",
+          "id": "day",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "show": "date",
+          "dateFormat": "weekday"
+        },
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "unit": "kn",
+          "decimals": 1,
+          "label": "SOG"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "timeZone": {
+      "name": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3"
+    },
+    "screenTimeout": 30,
+    "screenSaver": "both",
+    "screenSaverBrightness": 5
+  }
+}

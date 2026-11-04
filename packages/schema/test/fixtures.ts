@@ -106,3 +106,21 @@ export interface CenterZeroCases {
 export const CENTER_ZERO_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'center-zero.cases.json'), 'utf8'),
 ) as CenterZeroCases;
+
+/** Clock cases (ADR-0024), shared by the TS and C++ tests. */
+export interface ClockCases {
+  offsets: { zone?: string; posix: string; utc: string; expected: number }[];
+  times: {
+    local: number;
+    hour12: boolean;
+    seconds: boolean;
+    expected: { text: string; suffix: string };
+  }[];
+  dates: { local: number; format: string; expected: string }[];
+  iso: { text: string; expected: number | null }[];
+  posix: { zone: string; year: number; expected: string }[];
+}
+
+export const CLOCK_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'clock.cases.json'), 'utf8'),
+) as ClockCases;

@@ -22,6 +22,7 @@
     "autopilot",
     "graph",
     "heading_tape",
+    "clock",
     "chart"
   ],
   "fonts": [

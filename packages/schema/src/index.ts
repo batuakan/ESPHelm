@@ -3,6 +3,7 @@ export * from './tiles.js';
 export * from './position.js';
 export * from './headingTape.js';
 export * from './centerZero.js';
+export * from './clock.js';
 export * from './valueZones.js';
 export * from './serverZones.js';
 export * from './textFit.js';
