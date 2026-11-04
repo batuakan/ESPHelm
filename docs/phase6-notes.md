@@ -172,4 +172,5 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Tile:** *Clock* in the library and a drawer with examples. The first clock gives the layout the browser's time zone.
   - **Display settings:** the time zone, the time path, the screen saver and its brightness.
 - **Build size against `main`:** P4 flash +14.8 KB (3,353,082 B), C3 +11.7 KB (1,465,140 B, 79.8 %); static RAM +224 B.
-- **Not verified:** on the P4 (hardware step 23): the dimmed backlight, the touch through the saver, and NTP via `time_id` (no board YAML sets it yet).
+- **Checked on the P4** (hardware step 23): the clocks, the dimmed saver and the touch through it. The first try showed a black screen: the saver's 5 % backlight is dark on the P4-86, so the range became 1–100 % with a default of 30 %.
+- **Not verified:** NTP via `time_id` (no board YAML sets it yet).
