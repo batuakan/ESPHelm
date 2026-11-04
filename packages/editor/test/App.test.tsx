@@ -110,6 +110,10 @@ describe('editor', { timeout: 20000 }, () => {
     const save = await screen.findByRole('button', { name: 'Save & send' });
     await screen.findByText('Add at least one tile.');
     expect((save as HTMLButtonElement).disabled).toBe(true);
+    // One page still has a footer: its title and the settings menu button, no page buttons.
+    const footer = screen.getByLabelText('Display footer');
+    expect(footer.textContent).not.toMatch(/1\/1|</);
+    expect(within(footer).getByTitle('Settings on the display')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
     await screen.findByText(/tile-1: pick a SignalK path/);

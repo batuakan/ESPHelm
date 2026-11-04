@@ -478,7 +478,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
               {grid && (
                 <GridCanvas
                   page={grid}
-                  aspect={aspectFor(device, layout)}
+                  aspect={aspectFor(device)}
                   values={shownValues}
                   serverZones={serverZones}
                   selectedId={tile?.id}
@@ -516,7 +516,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   chart={charts.find((c) => c.identifier === chartPage.chart)}
                   values={shownValues}
                   width={display.width}
-                  height={Math.round(display.height * (layout.pages.length > 1 ? 0.89 : 1))}
+                  height={Math.round(display.height * 0.89)}
                   night={layout.theme === 'night'}
                   onSelect={() => setSelection({ id: chartPage.id })}
                 />
@@ -628,11 +628,10 @@ function graphHint(box: { width: number; height: number }, known: boolean): stri
   return `About ${box.width}×${box.height} px ${where}: ${what}.`;
 }
 
-function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined, layout: Layout) {
+function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined) {
   if (!device) return 1;
-  // The footer takes a strip at the bottom of the display when there are several pages.
-  const footer = layout.pages.length > 1 ? 0.11 : 0;
-  return device.hello.display.width / (device.hello.display.height * (1 - footer));
+  // The footer takes a strip at the bottom of the display (ADR-0025: on every layout).
+  return device.hello.display.width / (device.hello.display.height * 0.89);
 }
 
 const PROBLEM_TEXT: Record<string, string> = {

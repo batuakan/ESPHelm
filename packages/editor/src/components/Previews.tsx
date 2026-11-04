@@ -711,17 +711,28 @@ export function WindRosePreview(props: {
   );
 }
 
-/** The display's page footer (shown when the layout has more than one page). */
+/**
+ * The display's page footer: the page title and the settings menu button (ADR-0025), and with
+ * several pages the page buttons and "n/m".
+ */
 export function FooterPreview({ layout, index }: { layout: Layout; index: number }) {
-  if (layout.pages.length < 2) return null;
   const page = layout.pages[index];
+  const pages = layout.pages.length > 1;
   return (
     <div className="footer-preview" aria-label="Display footer">
-      <span className={`fbtn ${index === 0 ? 'off' : ''}`}>&lt;</span>
-      <span>
-        {page?.title ?? page?.id} {index + 1}/{layout.pages.length}
+      {pages ? <span className={`fbtn ${index === 0 ? 'off' : ''}`}>&lt;</span> : <span className="fspace" />}
+      <span className="ftitle">
+        {page?.title ?? page?.id}
+        {pages && ` ${index + 1}/${layout.pages.length}`}
       </span>
-      <span className={`fbtn ${index + 1 >= layout.pages.length ? 'off' : ''}`}>&gt;</span>
+      <span className="fend">
+        <span className="fbtn fmenu" title="Settings on the display">
+          <svg viewBox="0 0 16 12" width="16" height="12" aria-hidden="true">
+            <path d="M1 1h14M1 6h14M1 11h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </span>
+        {pages && <span className={`fbtn ${index + 1 >= layout.pages.length ? 'off' : ''}`}>&gt;</span>}
+      </span>
     </div>
   );
 }

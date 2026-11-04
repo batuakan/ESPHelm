@@ -1,6 +1,6 @@
 // Approximate pixel size of a tile on the display, from the display's resolution (hello) and the
 // runtime's fixed geometry (renderer.cpp): page area padding 8, grid gaps 8, tile padding 10,
-// and a footer of about 11 % of the height when the layout has several pages. Used for the
+// and a footer of about 11 % of the height (every layout has one, ADR-0025). Used for the
 // wind rose and autopilot size hints; the display decides from the cell it actually gets.
 import {
   AUTOPILOT_FIT,
@@ -33,7 +33,7 @@ export function tilePixels(
   const page = layout.pages[pageIndex];
   const cols = page?.kind === 'grid' ? page.grid.cols : 1;
   const rows = page?.kind === 'grid' ? page.grid.rows : 1;
-  const height = display.height * (layout.pages.length > 1 ? 1 - FOOTER_SHARE : 1);
+  const height = display.height * (1 - FOOTER_SHARE);
   const cellW = (display.width - 2 * AREA_PAD - GAP * (cols - 1)) / cols;
   const cellH = (height - 2 * AREA_PAD - GAP * (rows - 1)) / rows;
   return {

@@ -17,10 +17,11 @@ const onePage = (cols: number, rows: number, pages = 1): Layout => ({
 
 describe('tilePixels', () => {
   it('follows the runtime geometry (area padding, gaps, tile padding)', () => {
-    // 480 wide, 1 column: 480 - 2*8 padding - 2*10 tile padding = 444.
+    // 480 wide, 1 column: 480 - 2*8 padding - 2*10 tile padding = 444; the footer takes 11 % of
+    // the height: 480 * 0.89 - 16 - 20 = 391.
     expect(tilePixels({ width: 480, height: 480 }, onePage(1, 1), 0, { w: 1, h: 1 })).toEqual({
       width: 444,
-      height: 444,
+      height: 391,
     });
     // 3x3 at 480: cells of (480 - 16 - 16) / 3 = 149.3, minus 20 = 129.
     expect(tilePixels({ width: 480, height: 480 }, onePage(3, 3), 0, { w: 1, h: 1 }).width).toBe(
@@ -32,11 +33,11 @@ describe('tilePixels', () => {
     );
   });
 
-  it('leaves room for the footer when there are several pages', () => {
+  it('leaves room for the footer on every layout, one page or several (ADR-0025)', () => {
     const one = tilePixels({ width: 720, height: 720 }, onePage(1, 1), 0, { w: 1, h: 1 });
     const two = tilePixels({ width: 720, height: 720 }, onePage(1, 1, 2), 0, { w: 1, h: 1 });
-    expect(two.width).toBe(one.width);
-    expect(two.height).toBeLessThan(one.height - 70);
+    expect(two).toEqual(one);
+    expect(one.height).toBeLessThan(one.width - 70);
   });
 });
 
