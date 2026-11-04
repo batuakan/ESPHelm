@@ -66,7 +66,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 - the start page
 - *Auto day/night*: the night theme while `environment.sun` (derived-data plugin) says dusk or night; the drawer shows its current value
 - *Screen off without a touch*: Never, or 30 s to 1 hour
-- *Screen saver* (with a timeout): off, or the time, the date or both, shown faintly instead of turning the screen off, and its brightness (1–30 %, when the display can dim)
+- *Screen saver* (with a timeout): off, or the time, the date or both, shown faintly instead of turning the screen off, and its brightness (1–100 %, default 30; the P4-86 is dark below about 30 %; when the display can dim)
 - *Clock*: the time zone (every IANA zone the browser knows; the layout stores its POSIX rule, so the display follows summer time offline) and the path the time comes from (default `navigation.datetime`)
 
 Removing the start page, or replacing the pages with a starter layout, resets it to the first page.

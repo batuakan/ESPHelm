@@ -76,6 +76,6 @@
     },
     "screenTimeout": 30,
     "screenSaver": "both",
-    "screenSaverBrightness": 5
+    "screenSaverBrightness": 30
   }
 }

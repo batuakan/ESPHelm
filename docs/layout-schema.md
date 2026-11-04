@@ -276,7 +276,7 @@ Display settings travel with the layout (one layout per display), so they're val
 | `autoThemePath` | `environment.sun` | set by the derived-data plugin (`dawn`, `sunrise`, `day`, `sunset`, `dusk`, `night`) |
 | `screenTimeout` | 0 | seconds without a touch before the screen turns off, 0–3600; 0 = never. Displays apply at least 10 s. |
 | `screenSaver` | `off` | what the screen shows after `screenTimeout` instead of turning off: `time`, `date` or `both`, faintly, on black (ADR-0024). Written like the layout's first clock tile (else 24-hour, weekday date). Until the display knows the time it goes dark as with `off`. |
-| `screenSaverBrightness` | 5 | backlight in %, 1–30, while the screen saver shows |
+| `screenSaverBrightness` | 30 | backlight in %, 1–100, while the screen saver shows. Some panels (the P4-86) are dark below about 30 %. |
 | `timeZone` | UTC | `{ name, posix }`: the IANA zone (`name`, `^[A-Za-z0-9_+/-]{1,64}$`) and its POSIX TZ rule (`posix`, `POSIX_TZ_PATTERN`, `INVALID_FORMAT` otherwise), see below |
 | `clockPath` | `navigation.datetime` | where the display's clock comes from: an ISO 8601 date-time with a zone (a GPS gives it) |
 

@@ -70,8 +70,9 @@ export const Settings = Type.Object(
     screenSaverBrightness: Type.Optional(
       Type.Integer({
         minimum: 1,
-        maximum: 30,
-        description: 'Backlight in % while the screen saver shows.',
+        maximum: 100,
+        description:
+          'Backlight in % while the screen saver shows. Some panels are dark below about 30 %.',
       }),
     ),
   },
@@ -88,7 +89,7 @@ export const SETTINGS_DEFAULTS = {
   screenTimeout: 0,
   clockPath: 'navigation.datetime',
   screenSaver: 'off',
-  screenSaverBrightness: 5,
+  screenSaverBrightness: 30,
   /** Shortest timeout a display applies (a smaller value would make it hard to use). */
   minScreenTimeout: 10,
 } as const;

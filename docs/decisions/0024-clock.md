@@ -37,7 +37,7 @@ Your choices:
   - **No `path`:** older firmware doesn't list `clock` in its hello, so the plugin refuses such a layout (`UNSUPPORTED_WIDGET`).
   - **Fonts:** the time uses the digits-only fonts, which gain `:`. A font without `:` (an older board YAML) is skipped for the time.
   - **Before the first time:** it shows `--`, muted.
-- **The screen saver:** `settings.screenSaver` (`off`, `time`, `date`, `both`) and `screenSaverBrightness` (1–30 %, default 5).
+- **The screen saver:** `settings.screenSaver` (`off`, `time`, `date`, `both`) and `screenSaverBrightness` (1–100 %, default 30; first 1–30 % with a default of 5, but the P4-86 panel is dark below about 30 %, so the saver looked off).
   - **What it shows:** the time and/or date on the sleep cover, in the theme's muted colour, written like the layout's first clock tile (else 24-hour with the weekday date).
   - **Backlight:** dimmed, not turned off.
   - **Waking:** a touch wakes the screen through the cover, as before. An alarm wakes it too.

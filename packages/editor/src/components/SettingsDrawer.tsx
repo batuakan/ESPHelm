@@ -218,7 +218,7 @@ export function SettingsDrawer(props: {
               <input
                 type="range"
                 min={1}
-                max={30}
+                max={100}
                 step={1}
                 value={saverBrightness}
                 onChange={(e) => props.onChange({ screenSaverBrightness: Number(e.target.value) })}

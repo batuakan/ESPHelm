@@ -785,7 +785,7 @@ void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
   int saver = enum_field(chk, obj, sp, "screenSaver", false, SCREEN_SAVERS, 4);
   if (saver >= 0)
     settings.screen_saver = SAVER_SHOWS[saver];
-  if (int_field(chk, obj, sp, "screenSaverBrightness", false, 1, 30, n))
+  if (int_field(chk, obj, sp, "screenSaverBrightness", false, 1, 100, n))
     settings.screen_saver_brightness = static_cast<uint8_t>(n);
 }
 

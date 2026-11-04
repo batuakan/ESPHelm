@@ -1192,7 +1192,7 @@ async function main(): Promise<void> {
     check(
       'clock: the screen saver shows the clock after the timeout',
       (await fw.waitLog(/Screen off after 10 s without a touch/, 20000)) &&
-        (await fw.waitLog(/Screen saver: the clock, backlight 5 %/)),
+        (await fw.waitLog(/Screen saver: the clock, backlight 30 %/)),
     );
     await sleep(800);
     await fw.screenshot('63-clock-screen-saver', shots);

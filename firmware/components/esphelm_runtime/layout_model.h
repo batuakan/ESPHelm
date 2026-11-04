@@ -163,7 +163,7 @@ struct Settings {
   wallclock::Tz time_zone;
   std::string clock_path{"navigation.datetime"};
   ClockShow screen_saver{ClockShow::OFF};
-  uint8_t screen_saver_brightness{5};  // %
+  uint8_t screen_saver_brightness{30};  // %
 };
 
 struct Layout {

@@ -1,5 +1,5 @@
 {
-  "description": "screenSaverBrightness is 1 to 30 %",
+  "description": "screenSaverBrightness is 1 to 100 %",
   "expect": [
     {
       "code": "OUT_OF_RANGE",
@@ -32,7 +32,7 @@
       }
     ],
     "settings": {
-      "screenSaverBrightness": 60
+      "screenSaverBrightness": 101
     }
   }
 }
