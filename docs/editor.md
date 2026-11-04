@@ -57,6 +57,8 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 
 **Heading tape** (ADR-0022): a compass strip that scrolls with the heading, from the library's *Heading tape*, 2x1 by default. The drawer has the caption, the heading path (default `navigation.headingTrue`), the span (degrees across the tape, 30–180, default 90), and a checkbox per marker: course over ground, the bearing to the next waypoint and the autopilot target, each with its own path. A warning appears when the heading is magnetic and an enabled marker is true, or the other way round, since they'd be off by the magnetic variation. The preview draws the same ticks and labels as the display, for the tile's width on the selected display, with the live heading and markers.
 
+**Clock** (ADR-0024): the display's time and/or date, from the library's *Clock*, 1x1 by default with both. The drawer chooses what it shows, 12- or 24-hour, seconds, the date format (each with an example), and UTC instead of the layout's time zone. It has no path: the display keeps its own clock, set from SignalK's `navigation.datetime` (a GPS) or its firmware's NTP or HomeAssistant time. The preview shows this computer's time in the layout's zone. The first clock added to a layout gives it this computer's time zone.
+
 **Position tile:** shows `navigation.position` (or another position path) as two lines. The drawer lists the four formats, each with an example from the live value: degrees and decimal minutes (`60° 09.000' N`), degrees, minutes and seconds, decimal degrees, and signed decimal. *Decimals* applies to the last part (minutes, seconds or degrees); empty uses the format's default. The preview uses the same formatter as the display.
 
 **Display settings** (the *Display settings* button next to the display theme, ADR-0015) are part of the layout too, sent with *Save & send*:
@@ -64,6 +66,8 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 - the start page
 - *Auto day/night*: the night theme while `environment.sun` (derived-data plugin) says dusk or night; the drawer shows its current value
 - *Screen off without a touch*: Never, or 30 s to 1 hour
+- *Screen saver* (with a timeout): off, or the time, the date or both, shown faintly instead of turning the screen off, and its brightness (1–30 %, when the display can dim)
+- *Clock*: the time zone (every IANA zone the browser knows; the layout stores its POSIX rule, so the display follows summer time offline) and the path the time comes from (default `navigation.datetime`)
 
 Removing the start page, or replacing the pages with a starter layout, resets it to the first page.
 

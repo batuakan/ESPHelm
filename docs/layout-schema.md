@@ -88,6 +88,7 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `autopilot` | `label?`, `modes?`, `config?` | see below |
 | `graph` | DataItem + `window?`, `min?`, `max?`, `zones?` (value zones) | line graph of the value's recent history, see below |
 | `heading_tape` | `label?`, `span?`, `markers?`, `config?`, `staleAfter?` | compass strip that scrolls with the heading, see below |
+| `clock` | `label?`, `show?`, `hour12?`, `seconds?`, `dateFormat?`, `utc?` | the display's time and/or date, see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
@@ -230,6 +231,25 @@ A compass strip that scrolls with the heading under a fixed centre line, with th
   "config": { "headingPath": "navigation.headingMagnetic" } }
 ```
 
+### Clock tiles
+The display's own time and/or date, in the layout's time zone (`settings.timeZone`) or in UTC (ADR-0024). A clock has no `path` (`UNKNOWN_FIELD`): the display sets its clock from `settings.clockPath` (GPS time) or from its board's time source, and keeps it running offline. It shows `--`, muted, until it has a time.
+
+| Field | Notes |
+|---|---|
+| `label` | optional caption |
+| `show` | `time` (default), `date` or `both` |
+| `hour12` | 12-hour time with AM/PM; default 24-hour |
+| `seconds` | show seconds; default off |
+| `dateFormat` | `ymd` (2026-11-04, the default), `dmy` (04.11.2026), `mdy` (11/04/2026) or `weekday` (Wed 4 Nov) |
+| `utc` | UTC instead of the layout's time zone; the caption says "UTC" |
+
+- **Text** (`clockTime()`, `clockDate()` in `clock.ts`, mirrored by the firmware's `esphelm_clock.h`, shared cases in `fixtures/clock.cases.json`): 24-hour time zero-padded ("09:05"), 12-hour without ("9:05" and "AM"). Defaults are exported as `CLOCK_DEFAULTS`, formats as `CLOCK_DATE_FORMATS`.
+
+```json
+{ "type": "clock", "id": "local", "x": 0, "y": 0, "w": 2, "h": 1,
+  "show": "both", "hour12": true, "dateFormat": "weekday" }
+```
+
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
 
@@ -255,8 +275,26 @@ Display settings travel with the layout (one layout per display), so they're val
 | `autoTheme` | `off` | `sun`: the night theme while `autoThemePath` is `dusk` or `night` (`NIGHT_SUN_STATES`), else the layout's `theme`. Without a value the layout's `theme` stays. |
 | `autoThemePath` | `environment.sun` | set by the derived-data plugin (`dawn`, `sunrise`, `day`, `sunset`, `dusk`, `night`) |
 | `screenTimeout` | 0 | seconds without a touch before the screen turns off, 0–3600; 0 = never. Displays apply at least 10 s. |
+| `screenSaver` | `off` | what the screen shows after `screenTimeout` instead of turning off: `time`, `date` or `both`, faintly, on black (ADR-0024). Written like the layout's first clock tile (else 24-hour, weekday date). Until the display knows the time it goes dark as with `off`. |
+| `screenSaverBrightness` | 5 | backlight in %, 1–30, while the screen saver shows |
+| `timeZone` | UTC | `{ name, posix }`: the IANA zone (`name`, `^[A-Za-z0-9_+/-]{1,64}$`) and its POSIX TZ rule (`posix`, `POSIX_TZ_PATTERN`, `INVALID_FORMAT` otherwise), see below |
+| `clockPath` | `navigation.datetime` | where the display's clock comes from: an ISO 8601 date-time with a zone (a GPS gives it) |
 
 Brightness needs a backlight the firmware can dim (`capabilities.backlight` in the hello); other displays ignore it.
+
+**Time zones (ADR-0024).** SignalK has no time zone, and a display has no zone database, so the layout carries the zone as a POSIX TZ rule, which includes summer time, and the display follows it offline. The editor builds the rule from the browser's zone data (`posixTz()` in `clock.ts`) in the restricted form `localOffset()` reads:
+
+```text
+<+01>-1<+02>,M3.5.0,M10.5.0/3     standard name and offset (west positive), summer name, start and end rules
+<+0530>-5:30                      a zone without summer time
+```
+
+Names are numeric in `<...>` (as the tz database writes them) or three or more letters. A rule `Mm.w.d[/time]` is the month, the week 1–5 (5: the last), the weekday 0–6 (Sunday 0) and the local time of the change (default 2:00). It matches the browser's zone for every IANA zone in 2026, and for every zone whose rules stay the same in later years. Morocco's summer time pauses for Ramadan, which a rule can't express, so it is right only for the year the editor built it in.
+
+```json
+"settings": { "timeZone": { "name": "Europe/Stockholm", "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3" },
+              "screenTimeout": 300, "screenSaver": "both" }
+```
 
 ## 3. Validation and error codes
 `validateLayout(input)` returns `{ ok, value?, errors[] }`, with each error `{ pointer, code, message }`. `pointer` is an RFC 6901 JSON Pointer into the input. It works in two stages, and the **firmware mirrors both and logs the same codes**:
