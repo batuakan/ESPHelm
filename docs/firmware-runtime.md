@@ -68,7 +68,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Any layout | a footer with the page title and the settings menu button (ADR-0025); with more than one page also `<` and `>` (disabled at the ends) and "n/m" |
-| The footer's menu button (ADR-0025) | the settings panel below the banner: brightness, Day / Night / Auto, *Screen off* (with a screen timeout), and information on the display, the network, SignalK, the layout and the clock; only its close button closes it |
+| The footer's menu button (ADR-0025) | the settings panel below the banner, in two tabs: *Settings* (brightness, Day / Night / Auto, *Screen off* with a screen timeout) and *Info* (the display, the network, SignalK, the layout and the clock); only its close button closes it |
 | Zones change in the server's metadata (ADR-0020) | within seconds (at most about a minute) the visible tiles use them, replacing their own; the page is rebuilt once, without a new layout |
 | A tap on a value tile or wind rose that records (ADR-0018, ADR-0019) | its history popup below the banner: a button per value for a rose, live value, min/max, a line graph of the last 10 min / 1 h / 6 h (6 h with PSRAM only; angles drawn around their mean so north doesn't jump), "Collecting..." until there are two points; only its close button closes it |
 | An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
@@ -91,7 +91,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 - There is no swiping; the legacy apps keep theirs.
 
 ## Settings panel (ADR-0025)
-- **Opening and closing:** the footer's menu button opens `SettingsPanel` on LVGL's top layer, below the alarm banner. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
+- **Opening and closing:** the footer's menu button opens `SettingsPanel` on LVGL's top layer, below the alarm banner, on its *Settings* tab; *Info* is the other tab. Only the tab shown is built. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
 - **Brightness** is a slider for the theme shown: day 5–100 %, night 1–100 %. It dims live and is saved when let go. On a board without a backlight it is only logged.
 - **Theme:** *Day* and *Night* override the layout's theme and the sun; *Auto* hands it back.
 - **Screen off,** shown when the layout has a screen timeout, switches off (or to the screen saver) at once.
@@ -99,13 +99,13 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
   - **Format:** a self-checking record, `v=1;th=…;bd=…;bn=…` plus the layout values they were chosen against.
   - **Read:** before the first layout, so they survive a reboot. A record that doesn't parse or has a value out of range is ignored.
   - **Dropped:** when a layout brings a different `theme`/`autoTheme` (theme choice) or `brightness.day`/`.night` (that override), and a day/night choice when the sun changes. The first sun value after a boot is not a change.
-- **Information** is refreshed once a second while open.
+- **Information** (the *Info* tab, two columns of sections at 720) is refreshed once a second while it shows.
   - **Display:** id, board, firmware, screen, uptime, free memory (internal, and PSRAM). Free memory is not on the host.
   - **Network:** Wi-Fi and signal (`USE_WIFI`), IP (`USE_NETWORK`).
   - **SignalK:** server, stream, deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
   - **Layout:** name, version, where it came from (fetched, cached, last known good), pages, the plugin's state for the device.
   - **Clock:** UTC, its source, the time zone.
-  - **Long values** are shortened with "..". Each section is three labels (heading, names, values), so the row count of a section is fixed.
+  - **Long values** are shortened with "..". Each section is a box with three labels (heading, names, values), so the row count of a section is fixed.
 
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue.
@@ -201,10 +201,10 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes, now on every layout, with the menu button's three bars |
-| Settings panel (ADR-0025) | about 45 LVGL objects while open (each information section is three labels), none when closed; the saved choices are one record of under 100 B in NVS |
+| Settings panel (ADR-0025) | about 20 LVGL objects with the *Settings* tab, about 30 with *Info* (four per section), none when closed; the saved choices are one record of under 100 B in NVS |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,726 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 14.9 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,760 B of 321,296 B (35.1 %), flash 1.48 MB of 1.8 MB (80.7 %) |
+| P4 runtime firmware, static | RAM 98,742 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 15.5 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,768 B of 321,296 B (35.1 %), flash 1.48 MB of 1.8 MB (80.7 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -245,7 +245,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); switching the theme on the display (`esphelm_tap_request @theme`) from night to day holds while the sun stays down and is handed back to `autoTheme` at sunrise
 
-  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it (screenshots by day and at night, at 720 too); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
+  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and in two columns at 720); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
 
   18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
@@ -260,7 +260,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21e. **centre-zero gauges and bars** (ADR-0023, `fixtures/valid/center-zero.json`): a rudder and a rate of turn (port/starboard), a house current (−50…20, plus/minus) and a vertical start current, with live values one way, then the other way round, and at night; offline at 720 (no fill, "--")
 
   21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
-  Seventy screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -341,8 +341,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - One touch wakes it at full brightness without pressing anything under your finger.
     - Unplug the network: the clocks keep running. Reboot without the network: they show "--" until a time arrives (no clock without a source).
 24. **The settings panel (ADR-0025).** On any layout (a one-page one too), the footer has a button with three bars on the right, left of **>**.
-    - A tap opens *Settings*. Drag the brightness slider: the backlight follows while you drag. Let go, close the panel, and reboot: the brightness stays.
+    - A tap opens the panel on its *Settings* tab, with *Info* beside it. Drag the brightness slider: the backlight follows while you drag. Let go, close the panel, and reboot: the brightness stays.
     - *Night* switches to the red theme at once and *Auto* back to the layout's (or the sun's). The night brightness slider is separate from the day one.
-    - The information side shows the display's IP and Wi-Fi signal (check them against your router), the SignalK server's address, and a *Deltas* count that rises while you watch.
+    - The *Info* tab shows the display's IP and Wi-Fi signal (check them against your router), the SignalK server's address, and a *Deltas* count that rises while you watch.
     - Change the night brightness in the editor and Save & send: the display takes the editor's value.
     - Check that the menu button, the slider and the three theme buttons are easy to hit with a wet thumb, and that the panel is readable at night.

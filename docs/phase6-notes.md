@@ -179,16 +179,18 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 
 - **What:**
   - **Footer:** every layout has one now, with a menu button (three bars) next to the page buttons. A one-page layout shows its title and the button.
-  - **Panel:** the button opens it. *Brightness* (a slider for the theme shown), *Day* / *Night* / *Auto*, and *Screen off* (with a screen timeout).
-  - **Information:** the display, the network (Wi-Fi, signal, IP), SignalK (server, stream, deltas, dropped, last delta, paths), the layout and the clock.
+  - **Panel:** the button opens it, in two tabs.
+  - **Settings tab:** *Brightness* (a slider for the theme shown), *Day* / *Night* / *Auto*, and *Screen off* (with a screen timeout).
+  - **Info tab:** the display, the network (Wi-Fi, signal, IP), SignalK (server, stream, deltas, dropped, last delta, paths), the layout and the clock.
   - **Long-press:** the old one on the page title is gone.
 - **Saved on the display:** `display_prefs.cpp`, `Slot::PREFS`.
   - **Kept:** across reboots, until the layout brings a different value for what was overridden. A day/night choice also goes when the sun changes; the first sun value after a boot doesn't count.
   - **Checked:** by a g++ test (`prefs.cpp.test.ts`).
-- **ESPHomeSignalK:** `deltas_received()`, `messages_dropped()`, `last_delta_ms()`, `subscribed_paths()` (branch `feat/delta-counters`). It needs to be on that repo's `main` before ESPHelm builds against it.
+- **ESPHomeSignalK:** `deltas_received()`, `messages_dropped()`, `last_delta_ms()`, `subscribed_paths()` (PR #12 there, merged).
 - **Editor:** the footer preview on every layout, with the menu button; size hints reserve the footer on one-page layouts too.
 - **Tests:**
-  - **Goldens:** 56 re-recorded for the footer and reviewed by eye. Three new: the panel by day and at night, and at 720.
+  - **Goldens:** 56 re-recorded for the footer and reviewed by eye. Five new: the *Settings* tab by day and at night, *Info* by day, and both tabs at 720.
   - **Value sizes check:** "2400" now fits a single cell, so the check uses a 500 °C temperature.
-- **Build size against `main`:** P4 flash +14.9 KB (3,368,010 B), C3 +15.1 KB (1,480,248 B, 80.7 %); static RAM +200 B / +208 B.
-- **Not verified:** on the P4 (hardware step 24): the real touch on the menu button and the slider, the live dimming and its value after a reboot, the IP and Wi-Fi signal, the deltas count rising.
+- **Build size against `main`:** P4 flash +15.5 KB (3,368,618 B), C3 +15.7 KB (1,480,876 B, 80.7 %); static RAM +216 B on both.
+- **Checked on the P4** (hardware step 24), before the tabs: the panel works.
+- **Tabs:** added afterwards, at your request. *Settings* and *Info*, with only the shown tab built. Not yet checked on the P4.

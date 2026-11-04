@@ -24,7 +24,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-clock-day.png">
  <img width="200px" src="/docs/images/display-clock-saver.png">
  <img width="200px" src="/docs/images/display-settings-day.png">
- <img width="200px" src="/docs/images/display-settings-night.png">
+ <img width="200px" src="/docs/images/display-settings-info.png">
 </p>
 
 <p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day and night themes.</em></p>
@@ -79,7 +79,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
-- **Settings on the display itself:** the menu button in the footer opens a panel with a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. It also shows what the display knows: its IP and Wi-Fi signal, the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
+- **Settings on the display itself:** the menu button in the footer opens a panel with two tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Info* shows what the display knows: its IP and Wi-Fi signal, the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
 - **Resolution agnostic:** layouts are grids, so the same layout works on 480×480 and 720×720.
@@ -93,12 +93,12 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 ## 👆 On the display
 
 - **Change page:** the **<** and **>** buttons in the footer.
-- **Settings:** the button with three bars in the footer (every layout has one) opens the settings panel.
+- **Settings:** the button with three bars in the footer (every layout has one) opens the settings panel, on its *Settings* tab.
   - **Brightness:** a slider for the theme shown (day and night are kept separately).
   - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
   - **Screen off,** when the layout has a screen timeout.
   - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
-  - **Information:** the display (id, firmware, uptime, free memory), the network (Wi-Fi, signal, IP), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
+  - **Info tab:** the display (id, firmware, uptime, free memory), the network (Wi-Fi, signal, IP), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
   - **Closing:** only the **X** closes it.
 - **Alarms:** tap the banner to see the next alarm, **ACK** to acknowledge it.
 - **Screen off** (screen timeout): the first touch only wakes the display, it never presses a button.
@@ -132,7 +132,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 70 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 72 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```
