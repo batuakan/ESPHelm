@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "esphome/core/hal.h"
@@ -73,6 +74,8 @@ void EsphelmRuntime::setup() {
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
   this->tiles_.start();
+  const char *clock_test = std::getenv("ESPHELM_TEST_CLOCK");
+  this->clock_frozen_ = clock_test != nullptr && std::strcmp(clock_test, "frozen") == 0;
 
   this->popup_.set_fonts(this->fonts_);
   this->popup_.set_history(&this->history_);
@@ -214,7 +217,10 @@ void EsphelmRuntime::loop() {
     this->wake_wanted_ = false;
     this->wake_("touch");
   }
+  this->tick_clock_(now);
   this->check_sleep_(now);
+  if (this->asleep_ && this->saver_on_)
+    this->show_saver_(now);
   this->alarms_.tick(this->theme_, connected,
                      authorized && connected && this->server_state_ != ServerState::UNKNOWN);
   // The banner pushes the page down instead of covering it, so no control hides under it.
@@ -246,7 +252,7 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["rotation"] = 0;
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
-  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape"})
+  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock"})
     doc["widgets"].add(w);
   if (this->psram_)
     doc["widgets"].add("chart");
@@ -458,6 +464,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->theme_ = this->layout_.theme;
   this->has_layout_ = true;
   this->watch_sun_();
+  this->watch_clock_();
   if (this->asleep_)
     this->wake_("new layout");
   this->apply_brightness_();
@@ -579,7 +586,8 @@ void EsphelmRuntime::check_sleep_(uint32_t now) {
 #ifdef USE_ESPHELM_BACKLIGHT
   // A touch while asleep may be handled by the board's YAML (it resumes LVGL and turns the light
   // on); that touch never reached LVGL, so nothing on the page was pressed.
-  if (this->asleep_ && this->backlight_ != nullptr && this->backlight_->remote_values.is_on()) {
+  // (Not while the screen saver shows: then the light is on, dimmed, and LVGL isn't paused.)
+  if (this->asleep_ && !this->saver_on_ && this->backlight_ != nullptr && this->backlight_->remote_values.is_on()) {
     this->wake_("touch");
     return;
   }
@@ -610,7 +618,193 @@ void EsphelmRuntime::sleep_() {
         LV_EVENT_PRESSED, this);
   }
   lv_obj_remove_flag(this->sleep_cover_, LV_OBJ_FLAG_HIDDEN);
-  this->set_backlight_(false, 0);
+  // The screen saver (ADR-0024): a faint clock on the cover and a dimmed backlight, once the
+  // display knows the time; else dark, as without it.
+  this->saver_on_ = this->layout_.settings.screen_saver != esphelm::ClockShow::OFF && this->clock_set_;
+  if (!this->saver_on_) {
+    for (lv_obj_t *l : {this->saver_time_, this->saver_date_}) {
+      if (l != nullptr)
+        lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
+    }
+    this->set_backlight_(false, 0);
+    return;
+  }
+  const esphelm::ClockShow show = this->layout_.settings.screen_saver;
+  // Written like the layout's first clock tile; without one 24 h, and the weekday date.
+  this->saver_clock_ = esphelm::ClockConfig{};
+  this->saver_clock_.date_format = esphelm::wallclock::DateFormat::WEEKDAY;
+  bool found = false;
+  for (const auto &page : this->layout_.pages) {
+    for (const auto &tile : page.tiles) {
+      if (!found && tile.type == esphelm::TileType::CLOCK) {
+        this->saver_clock_.hour12 = tile.clock.hour12;
+        this->saver_clock_.date_format = tile.clock.date_format;
+        found = true;
+      }
+    }
+  }
+  lv_obj_update_layout(this->sleep_cover_);
+  const int32_t w = lv_obj_get_width(this->sleep_cover_);
+  const int32_t h = lv_obj_get_height(this->sleep_cover_);
+  const lv_color_t faint = colors_for(this->theme_).muted;
+  // The time as wide as half the screen; digits-only fonts when they have ":" and no AM/PM follows.
+  const char *sample = this->saver_clock_.hour12 ? "88:88 PM" : "88:88";
+  const lv_font_t *time_font = this->fonts_.small;  // when nothing larger fits
+  lv_font_glyph_dsc_t glyph;
+  for (int i = this->fonts_.count - 1; i >= 0; i--) {
+    const lv_font_t *f = this->fonts_.ladder[i];
+    if (this->fonts_.digits[i] && (this->saver_clock_.hour12 || !lv_font_get_glyph_dsc(f, &glyph, ':', 0)))
+      continue;
+    if (text_width(sample, f) <= w / 2 && lv_font_get_line_height(f) <= h / 2) {
+      time_font = f;
+      break;
+    }
+  }
+  const lv_font_t *date_font = companion_font(this->fonts_, time_font);
+  if (show == esphelm::ClockShow::DATE)
+    date_font = fit_font(this->fonts_, "88/88/8888", w / 2, h / 2);
+  lv_obj_t **labels[] = {&this->saver_time_, &this->saver_date_};
+  for (lv_obj_t **l : labels) {
+    if (*l == nullptr)
+      *l = lv_label_create(this->sleep_cover_);
+    lv_obj_set_style_text_color(*l, faint, LV_PART_MAIN);
+  }
+  lv_obj_set_style_text_font(this->saver_time_, time_font, LV_PART_MAIN);
+  lv_obj_set_style_text_font(this->saver_date_, date_font, LV_PART_MAIN);
+  const bool with_time = show != esphelm::ClockShow::DATE, with_date = show != esphelm::ClockShow::TIME;
+  if (with_time)
+    lv_obj_remove_flag(this->saver_time_, LV_OBJ_FLAG_HIDDEN);
+  else
+    lv_obj_add_flag(this->saver_time_, LV_OBJ_FLAG_HIDDEN);
+  if (with_date)
+    lv_obj_remove_flag(this->saver_date_, LV_OBJ_FLAG_HIDDEN);
+  else
+    lv_obj_add_flag(this->saver_date_, LV_OBJ_FLAG_HIDDEN);
+  // Centred as a pair: the date under the time.
+  const int32_t pair = with_time && with_date ? lv_font_get_line_height(date_font) / 2 : 0;
+  lv_obj_align(this->saver_time_, LV_ALIGN_CENTER, 0, -pair);
+  lv_obj_align(this->saver_date_, LV_ALIGN_CENTER, 0,
+               with_time ? lv_font_get_line_height(time_font) / 2 : 0);
+  this->saver_shown_time_.clear();
+  this->saver_shown_date_.clear();
+  this->next_saver_ms_ = 0;
+  this->show_saver_(millis());
+  ESP_LOGI(TAG, "Screen saver: the clock, backlight %d %%", this->layout_.settings.screen_saver_brightness);
+  this->set_backlight_(true, this->layout_.settings.screen_saver_brightness);
+}
+
+void EsphelmRuntime::show_saver_(uint32_t now) {
+  if (now < this->next_saver_ms_)
+    return;
+  this->next_saver_ms_ = now + 1000;  // the text changes once a minute; checking each second is cheap
+  int64_t utc;
+  if (!this->utc_now_(utc))
+    return;
+  const int64_t local = utc + esphelm::wallclock::offset(this->layout_.settings.time_zone, utc);
+  char time_buf[9], date_buf[16];
+  const char *suffix;
+  esphelm::wallclock::time_text(local, this->saver_clock_.hour12, false, time_buf, sizeof(time_buf), suffix);
+  esphelm::wallclock::date_text(local, this->saver_clock_.date_format, date_buf, sizeof(date_buf));
+  const std::string time_text = suffix[0] != '\0' ? std::string(time_buf) + " " + suffix : std::string(time_buf);
+  if (this->saver_shown_time_ != time_text) {
+    this->saver_shown_time_ = time_text;
+    lv_label_set_text(this->saver_time_, time_text.c_str());
+  }
+  if (this->saver_shown_date_ != date_buf) {
+    this->saver_shown_date_ = date_buf;
+    lv_label_set_text(this->saver_date_, date_buf);
+  }
+}
+
+// ---- Clock (ADR-0024) ----
+
+bool EsphelmRuntime::clock_wanted_() const {
+  if (!this->has_layout_)
+    return false;
+  if (this->layout_.settings.screen_saver != esphelm::ClockShow::OFF)
+    return true;
+  for (const auto &page : this->layout_.pages) {
+    for (const auto &tile : page.tiles) {
+      if (tile.type == esphelm::TileType::CLOCK)
+        return true;
+    }
+  }
+  return false;
+}
+
+void EsphelmRuntime::watch_clock_() {
+  const bool wanted = this->clock_wanted_();
+  const std::string &path = this->layout_.settings.clock_path;
+  if (wanted && path == this->clock_path_)
+    return;
+  if (!this->clock_path_.empty())
+    this->signalk_->remove_listener(this->clock_listener_);
+  this->clock_path_.clear();
+  if (!wanted)
+    return;
+  this->clock_path_ = path;
+  this->clock_listener_ = this->signalk_->add_listener(
+      path, [this](const std::string &, ArduinoJson::JsonVariantConst v) { this->on_clock_(v); });
+}
+
+void EsphelmRuntime::on_clock_(ArduinoJson::JsonVariantConst value) {
+  int64_t utc;
+  // Untrusted: an ISO date-time string, else ignored.
+  if (!value.is<const char *>() || !esphelm::wallclock::parse_iso_utc(value.as<const char *>(), utc))
+    return;
+  // A GPS without a fix (or replayed old data) can send a date long past; keep the board's time.
+  static const int64_t EARLIEST = 1577836800;  // 2020-01-01
+  if (utc < EARLIEST) {
+    if (!this->clock_old_logged_)
+      ESP_LOGW(TAG, "Clock: ignoring %s from %s (before 2020)", value.as<const char *>(), this->clock_path_.c_str());
+    this->clock_old_logged_ = true;
+    return;
+  }
+  this->clock_signalk_ms_ = millis() | 1;
+  this->set_clock_(utc, this->clock_path_.c_str());
+}
+
+void EsphelmRuntime::set_clock_(int64_t utc, const char *source) {
+  int64_t before;
+  const bool had = this->utc_now_(before);
+  this->clock_utc_ = utc;
+  this->clock_ms_ = millis();
+  this->clock_set_ = true;
+  if (had && std::llabs(before - utc) <= 2)
+    return;  // a routine update
+  char time_buf[9], date_buf[16];
+  const char *suffix;
+  esphelm::wallclock::time_text(utc, false, true, time_buf, sizeof(time_buf), suffix);
+  esphelm::wallclock::date_text(utc, esphelm::wallclock::DateFormat::YMD, date_buf, sizeof(date_buf));
+  ESP_LOGI(TAG, "Clock set from %s: %s %s UTC", source, date_buf, time_buf);
+}
+
+bool EsphelmRuntime::utc_now_(int64_t &utc) const {
+  if (!this->clock_set_)
+    return false;
+  utc = this->clock_utc_ + (this->clock_frozen_ ? 0 : (millis() - this->clock_ms_) / 1000);
+  return true;
+}
+
+void EsphelmRuntime::tick_clock_(uint32_t now) {
+  if (now < this->next_clock_check_ms_)
+    return;
+  this->next_clock_check_ms_ = now + 10000;
+  // Move the anchor forward now and then, so millis() wrapping (49 days) never matters.
+  const uint32_t elapsed = (now - this->clock_ms_) / 1000;
+  if (this->clock_set_ && !this->clock_frozen_ && elapsed >= 3600) {
+    this->clock_utc_ += elapsed;
+    this->clock_ms_ += elapsed * 1000;
+  }
+#ifdef USE_ESPHELM_TIME
+  // The board's time (SNTP, HomeAssistant) when SignalK hasn't sent one for ten minutes.
+  if (this->time_ != nullptr && this->clock_wanted_() &&
+      (this->clock_signalk_ms_ == 0 || now - this->clock_signalk_ms_ > 600000)) {
+    const ESPTime t = this->time_->utcnow();
+    if (t.is_valid())
+      this->set_clock_(t.timestamp, "the board's time");
+  }
+#endif
 }
 
 void EsphelmRuntime::wake_(const char *why) {
@@ -619,6 +813,7 @@ void EsphelmRuntime::wake_(const char *why) {
     return;
   ESP_LOGI(TAG, "Screen on (%s)", why);
   this->asleep_ = false;
+  this->saver_on_ = false;
   if (this->sleep_cover_ != nullptr)
     lv_obj_add_flag(this->sleep_cover_, LV_OBJ_FLAG_HIDDEN);
   this->applied_brightness_ = -1;
@@ -672,6 +867,8 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.night = this->layout_.theme == esphelm::Theme::NIGHT;
   env.has_history = [this](const std::string &key) { return this->history_.find(key) >= 0; };
   env.history = &this->history_;
+  env.utc_now = [this](int64_t &utc) { return this->utc_now_(utc); };
+  env.time_zone = this->layout_.settings.time_zone;
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
   env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
@@ -745,6 +942,10 @@ void EsphelmRuntime::clear_layout_() {
   if (!this->sun_path_.empty()) {
     this->signalk_->remove_listener(this->sun_listener_);
     this->sun_path_.clear();
+  }
+  if (!this->clock_path_.empty()) {
+    this->signalk_->remove_listener(this->clock_listener_);
+    this->clock_path_.clear();
   }
   if (this->asleep_)
     this->wake_("no layout");

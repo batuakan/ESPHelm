@@ -105,6 +105,10 @@ struct WidgetEnv {
   std::function<void(const std::string &tile_id)> open_history;
   /// The recorded values, read by graph tiles (ADR-0021). Lives as long as the layout.
   const esphelm::ValueHistory *history{nullptr};
+  /// The display's clock (ADR-0024): Unix seconds now, false until it has been set. Clock tiles
+  /// show it in `time_zone` (UTC when the layout has none).
+  std::function<bool(int64_t &utc)> utc_now;
+  esphelm::wallclock::Tz time_zone;
 };
 
 class Widget {
@@ -146,6 +150,9 @@ int32_t text_width(const char *text, const lv_font_t *font);
 /// fit w x h; the smallest when none does. Digits-only fonts are skipped: `text` may be anything.
 const lv_font_t *fit_font(const Fonts &fonts, const char *text, int32_t w, int32_t h, int lines = 1,
                           const lv_font_t *max = nullptr);
+
+/// Caption and unit font beside a number in `font` (ADR-0017).
+const lv_font_t *companion_font(const Fonts &fonts, const lv_font_t *font);
 
 /// Display-unit number from a SignalK value; false if it is not a finite number.
 bool display_number(ArduinoJson::JsonVariantConst value, const esphelm::units::UnitDef *unit, double &out);

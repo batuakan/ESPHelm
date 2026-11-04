@@ -129,9 +129,9 @@ std::string value_sample(int decimals) {
   return s;
 }
 
-/// What a formatted number can contain; the digits-only fonts have just these glyphs.
+/// What a formatted number or a clock time can contain; the digits-only fonts have just these glyphs.
 bool is_numeric(const std::string &text) {
-  return text.find_first_not_of("0123456789.-") == std::string::npos;
+  return text.find_first_not_of("0123456789.-:") == std::string::npos;
 }
 
 /// The smallest full (not digits-only) font.
@@ -248,6 +248,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return make_graph_widget(cell, tile, env);
     case esphelm::TileType::HEADING_TAPE:
       return make_heading_tape_widget(cell, tile, env);
+    case esphelm::TileType::CLOCK:
+      return make_clock_widget(cell, tile, env);
     case esphelm::TileType::VALUE:
     default:
       return make_value_widget(cell, tile, env);

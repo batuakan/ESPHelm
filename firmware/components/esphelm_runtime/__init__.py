@@ -1,7 +1,7 @@
 """esphelm_runtime: renders layouts from the signalk-esphelm plugin (docs/firmware-runtime.md)."""
 
 import esphome.codegen as cg
-from esphome.components import font, light
+from esphome.components import font, light, time
 from esphome.components.lvgl.types import lv_obj_t
 from esphome.components.lvgl.widgets import get_widgets
 from esphome.components.signalk import signalk as SignalKComponent
@@ -25,6 +25,7 @@ CONF_STALE_AFTER = "stale_after"
 CONF_MAX_LAYOUT_BYTES = "max_layout_bytes"
 CONF_STORE_DIR = "store_dir"
 CONF_BACKLIGHT = "backlight"
+CONF_TIME_ID = "time_id"
 
 # LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
 # links against it for image needles).
@@ -55,7 +56,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Required(CONF_SMALL): cv.use_id(font.Font),
                 # More sizes for tile text to pick from (ADR-0017), in any order.
                 cv.Optional(CONF_EXTRA, default=[]): cv.ensure_list(cv.use_id(font.Font)),
-                # Fonts with only the glyphs "0123456789.-": value tile numbers only.
+                # Fonts with only the glyphs "0123456789.-:": value numbers and clock times only.
                 cv.Optional(CONF_DIGITS, default=[]): cv.ensure_list(cv.use_id(font.Font)),
             }
         ),
@@ -66,6 +67,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_STORE_DIR, default="."): cv.string,
         # A dimmable light driving the display backlight: layout brightness and screen timeout.
         cv.Optional(CONF_BACKLIGHT): cv.use_id(light.LightState),
+        # A second source for the clock (ADR-0024), e.g. SNTP or HomeAssistant; SignalK's
+        # navigation.datetime (GPS time) wins while it arrives.
+        cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -107,3 +111,6 @@ async def to_code(config):
     if CONF_BACKLIGHT in config:
         cg.add_define("USE_ESPHELM_BACKLIGHT")
         cg.add(var.set_backlight(await cg.get_variable(config[CONF_BACKLIGHT])))
+    if CONF_TIME_ID in config:
+        cg.add_define("USE_ESPHELM_TIME")
+        cg.add(var.set_time(await cg.get_variable(config[CONF_TIME_ID])))

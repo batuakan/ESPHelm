@@ -26,12 +26,10 @@ int32_t line_height(const lv_font_t *font);
 int32_t digit_height(const lv_font_t *font);
 /// The number a value-like tile sizes its font for: "88" plus its decimals (-1: the default 1).
 std::string value_sample(int decimals);
-/// What a formatted number can contain; the digits-only fonts have just these glyphs.
+/// What a formatted number or a clock time can contain; the digits-only fonts have just these glyphs.
 bool is_numeric(const std::string &text);
 /// The smallest full (not digits-only) font.
 const lv_font_t *smallest_font(const Fonts &fonts);
-/// Caption and unit font beside a number in `font` (ADR-0017).
-const lv_font_t *companion_font(const Fonts &fonts, const lv_font_t *font);
 /// The item's staleAfter, or the layout default.
 uint32_t stale_ms(const esphelm::DataItem &item, const WidgetEnv &env);
 /// Zone style (scale section arcs) for an alert state and arc width; static, shared per page.
@@ -106,6 +104,7 @@ std::unique_ptr<Widget> make_wind_rose_widget(lv_obj_t *cell, const esphelm::Til
 std::unique_ptr<Widget> make_position_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_graph_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_heading_tape_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_clock_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
 }  // namespace esphelm_runtime
 }  // namespace esphome
