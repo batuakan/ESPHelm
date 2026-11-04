@@ -658,6 +658,12 @@ async function main(): Promise<void> {
     check('panel: the footer menu button opens the settings', await fw.waitLog(/Settings opened/));
     await sleep(1000);
     await fw.screenshot('64-settings-panel', shots);
+    settingsTap('tab-info');
+    check('panel: the Info tab shows the information', await waitNext(/Settings: information tab/));
+    await sleep(1500);
+    await fw.screenshot('66-settings-info', shots);
+    settingsTap('tab-settings');
+    check('panel: back to the Settings tab', await waitNext(/Settings: settings tab/));
     settingsTap('night');
     check(
       'panel: Night switches the theme',
@@ -1431,11 +1437,15 @@ async function main(): Promise<void> {
     await sleep(1500);
     await fw720.screenshot('720-10-clock', shots);
 
-    // 12h. The settings panel at 720: controls and information side by side.
+    // 12h. The settings panel at 720: its Settings tab, and the Info tab in two columns.
     writeFileSync(join(work720, 'esphelm_tap_request'), '@menu');
     check('720 build opens the settings panel', await fw720.waitLog(/Settings opened/));
     await sleep(1000);
     await fw720.screenshot('720-11-settings-panel', shots);
+    writeFileSync(join(work720, 'esphelm_tap_request'), '@settings tab-info');
+    check('720 build shows the Info tab', await fw720.waitLog(/Settings: information tab/));
+    await sleep(1500);
+    await fw720.screenshot('720-12-settings-info', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

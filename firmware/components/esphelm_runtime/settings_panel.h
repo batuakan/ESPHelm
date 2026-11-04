@@ -1,12 +1,12 @@
 #pragma once
-// Settings and information panel (ADR-0025), opened by the footer's menu button: brightness,
-// day/night/auto and "screen off" on one side, what the display knows about itself, the network,
-// SignalK, its layout and its clock on the other. Over the page and below the alarm banner, on
+// Settings and information panel (ADR-0025), opened by the footer's menu button, in two tabs:
+// Settings (brightness, day/night/auto and "screen off") and Info (what the display knows about
+// itself, the network, SignalK, its layout and its clock). Only the shown tab is built. Over the page and below the alarm banner, on
 // LVGL's top layer, like the history popup; closed only by its close button. Not a widget: it
 // belongs to the runtime and outlives page changes underneath it. Main loop only; its LVGL events
 // only record what was pressed, the runtime applies it after tick().
-// Memory: about 45 LVGL objects while open (each information section is three labels), none when
-// closed.
+// Memory: about 20 LVGL objects while the Settings tab is open, about 30 for Info (each section
+// is four), none when closed.
 
 #include <cstdint>
 #include <functional>
@@ -46,8 +46,8 @@ class SettingsPanel {
   void close();
   bool is_open() const { return this->root_ != nullptr; }
 
-  /// Test hook and the buttons: "close", "day", "night", "auto", "sleep", or "brightness=<1-100>"
-  /// (the slider let go there). Applied in tick().
+  /// Test hook and the buttons: "close", "tab-settings", "tab-info", "day", "night", "auto",
+  /// "sleep", or "brightness=<1-100>" (the slider let go there). Applied in tick().
   void tap(const std::string &part);
   /// Follow the state (rebuilt for another theme) and the banner, refresh the information once a
   /// second. True if the panel was built anew (the banner must go in front).
@@ -67,10 +67,16 @@ class SettingsPanel {
     return was;
   }
   void build_();
+  void build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h);
+  void build_info_(lv_obj_t *body, int32_t w, int32_t gap, int32_t line_small);
   void refresh_info_();
   void style_choices_();
 
+  enum class Tab : uint8_t { SETTINGS, INFO };
+
   Fonts fonts_;
+  Tab tab_{Tab::SETTINGS};  // shown; only its objects exist
+  int8_t pending_tab_{-1};
   std::function<void(std::vector<InfoRow> &)> fill_;
   State state_;
   int32_t top_{0};
@@ -87,6 +93,7 @@ class SettingsPanel {
   lv_obj_t *brightness_value_{nullptr};
   lv_obj_t *slider_{nullptr};
   lv_obj_t *choices_[3]{};  // day, night, auto
+  lv_obj_t *tabs_[2]{};     // settings, info
   struct Section {
     lv_obj_t *values;
     std::string shown;
