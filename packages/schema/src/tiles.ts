@@ -1,4 +1,5 @@
 import Type from 'typebox';
+import { CLOCK_DATE_FORMATS } from './clock.js';
 import { DataItem, Decimals, Id, Label, SkPath } from './primitives.js';
 
 /** Placement of a tile on its page grid, in cells (0-based; a tile may span several cells). */
@@ -211,6 +212,55 @@ export const HEADING_TAPE_DEFAULTS = {
   cogPath: 'navigation.courseOverGroundTrue',
   bearingPath: 'navigation.course.calcValues.bearingTrue',
   targetPath: 'steering.autopilot.target',
+} as const;
+
+/** What a clock tile shows (ADR-0024). */
+export const ClockShow = Type.Union([
+  Type.Literal('time'),
+  Type.Literal('date'),
+  Type.Literal('both'),
+]);
+export type ClockShow = Type.Static<typeof ClockShow>;
+
+/**
+ * Clock (ADR-0024): the display's own time and/or date in the layout's time zone
+ * (settings.timeZone), or in UTC. The display sets its clock from settings.clockPath (GPS time)
+ * or the board's time source and keeps it running offline; it shows "--" until it has one.
+ * clock.ts defines the text; the firmware mirrors it.
+ */
+export const ClockTile = Type.Object(
+  {
+    type: Type.Literal('clock'),
+    ...Placement,
+    label: Type.Optional(Label),
+    show: Type.Optional(Type.Union(ClockShow.anyOf, { description: 'Absent: time.' })),
+    hour12: Type.Optional(
+      Type.Boolean({ description: '12-hour time with AM/PM. Absent: 24-hour.' }),
+    ),
+    seconds: Type.Optional(Type.Boolean({ description: 'Show seconds. Absent: false.' })),
+    dateFormat: Type.Optional(
+      Type.Union(
+        CLOCK_DATE_FORMATS.map((f) => Type.Literal(f)),
+        {
+          description:
+            'ymd: 2026-11-04; dmy: 04.11.2026; mdy: 11/04/2026; weekday: Wed 4 Nov. Absent: ymd.',
+        },
+      ),
+    ),
+    utc: Type.Optional(
+      Type.Boolean({ description: 'Show UTC instead of the layout time zone. Absent: false.' }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted clock tile fields. */
+export const CLOCK_DEFAULTS = {
+  show: 'time',
+  hour12: false,
+  seconds: false,
+  dateFormat: 'ymd',
+  utc: false,
 } as const;
 
 /** Boolean SignalK path: shows its state and sends a PUT to the same path when tapped. */
@@ -448,6 +498,7 @@ export const TILE_TYPES = {
   autopilot: AutopilotTile,
   graph: GraphTile,
   heading_tape: HeadingTapeTile,
+  clock: ClockTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -466,6 +517,7 @@ export const Tile = Type.Union([
   AutopilotTile,
   GraphTile,
   HeadingTapeTile,
+  ClockTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -476,4 +528,5 @@ export type WindRoseTile = Type.Static<typeof WindRoseTile>;
 export type AutopilotTile = Type.Static<typeof AutopilotTile>;
 export type GraphTile = Type.Static<typeof GraphTile>;
 export type HeadingTapeTile = Type.Static<typeof HeadingTapeTile>;
+export type ClockTile = Type.Static<typeof ClockTile>;
 export type Tile = Type.Static<typeof Tile>;

@@ -20,7 +20,8 @@
     "position",
     "wind_rose",
     "graph",
-    "heading_tape"
+    "heading_tape",
+    "clock"
   ],
   "fonts": [
     "tiny",

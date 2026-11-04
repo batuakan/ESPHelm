@@ -1,4 +1,5 @@
 import Type from 'typebox';
+import { POSIX_TZ_PATTERN } from './clock.js';
 import { Id, SkPath } from './primitives.js';
 
 /**
@@ -37,6 +38,43 @@ export const Settings = Type.Object(
           'Seconds without a touch before the screen turns off; 0 = never. Displays treat values under 10 as 10.',
       }),
     ),
+    timeZone: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String({
+            pattern: '^[A-Za-z0-9_+/-]{1,64}$',
+            description: 'IANA zone the editor built the rule from, e.g. "Europe/Stockholm".',
+          }),
+          posix: Type.String({
+            pattern: POSIX_TZ_PATTERN,
+            description:
+              'The zone as a POSIX TZ rule (clock.ts), which the display uses: "<+01>-1<+02>,M3.5.0,M10.5.0/3".',
+          }),
+        },
+        {
+          additionalProperties: false,
+          description: 'Time zone of clocks (ADR-0024). Absent: UTC.',
+        },
+      ),
+    ),
+    clockPath: Type.Optional(SkPath),
+    screenSaver: Type.Optional(
+      Type.Union(
+        [Type.Literal('off'), Type.Literal('time'), Type.Literal('date'), Type.Literal('both')],
+        {
+          description:
+            'What the screen shows, faintly, after screenTimeout instead of turning off (ADR-0024). Absent: off.',
+        },
+      ),
+    ),
+    screenSaverBrightness: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        maximum: 100,
+        description:
+          'Backlight in % while the screen saver shows. Some panels are dark below about 30 %.',
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -49,6 +87,9 @@ export const SETTINGS_DEFAULTS = {
   autoTheme: 'off',
   autoThemePath: 'environment.sun',
   screenTimeout: 0,
+  clockPath: 'navigation.datetime',
+  screenSaver: 'off',
+  screenSaverBrightness: 30,
   /** Shortest timeout a display applies (a smaller value would make it hard to use). */
   minScreenTimeout: 10,
 } as const;

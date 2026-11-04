@@ -62,8 +62,8 @@ export interface ValueTextFit {
   caption: number;
 }
 
-/** Characters a formatted number can contain: what the digits-only fonts have. */
-export const DIGIT_GLYPHS = '0123456789.-';
+/** Characters a formatted number or a clock time can contain: what the digits-only fonts have. */
+export const DIGIT_GLYPHS = '0123456789.-:';
 
 /** Whether `text` can be drawn in a digits-only font. */
 export function isNumericText(text: string): boolean {

@@ -461,6 +461,55 @@ void check_heading_tape(Checker &chk, JsonObjectConst obj, const std::string &pt
   }
 }
 
+const char *const CLOCK_SHOWS[] = {"time", "date", "both"};
+const char *const CLOCK_DATE_FORMATS[] = {"ymd", "dmy", "mdy", "weekday"};
+
+/// An optional boolean field.
+void bool_field(Checker &chk, JsonObjectConst obj, const std::string &ptr, const char *key, bool &out) {
+  if (!has(obj, key))
+    return;
+  if (!obj[key].is<bool>())
+    chk.add(ptr + "/" + key, "INVALID_TYPE");
+  else
+    out = obj[key].as<bool>();
+}
+
+void check_clock(Checker &chk, JsonObjectConst obj, const std::string &ptr, ClockConfig &clock) {
+  int show = enum_field(chk, obj, ptr, "show", false, CLOCK_SHOWS, 3);
+  if (show >= 0)
+    clock.show = static_cast<ClockShow>(show);
+  bool_field(chk, obj, ptr, "hour12", clock.hour12);
+  bool_field(chk, obj, ptr, "seconds", clock.seconds);
+  int format = enum_field(chk, obj, ptr, "dateFormat", false, CLOCK_DATE_FORMATS, 4);
+  if (format >= 0)
+    clock.date_format = static_cast<wallclock::DateFormat>(format);
+  bool_field(chk, obj, ptr, "utc", clock.utc);
+}
+
+/// settings.timeZone: the IANA name (^[A-Za-z0-9_+/-]{1,64}$) and the POSIX rule clocks use.
+void check_time_zone(Checker &chk, JsonVariantConst v, const std::string &ptr, Settings &settings) {
+  if (!v.is<JsonObjectConst>()) {
+    chk.add(ptr, "INVALID_TYPE");
+    return;
+  }
+  JsonObjectConst obj = v.as<JsonObjectConst>();
+  std::string name, posix;
+  if (string_field(chk, obj, ptr, "name", true, StrKind::PLAIN, name)) {
+    bool ok = !name.empty() && name.size() <= 64;
+    for (char c : name)
+      ok = ok && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' ||
+                  c == '+' || c == '/' || c == '-');
+    if (!ok)
+      chk.add(ptr + "/name", "INVALID_FORMAT");
+    else
+      settings.time_zone_name = name;
+  }
+  if (string_field(chk, obj, ptr, "posix", true, StrKind::PLAIN, posix)) {
+    if (!wallclock::parse_tz(posix.c_str(), settings.time_zone))
+      chk.add(ptr + "/posix", "INVALID_FORMAT");
+  }
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -482,6 +531,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::GRAPH;
   } else if (t != nullptr && std::strcmp(t, "heading_tape") == 0) {
     tile.type = TileType::HEADING_TAPE;
+  } else if (t != nullptr && std::strcmp(t, "clock") == 0) {
+    tile.type = TileType::CLOCK;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -518,6 +569,11 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     auto tape = std::make_shared<HeadingTapeConfig>();
     check_heading_tape(chk, obj, ptr, *tape);
     tile.tape = std::move(tape);
+    return;
+  }
+  if (tile.type == TileType::CLOCK) {
+    string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
+    check_clock(chk, obj, ptr, tile.clock);
     return;
   }
   if (tile.type == TileType::WIND_ROSE) {
@@ -692,6 +748,7 @@ void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
 }
 
 const char *const AUTO_THEMES[] = {"off", "sun"};
+const char *const SCREEN_SAVERS[] = {"off", "time", "date", "both"};
 
 void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
   const std::string sp = "/settings";
@@ -720,6 +777,16 @@ void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
   string_field(chk, obj, sp, "autoThemePath", false, StrKind::PATH, settings.auto_theme_path);
   if (int_field(chk, obj, sp, "screenTimeout", false, 0, 3600, n))
     settings.screen_timeout = static_cast<uint16_t>(n);
+  if (has(obj, "timeZone"))
+    check_time_zone(chk, obj["timeZone"], sp + "/timeZone", settings);
+  string_field(chk, obj, sp, "clockPath", false, StrKind::PATH, settings.clock_path);
+  // "off" first in the schema, OFF last in ClockShow (whose first three a tile shares).
+  static const ClockShow SAVER_SHOWS[] = {ClockShow::OFF, ClockShow::TIME, ClockShow::DATE, ClockShow::BOTH};
+  int saver = enum_field(chk, obj, sp, "screenSaver", false, SCREEN_SAVERS, 4);
+  if (saver >= 0)
+    settings.screen_saver = SAVER_SHOWS[saver];
+  if (int_field(chk, obj, sp, "screenSaverBrightness", false, 1, 100, n))
+    settings.screen_saver_brightness = static_cast<uint8_t>(n);
 }
 
 void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {

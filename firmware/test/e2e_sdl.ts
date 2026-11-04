@@ -1163,9 +1163,50 @@ async function main(): Promise<void> {
     tapTile('@theme');
     await sleep(800);
 
+    // 9k. Clocks (ADR-0024): "--" until a time arrives, then local time in the layout's zone
+    //     (Stockholm, summer time), 12 h with seconds, UTC and a weekday date; night; and the
+    //     screen saver showing the time and date instead of a black screen. The clock is frozen
+    //     (ESPHELM_TEST_CLOCK) so the screenshots don't depend on when they are taken.
+    await fw.stop();
+    fw.start({ ESPHELM_TEST_CLOCK: 'frozen' });
+    await fw.waitLog(/Sending hello/, 15000);
+    const clock = fixture('valid/clock.json');
+    (clock.settings as Record<string, unknown>).screenTimeout = 10;
+    await json('PUT', '/plugins/esphelm/api/layouts/clock', admin, clock);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'clock' });
+    check('clock: the layout renders', await fw.waitLog(/Showing fetched layout "clock"/));
+    publish({ 'navigation.speedOverGround': 3.1 });
+    await sleep(1500);
+    await fw.screenshot('60-clock-unset', shots);
+    publish({ 'navigation.datetime': '2026-07-14T09:05:00.000Z' });
+    check(
+      'clock: set from navigation.datetime',
+      await fw.waitLog(/Clock set from navigation\.datetime: 2026-07-14 09:05:00 UTC/),
+    );
+    await sleep(1000);
+    await fw.screenshot('61-clock', shots);
+    tapTile('@theme');
+    await sleep(800);
+    await fw.screenshot('62-clock-night', shots);
+    tapTile('@theme');
+    check(
+      'clock: the screen saver shows the clock after the timeout',
+      (await fw.waitLog(/Screen off after 10 s without a touch/, 20000)) &&
+        (await fw.waitLog(/Screen saver: the clock, backlight 30 %/)),
+    );
+    await sleep(800);
+    await fw.screenshot('63-clock-screen-saver', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
+    check('clock: a touch wakes the screen', await fw.waitLog(/Screen on \(touch\)/));
+    publish({ 'navigation.datetime': '2015-03-01T10:00:00Z' });
+    check(
+      'clock: a date before 2020 (a GPS without a fix) is ignored',
+      await fw.waitLog(/Clock: ignoring 2015-03-01T10:00:00Z/),
+    );
+
     await fw.stop();
     fw.start();
-    await fw.waitLog(/Showing cached layout "center-zero"/);
+    await fw.waitLog(/Showing cached layout "clock"/);
     await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
@@ -1299,6 +1340,18 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-09-center-zero', shots);
+    await fw720.stop();
+
+    // 12g. Clocks at 720, offline before any time arrived: "--", muted.
+    const clock720 = readFileSync(join(FIXTURES, 'valid/clock.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(clock720, '"seed-clock"'));
+    fw720.start();
+    check(
+      '720 build shows the clock layout',
+      await fw720.waitLog(/Showing cached layout "clock" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-10-clock', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

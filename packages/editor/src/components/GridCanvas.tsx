@@ -35,6 +35,8 @@ interface Props {
   graphAxis(tile: Tile): boolean;
   /** A tile's content width on the display, in pixels (heading tapes draw ticks for it). */
   tileWidth(tile: Tile): number;
+  /** The layout's time zone as a POSIX rule, for clock previews; absent: UTC. */
+  timeZone?: string;
   /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
   textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
@@ -189,7 +191,9 @@ export function GridCanvas(props: Props) {
               <span className="tile-label">
                 {tile.type === 'wind_rose'
                   ? ''
-                  : tile.type === 'autopilot' || tile.type === 'position' || tile.type === 'heading_tape'
+                  : tile.type === 'clock'
+                    ? [tile.label, tile.utc ? 'UTC' : ''].filter(Boolean).join(' ')
+                    : tile.type === 'autopilot' || tile.type === 'position' || tile.type === 'heading_tape'
                     ? (tile.label ?? '')
                     : tile.label || (tile.path ? '' : 'Pick a path')}
               </span>
@@ -201,6 +205,7 @@ export function GridCanvas(props: Props) {
                 autopilotTier={tile.type === 'autopilot' ? props.autopilotTier(tile) : undefined}
                 graphAxis={tile.type === 'graph' ? props.graphAxis(tile) : undefined}
                 tapeWidth={tile.type === 'heading_tape' ? props.tileWidth(tile) : undefined}
+                timeZone={tile.type === 'clock' ? props.timeZone : undefined}
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />

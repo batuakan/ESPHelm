@@ -20,6 +20,9 @@
 #ifdef USE_ESPHELM_BACKLIGHT
 #include "esphome/components/light/light_state.h"
 #endif
+#ifdef USE_ESPHELM_TIME
+#include "esphome/components/time/real_time_clock.h"
+#endif
 
 #include "alarms.h"
 #include "esphelm_server_zones.h"
@@ -58,6 +61,9 @@ class EsphelmRuntime : public Component {
   void set_store_dir(const std::string &dir) { this->store_.set_dir(dir); }
 #ifdef USE_ESPHELM_BACKLIGHT
   void set_backlight(light::LightState *backlight) { this->backlight_ = backlight; }
+#endif
+#ifdef USE_ESPHELM_TIME
+  void set_time(time::RealTimeClock *time) { this->time_ = time; }
 #endif
 
   void setup() override;
@@ -114,6 +120,14 @@ class EsphelmRuntime : public Component {
   void wake_(const char *why);
   void check_sleep_(uint32_t now);
   bool has_backlight_() const;
+  // Clock and screen saver (ADR-0024)
+  bool clock_wanted_() const;
+  void watch_clock_();
+  void on_clock_(ArduinoJson::JsonVariantConst value);
+  void set_clock_(int64_t utc, const char *source);
+  bool utc_now_(int64_t &utc) const;
+  void tick_clock_(uint32_t now);
+  void show_saver_(uint32_t now);
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
@@ -186,6 +200,28 @@ class EsphelmRuntime : public Component {
 #ifdef USE_ESPHELM_BACKLIGHT
   light::LightState *backlight_{nullptr};
 #endif
+
+  // Clock (ADR-0024): Unix seconds at clock_ms_ (millis), set from SignalK's clockPath or the
+  // board's time; it runs on millis() in between, so it keeps time offline.
+  bool clock_set_{false};
+  int64_t clock_utc_{0};
+  uint32_t clock_ms_{0};
+  uint32_t clock_signalk_ms_{0};  // when SignalK last set it; 0: never
+  bool clock_frozen_{false};      // test hook ESPHELM_TEST_CLOCK=frozen: it never advances
+  bool clock_old_logged_{false};
+  std::string clock_path_;
+  uint32_t clock_listener_{0};
+  uint32_t next_clock_check_ms_{0};
+#ifdef USE_ESPHELM_TIME
+  time::RealTimeClock *time_{nullptr};
+#endif
+  // Screen saver: the time and/or date on the sleep cover, with the backlight dimmed.
+  bool saver_on_{false};
+  esphelm::ClockConfig saver_clock_;  // how it writes the time and date
+  lv_obj_t *saver_time_{nullptr};
+  lv_obj_t *saver_date_{nullptr};
+  std::string saver_shown_time_, saver_shown_date_;
+  uint32_t next_saver_ms_{0};
 
   // Protocol state
   ServerState server_state_{ServerState::UNKNOWN};

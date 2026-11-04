@@ -157,3 +157,20 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Problems list:** now words range problems by tile.
 - **Changed from the plan:** `sides` without `centerZero` is ignored rather than refused, since a cross-field `INVALID_VALUE` would split the JSON Schema from the validator.
 - **Hardware:** checked on the P4 (step 22, 2026-11-04).
+
+## Clock tile and clock screen saver (ADR-0024, branch `feat/clock`)
+
+- **What:**
+  - **Tile:** a `clock` tile (time, date or both; 12/24 h, seconds, four date formats, UTC).
+  - **Saver:** `settings.screenSaver`, which shows the time and/or date faintly after the screen timeout instead of a black screen.
+- **Time:**
+  - **Clock:** the display keeps its own, set from `navigation.datetime` (GPS), or from an optional ESPHome `time_id` (NTP, HomeAssistant) when SignalK has none. It runs on `millis()` in between.
+  - **Time zone:** `settings.timeZone` carries the zone as a POSIX rule built in the editor from the browser's zone data, so summer time works offline.
+- **Shared contract:** `clock.ts` / `esphelm_clock.h`, `clock.cases.json`, with offsets taken from `Intl`. The TS test also checks the generated rules against `Intl` for two years.
+- **Fonts:** the digits fonts gain `:` (`DIGIT_GLYPHS` too). A font without it is skipped for clock times.
+- **Editor:**
+  - **Tile:** *Clock* in the library and a drawer with examples. The first clock gives the layout the browser's time zone.
+  - **Display settings:** the time zone, the time path, the screen saver and its brightness.
+- **Build size against `main`:** P4 flash +14.8 KB (3,353,082 B), C3 +11.7 KB (1,465,140 B, 79.8 %); static RAM +224 B.
+- **Checked on the P4** (hardware step 23): the clocks, the dimmed saver and the touch through it. The first try showed a black screen: the saver's 5 % backlight is dark on the P4-86, so the range became 1–100 % with a default of 30 %.
+- **Not verified:** NTP via `time_id` (no board YAML sets it yet).

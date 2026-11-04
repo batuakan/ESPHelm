@@ -1,0 +1,521 @@
+{
+  "description": "Clock text and time zones (ADR-0024): localOffset(), clockTime(), clockDate() and parseIsoUtc() in src/clock.ts and esphelm_clock.h must both reproduce these; posix is TS only (posixTz, from Intl). Offsets are seconds east of UTC, taken from Intl.",
+  "offsets": [
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2026-03-29T00:59:59Z",
+      "expected": 3600
+    },
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2026-03-29T01:00:00Z",
+      "expected": 7200
+    },
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2026-10-25T00:59:59Z",
+      "expected": 7200
+    },
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2026-10-25T01:00:00Z",
+      "expected": 3600
+    },
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2026-07-01T12:00:00Z",
+      "expected": 7200
+    },
+    {
+      "zone": "Europe/Stockholm",
+      "posix": "<+01>-1<+02>,M3.5.0,M10.5.0/3",
+      "utc": "2030-12-31T23:30:00Z",
+      "expected": 3600
+    },
+    {
+      "zone": "America/New_York",
+      "posix": "<-05>5<-04>,M3.2.0,M11.1.0",
+      "utc": "2026-03-08T06:59:59Z",
+      "expected": -18000
+    },
+    {
+      "zone": "America/New_York",
+      "posix": "<-05>5<-04>,M3.2.0,M11.1.0",
+      "utc": "2026-03-08T07:00:00Z",
+      "expected": -14400
+    },
+    {
+      "zone": "America/New_York",
+      "posix": "<-05>5<-04>,M3.2.0,M11.1.0",
+      "utc": "2026-11-01T05:59:59Z",
+      "expected": -14400
+    },
+    {
+      "zone": "America/New_York",
+      "posix": "<-05>5<-04>,M3.2.0,M11.1.0",
+      "utc": "2026-11-01T06:00:00Z",
+      "expected": -18000
+    },
+    {
+      "zone": "America/New_York",
+      "posix": "<-05>5<-04>,M3.2.0,M11.1.0",
+      "utc": "2027-01-01T04:59:59Z",
+      "expected": -18000
+    },
+    {
+      "zone": "Australia/Sydney",
+      "posix": "<+10>-10<+11>,M10.1.0,M4.1.0/3",
+      "utc": "2026-04-04T15:59:59Z",
+      "expected": 39600
+    },
+    {
+      "zone": "Australia/Sydney",
+      "posix": "<+10>-10<+11>,M10.1.0,M4.1.0/3",
+      "utc": "2026-04-04T16:00:00Z",
+      "expected": 36000
+    },
+    {
+      "zone": "Australia/Sydney",
+      "posix": "<+10>-10<+11>,M10.1.0,M4.1.0/3",
+      "utc": "2026-10-03T15:59:59Z",
+      "expected": 36000
+    },
+    {
+      "zone": "Australia/Sydney",
+      "posix": "<+10>-10<+11>,M10.1.0,M4.1.0/3",
+      "utc": "2026-10-03T16:00:00Z",
+      "expected": 39600
+    },
+    {
+      "zone": "Australia/Sydney",
+      "posix": "<+10>-10<+11>,M10.1.0,M4.1.0/3",
+      "utc": "2026-12-31T13:00:00Z",
+      "expected": 39600
+    },
+    {
+      "zone": "Asia/Kolkata",
+      "posix": "<+0530>-5:30",
+      "utc": "2026-01-01T00:00:00Z",
+      "expected": 19800
+    },
+    {
+      "zone": "Asia/Kolkata",
+      "posix": "<+0530>-5:30",
+      "utc": "2026-07-01T00:00:00Z",
+      "expected": 19800
+    },
+    {
+      "zone": "America/St_Johns",
+      "posix": "<-0330>3:30<-0230>,M3.2.0,M11.1.0",
+      "utc": "2026-03-08T05:29:59Z",
+      "expected": -12600
+    },
+    {
+      "zone": "America/St_Johns",
+      "posix": "<-0330>3:30<-0230>,M3.2.0,M11.1.0",
+      "utc": "2026-03-08T05:30:00Z",
+      "expected": -9000
+    },
+    {
+      "zone": "Pacific/Chatham",
+      "posix": "<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45",
+      "utc": "2026-09-26T13:59:59Z",
+      "expected": 45900
+    },
+    {
+      "zone": "Pacific/Chatham",
+      "posix": "<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45",
+      "utc": "2026-09-26T14:00:00Z",
+      "expected": 49500
+    },
+    {
+      "zone": "UTC",
+      "posix": "<+00>0",
+      "utc": "2026-11-04T12:34:56Z",
+      "expected": 0
+    },
+    {
+      "posix": "UTC0",
+      "utc": "2026-06-01T00:00:00Z",
+      "expected": 0
+    },
+    {
+      "posix": "CET-1CEST,M3.5.0,M10.5.0/3",
+      "utc": "2026-06-01T00:00:00Z",
+      "expected": 7200
+    },
+    {
+      "posix": "CET-1CEST,M3.5.0,M10.5.0/3",
+      "utc": "2026-12-01T00:00:00Z",
+      "expected": 3600
+    },
+    {
+      "posix": "<-03>3",
+      "utc": "2026-06-01T00:00:00Z",
+      "expected": -10800
+    },
+    {
+      "posix": "<+1030>-10:30<+11>-11,M10.1.0,M4.1.0",
+      "utc": "2026-01-01T00:00:00Z",
+      "expected": 39600
+    },
+    {
+      "posix": "not a zone",
+      "utc": "2026-06-01T00:00:00Z",
+      "expected": 0
+    }
+  ],
+  "times": [
+    {
+      "local": 1793795696,
+      "hour12": false,
+      "seconds": false,
+      "expected": {
+        "text": "12:34",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793795696,
+      "hour12": false,
+      "seconds": true,
+      "expected": {
+        "text": "12:34:56",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793795696,
+      "hour12": true,
+      "seconds": false,
+      "expected": {
+        "text": "12:34",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793795696,
+      "hour12": true,
+      "seconds": true,
+      "expected": {
+        "text": "12:34:56",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793750709,
+      "hour12": false,
+      "seconds": false,
+      "expected": {
+        "text": "00:05",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793750709,
+      "hour12": false,
+      "seconds": true,
+      "expected": {
+        "text": "00:05:09",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793750709,
+      "hour12": true,
+      "seconds": false,
+      "expected": {
+        "text": "12:05",
+        "suffix": "AM"
+      }
+    },
+    {
+      "local": 1793750709,
+      "hour12": true,
+      "seconds": true,
+      "expected": {
+        "text": "12:05:09",
+        "suffix": "AM"
+      }
+    },
+    {
+      "local": 1793793600,
+      "hour12": false,
+      "seconds": false,
+      "expected": {
+        "text": "12:00",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793793600,
+      "hour12": false,
+      "seconds": true,
+      "expected": {
+        "text": "12:00:00",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793793600,
+      "hour12": true,
+      "seconds": false,
+      "expected": {
+        "text": "12:00",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793793600,
+      "hour12": true,
+      "seconds": true,
+      "expected": {
+        "text": "12:00:00",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793836799,
+      "hour12": false,
+      "seconds": false,
+      "expected": {
+        "text": "23:59",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793836799,
+      "hour12": false,
+      "seconds": true,
+      "expected": {
+        "text": "23:59:59",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793836799,
+      "hour12": true,
+      "seconds": false,
+      "expected": {
+        "text": "11:59",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793836799,
+      "hour12": true,
+      "seconds": true,
+      "expected": {
+        "text": "11:59:59",
+        "suffix": "PM"
+      }
+    },
+    {
+      "local": 1793783220,
+      "hour12": false,
+      "seconds": false,
+      "expected": {
+        "text": "09:07",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793783220,
+      "hour12": false,
+      "seconds": true,
+      "expected": {
+        "text": "09:07:00",
+        "suffix": ""
+      }
+    },
+    {
+      "local": 1793783220,
+      "hour12": true,
+      "seconds": false,
+      "expected": {
+        "text": "9:07",
+        "suffix": "AM"
+      }
+    },
+    {
+      "local": 1793783220,
+      "hour12": true,
+      "seconds": true,
+      "expected": {
+        "text": "9:07:00",
+        "suffix": "AM"
+      }
+    }
+  ],
+  "dates": [
+    {
+      "local": 1793795696,
+      "format": "ymd",
+      "expected": "2026-11-04"
+    },
+    {
+      "local": 1793795696,
+      "format": "dmy",
+      "expected": "04.11.2026"
+    },
+    {
+      "local": 1793795696,
+      "format": "mdy",
+      "expected": "11/04/2026"
+    },
+    {
+      "local": 1793795696,
+      "format": "weekday",
+      "expected": "Wed 4 Nov"
+    },
+    {
+      "local": 951782400,
+      "format": "ymd",
+      "expected": "2000-02-29"
+    },
+    {
+      "local": 951782400,
+      "format": "dmy",
+      "expected": "29.02.2000"
+    },
+    {
+      "local": 951782400,
+      "format": "mdy",
+      "expected": "02/29/2000"
+    },
+    {
+      "local": 951782400,
+      "format": "weekday",
+      "expected": "Tue 29 Feb"
+    },
+    {
+      "local": 946684799,
+      "format": "ymd",
+      "expected": "1999-12-31"
+    },
+    {
+      "local": 946684799,
+      "format": "dmy",
+      "expected": "31.12.1999"
+    },
+    {
+      "local": 946684799,
+      "format": "mdy",
+      "expected": "12/31/1999"
+    },
+    {
+      "local": 946684799,
+      "format": "weekday",
+      "expected": "Fri 31 Dec"
+    },
+    {
+      "local": 1767571200,
+      "format": "ymd",
+      "expected": "2026-01-05"
+    },
+    {
+      "local": 1767571200,
+      "format": "dmy",
+      "expected": "05.01.2026"
+    },
+    {
+      "local": 1767571200,
+      "format": "mdy",
+      "expected": "01/05/2026"
+    },
+    {
+      "local": 1767571200,
+      "format": "weekday",
+      "expected": "Mon 5 Jan"
+    }
+  ],
+  "iso": [
+    {
+      "text": "2026-11-04T12:34:56.000Z",
+      "expected": 1793795696
+    },
+    {
+      "text": "2026-11-04T12:34:56Z",
+      "expected": 1793795696
+    },
+    {
+      "text": "2026-11-04T13:34:56+01:00",
+      "expected": 1793795696
+    },
+    {
+      "text": "2026-11-04T07:04:56-0530",
+      "expected": 1793795696
+    },
+    {
+      "text": "2026-11-04T12:34:56.123456Z",
+      "expected": 1793795696
+    },
+    {
+      "text": "2026-11-04 12:34:56Z",
+      "expected": null
+    },
+    {
+      "text": "2026-13-04T12:34:56Z",
+      "expected": null
+    },
+    {
+      "text": "2026-11-04T12:34:56",
+      "expected": null
+    },
+    {
+      "text": "",
+      "expected": null
+    },
+    {
+      "text": "yesterday",
+      "expected": null
+    }
+  ],
+  "posix": [
+    {
+      "zone": "Europe/Stockholm",
+      "year": 2026,
+      "expected": "<+01>-1<+02>,M3.5.0,M10.5.0/3"
+    },
+    {
+      "zone": "America/New_York",
+      "year": 2026,
+      "expected": "<-05>5<-04>,M3.2.0,M11.1.0"
+    },
+    {
+      "zone": "Australia/Sydney",
+      "year": 2026,
+      "expected": "<+10>-10<+11>,M10.1.0,M4.1.0/3"
+    },
+    {
+      "zone": "Asia/Kolkata",
+      "year": 2026,
+      "expected": "<+0530>-5:30"
+    },
+    {
+      "zone": "UTC",
+      "year": 2026,
+      "expected": "<+00>0"
+    },
+    {
+      "zone": "Australia/Lord_Howe",
+      "year": 2026,
+      "expected": "<+1030>-10:30<+11>-11,M10.1.0,M4.1.0"
+    },
+    {
+      "zone": "Pacific/Chatham",
+      "year": 2026,
+      "expected": "<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45"
+    },
+    {
+      "zone": "America/Santiago",
+      "year": 2026,
+      "expected": "<-04>4<-03>,M9.1.0/0,M4.1.0/0"
+    }
+  ]
+}

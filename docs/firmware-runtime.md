@@ -29,18 +29,21 @@ esphelm_runtime:
     label: esphelm_font_label
     small: esphelm_font_small
     extra: [esphelm_font_medium, esphelm_font_huge]   # optional: more sizes for tile text
-    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]  # optional: glyphs "0123456789.-" only
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]  # optional: glyphs "0123456789.-:" only
   board: waveshare-esp32-p4-86    # reported in hello
   touch: true
   stale_after: 15s                # default when a tile sets no staleAfter
   # max_layout_bytes: 65536       # override the computed capacity
   # store_dir: "."                # host build only: where the cache files go
   # backlight: display_backlight  # a dimmable light: layout brightness and screen timeout
+  # time_id: sntp_time            # an ESPHome time source for the clock when SignalK has none
 ```
 
 All the fonts form one ladder, sorted by line height. Tile text picks the largest size that fits the tile (ADR-0017). `firmware/fonts.yaml` sets the sizes by substitution: P4 and the 720 SDL build use 28 / 42 / 64 / 96 / 144 px, the default 480 build 22 / 32 / 48 / 64 / 96, and the C3 14 / 20 / 28 / 40 / 56. The `digits` fonts (192 / 288, 128 / 192 and 80 / 112) have only the glyphs a number needs, so they're cheap even that large. Only a value tile's number uses them, while its text is numeric. The hello reports the ladder as `fontLineHeights` and `digitFontLineHeights`.
 
 `backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
+
+**The clock** (ADR-0024) is set from the layout's `clockPath` (default `navigation.datetime`, GPS time), and runs on `millis()` in between, so it keeps time offline. It's subscribed only when the layout has a clock tile or a clock screen saver. `time_id` is optional: any ESPHome `time:` component, used when SignalK hasn't sent a time for ten minutes: `homeassistant`, or `sntp` with `servers:` on the boat's LAN (its defaults are internet pool servers, and ESPHelm doesn't depend on the internet). No ready-made config sets it. A time before 2020 (a GPS without a fix) is ignored. With the layout's `screenSaver` set, the screen timeout dims the backlight to `screenSaverBrightness` and shows the time and/or date faintly instead of going dark; until the display knows the time it goes dark as before. The digits fonts need `:` for the time; a font without it is skipped for clocks.
 
 Ready-made configs:
 
@@ -175,13 +178,14 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
 | `graph` tile (ADR-0021) | its recorded value (the row below) and, while its page is shown, ≈8.8 KB of LVGL objects with its 1.9 KB point buffer (four graphs with two zones = 35,152 B) |
 | centre-zero gauge / bar (ADR-0023) | one more LVGL arc (gauge) or line (bar) and two labels for the ends |
+| `clock` tile (ADR-0024) | up to four labels and a few bytes of state; nothing per update. The screen saver adds two labels to the sleep cover, created on first use |
 | `heading_tape` tile (ADR-0022) | four LVGL objects; the ticks are drawn in its draw callback from a stack list (at most 37) |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
-| P4 runtime firmware, static | RAM 98,302 B (17.1 %), flash 3.34 MB (20.2 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
-| C3 compile check, static | RAM 112,328 B of 321,296 B (35.0 %), flash 1.45 MB of 1.8 MB (79.2 %) |
+| P4 runtime firmware, static | RAM 98,526 B (17.1 %), flash 3.35 MB (20.3 %; the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
+| C3 compile check, static | RAM 112,552 B of 321,296 B (35.0 %), flash 1.47 MB of 1.8 MB (79.8 %) |
 
 Widget figures are logged at DEBUG by the renderer per page (`Page n/m "id": k widgets, N bytes`) on the 64-bit host; on ESP32 pointers are half the size, so expect less.
 
@@ -234,7 +238,8 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21d. **heading tapes** (ADR-0022, `fixtures/valid/heading-tape.json`): three tapes at 480 with live values (across north, COG right of centre, the target left, the waypoint bearing off the left edge; a magnetic 60° tape; a 1x1 tape without markers), a turn to 20°, a marker gone stale on its own, night; and offline at 720 (muted, "--", no markers)
   21e. **centre-zero gauges and bars** (ADR-0023, `fixtures/valid/center-zero.json`): a rudder and a rate of turn (port/starboard), a house current (−50…20, plus/minus) and a vertical start current, with live values one way, then the other way round, and at night; offline at 720 (no fill, "--")
 
-  Sixty-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
+  Sixty-seven screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
@@ -311,3 +316,9 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The rudder needle and its fill follow the helm smoothly; the fill is red to port and green to starboard, and the value reads e.g. "12 ° P".
     - The house current bar fills left of the middle when discharging ("-30.0 A") and right when charging, and never past 20.
     - At night all fills are red; check that P and S (and − and +) can still be told apart.
+
+23. **Clocks and the screen saver (ADR-0024).** Assign `packages/schema/fixtures/valid/clock.json` (Stockholm time, the screen saver with the time and date after 30 s) with a GPS sending `navigation.datetime`; pick your own zone in the editor's display settings first if you like.
+    - The Local and 12 h tiles match your phone's clock, the UTC tile is your phone's time minus your zone's offset, and the seconds tick evenly.
+    - Without touching it, after 30 s the screen dims to a faint time and date that are readable up close and change each minute; the rest of the screen is black.
+    - One touch wakes it at full brightness without pressing anything under your finger.
+    - Unplug the network: the clocks keep running. Reboot without the network: they show "--" until a time arrives (no clock without a source).

@@ -7,6 +7,13 @@
 // tapes (ADR-0022) have their span, markers and paths.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  CLOCK_DATE_FORMATS,
+  CLOCK_DEFAULTS,
+  clockDate,
+  clockTime,
+  type ClockDateFormat,
+  type ClockShow,
+  type ClockTile,
   AUTOPILOT_DEFAULTS,
   CHART_DEFAULTS,
   LABEL_PATTERN,
@@ -1040,6 +1047,98 @@ function AutopilotFields(
   );
 }
 
+const CLOCK_SHOWS: { key: ClockShow; name: string }[] = [
+  { key: 'time', name: 'Time' },
+  { key: 'date', name: 'Date' },
+  { key: 'both', name: 'Time and date' },
+];
+
+/** The examples' instant: Wednesday 4 November 2026, 14:05:09. */
+const CLOCK_EXAMPLE = Date.UTC(2026, 10, 4, 14, 5, 9) / 1000;
+
+/** A clock's caption, what it shows and how it writes it (ADR-0024). */
+function ClockFields(props: Common & { tile: ClockTile; onChange(patch: Patch): void }) {
+  const { tile, onChange } = props;
+  const show = tile.show ?? CLOCK_DEFAULTS.show;
+  const format = tile.dateFormat ?? CLOCK_DEFAULTS.dateFormat;
+  const time = clockTime(CLOCK_EXAMPLE, tile.hour12 ?? false, tile.seconds ?? false);
+  return (
+    <>
+      <LabelField label={tile.label ?? ''} placeholder="e.g. Local time" onChange={onChange} />
+      <fieldset className="settings-group" role="radiogroup" aria-label="Shows">
+        <legend>Shows</legend>
+        {CLOCK_SHOWS.map(({ key, name }) => (
+          <label key={key} className="check">
+            <input
+              type="radio"
+              name={`clock-show-${tile.id}`}
+              checked={show === key}
+              onChange={() => onChange({ show: key === CLOCK_DEFAULTS.show ? undefined : key })}
+              aria-label={name}
+            />
+            {name}
+          </label>
+        ))}
+      </fieldset>
+      {show !== 'date' && (
+        <fieldset className="settings-group" aria-label="Time">
+          <legend>
+            Time <small className="format-example">{`${time.text} ${time.suffix}`.trim()}</small>
+          </legend>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={tile.hour12 ?? false}
+              onChange={(e) => onChange({ hour12: e.target.checked || undefined })}
+              aria-label="12-hour clock"
+            />
+            12-hour clock (AM/PM)
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={tile.seconds ?? false}
+              onChange={(e) => onChange({ seconds: e.target.checked || undefined })}
+              aria-label="Seconds"
+            />
+            Seconds
+          </label>
+        </fieldset>
+      )}
+      {show !== 'time' && (
+        <fieldset className="settings-group" role="radiogroup" aria-label="Date format">
+          <legend>Date format</legend>
+          {CLOCK_DATE_FORMATS.map((f: ClockDateFormat) => (
+            <label key={f} className="check">
+              <input
+                type="radio"
+                name={`clock-date-${tile.id}`}
+                checked={format === f}
+                onChange={() => onChange({ dateFormat: f === CLOCK_DEFAULTS.dateFormat ? undefined : f })}
+                aria-label={clockDate(CLOCK_EXAMPLE, f)}
+              />
+              {clockDate(CLOCK_EXAMPLE, f)}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={tile.utc ?? false}
+          onChange={(e) => onChange({ utc: e.target.checked || undefined })}
+          aria-label="UTC"
+        />
+        UTC instead of the layout's time zone
+      </label>
+      <p className="hint">
+        The display sets its clock from SignalK (navigation.datetime, from a GPS) or, if its firmware has one,
+        from NTP or HomeAssistant, and keeps time offline. The time zone is in Display settings.
+      </p>
+    </>
+  );
+}
+
 const TAPE_MARKERS: {
   key: HeadingTapeMarker;
   name: string;
@@ -1245,7 +1344,8 @@ export function TileDrawer(
       ? 'Wind rose'
       : tile.type === 'autopilot'
         ? 'Autopilot'
-        : tile.label || (tile.type === 'position' ? 'Position' : tile.id);
+        : tile.label ||
+          (tile.type === 'position' ? 'Position' : tile.type === 'clock' ? 'Clock' : tile.id);
   return (
     <Drawer title={title} label="Tile settings" onClose={props.onClose}>
       {!props.supported && (
@@ -1265,6 +1365,14 @@ export function TileDrawer(
         </>
       ) : tile.type === 'position' ? (
         <PositionFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          onChange={onChange}
+          onClose={props.onClose}
+        />
+      ) : tile.type === 'clock' ? (
+        <ClockFields
           tile={tile}
           paths={props.paths}
           values={props.values}

@@ -145,6 +145,34 @@ const mutations: { name: string; doc: unknown }[] = [
       settings: { brightness: 50, startPage: 3, autoTheme: 1, screenTimeout: 2.5 },
     },
   },
+  {
+    name: 'clock fields of the wrong type',
+    doc: withTile({ type: 'clock', show: 1, hour12: 'yes', seconds: 0, utc: null, label: 3 }),
+  },
+  { name: 'clock date format of the wrong type', doc: withTile({ type: 'clock', dateFormat: 1 }) },
+  { name: 'time zone not an object', doc: { ...minimal, settings: { timeZone: 'Europe/Oslo' } } },
+  {
+    name: 'time zone without its fields',
+    doc: { ...minimal, settings: { timeZone: {} } },
+  },
+  {
+    name: 'time zone with a bad name and a number for a rule',
+    doc: { ...minimal, settings: { timeZone: { name: 'Europe Oslo', posix: 1 } } },
+  },
+  {
+    name: 'time zone rules the device must refuse',
+    doc: {
+      ...minimal,
+      settings: { timeZone: { name: 'Etc/Test', posix: 'CET-1CEST,M3.5.0,M10.5.0/3x' } },
+    },
+  },
+  {
+    name: 'clock settings of the wrong type and out of range',
+    doc: {
+      ...minimal,
+      settings: { clockPath: 'a..b', screenSaver: true, screenSaverBrightness: 0 },
+    },
+  },
   { name: 'fractional integer', doc: withTile({ x: 0.5 }) },
   { name: 'null optional field', doc: withTile({ label: null }) },
   { name: 'number as label', doc: withTile({ label: 42 }) },

@@ -16,7 +16,8 @@
     "value",
     "bar",
     "graph",
-    "heading_tape"
+    "heading_tape",
+    "clock"
   ],
   "capacity": {
     "psram": false,

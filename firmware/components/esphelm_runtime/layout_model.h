@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "esphelm_center_zero.h"
+#include "esphelm_clock.h"
 #include "esphelm_position.h"
 #include "esphelm_units.h"
 #include "esphelm_value_zones.h"
@@ -15,7 +16,7 @@
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH, HEADING_TAPE };
+enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH, HEADING_TAPE, CLOCK };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
 /// Value tile colour names (schema VALUE_COLORS); the theme decides the actual colour.
@@ -80,6 +81,18 @@ struct HeadingTapeConfig {
 /// A heading tape's `markers` names (HEADING_TAPE_MARKERS in packages/schema/src/tiles.ts).
 inline constexpr const char *HEADING_TAPE_MARKER_NAMES[HeadingTapeConfig::MARKERS] = {"cog", "bearing", "target"};
 
+/// What a clock shows (ClockShow in the schema), and what the screen saver shows (OFF: nothing).
+enum class ClockShow : uint8_t { TIME, DATE, BOTH, OFF };
+
+/// Clock settings (only clock tiles carry them; ADR-0024). The caption is the tile's data.label.
+struct ClockConfig {
+  ClockShow show{ClockShow::TIME};
+  bool hour12{false};
+  bool seconds{false};
+  wallclock::DateFormat date_format{wallclock::DateFormat::YMD};
+  bool utc{false};
+};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -105,6 +118,8 @@ struct Tile {
   std::shared_ptr<const AutopilotConfig> autopilot;
   // heading_tape
   std::shared_ptr<const HeadingTapeConfig> tape;
+  // clock
+  ClockConfig clock;
 };
 
 /// A grid page (the only page kind in v1).
@@ -143,6 +158,12 @@ struct Settings {
   AutoTheme auto_theme{AutoTheme::OFF};
   std::string auto_theme_path{"environment.sun"};
   uint16_t screen_timeout{0};  // seconds; 0: never (the runtime applies at least 10)
+  // Clocks (ADR-0024): the zone (UTC when absent), where the time comes from, the screen saver.
+  std::string time_zone_name;  // the IANA name, for the log
+  wallclock::Tz time_zone;
+  std::string clock_path{"navigation.datetime"};
+  ClockShow screen_saver{ClockShow::OFF};
+  uint8_t screen_saver_brightness{30};  // %
 };
 
 struct Layout {

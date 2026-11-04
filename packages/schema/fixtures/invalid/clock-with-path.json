@@ -1,0 +1,35 @@
+{
+  "description": "a clock reads the display clock, not a path",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/pages/0/tiles/0/path"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "clock",
+            "id": "c",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.datetime"
+          }
+        ]
+      }
+    ]
+  }
+}
