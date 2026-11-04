@@ -63,7 +63,8 @@ class Firmware {
     this.proc = spawn(this.program, [], {
       cwd: this.work,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, ...env },
+      // The settings panel's values that change by themselves (uptime, deltas, ...) read "test".
+      env: { ...process.env, ESPHELM_TEST_INFO: 'fixed', ...env },
     });
     this.proc.stdout?.on('data', (d: Buffer) => (this.out += d.toString()));
     this.proc.stderr?.on('data', (d: Buffer) => (this.out += d.toString()));
@@ -647,6 +648,87 @@ async function main(): Promise<void> {
       await fw.waitLog(/Sun: day, back to the automatic theme/),
     );
 
+    // 9c2. The settings panel (ADR-0025): the footer's menu button opens it. Brightness and
+    //      day/night chosen there are saved on the display and come back after a restart,
+    //      until the editor sends other values for them.
+    const settingsTap = (part: string) =>
+      writeFileSync(join(fw.workDir, 'esphelm_tap_request'), `@settings ${part}`);
+    const waitNext = (re: RegExp, ms = 15000) => fw.waitLog(re, ms, fw.count(re) + 1);
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@menu');
+    check('panel: the footer menu button opens the settings', await fw.waitLog(/Settings opened/));
+    await sleep(1000);
+    await fw.screenshot('64-settings-panel', shots);
+    settingsTap('tab-info');
+    check('panel: the Info tab shows the information', await waitNext(/Settings: information tab/));
+    await sleep(1500);
+    await fw.screenshot('66-settings-info', shots);
+    settingsTap('tab-settings');
+    check('panel: back to the Settings tab', await waitNext(/Settings: settings tab/));
+    settingsTap('night');
+    check(
+      'panel: Night switches the theme',
+      await waitNext(/Theme switched on the display: night/),
+    );
+    await sleep(1000);
+    await fw.screenshot('65-settings-panel-night', shots);
+    settingsTap('brightness=15');
+    check(
+      'panel: the slider sets the night brightness and saves it',
+      (await waitNext(/Brightness chosen on the display: 15 % \(night\)/)) &&
+        fw.count(/Brightness 15 % \(no backlight configured\)/) >= 1,
+    );
+    settingsTap('close');
+    check('panel: the close button closes it', await waitNext(/Settings closed/));
+    await fw.stop();
+    fw.start();
+    check(
+      'panel: the choices come back after a restart',
+      (await fw.waitLog(/Display choices: v=1;th=1;bd=-1;bn=15;/)) &&
+        (await fw.waitLog(/Showing cached layout "settings"/)) &&
+        (await fw.waitLog(/Brightness 15 % \(no backlight configured\)/)),
+    );
+    await fw.waitLog(/Sending hello/, 15000);
+    publish({ 'environment.sun': 'day' });
+    await sleep(1500);
+    check(
+      "panel: the sun's first value after a boot keeps the saved choice",
+      fw.count(/back to the automatic theme/) === 0,
+    );
+    settings.settings = {
+      ...(settings.settings as Record<string, unknown>),
+      brightness: { day: 90, night: 20 },
+    };
+    await json('PUT', '/plugins/esphelm/api/layouts/settings', admin, settings);
+    check(
+      "panel: another night brightness from the editor replaces the display's",
+      (await fw.waitLog(/dropping what was chosen on the display/)) &&
+        (await fw.waitLog(/Brightness 20 % \(no backlight configured\)/)),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@menu');
+    await waitNext(/Settings opened/);
+    settingsTap('auto');
+    check(
+      'panel: Auto hands the theme back to the layout',
+      await waitNext(/Theme on the display: automatic \(day\)/),
+    );
+    settingsTap('sleep');
+    check(
+      'panel: Screen off switches the screen off at once',
+      (await waitNext(/Screen off from the settings/)) && fw.count(/Settings closed/) >= 1,
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
+    check('panel: a touch switches it on again', await waitNext(/Screen on \(touch\)/));
+    await fw.stop();
+    writeFileSync(join(fw.workDir, 'esphelm_prefs.bin'), cacheRecord('v=1;th=5', 'prefs'));
+    fw.start();
+    check(
+      'panel: a saved record that is not valid is ignored',
+      (await fw.waitLog(/Saved display choices are not valid; ignoring them/)) &&
+        (await fw.waitLog(/Showing cached layout "settings"/)),
+    );
+    rmSync(join(fw.workDir, 'esphelm_prefs.bin'), { force: true });
+    await fw.waitLog(/Sending hello/, 15000);
+
     // 9d. Position tiles: the four text formats of one live position (two wide tiles, two
     //     single cells that fall back to a smaller font), then a value that isn't a position.
     const position = fixture('valid/position.json');
@@ -868,12 +950,14 @@ async function main(): Promise<void> {
       'environment.depth.belowTransducer': 12.4,
       'propulsion.p0.revolutions': 40, // 2400 rpm
       'electrical.batteries.house.voltage': 12.75,
-      'propulsion.p0.temperature': 353.15, // 80 °C
+      // 500 °C: three digits are wider than the sample ("88") in the captionless cell's font.
+      // (Since ADR-0025 the footer makes the cells shorter, so the RPM's "2400" fits as it is.)
+      'propulsion.p0.temperature': 773.15,
       'navigation.headingTrue': 4.2, // 241°
     });
     check(
       'sizes: a value wider than the sample steps down a font size',
-      await fw.waitLog(/Value rpm: smaller font \(line \d+ px\) for "2400"/),
+      await fw.waitLog(/Value temp: smaller font \(line \d+ px\) for "500"/),
     );
     await sleep(1500);
     await fw.screenshot('32-value-sizes', shots);
@@ -1352,6 +1436,16 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-10-clock', shots);
+
+    // 12h. The settings panel at 720: its Settings tab, and the Info tab.
+    writeFileSync(join(work720, 'esphelm_tap_request'), '@menu');
+    check('720 build opens the settings panel', await fw720.waitLog(/Settings opened/));
+    await sleep(1000);
+    await fw720.screenshot('720-11-settings-panel', shots);
+    writeFileSync(join(work720, 'esphelm_tap_request'), '@settings tab-info');
+    check('720 build shows the Info tab', await fw720.waitLog(/Settings: information tab/));
+    await sleep(1500);
+    await fw720.screenshot('720-12-settings-info', shots);
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the

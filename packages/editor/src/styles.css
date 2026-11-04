@@ -771,6 +771,22 @@ select {
   border-radius: 8px;
   padding: 2px 18px;
 }
+.footer-preview .fend {
+  display: flex;
+  gap: 4px;
+}
+.footer-preview .fspace {
+  width: 48px;
+}
+.footer-preview .ftitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.footer-preview .fmenu {
+  display: inline-flex;
+  align-items: center;
+}
 .footer-preview .fbtn.off {
   color: var(--tile-muted);
   opacity: 0.6;

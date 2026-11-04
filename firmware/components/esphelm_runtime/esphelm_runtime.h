@@ -23,8 +23,15 @@
 #ifdef USE_ESPHELM_TIME
 #include "esphome/components/time/real_time_clock.h"
 #endif
+#ifdef USE_WIFI
+#include "esphome/components/wifi/wifi_component.h"
+#endif
+#ifdef USE_NETWORK
+#include "esphome/components/network/util.h"
+#endif
 
 #include "alarms.h"
+#include "display_prefs.h"
 #include "esphelm_server_zones.h"
 #include "history_popup.h"
 #include "layout_client.h"
@@ -32,6 +39,7 @@
 #include "layout_parser.h"
 #include "layout_store.h"
 #include "renderer.h"
+#include "settings_panel.h"
 #include "value_history.h"
 
 namespace esphome {
@@ -111,7 +119,13 @@ class EsphelmRuntime : public Component {
   void save_boot_record_();
   // Display settings (ADR-0015)
   esphelm::Theme effective_theme_() const;
+  /// The layout's theme, or night by environment.sun (autoTheme): what "auto" shows.
+  esphelm::Theme automatic_theme_() const;
   void toggle_theme_();
+  /// -1: the layout's theme (autoTheme), else a Theme chosen on the display (saved).
+  void set_theme_choice_(int8_t choice);
+  void show_theme_();
+  int brightness_percent_() const;
   void watch_sun_();
   void on_sun_(ArduinoJson::JsonVariantConst value);
   void apply_brightness_();
@@ -128,6 +142,11 @@ class EsphelmRuntime : public Component {
   bool utc_now_(int64_t &utc) const;
   void tick_clock_(uint32_t now);
   void show_saver_(uint32_t now);
+  // Settings panel and the display's own choices (ADR-0025)
+  SettingsPanel::State panel_state_() const;
+  void tick_panel_(uint32_t now);
+  void fill_info_(std::vector<InfoRow> &rows) const;
+  void save_prefs_();
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
@@ -166,7 +185,11 @@ class EsphelmRuntime : public Component {
   esphelm::Layout layout_;
   size_t page_{0};
   int pending_step_{0};  // footer button presses, applied in loop() (never inside LVGL events)
-  bool theme_toggle_wanted_{false};  // the footer title was held: switch day/night in loop()
+  bool theme_toggle_wanted_{false};  // test hook @theme: switch day/night in loop()
+  bool menu_wanted_{false};          // the footer's menu button: open the settings in loop()
+  SettingsPanel panel_;
+  const char *layout_origin_{""};  // where the shown layout came from: fetched, cached, ...
+  bool info_fixed_{false};  // test hook ESPHELM_TEST_INFO=fixed: values that change by themselves read "test"
   std::vector<std::unique_ptr<Widget>> widgets_;
   esphelm::Theme theme_{esphelm::Theme::NIGHT};
   std::string etag_;
@@ -187,9 +210,9 @@ class EsphelmRuntime : public Component {
   // brightness last applied, and the screen timeout's state.
   esphelm::Theme base_theme_{esphelm::Theme::DAY};
   int8_t sun_night_{-1};  // -1 unknown, 0 not night, 1 dusk or night
-  // Day/night chosen on the display (footer title held); -1 none. Kept until the sun changes
-  // (autoTheme) or a layout with another theme arrives; not kept across a reboot.
-  int8_t manual_theme_{-1};
+  // Brightness and day/night chosen on the display (ADR-0025), saved. A day/night choice is
+  // dropped when the sun changes (autoTheme); any override when the layout brings other values.
+  esphelm::DisplayPrefs prefs_;
   std::string sun_path_;
   uint32_t sun_listener_{0};
   int applied_brightness_{-1};
@@ -210,6 +233,7 @@ class EsphelmRuntime : public Component {
   bool clock_frozen_{false};      // test hook ESPHELM_TEST_CLOCK=frozen: it never advances
   bool clock_old_logged_{false};
   std::string clock_path_;
+  std::string clock_source_;  // what set it last, for the settings panel
   uint32_t clock_listener_{0};
   uint32_t next_clock_check_ms_{0};
 #ifdef USE_ESPHELM_TIME

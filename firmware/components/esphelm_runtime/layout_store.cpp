@@ -26,6 +26,8 @@ static const char *slot_key(Slot slot) {
       return "cur";
     case Slot::LAST_KNOWN_GOOD:
       return "lkg";
+    case Slot::PREFS:
+      return "prefs";
     default:
       return "boot";
   }
@@ -96,7 +98,7 @@ bool LayoutStore::load(Slot slot, StoredLayout &out) {
     if (nvs_get_blob(handle, slot_key(slot), &record[0], &len) == ESP_OK) {
       ok = decode(record, out);
       if (!ok)
-        ESP_LOGW(TAG, "Stored %s layout is corrupted; ignoring it", slot_key(slot));
+        ESP_LOGW(TAG, "Stored %s record is corrupted; ignoring it", slot_key(slot));
     }
   }
   nvs_close(handle);
@@ -116,7 +118,7 @@ bool LayoutStore::save(Slot slot, const StoredLayout &layout) {
     err = nvs_commit(handle);
   nvs_close(handle);
   if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Saving %s layout (%u bytes) failed: %s", slot_key(slot), (unsigned) record.size(),
+    ESP_LOGE(TAG, "Saving %s record (%u bytes) failed: %s", slot_key(slot), (unsigned) record.size(),
              esp_err_to_name(err));
     return false;
   }
@@ -137,7 +139,7 @@ bool LayoutStore::load(Slot slot, StoredLayout &out) {
     record.append(buf, n);
   std::fclose(f);
   if (!decode(record, out)) {
-    ESP_LOGW(TAG, "Stored %s layout is corrupted; ignoring it", slot_key(slot));
+    ESP_LOGW(TAG, "Stored %s record is corrupted; ignoring it", slot_key(slot));
     return false;
   }
   return true;
@@ -153,7 +155,7 @@ bool LayoutStore::save(Slot slot, const StoredLayout &layout) {
   const bool written = std::fwrite(record.data(), 1, record.size(), f) == record.size();
   const bool closed = std::fclose(f) == 0;
   if (!written || !closed || std::rename(tmp.c_str(), path.c_str()) != 0) {
-    ESP_LOGE(TAG, "Saving %s layout to %s failed", slot_key(slot), path.c_str());
+    ESP_LOGE(TAG, "Saving %s record to %s failed", slot_key(slot), path.c_str());
     return false;
   }
   return true;

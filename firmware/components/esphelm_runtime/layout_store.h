@@ -1,6 +1,7 @@
 #pragma once
 // Persists the current and last-known-good layout (ADR-0002), and the boot guard's record
-// (ADR-0013: etag = layout being shown, body = attempts and the skipped etag).
+// (ADR-0013: etag = layout being shown, body = attempts and the skipped etag), and the display's own
+// brightness and theme choices (ADR-0025: body = encode_prefs()).
 // ESP-IDF: one NVS blob per slot in namespace "esphelm". Host (SDL): one file per slot.
 // Each record is self-checking (magic, length, CRC32), so a torn or corrupted write is
 // detected on load and the record is ignored.
@@ -11,7 +12,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-enum class Slot : uint8_t { CURRENT, LAST_KNOWN_GOOD, BOOT };
+enum class Slot : uint8_t { CURRENT, LAST_KNOWN_GOOD, BOOT, PREFS };
 
 struct StoredLayout {
   std::string etag;

@@ -2,6 +2,7 @@
 
 #include "esphome/core/log.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
@@ -18,7 +19,6 @@ static const char *const TAG = "esphelm.render";
 // Stop building when free heap drops below this (all allocation capabilities). Leaves room for
 // Wi-Fi, SignalK and LVGL redraws; matters on boards without PSRAM.
 static const size_t MIN_FREE_HEAP = 32 * 1024;
-static const uint32_t THEME_HOLD_MS = 1000;  // holding the footer title this long switches day/night
 
 /// Bytes currently allocated (all heaps), for the per-page memory log.
 static size_t heap_used() {
@@ -144,34 +144,56 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
         },
         LV_EVENT_CLICKED, this);
   };
-  make_button("<", -1, LV_ALIGN_LEFT_MID, index > 0);
-  make_button(">", +1, LV_ALIGN_RIGHT_MID, index + 1 < layout.pages.size());
+  const bool pages = layout.pages.size() > 1;
+  const int32_t btn_w = h * 16 / 10;
+  if (pages) {
+    make_button("<", -1, LV_ALIGN_LEFT_MID, index > 0);
+    make_button(">", +1, LV_ALIGN_RIGHT_MID, index + 1 < layout.pages.size());
+  }
 
-  const esphelm::Page &page = layout.pages[index];
-  const std::string title = (page.title.empty() ? page.id : page.title) + "   " + std::to_string(index + 1) + "/" +
-                            std::to_string(layout.pages.size());
-  lv_obj_t *label = make_label(footer, this->fonts_.small, c.text, title);
-  lv_obj_center(label);
-  // Holding the page title switches day/night. It takes a full second, so a brushing touch
-  // never turns a night screen bright. The hit area spans the footer between the buttons.
-  lv_obj_add_flag(label, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_ext_click_area(label, h / 2);
+  // The settings menu (ADR-0025), left of ">": three bars, as the fonts have no symbols.
+  lv_obj_t *menu = lv_button_create(footer);
+  lv_obj_set_size(menu, btn_w, lv_pct(100));
+  lv_obj_align(menu, LV_ALIGN_RIGHT_MID, pages ? -(btn_w + 8) : 0, 0);
+  lv_obj_set_style_bg_color(menu, c.background, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(menu, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_radius(menu, 10, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(menu, 0, LV_PART_MAIN);
+  const int32_t bar_h = std::max<int32_t>(2, h / 14);
+  for (int i = -1; i <= 1; i++) {
+    lv_obj_t *bar = lv_obj_create(menu);
+    plain(bar);
+    lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(bar, h / 2, bar_h);
+    lv_obj_set_style_bg_color(bar, c.text, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(bar, bar_h / 2, LV_PART_MAIN);
+    lv_obj_align(bar, LV_ALIGN_CENTER, 0, i * h / 7);
+  }
   lv_obj_add_event_cb(
-      label,
+      menu,
       [](lv_event_t *e) {
         auto *self = static_cast<Renderer *>(lv_event_get_user_data(e));
-        const lv_event_code_t code = lv_event_get_code(e);
-        if (code == LV_EVENT_PRESSED) {
-          self->title_pressed_ms_ = lv_tick_get();
-          self->title_fired_ = false;
-        } else if (code == LV_EVENT_PRESSING && !self->title_fired_ &&
-                   lv_tick_elaps(self->title_pressed_ms_) >= THEME_HOLD_MS) {
-          self->title_fired_ = true;
-          if (self->theme_toggle_)
-            self->theme_toggle_();
-        }
+        if (self->menu_)
+          self->menu_();
       },
-      LV_EVENT_ALL, this);
+      LV_EVENT_CLICKED, this);
+
+  const esphelm::Page &page = layout.pages[index];
+  std::string title = page.title.empty() ? page.id : page.title;
+  if (pages)
+    title += "   " + std::to_string(index + 1) + "/" + std::to_string(layout.pages.size());
+  lv_obj_t *label = make_label(footer, this->fonts_.small, c.text, title);
+  // One line, centred between "<" and the menu button (on a single page: on the screen).
+  const int32_t pad = 8;  // the footer's
+  const int32_t screen_w = lv_display_get_horizontal_resolution(lv_display_get_default());
+  const int32_t left = btn_w + 8;
+  const int32_t right = pages ? 2 * btn_w + 16 : btn_w + 8;
+  const int32_t space = std::max<int32_t>(btn_w, screen_w - 2 * pad - left - right);
+  lv_obj_set_size(label, space, lv_font_get_line_height(this->fonts_.small));
+  lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_align(label, LV_ALIGN_LEFT_MID, left, 0);
 }
 
 bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const WidgetEnv &env,
@@ -190,8 +212,7 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
   lv_obj_set_width(area, lv_pct(100));
   lv_obj_set_flex_grow(area, 1);
   lv_obj_set_style_pad_all(area, 8, LV_PART_MAIN);
-  if (layout.pages.size() > 1)
-    this->build_footer_(layout, index, env.colors);
+  this->build_footer_(layout, index, env.colors);
 
   const size_t used_before = heap_used();
   if (page.kind == esphelm::PageKind::CHART) {

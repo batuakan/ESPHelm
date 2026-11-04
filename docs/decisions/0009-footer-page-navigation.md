@@ -10,7 +10,7 @@ You chose: "drop swiping and switch to a footer on the bottom of the display, wi
 Boards without PSRAM (C3/C6, still in scope) can't hold several pages of LVGL objects at once. The measured cost is about 2 KB per tile on the host build, and up to 21 KB for an 8-switch page.
 
 ## Decision
-- **Navigation is a footer.** When a layout has more than one page, the runtime splits its container into the page area and a footer: a `<` button on the left, a `>` button on the right, and "title n/m" between them. The buttons are disabled at the ends; there is no wrap-around and no swiping. A one-page layout has no footer.
+- **Navigation is a footer.** When a layout has more than one page, the runtime splits its container into the page area and a footer: a `<` button on the left, a `>` button on the right, and "title n/m" between them. The buttons are disabled at the ends; there is no wrap-around and no swiping. A one-page layout has no footer. *(Amended by ADR-0025: every layout has a footer, with a settings menu button; a one-page layout shows its title and the menu button only.)*
 - The footer is **display UI, not layout data.** The schema doesn't change: page order is the `pages` array, and the footer text is the page `title` (else its id).
 - **Only the visible page is built.** Changing page deletes the page's LVGL objects and widgets and builds the next one. Subscriptions are re-derived from the new page; the server replays cached values, so the page fills in immediately.
 - Footer presses are **deferred to `loop()`**, because the rebuild deletes the button whose event is running.

@@ -1,6 +1,7 @@
 #pragma once
-// Builds LVGL objects for a layout inside the container the runtime owns: the visible page
-// plus, for layouts with several pages, a footer with previous/next buttons and the page title.
+// Builds LVGL objects for a layout inside the container the runtime owns: the visible page and a
+// footer with the page title, the settings menu button (ADR-0025) and, for layouts with several
+// pages, previous/next buttons.
 // Only the visible page exists at any time (memory stays flat on boards without PSRAM).
 // Main loop only (LVGL is not thread-safe and is driven by LvglComponent::loop()).
 
@@ -23,8 +24,8 @@ class Renderer {
   void set_fonts(const Fonts &fonts) { this->fonts_ = fonts; }
   /// Called from the footer buttons (main loop, inside LVGL event handling).
   void set_navigation(std::function<void(int delta)> navigate) { this->navigate_ = std::move(navigate); }
-  /// Called when the footer's page title is held down (main loop, inside LVGL event handling).
-  void set_theme_toggle(std::function<void()> toggle) { this->theme_toggle_ = std::move(toggle); }
+  /// Called from the footer's menu button (main loop, inside LVGL event handling).
+  void set_menu(std::function<void()> menu) { this->menu_ = std::move(menu); }
 
   /// Full-screen status text (no layout, waiting for approval, errors, ...).
   void show_status(const std::string &headline, const std::string &detail, const std::string &footer,
@@ -50,9 +51,7 @@ class Renderer {
   int32_t top_inset_{0};
   Fonts fonts_;
   std::function<void(int)> navigate_;
-  std::function<void()> theme_toggle_;
-  uint32_t title_pressed_ms_{0};
-  bool title_fired_{false};
+  std::function<void()> menu_;
   // LVGL keeps pointers to the grid descriptors, so they must outlive the page.
   std::vector<int32_t> col_dsc_;
   std::vector<int32_t> row_dsc_;

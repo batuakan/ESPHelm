@@ -23,6 +23,8 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-center-zero-day.png">
  <img width="200px" src="/docs/images/display-clock-day.png">
  <img width="200px" src="/docs/images/display-clock-saver.png">
+ <img width="200px" src="/docs/images/display-settings-day.png">
+ <img width="200px" src="/docs/images/display-settings-info.png">
 </p>
 
 <p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day and night themes.</em></p>
@@ -73,11 +75,11 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar (gauges and bars can be centre zero, for a rudder, heel, rate of turn or battery current: filled from zero, red to port and green to starboard, or plus and minus), switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY), a graph of a value's last 10 min, 1 h or 6 h (with an optional fixed range and zone bands), and a heading tape: a compass strip that scrolls with the heading, with markers for COG, the bearing to the next waypoint and the autopilot target, and a clock: the time and/or date in your time zone (summer time included) or UTC, set from GPS time through SignalK or from NTP, and kept running offline.
 - **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge, bar or graph tile's own zones, and the display follows them when they change on the server.
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
-- **Pages:** as many as you like, with page buttons in a footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
+- **Pages:** as many as you like, with page buttons in the footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
-- **Day/night on the display itself:** hold the page title in the footer for a second (see [On the display](#-on-the-display)).
+- **Settings on the display itself:** the menu button in the footer opens a panel with two tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Info* shows what the display knows: its IP and Wi-Fi signal, the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
 - **Resolution agnostic:** layouts are grids, so the same layout works on 480×480 and 720×720.
@@ -91,10 +93,13 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 ## 👆 On the display
 
 - **Change page:** the **<** and **>** buttons in the footer.
-- **Switch day/night:** press and **hold the page title** in the footer (between the **<** and **>** buttons) for one second. The page redraws in the other theme, at that theme's brightness.
-  - With automatic day/night on, your choice holds until the next sunrise or sunset, then the sun takes over again.
-  - Sending a layout with a different theme from the editor also replaces it, and a restart goes back to the layout's theme.
-  - The footer only appears on layouts with more than one page, so a single-page layout can't be switched on the display: set its theme in the editor.
+- **Settings:** the button with three bars in the footer (every layout has one) opens the settings panel, on its *Settings* tab.
+  - **Brightness:** a slider for the theme shown (day and night are kept separately).
+  - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
+  - **Screen off,** when the layout has a screen timeout.
+  - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
+  - **Info tab:** the display (id, firmware, uptime, free memory), the network (Wi-Fi, signal, IP), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
+  - **Closing:** only the **X** closes it.
 - **Alarms:** tap the banner to see the next alarm, **ACK** to acknowledge it.
 - **Screen off** (screen timeout): the first touch only wakes the display, it never presses a button.
 
@@ -127,7 +132,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 67 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 72 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```
