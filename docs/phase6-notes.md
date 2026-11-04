@@ -156,4 +156,4 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Preview:** draws the same.
   - **Problems list:** now words range problems by tile.
 - **Changed from the plan:** `sides` without `centerZero` is ignored rather than refused, since a cross-field `INVALID_VALUE` would split the JSON Schema from the validator.
-- **Not verified:** on the P4 (hardware step 22).
+- **Hardware:** checked on the P4 (step 22, 2026-11-04).
