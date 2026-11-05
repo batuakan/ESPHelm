@@ -194,3 +194,19 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Build size against `main`:** P4 flash +15.5 KB (3,368,618 B), C3 +15.7 KB (1,480,876 B, 80.7 %); static RAM +216 B on both.
 - **Checked on the P4** (hardware step 24), before the tabs: the panel works.
 - **Tabs:** added afterwards, at your request. *Settings* and *Info*, with only the shown tab built. Not yet checked on the P4.
+
+## Setup without configuration (ADR-0026, branch `feat/zero-config`)
+
+- **What:**
+  - **No secrets:** the P4 and C3 builds compile in no Wi-Fi network and no SignalK host. Names get the MAC suffix.
+  - **Setup network:** ESPHome's access point and captive portal, with a password made per display (`esphelm_wifi_setup.h`, `Slot::AP`) and shown with a QR code. It opens only after a power-up without Wi-Fi (2 min, closing 10 min after power-up), or at once with no saved network, and never once connected.
+  - **Setup screens:** *Set up Wi-Fi*, *Joining Wi-Fi*, *Looking for a SignalK server*. The status page has the menu button too.
+  - **Network tab** in the settings panel: Wi-Fi rows, the setup network, *Forget Wi-Fi*; the server's rows, *Change server* (mDNS list), *Forget server*. Forgets ask *Yes* first.
+- **ESPHomeSignalK** (branch `feat/server-identity`): the server is saved next to the token and is the only one accepted after a restart; `scan_servers()`, `servers_found()`, `choose_server()`, `forget_server()`, `disconnect()` on each transport; an HTTP request without a response searches for the server again. Tests: `saved_server_test.cpp` (the record and the checks behind choosing).
+- **Tests:**
+  - **Unit:** the password and QR text (`wifi_setup.cpp.test.ts`, g++).
+  - **SDL e2e:** 212 checks. Seven goldens re-recorded and reviewed by eye (the three tabs, and the status page's menu button); six new: the Network tab at 480 and 720, the server list, the *Forget server* question, the setup screen and the Network tab with the setup network.
+- **Build size against `main`:** P4 flash +74.3 KB (3,442,920 B, 20.8 %), C3 +125.8 KB (1,606,628 B, 87.6 %); RAM +724 / +694 B. Mostly the captive portal with its web server and web OTA.
+- **Not verified:**
+  - **On hardware** (step 25): the setup network on the P4's C6 coprocessor, the portal, the QR code from a phone, the power-up window, *Forget Wi-Fi*.
+  - **The server binding on a device:** it is built and its record is unit-tested, but choosing, forgetting and the restart behaviour only ran against made-up servers on the SDL build (the e2e must not search the LAN).
