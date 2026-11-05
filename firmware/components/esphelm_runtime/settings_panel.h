@@ -1,12 +1,14 @@
 #pragma once
-// Settings and information panel (ADR-0025), opened by the footer's menu button, in two tabs:
-// Settings (brightness, day/night/auto and "screen off") and Info (what the display knows about
-// itself, the network, SignalK, its layout and its clock). Only the shown tab is built. Over the page and below the alarm banner, on
-// LVGL's top layer, like the history popup; closed only by its close button. Not a widget: it
-// belongs to the runtime and outlives page changes underneath it. Main loop only; its LVGL events
-// only record what was pressed, the runtime applies it after tick().
-// Memory: about 20 LVGL objects while the Settings tab is open, about 30 for Info (each section
-// is four), none when closed.
+// Settings and information panel (ADR-0025), opened by the footer's menu button, in three tabs:
+// Settings (brightness, day/night/auto and "screen off"), Network (Wi-Fi and the SignalK server:
+// forget them, choose another server; ADR-0026) and Info (what the display knows about itself,
+// SignalK, its layout and its clock). Only the shown tab is built. Over the page and below the
+// alarm banner, on LVGL's top layer, like the history popup; closed only by its close button. Not a
+// widget: it belongs to the runtime and outlives page changes underneath it. Main loop only; its
+// LVGL events only record what was pressed, the runtime applies it after tick().
+// Memory: about 20 LVGL objects while the Settings tab is open, about 30 for Network (with the
+// setup network's QR code: one image of a few KB) and for Info (each section is four), none when
+// closed.
 
 #include <cstdint>
 #include <functional>
@@ -36,18 +38,29 @@ class SettingsPanel {
     int brightness{100};                        // % of the shown theme
     int min_brightness{1};
     bool can_sleep{false};  // the layout has a screen timeout
+    // Network tab (ADR-0026)
+    bool wifi{false};          // the board has Wi-Fi (not the host build)
+    bool ap_active{false};     // the setup network is up
+    std::string ap_ssid;
+    std::string ap_password;
+    bool server_choice{false};  // the server is found with mDNS, not set in the firmware
+    bool scanning{false};       // a search for servers is running
+    std::vector<std::string> servers;  // what the last search found, as shown
   };
 
   void set_fonts(const Fonts &fonts) { this->fonts_ = fonts; }
-  /// Fills the information rows; called when the panel opens and once a second while it is open.
-  void set_info(std::function<void(std::vector<InfoRow> &)> fill) { this->fill_ = std::move(fill); }
+  /// Fills the rows of the Info tab, or of the Network tab (`network`); called when the tab is
+  /// built and once a second while it shows. A tab always gets as many rows.
+  void set_info(std::function<void(std::vector<InfoRow> &, bool network)> fill) { this->fill_ = std::move(fill); }
 
   void open(const State &state, int32_t top);
   void close();
   bool is_open() const { return this->root_ != nullptr; }
 
-  /// Test hook and the buttons: "close", "tab-settings", "tab-info", "day", "night", "auto",
-  /// "sleep", or "brightness=<1-100>" (the slider let go there). Applied in tick().
+  /// Test hook and the buttons: "close", "tab-settings", "tab-network", "tab-info", "day",
+  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "forget-wifi",
+  /// "forget-server", "change-server", "server=<n>" (in the list), "confirm" and "cancel".
+  /// Applied in tick().
   void tap(const std::string &part);
   /// Follow the state (rebuilt for another theme) and the banner, refresh the information once a
   /// second. True if the panel was built anew (the banner must go in front).
@@ -59,6 +72,13 @@ class SettingsPanel {
   /// The slider moved (live) or was let go there (`done`: save it).
   bool take_brightness(int &percent, bool &done);
   bool take_sleep() { return take(this->sleep_wanted_); }
+  /// Confirmed: forget the Wi-Fi network (the display restarts), or the SignalK server.
+  bool take_forget_wifi() { return take(this->forget_wifi_); }
+  bool take_forget_server() { return take(this->forget_server_); }
+  /// "Change server" was pressed: search for servers.
+  bool take_scan() { return take(this->scan_wanted_); }
+  /// A server of the list was picked (its index in State::servers).
+  bool take_server(int &index);
 
  protected:
   static bool take(bool &flag) {
@@ -68,16 +88,24 @@ class SettingsPanel {
   }
   void build_();
   void build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h);
+  void build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int32_t line_small);
   void build_info_(lv_obj_t *body, int32_t w, int32_t line_small);
+  /// The rows of the shown tab, a block per section; `after` adds controls below a section.
+  void build_rows_(lv_obj_t *body, int32_t w, int32_t line_small,
+                   const std::function<void(const char *section)> &after);
+  void build_setup_network_(lv_obj_t *body, int32_t w);
+  void build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question);
   void refresh_info_();
   void style_choices_();
 
-  enum class Tab : uint8_t { SETTINGS, INFO };
+  enum class Tab : uint8_t { SETTINGS, NETWORK, INFO };
+  /// A forget waiting for "Yes".
+  enum class Confirm : uint8_t { NONE, WIFI, SERVER };
 
   Fonts fonts_;
   Tab tab_{Tab::SETTINGS};  // shown; only its objects exist
   int8_t pending_tab_{-1};
-  std::function<void(std::vector<InfoRow> &)> fill_;
+  std::function<void(std::vector<InfoRow> &, bool)> fill_;
   State state_;
   int32_t top_{0};
   uint32_t next_info_ms_{0};
@@ -88,12 +116,20 @@ class SettingsPanel {
   int pending_brightness_{-1};
   bool brightness_done_{false};
   bool sleep_wanted_{false};
+  // Network tab: what it shows (changed in tap(), rebuilt in tick()) and what was confirmed.
+  Confirm confirm_{Confirm::NONE};
+  bool listing_{false};  // the server list instead of the server buttons
+  bool network_dirty_{false};
+  bool forget_wifi_{false};
+  bool forget_server_{false};
+  bool scan_wanted_{false};
+  int chosen_server_{-1};
 
   lv_obj_t *root_{nullptr};
   lv_obj_t *brightness_value_{nullptr};
   lv_obj_t *slider_{nullptr};
   lv_obj_t *choices_[3]{};  // day, night, auto
-  lv_obj_t *tabs_[2]{};     // settings, info
+  lv_obj_t *tabs_[3]{};     // settings, network, info
   struct Section {
     lv_obj_t *values;
     std::string shown;

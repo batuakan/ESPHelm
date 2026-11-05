@@ -6,12 +6,18 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "esphome/core/application.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include "esphelm_wifi_setup.h"
 
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
+#include <bootloader_random.h>
 #include <esp_heap_caps.h>
+#include <esp_random.h>
 #include <esp_system.h>
+#include <nvs.h>
 #else
 #include <cstdlib>
 #endif
@@ -66,6 +72,8 @@ void EsphelmRuntime::compute_capacity_() {
 }
 
 void EsphelmRuntime::setup() {
+  // Before Wi-Fi starts (its setup runs after ours): the setup network gets this display's password.
+  this->setup_ap_();
   this->compute_capacity_();
   this->renderer_.set_fonts(this->fonts_);
   this->renderer_.set_navigation([this](int step) { this->pending_step_ += step; });
@@ -78,11 +86,25 @@ void EsphelmRuntime::setup() {
   this->clock_frozen_ = clock_test != nullptr && std::strcmp(clock_test, "frozen") == 0;
   const char *info_test = std::getenv("ESPHELM_TEST_INFO");
   this->info_fixed_ = info_test != nullptr && std::strcmp(info_test, "fixed") == 0;
+  const char *servers_test = std::getenv("ESPHELM_TEST_SERVERS");
+  this->test_servers_ = servers_test != nullptr && std::strcmp(servers_test, "fixed") == 0;
+  if (this->test_servers_) {
+    signalk::ServerCandidate a, b;
+    a.hostname = "boat-pc";
+    a.address = "192.168.1.20";
+    a.port = 3000;
+    b.hostname = "navstation";
+    b.address = "192.168.1.31";
+    b.port = 3443;
+    this->test_server_list_ = {a, b};
+  }
+  const char *setup_test = std::getenv("ESPHELM_TEST_SETUP");
+  this->test_setup_ = setup_test != nullptr ? setup_test : "";
 
   this->popup_.set_fonts(this->fonts_);
   this->popup_.set_history(&this->history_);
   this->panel_.set_fonts(this->fonts_);
-  this->panel_.set_info([this](std::vector<InfoRow> &rows) { this->fill_info_(rows); });
+  this->panel_.set_info([this](std::vector<InfoRow> &rows, bool network) { this->fill_info_(rows, network); });
 
   // Alarms (ADR-0014): every notification, whatever the layout shows.
   this->alarms_.set_fonts(this->fonts_);
@@ -193,18 +215,20 @@ void EsphelmRuntime::loop() {
   }
   this->pump_meta_(now, authorized && connected);
 
+  this->tick_network_();
+  // The menu is in the footer, and on the status page before there is a layout.
+  if (this->menu_wanted_) {
+    this->menu_wanted_ = false;
+    if (!this->panel_.is_open() && !this->asleep_) {
+      this->panel_.open(this->panel_state_(), this->alarms_.height());
+      this->alarms_.raise();
+    }
+  }
   bool history_closed = false;
   if (this->has_layout_) {
     if (this->theme_toggle_wanted_) {
       this->theme_toggle_wanted_ = false;
       this->toggle_theme_();
-    }
-    if (this->menu_wanted_) {
-      this->menu_wanted_ = false;
-      if (!this->panel_.is_open() && !this->asleep_) {
-        this->panel_.open(this->panel_state_(), this->alarms_.height());
-        this->alarms_.raise();
-      }
     }
     if (this->pending_step_ != 0) {
       const int target = static_cast<int>(this->page_) + this->pending_step_;
@@ -895,7 +919,132 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
   s.brightness = this->brightness_percent_();
   s.min_brightness = this->theme_ == esphelm::Theme::NIGHT ? esphelm::PREFS_MIN_NIGHT : esphelm::PREFS_MIN_DAY;
   s.can_sleep = this->layout_.settings.screen_timeout > 0;
+#ifdef USE_ESPHELM_WIFI_SETUP
+  s.wifi = true;
+#endif
+  s.ap_active = this->ap_active_();
+  if (s.ap_active) {
+    s.ap_ssid = this->ap_ssid_();
+    s.ap_password = this->ap_password_;
+  }
+  s.server_choice = this->test_servers_ || !this->signalk_->server_configured();
+  s.scanning = !this->test_servers_ && this->signalk_->scanning();
+  for (const signalk::ServerCandidate &server : this->servers_()) {
+    // "name  address:port"; the fonts only have ASCII.
+    std::string text = server.hostname.empty() ? server.address : server.hostname;
+    for (char &ch : text) {
+      if (static_cast<unsigned char>(ch) < 0x20 || static_cast<unsigned char>(ch) > 0x7e)
+        ch = '?';
+    }
+    s.servers.push_back(text + "  " + server.connect_host() + ":" + std::to_string(server.port));
+  }
   return s;
+}
+
+// ---- Setup without configuration (ADR-0026) ----
+
+void EsphelmRuntime::setup_ap_() {
+  if (std::getenv("ESPHELM_TEST_SETUP") != nullptr) {
+    this->ap_password_ = "Xk7pQ2mZ9t";  // the host build's setup screens: always the same
+    return;
+  }
+#ifdef USE_WIFI_AP
+  if (wifi::global_wifi_component == nullptr || !wifi::global_wifi_component->has_ap())
+    return;
+  StoredLayout saved;
+  if (this->store_.load(Slot::AP, saved) && saved.etag == "ap" && esphelm::valid_ap_password(saved.body)) {
+    this->ap_password_ = saved.body;
+  } else {
+#ifdef USE_ESP32_FRAMEWORK_ESP_IDF
+    // The RNG is only truly random while the radio or this entropy source runs, and the radio isn't
+    // on yet (on the P4 it is on the network coprocessor). Made once per display.
+    bootloader_random_enable();
+    this->ap_password_ = esphelm::make_ap_password([]() { return esp_random(); });
+    bootloader_random_disable();
+#else
+    this->ap_password_ = esphelm::make_ap_password([]() { return random_uint32(); });
+#endif
+    // Not saved: still a random password, only another one after every restart.
+    if (!this->store_.save(Slot::AP, {"ap", this->ap_password_}))
+      ESP_LOGW(TAG, "The setup network's password could not be saved");
+  }
+  wifi::WiFiAP ap = wifi::global_wifi_component->get_ap();
+  ap.set_password(this->ap_password_);
+  wifi::global_wifi_component->set_ap(ap);
+#endif
+}
+
+void EsphelmRuntime::tick_network_() {
+#ifdef USE_WIFI_AP
+  if (!this->wifi_seen_ && this->wifi_connected_()) {
+    this->wifi_seen_ = true;
+    // From the first connection on, losing the network (the boat's router switched off) never
+    // brings the setup network up: only a power-up without Wi-Fi, or "Forget Wi-Fi", does.
+    wifi::global_wifi_component->set_ap_timeout(0);
+    ESP_LOGD(TAG, "Wi-Fi connected; the setup network stays off until the next power-up");
+  }
+#endif
+}
+
+bool EsphelmRuntime::ap_active_() const {
+  if (!this->test_setup_.empty())
+    return this->test_setup_ == "ap";
+#ifdef USE_WIFI_AP
+  return wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_ap_active();
+#else
+  return false;
+#endif
+}
+
+std::string EsphelmRuntime::ap_ssid_() const {
+  if (!this->test_setup_.empty())
+    return "esphelm-sdl-a1b2c3";
+#ifdef USE_WIFI_AP
+  // No SSID in the YAML: ESPHome names the network after the device (with its MAC suffix).
+  if (wifi::global_wifi_component != nullptr) {
+    const std::string ssid(wifi::global_wifi_component->get_ap().get_ssid().c_str());
+    if (!ssid.empty())
+      return ssid;
+  }
+#endif
+  return App.get_name().substr(0, 32);
+}
+
+bool EsphelmRuntime::wifi_connected_() const {
+  if (!this->test_setup_.empty())
+    return this->test_setup_ != "ap" && this->test_setup_ != "joining";
+#ifdef USE_WIFI
+  return wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_connected();
+#else
+  return true;  // the host build is always on the network
+#endif
+}
+
+const std::vector<signalk::ServerCandidate> &EsphelmRuntime::servers_() const {
+  return this->test_servers_ ? this->test_server_list_ : this->signalk_->servers_found();
+}
+
+void EsphelmRuntime::forget_wifi_() {
+#if defined(USE_ESPHELM_WIFI_SETUP) && defined(USE_ESP32_FRAMEWORK_ESP_IDF)
+  // ESPHome can save a network but not forget one (an empty one still counts as set), so its
+  // record is erased: the key of a build without a compiled-in network (wifi_component.cpp,
+  // 88491487) and the fast-connect record after it. The layout, the token and the display's
+  // choices stay. After the restart the setup network comes up at once.
+  nvs_handle_t handle;
+  if (nvs_open("esphome", NVS_READWRITE, &handle) == ESP_OK) {
+    for (uint32_t key : {88491487u, 88491488u}) {
+      char name[12];
+      std::snprintf(name, sizeof(name), "%u", static_cast<unsigned>(key));
+      nvs_erase_key(handle, name);
+    }
+    nvs_commit(handle);
+    nvs_close(handle);
+  }
+  ESP_LOGW(TAG, "Wi-Fi network forgotten; restarting into the setup network");
+  App.safe_reboot();
+#else
+  ESP_LOGW(TAG, "Forget Wi-Fi: this build has no saved network to forget");
+#endif
 }
 
 void EsphelmRuntime::tick_panel_(uint32_t now) {
@@ -923,6 +1072,22 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
     this->panel_.close();
     this->sleep_();
   }
+  if (this->panel_.take_forget_wifi())
+    this->forget_wifi_();
+  if (this->panel_.take_forget_server()) {
+    ESP_LOGI(TAG, "Forget server from the settings");
+    if (!this->test_servers_)
+      this->signalk_->forget_server();
+  }
+  if (this->panel_.take_scan() && !this->test_servers_)
+    this->signalk_->scan_servers();
+  int index;
+  if (this->panel_.take_server(index) && index < static_cast<int>(this->servers_().size())) {
+    const signalk::ServerCandidate server = this->servers_()[index];
+    ESP_LOGI(TAG, "Server chosen in the settings: %s:%u", server.connect_host().c_str(), server.port);
+    if (!this->test_servers_)
+      this->signalk_->choose_server(server);
+  }
   this->panel_.take_close();
 }
 
@@ -938,58 +1103,26 @@ static std::string uptime_text(uint64_t seconds) {
   return buf;
 }
 
-void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows) const {
+void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const {
   char buf[48];
   const uint32_t now = millis();
   lv_display_t *disp = lv_display_get_default();
-
-  rows.push_back({"Display", "Id", this->device_id_});
-  rows.push_back({nullptr, "Board", this->board_});
-  rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
-  std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
-                (int) lv_display_get_vertical_resolution(disp));
-  rows.push_back({nullptr, "Screen", buf});
-  rows.push_back({nullptr, "Up", uptime_text(millis_64() / 1000)});
-  const size_t up = rows.size() - 1;
-#ifdef USE_ESP32_FRAMEWORK_ESP_IDF
-  const unsigned internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
-  if (this->psram_)
-    std::snprintf(buf, sizeof(buf), "%u KB, PSRAM %u KB", internal,
-                  (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
-  else
-    std::snprintf(buf, sizeof(buf), "%u KB", internal);
-  rows.push_back({nullptr, "Free memory", buf});
-#endif
-
-#if defined(USE_WIFI) || defined(USE_NETWORK)
-  rows.push_back({"Network", "Wi-Fi", "-"});
-#ifdef USE_WIFI
-  if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_connected()) {
-    char ssid[wifi::SSID_BUFFER_SIZE];
-    rows.back().value = wifi::global_wifi_component->wifi_ssid_to(ssid);
-    std::snprintf(buf, sizeof(buf), "%d dBm", wifi::global_wifi_component->wifi_rssi());
-    rows.push_back({nullptr, "Signal", buf});
-  } else {
-    rows.back().value = "not connected";
-    rows.push_back({nullptr, "Signal", "-"});
-  }
-#endif
-  std::string ip = "-";
-#ifdef USE_NETWORK
-  for (const auto &addr : network::get_ip_addresses()) {
-    char ip_buf[network::IP_ADDRESS_BUFFER_SIZE];
-    if (addr.is_ip4() && std::strcmp(addr.str_to(ip_buf), "0.0.0.0") != 0) {
-      ip = ip_buf;
-      break;
+  // Values that change by themselves read "test" under ESPHELM_TEST_INFO=fixed, for screenshots.
+  static const char *const CHANGING[] = {"Up", "Free memory", "Signal", "Deltas", "Dropped", "Last delta", "UTC"};
+  const auto fix = [&]() {
+    if (!this->info_fixed_)
+      return;
+    for (InfoRow &row : rows) {
+      for (const char *n : CHANGING) {
+        if (std::strcmp(row.name, n) == 0)
+          row.value = "test";
+      }
     }
-  }
-#endif
-  rows.push_back({nullptr, "IP", ip});
-#endif
+  };
 
   const std::string &host = this->signalk_->get_host();
-  rows.push_back({"SignalK", "Server",
-                  host.empty() ? std::string("searching") : host + ":" + std::to_string(this->signalk_->get_port())});
+  const std::string server =
+      host.empty() ? std::string("searching") : host + ":" + std::to_string(this->signalk_->get_port());
   const char *stream;
   switch (this->signalk_->access_state()) {
     case signalk::SignalKAccessState::PENDING_APPROVAL:
@@ -1001,6 +1134,61 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows) const {
     default:
       stream = this->signalk_->is_stream_connected() ? "connected" : "not connected";
   }
+
+  if (network) {
+    // As many rows on every build: the panel builds its labels once.
+    rows.push_back({"Wi-Fi", "Network", "-"});
+    rows.push_back({nullptr, "Signal", "-"});
+#ifdef USE_WIFI
+    if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_connected()) {
+      char ssid[wifi::SSID_BUFFER_SIZE];
+      rows[0].value = wifi::global_wifi_component->wifi_ssid_to(ssid);
+      std::snprintf(buf, sizeof(buf), "%d dBm", wifi::global_wifi_component->wifi_rssi());
+      rows[1].value = buf;
+    } else {
+      rows[0].value = "not connected";
+    }
+#endif
+    std::string ip = "-";
+#ifdef USE_NETWORK
+    for (const auto &addr : network::get_ip_addresses()) {
+      char ip_buf[network::IP_ADDRESS_BUFFER_SIZE];
+      if (addr.is_ip4() && std::strcmp(addr.str_to(ip_buf), "0.0.0.0") != 0) {
+        ip = ip_buf;
+        break;
+      }
+    }
+#endif
+    rows.push_back({nullptr, "IP", ip});
+    rows.push_back({nullptr, "Setup network", this->ap_active_() ? std::string("on") : std::string("off")});
+    const signalk::ServerCandidate &bound = this->signalk_->current_server();
+    rows.push_back({"SignalK server", "Address", server});
+    rows.push_back({nullptr, "Name", this->signalk_->server_configured() || bound.hostname.empty()
+                                         ? std::string("-")
+                                         : bound.hostname});
+    rows.push_back({nullptr, "Stream", stream});
+    fix();
+    return;
+  }
+
+  rows.push_back({"Display", "Id", this->device_id_});
+  rows.push_back({nullptr, "Board", this->board_});
+  rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
+  std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
+                (int) lv_display_get_vertical_resolution(disp));
+  rows.push_back({nullptr, "Screen", buf});
+  rows.push_back({nullptr, "Up", uptime_text(millis_64() / 1000)});
+#ifdef USE_ESP32_FRAMEWORK_ESP_IDF
+  const unsigned internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
+  if (this->psram_)
+    std::snprintf(buf, sizeof(buf), "%u KB, PSRAM %u KB", internal,
+                  (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+  else
+    std::snprintf(buf, sizeof(buf), "%u KB", internal);
+  rows.push_back({nullptr, "Free memory", buf});
+#endif
+
+  rows.push_back({"SignalK", "Server", server});
   rows.push_back({nullptr, "Stream", stream});
   rows.push_back({nullptr, "Deltas", std::to_string(this->signalk_->deltas_received())});
   rows.push_back({nullptr, "Dropped", std::to_string(this->signalk_->messages_dropped())});
@@ -1036,16 +1224,7 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows) const {
   }
   const std::string &zone = this->layout_.settings.time_zone_name;
   rows.push_back({nullptr, "Time zone", zone.empty() ? std::string("UTC") : zone});
-  if (this->info_fixed_) {
-    rows[up].value = "test";
-    for (size_t i = up + 1; i < rows.size(); i++) {
-      static const char *const CHANGING[] = {"Free memory", "Signal", "Deltas", "Dropped", "Last delta", "UTC"};
-      for (const char *n : CHANGING) {
-        if (std::strcmp(rows[i].name, n) == 0)
-          rows[i].value = "test";
-      }
-    }
-  }
+  fix();
 }
 
 // ---- Boot guard (ADR-0013) ----
@@ -1148,7 +1327,7 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
     this->menu_wanted_ = true;
     return;
   }
-  if (tile_id == "@settings") {  // the settings panel's controls: close, day, night, auto, sleep, brightness=N
+  if (tile_id == "@settings") {  // the settings panel's controls (SettingsPanel::tap)
     lv_display_trigger_activity(nullptr);
     this->panel_.tap(part);
     return;
@@ -1498,13 +1677,14 @@ bool EsphelmRuntime::open_history_(const std::string &tile_id, const std::string
 
 // ---- Status page ----
 
-void EsphelmRuntime::show_status_(const std::string &headline, const std::string &detail) {
-  const std::string key = headline + "\n" + detail;
+void EsphelmRuntime::show_status_(const std::string &headline, const std::string &detail, const std::string &qr) {
+  const std::string key = headline + "\n" + detail + "\n" + qr;
   if (key == this->status_key_)
     return;
   this->status_key_ = key;
+  ESP_LOGI(TAG, "Status: %s", headline.c_str());
   this->renderer_.show_status(headline, detail, "ESPHelm " + std::string(FIRMWARE_VERSION) + "\n" + this->device_id_,
-                              this->theme_);
+                              this->theme_, this->touch_, qr);
 }
 
 void EsphelmRuntime::update_status_() {
@@ -1512,6 +1692,17 @@ void EsphelmRuntime::update_status_() {
   const SignalKAccessState access = this->signalk_->access_state();
   if (!this->layout_error_.empty()) {
     this->show_status_("Layout rejected", this->layout_error_);
+  } else if (this->ap_active_()) {
+    // Setup (ADR-0026): join the display's own network, then pick the boat's in the page it opens.
+    const std::string ssid = this->ap_ssid_();
+    this->show_status_("Set up Wi-Fi",
+                       "Join the network " + ssid + "\nPassword " + this->ap_password_ +
+                           "\nthen choose the boat's network on the page that opens (or http://192.168.4.1)",
+                       esphelm::wifi_qr_text(ssid, this->ap_password_));
+  } else if (!this->wifi_connected_()) {
+    this->show_status_("Joining Wi-Fi", "Without Wi-Fi after a power-up, the setup network opens in 2 minutes");
+  } else if (this->signalk_->get_host().empty()) {
+    this->show_status_("Looking for a SignalK server", "Searching the network (mDNS)");
   } else if (access == SignalKAccessState::PENDING_APPROVAL) {
     this->show_status_("Approve this display in SignalK",
                        "Security > Access Requests: grant read/write");

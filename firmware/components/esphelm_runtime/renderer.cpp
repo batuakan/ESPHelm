@@ -79,18 +79,36 @@ bool Renderer::set_top_inset(int32_t px) {
 }
 
 void Renderer::show_status(const std::string &headline, const std::string &detail, const std::string &footer,
-                           esphelm::Theme theme) {
+                           esphelm::Theme theme, bool menu, const std::string &qr) {
   if (this->container_ == nullptr)
     return;
   this->clear_(theme);
   const Colors c = colors_for(theme);
   lv_obj_set_style_pad_all(this->container_, 16, LV_PART_MAIN);
+  lv_display_t *disp = lv_display_get_default();
+  const int32_t sw = lv_display_get_horizontal_resolution(disp);
+  const int32_t sh = lv_display_get_vertical_resolution(disp);
 
   lv_obj_t *title = make_label(this->container_, this->fonts_.label, c.text, headline);
   lv_obj_set_width(title, lv_pct(100));
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_label_set_long_mode(title, LV_LABEL_LONG_MODE_WRAP);
-  lv_obj_align(title, LV_ALIGN_CENTER, 0, -30);
+  if (qr.empty()) {
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -30);
+  } else {
+    // The setup network: its QR code at the top (phone cameras join from it), the text below.
+    // Dark modules on light ones by day; at night the light ones are the dim red text colour.
+    const int32_t size = std::min(sw, sh) * 4 / 10;
+    lv_obj_t *code = lv_qrcode_create(this->container_);
+    lv_qrcode_set_size(code, size);
+    const bool night = theme == esphelm::Theme::NIGHT;
+    lv_qrcode_set_dark_color(code, night ? c.background : c.text);
+    lv_qrcode_set_light_color(code, night ? c.text : c.background);
+    lv_qrcode_set_quiet_zone(code, true);
+    lv_qrcode_update(code, qr.data(), qr.size());
+    lv_obj_align(code, LV_ALIGN_TOP_MID, 0, sh / 20);
+    lv_obj_align_to(title, code, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
+  }
 
   lv_obj_t *body = make_label(this->container_, this->fonts_.small, c.muted, detail);
   lv_obj_set_width(body, lv_pct(100));
@@ -103,6 +121,43 @@ void Renderer::show_status(const std::string &headline, const std::string &detai
   lv_obj_set_style_text_align(foot, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_label_set_long_mode(foot, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_align(foot, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+  if (menu) {
+    // As big as the footer's, in the top right corner: the Network tab before any layout is shown.
+    const int32_t h = lv_font_get_line_height(this->fonts_.small) * 22 / 10 - 12;
+    lv_obj_t *button = this->menu_button_(this->container_, h * 16 / 10, h, c, c.tile);
+    lv_obj_add_flag(button, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align(button, LV_ALIGN_TOP_RIGHT, 0, 0);
+  }
+}
+
+lv_obj_t *Renderer::menu_button_(lv_obj_t *parent, int32_t w, int32_t h, const Colors &c, lv_color_t bg) {
+  lv_obj_t *menu = lv_button_create(parent);
+  lv_obj_set_size(menu, w, h);
+  lv_obj_set_style_bg_color(menu, bg, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(menu, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_radius(menu, 10, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(menu, 0, LV_PART_MAIN);
+  const int32_t bar_h = std::max<int32_t>(2, h / 14);
+  for (int i = -1; i <= 1; i++) {
+    lv_obj_t *bar = lv_obj_create(menu);
+    plain(bar);
+    lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(bar, h / 2, bar_h);
+    lv_obj_set_style_bg_color(bar, c.text, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(bar, bar_h / 2, LV_PART_MAIN);
+    lv_obj_align(bar, LV_ALIGN_CENTER, 0, i * h / 7);
+  }
+  lv_obj_add_event_cb(
+      menu,
+      [](lv_event_t *e) {
+        auto *self = static_cast<Renderer *>(lv_event_get_user_data(e));
+        if (self->menu_)
+          self->menu_();
+      },
+      LV_EVENT_CLICKED, this);
+  return menu;
 }
 
 void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const Colors &c) {
@@ -151,33 +206,10 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
     make_button(">", +1, LV_ALIGN_RIGHT_MID, index + 1 < layout.pages.size());
   }
 
-  // The settings menu (ADR-0025), left of ">": three bars, as the fonts have no symbols.
-  lv_obj_t *menu = lv_button_create(footer);
-  lv_obj_set_size(menu, btn_w, lv_pct(100));
+  // The settings menu (ADR-0025), left of ">".
+  lv_obj_t *menu = this->menu_button_(footer, btn_w, h, c, c.background);
+  lv_obj_set_height(menu, lv_pct(100));
   lv_obj_align(menu, LV_ALIGN_RIGHT_MID, pages ? -(btn_w + 8) : 0, 0);
-  lv_obj_set_style_bg_color(menu, c.background, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(menu, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_set_style_radius(menu, 10, LV_PART_MAIN);
-  lv_obj_set_style_shadow_width(menu, 0, LV_PART_MAIN);
-  const int32_t bar_h = std::max<int32_t>(2, h / 14);
-  for (int i = -1; i <= 1; i++) {
-    lv_obj_t *bar = lv_obj_create(menu);
-    plain(bar);
-    lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(bar, h / 2, bar_h);
-    lv_obj_set_style_bg_color(bar, c.text, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar, bar_h / 2, LV_PART_MAIN);
-    lv_obj_align(bar, LV_ALIGN_CENTER, 0, i * h / 7);
-  }
-  lv_obj_add_event_cb(
-      menu,
-      [](lv_event_t *e) {
-        auto *self = static_cast<Renderer *>(lv_event_get_user_data(e));
-        if (self->menu_)
-          self->menu_();
-      },
-      LV_EVENT_CLICKED, this);
 
   const esphelm::Page &page = layout.pages[index];
   std::string title = page.title.empty() ? page.id : page.title;

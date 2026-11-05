@@ -2,11 +2,13 @@
 
 import esphome.codegen as cg
 from esphome.components import font, light, time
+import esphome.final_validate as fv
 from esphome.components.lvgl.types import lv_obj_t
 from esphome.components.lvgl.widgets import get_widgets
 from esphome.components.signalk import signalk as SignalKComponent
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
+from esphome.core import CORE
 
 CODEOWNERS = ["@batuakan"]
 DEPENDENCIES = ["lvgl", "signalk", "json"]
@@ -29,7 +31,10 @@ CONF_TIME_ID = "time_id"
 
 # LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
 # links against it for image needles).
-LVGL_FEATURES = ("label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image", "chart", "arc", "slider")
+LVGL_FEATURES = (
+    "label", "grid", "flex", "font", "scale", "line", "bar", "switch", "button", "image", "chart", "arc", "slider",
+    "canvas", "qrcode",
+)
 
 esphelm_ns = cg.esphome_ns.namespace("esphelm_runtime")
 EsphelmRuntime = esphelm_ns.class_("EsphelmRuntime", cg.Component)
@@ -73,7 +78,20 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
-FINAL_VALIDATE_SCHEMA = _enable_lvgl_features
+def _final_validate(config):
+    _enable_lvgl_features(config)
+    # The setup network (ADR-0026) gets a password per display, made on the display and shown on
+    # its screen: one written in the YAML would be the same on every display built from it.
+    wifi_conf = fv.full_config.get().get("wifi")
+    if wifi_conf is not None and "ap" in wifi_conf and wifi_conf["ap"].get("password"):
+        raise cv.Invalid(
+            "esphelm_runtime sets the setup network's password itself (one per display, shown on "
+            "its screen); remove 'password' from 'wifi: ap:'"
+        )
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def to_code(config):
@@ -108,6 +126,10 @@ async def to_code(config):
     if CONF_MAX_LAYOUT_BYTES in config:
         cg.add(var.set_max_layout_bytes(config[CONF_MAX_LAYOUT_BYTES]))
     cg.add(var.set_store_dir(config[CONF_STORE_DIR]))
+    # No network in the YAML: it comes from the setup network's portal, and can be forgotten.
+    wifi_conf = CORE.config.get("wifi")
+    if wifi_conf is not None and not wifi_conf.get("networks") and "ap" in wifi_conf:
+        cg.add_define("USE_ESPHELM_WIFI_SETUP")
     if CONF_BACKLIGHT in config:
         cg.add_define("USE_ESPHELM_BACKLIGHT")
         cg.add(var.set_backlight(await cg.get_variable(config[CONF_BACKLIGHT])))

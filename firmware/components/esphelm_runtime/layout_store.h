@@ -12,7 +12,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-enum class Slot : uint8_t { CURRENT, LAST_KNOWN_GOOD, BOOT, PREFS };
+enum class Slot : uint8_t { CURRENT, LAST_KNOWN_GOOD, BOOT, PREFS, AP };
 
 struct StoredLayout {
   std::string etag;
