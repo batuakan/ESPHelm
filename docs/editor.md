@@ -8,6 +8,13 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 3. **Pages.** Each display has one layout, created on the first save. The tabs above the canvas are its pages, in the order the display shows them (its footer buttons step through them; the canvas shows a preview of that footer, which every layout has: the page title and the display's settings menu button, ADR-0025, plus the page buttons when there are several pages):
    - **+** adds a **grid page**, a **wind rose page** (a 1x1 grid with one wind rose tile filling the screen), or one page from a starter layout, after the current page.
    - **Templates** replaces *all* pages (and the theme) with a starter layout: Wind, Speeds, Energy, Engine, Switchboard, Autopilot, or the denser *Sailing*, *Wind and engine* and *Helm* (rose and autopilot side by side) layouts for large displays (listed first when the display's shorter side is at least 600 px). It asks first.
+   - **Share** (ADR-0027):
+     - **Export file:** downloads the layout as `esphelm-<name>.json` (plain layout v1, including changes not yet sent).
+     - **Import file…:** replaces all pages, the theme and the settings with a file's. The layout keeps this display's id and name, and nothing is sent until *Save & send*.
+       - A file that isn't a valid layout is refused, with its first errors.
+       - Paths and charts this server doesn't have are then listed with a picker each. A replacement applies to every use; *Keep as is* skips them.
+     - **Use another display's layout:** pick a display, then **Copy** (its pages become this display's own layout, sent with *Save & send*) or **Link** (both displays show one layout at once, and editing it changes both; the editor says "Shared with …").
+     - **Make a separate copy** (on a linked display) gives it its own layout again with the next *Save & send*.
    - The current page's **title** (shown in the display's footer), **← →** to reorder, **Delete** (asks first; the last page can't be deleted).
    - Pages or templates that need widgets this display's firmware lacks are struck through or disabled.
 4. **Edit a grid page:**
@@ -91,6 +98,7 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template
     - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
     - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, and the display downloads the page
+    - sharing: a second display; *Export file* downloads exactly the layout the display gets; a file with a path the server lacks is imported on the second display, the path replaced in the list, and the display gets it under its own id; *Link* gives both displays one layout and *Make a separate copy* separates them again
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer
 
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.

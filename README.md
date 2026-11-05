@@ -63,6 +63,12 @@ Pages side by side, live values in the preview, and a drawer with the settings o
  <img width="800px" src="/docs/images/editor-wind-rose-drawer.png">
 </p>
 
+Layouts can be shared: export one as a file and import it on another display, or on another boat. Paths that boat's server doesn't have are listed with a picker, so nothing has to be edited by hand. On the same boat, a display can copy another display's layout or link to it, so both show one layout.
+
+<p align="center">
+ <img width="800px" src="/docs/images/editor-share.png">
+</p>
+
 It works on a phone too, and has day, dark and night (red) themes of its own, separate from the display's theme.
 
 <p align="center">
@@ -77,6 +83,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
 - **Pages:** as many as you like, with page buttons in the footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
+- **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
 - **Settings on the display itself:** the menu button in the footer opens a panel with two tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Info* shows what the display knows: its IP and Wi-Fi signal, the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
