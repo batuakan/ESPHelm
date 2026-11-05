@@ -92,6 +92,8 @@ jobs:
             firmware/.esphome
           key: firmware-sdl-${{ hashFiles('firmware/**/*.yaml', 'firmware/components/**') }}
           restore-keys: firmware-sdl-
+      # ESPHome refreshes a git component only once a day: fetch ESPHomeSignalK's main afresh.
+      - run: rm -rf firmware/.esphome/external_components
       - run: npm ci
       - run: npm i -g signalk-server@${{ env.SIGNALK_SERVER_VERSION }}
       - run: npm run build
