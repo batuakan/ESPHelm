@@ -1,6 +1,6 @@
 # Phase 6 notes: boot guard, alarms, display settings
 
-Status: **done on SDL, pending your review and the P4 hardware check** · 2026-10-26
+Status: **done, checked on the P4** · 2026-11-05
 
 Your scope for this round:
 - the boot-loop fix
@@ -53,7 +53,7 @@ Not done this round: landscape and other sizes, auth and recovery tooling. Desig
 - Compiles: P4 (RAM 95,262 B, flash 2.69 MB) and C3 (RAM 109,208 B, flash 68.8 %).
 
 ## Not verified / gaps
-- **Hardware:** backlight dimming, the touch-to-wake behaviour on the P4 (via the board YAML's resume), and the banner on 720×720 hardware. These are hardware check steps 12 and 13 in `docs/firmware-runtime.md`.
+- **Hardware:** checked on the P4 (2026-11-05), hardware check steps 12 and 13.
 - **Boot guard on hardware:** the ESP32 reset-reason path (panic/watchdog) only compiles. Only the host path was run.
 - **Real alarm sources:** the derived-data plugin's `environment.sun` and real alarm plugins weren't tried; only notifications I published myself.
 - **Acknowledgements live in the plugin's memory:** a server restart forgets them. Clients that ignore `method` keep sounding.
@@ -80,7 +80,7 @@ A tap on a value tile opens a graph of its recent values; only the close button 
 - **Tests:**
   - SDL e2e: seven new goldens (480 day/night, 1 h window, collecting, under an alarm, the page after closing, 720), plus a live recording check through the log. Every golden with value tiles was re-recorded for the 66-pixel mark, and each diff was checked to be the mark only.
   - Editor e2e: the mock popup, history off, and `history: false` in the served layout.
-- **Not verified:** touch on the P4 (hardware step 18), PSRAM allocation and the C3's internal-RAM guard on real chips (both only compile), and a full 6 h recording (the windows were tested with the unit test and a seeded curve).
+- **Checked on the P4** (2026-11-05, hardware step 18). **Not verified:** the C3's internal-RAM guard on a real chip (it only compiles), and a full 6 h recording (the windows were tested with the unit test and a seeded curve).
 
 ## History per value, the wind rose, angles (2026-10-28, branch `feat/history-per-value`)
 Each value is switched on in the editor, so only chosen values take memory; the wind rose's values can record too (ADR-0019).
@@ -97,7 +97,7 @@ Each value is switched on in the editor, so only chosen values take memory; the 
     - Sixteen goldens back to their pre-ADR-0018 images (0 changed pixels); `720-03` and `34` re-recorded (fewer marks; "1/3" in the footer).
     - A live check that a rose value records.
   - **Editor e2e:** off by default, the counter, the rose checkboxes, the preview's buttons, and the served `history` list.
-- **Not verified:** touch on the P4 (hardware step 18, extended), and real angles crossing north on the boat (only the seeded curve and unit tests).
+- **Checked on the P4** (2026-11-05, hardware step 18, extended).
 
 ## Zones from the server's metadata (ADR-0020)
 
@@ -108,7 +108,7 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Schema:** no layout change. `serverZonesToDisplay` with shared cases in TS and C++.
 - **Editor:** previews use the effective zones; the drawer lists the server's.
 - **Tests:** shared cases in TS and C++; `withServerZones`; `/api/paths` in the plugin e2e; preview and drawer in the editor e2e; SDL e2e with two new goldens (`49`, taken again after the zones are removed, and `50`).
-- **Not verified:** on the P4 (hardware step 19).
+- **Checked on the P4** (2026-11-05, hardware step 19).
 
 
 ## Graph tile (ADR-0021, branch `feat/graph-tile`)
@@ -127,7 +127,7 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Plugin:** the catalog and the compat refusal.
   - **Editor:** an App test and a browser e2e step.
   - **SDL e2e:** a live depth line, and three new goldens (`51`, `52`, `720-07`). All 50 existing goldens are unchanged, including every popup image.
-- **Not verified:** on the P4 (hardware step 20), and the C3's internal-RAM limit with graphs on a real chip.
+- **Checked on the P4** (2026-11-05, hardware step 20). **Not verified:** the C3's internal-RAM limit with graphs on a real chip.
 
 ## Heading tape (ADR-0022, branch `feat/heading-tape`, on top of `feat/graph-tile`)
 
@@ -193,7 +193,7 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Value sizes check:** "2400" now fits a single cell, so the check uses a 500 °C temperature.
 - **Build size against `main`:** P4 flash +15.5 KB (3,368,618 B), C3 +15.7 KB (1,480,876 B, 80.7 %); static RAM +216 B on both.
 - **Checked on the P4** (hardware step 24), before the tabs: the panel works.
-- **Tabs:** added afterwards, at your request. *Settings* and *Info*, with only the shown tab built. Not yet checked on the P4.
+- **Tabs:** added afterwards, at your request. *Settings* and *Info*, with only the shown tab built. Checked on the P4 (2026-11-05).
 
 ## Setup without configuration (ADR-0026, branch `feat/zero-config`)
 
@@ -207,6 +207,4 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Unit:** the password and QR text (`wifi_setup.cpp.test.ts`, g++).
   - **SDL e2e:** 212 checks. Seven goldens re-recorded and reviewed by eye (the three tabs, and the status page's menu button); six new: the Network tab at 480 and 720, the server list, the *Forget server* question, the setup screen and the Network tab with the setup network.
 - **Build size against `main`:** P4 flash +74.3 KB (3,442,920 B, 20.8 %), C3 +125.8 KB (1,606,628 B, 87.6 %); RAM +724 / +694 B. Mostly the captive portal with its web server and web OTA.
-- **Not verified:**
-  - **On hardware** (step 25): the setup network on the P4's C6 coprocessor, the portal, the QR code from a phone, the power-up window, *Forget Wi-Fi*.
-  - **The server binding on a device:** it is built and its record is unit-tested, but choosing, forgetting and the restart behaviour only ran against made-up servers on the SDL build (the e2e must not search the LAN).
+- **Checked on the P4** (2026-11-05, hardware step 25): the setup network, the portal, the QR code, *Forget Wi-Fi*, and choosing, forgetting and the restart behaviour of the server binding.

@@ -1,6 +1,6 @@
 # Phase 5c notes: autopilot tile
 
-Status: **done, pending your review and the hardware check** · 2026-10-25
+Status: **done, checked on the P4** · 2026-11-05
 
 Ports the legacy autopilot app to a tile. It can be full-screen (a 1×1 grid) or sit next to other tiles. Design and safety rules: ADR-0011.
 
@@ -41,7 +41,7 @@ Ports the legacy autopilot app to a tile. It can be full-screen (a 1×1 grid) or
 - Compiles: P4 (RAM 94,276 B, flash 2.65 MB) and C3 (RAM 108,320 B; flash 66.8 %).
 
 ## Not verified / gaps
-- **No real autopilot.** I tested only against the stand-in. Hardware check: `docs/firmware-runtime.md`, step 10; do it at the dock or with the drive disconnected.
+- **Hardware:** checked on the P4 (2026-11-05), `docs/firmware-runtime.md` step 10.
 - **Classic change requests only.** A provider that implements only SignalK's v2 Autopilot API (REST) won't respond. A bridge in the ESPHelm plugin would fix that; tell me if your pilot needs it.
 - **The PUT response isn't read.** A rejected request shows "no response from the autopilot" after 5 s.
 - **No tack, dodge or absolute course yet.** The legacy app had them only as comments.

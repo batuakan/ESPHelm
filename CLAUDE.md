@@ -190,10 +190,10 @@ Never claim something works unless you ran it. If you could not run a check (no 
 - [x] **Phase 0:** Recon and decisions (no feature code), see `docs/phase0-findings.md`
 - [x] **Phase 1:** Contract: schema v1, fixtures, contract tests (`value`, `gauge`, `bar`, `switch`), see `docs/phase1-notes.md`
 - [x] **Phase 2:** Plugin skeleton: layout CRUD, device registry, hello/layout endpoints with ETag, version delta, see `docs/phase2-notes.md`
-- [ ] **Phase 3:** Firmware vertical slice: fetch, cache, render one page of `value` tiles, dynamic subscriptions. Done on SDL, pending the P4 hardware check (`docs/phase3-notes.md`)
+- [x] **Phase 3:** Firmware vertical slice: fetch, cache, render one page of `value` tiles, dynamic subscriptions. Checked on the P4 (`docs/phase3-notes.md`)
 - [ ] **Phase 4:** Editor MVP: device list, one page, drag tiles, path picker, Save & send. Done, pending your review (`docs/phase4-notes.md`)
-- [ ] **Phase 5a:** gauge/bar/switch tiles, wind-rose page, multi-page with a footer (no swipe, ADR-0009), editor support, starter layouts (wind, speeds, energy, engine, switchboard). Done on SDL, pending your review and the P4 hardware check (`docs/phase5a-notes.md`)
-- [ ] **Phase 5b:** wind rose becomes a tile (page kind removed, pixel size tiers, 720 templates and SDL 720 check). Done on SDL, pending your review and the P4 hardware check (`docs/phase5b-notes.md`)
-- [ ] **Phase 5c:** autopilot tile (confirm to engage, ADR-0011). Done on SDL against a stand-in, pending your review and the hardware check (`docs/phase5c-notes.md`)
-- [ ] **Phase 5d:** chart page with anchor watch (ADR-0012). Done on SDL against a charts stand-in, pending your review and the P4 hardware check (`docs/phase5d-notes.md`)
-- [ ] **Phase 6:** Hardening. This round: boot guard (ADR-0013), alarm banner with acknowledge through the plugin (ADR-0014), display settings in the layout (brightness, start page, auto day/night, screen timeout; ADR-0015). Done on SDL, pending your review and the P4 hardware check (`docs/phase6-notes.md`). Still open: orientation/resolution scaling, auth/recovery tooling
+- [x] **Phase 5a:** gauge/bar/switch tiles, wind-rose page, multi-page with a footer (no swipe, ADR-0009), editor support, starter layouts (wind, speeds, energy, engine, switchboard). Done, checked on the P4 (`docs/phase5a-notes.md`)
+- [x] **Phase 5b:** wind rose becomes a tile (page kind removed, pixel size tiers, 720 templates and SDL 720 check). Done, checked on the P4 (`docs/phase5b-notes.md`)
+- [x] **Phase 5c:** autopilot tile (confirm to engage, ADR-0011). Done, checked on the P4 (`docs/phase5c-notes.md`)
+- [x] **Phase 5d:** chart page with anchor watch (ADR-0012). Done, checked on the P4 (`docs/phase5d-notes.md`)
+- [ ] **Phase 6:** Hardening. This round: boot guard (ADR-0013), alarm banner with acknowledge through the plugin (ADR-0014), display settings in the layout (brightness, start page, auto day/night, screen timeout; ADR-0015). Done, checked on the P4 (`docs/phase6-notes.md`). Still open: orientation/resolution scaling, auth/recovery tooling

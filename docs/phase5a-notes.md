@@ -1,6 +1,6 @@
 # Phase 5a notes: gauge, bar, switch, wind rose, multi-page with a footer
 
-Status: **done, pending your review and the P4 hardware check** · 2026-10-25
+Status: **done, checked on the P4** · 2026-11-05
 
 Phase 5 is split: **5a** (this) ports the legacy wind, speeds, energy, engine and switchboard apps; **5b** autopilot; **5c** chart/anchor (ESPTiles). No schema change was needed: `gauge`, `bar`, `switch` and `wind_rose` were in schema v1 since Phase 1.
 
@@ -34,7 +34,7 @@ Phase 5 is split: **5a** (this) ports the legacy wind, speeds, energy, engine an
 - Memory per page on the host build: speeds (4 values) 7,136 B, energy 6,416 B, engine 6,544 B, wind rose 4,720 B, switchboard (8 switches) 20,992 B.
 
 ## Not verified / gaps
-- **Hardware:** nothing in Phases 3–5a has run on the P4 yet. Checklist: `docs/firmware-runtime.md` → *Hardware check* (steps 7–9 are new: footer buttons, widget look at 720², switch PUT).
+- **Hardware:** checked on the P4 (2026-11-05), `docs/firmware-runtime.md` → *Hardware check*, steps 7–9.
 - **Switch PUT on a real boat:** a PUT needs a handler on the server (e.g. a digital-switching plugin). It was tested only against the echo test plugin. The firmware ignores the PUT response and trusts the value stream; a rejected PUT shows up as the 5 s revert.
 - **C3/C6 runtime heap** is still unmeasured (no hardware). One 8-switch page is ~21 KB on the 64-bit host; expect less on the 32-bit ESP32.
 - The editor's preview is an HTML/SVG approximation. Tick labels and exact proportions differ from the display (open question 7); the SDL goldens are the reference.

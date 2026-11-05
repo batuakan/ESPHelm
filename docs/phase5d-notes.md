@@ -1,6 +1,6 @@
 # Phase 5d notes: chart page with anchor watch
 
-Status: **done, pending your review and the P4 hardware check** · 2026-10-25
+Status: **done, checked on the P4** · 2026-11-05
 
 This ports the legacy chart app (ESPTiles tiles, vessel, anchor and alarm radius) to a runtime page kind. Design: ADR-0012.
 
@@ -40,9 +40,7 @@ This ports the legacy chart app (ESPTiles tiles, vessel, anchor and alarm radius
 
 ## Not verified / gaps
 - **Real charts and hardware:**
-  - Tested only with the generated stand-in chart, never a real charts plugin (MBTiles) or the P4.
-  - Tile speed, PSRAM headroom and touch on the zoom buttons are unknown.
-  - Hardware check step 11 in `docs/firmware-runtime.md`.
+  - Checked on the P4 (2026-11-05), hardware check step 11 in `docs/firmware-runtime.md`.
 - **No tiles offline after a reboot** (they aren't stored on flash). Tiles already loaded stay while the server is down.
 - **Chart formats:** only raster PNG/JPEG charts at 256 px. Vector (`pbf`) and WebP are refused, and so are servers reachable only over SSL.
 - **Anchor watch only shows.** Setting, raising and changing the radius stay in the anchor alarm plugin.
