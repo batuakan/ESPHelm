@@ -6,7 +6,8 @@ import type { Hello, Layout } from '@esphelm/schema';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { createApi, type Device, type PathInfo } from '../src/api';
-import { pageTiles } from '../src/layoutOps';
+import { layoutIdFor, pageTiles } from '../src/layoutOps';
+import { exportFile } from '../src/share';
 import type { LiveSource, ValueListener } from '../src/live';
 
 const FIXTURES = join(__dirname, '../../schema/fixtures');
@@ -683,5 +684,110 @@ describe('editor', { timeout: 20000 }, () => {
     const api = createApi(async () => new Response('Unauthorized', { status: 401 }));
     render(<App api={api} live={fakeLive().factory} />);
     expect((await screen.findByRole('link', { name: 'Log in' })).getAttribute('href')).toBe('/admin/#/login');
+  });
+});
+
+describe('sharing layouts (ADR-0027)', { timeout: 20000 }, () => {
+  const own = layoutIdFor(p4.deviceId);
+  const cockpitLayout: Layout = {
+    version: 1,
+    id: 'display-cockpit',
+    name: 'Cockpit',
+    theme: 'day',
+    pages: [
+      {
+        kind: 'grid',
+        id: 'battery',
+        title: 'Battery',
+        grid: { cols: 1, rows: 1 },
+        tiles: [{ type: 'value', id: 'volts', x: 0, y: 0, w: 1, h: 1, path: 'electrical.batteries.house.voltage', label: 'House' }],
+      },
+    ],
+  };
+  const cockpit = (): Device => ({
+    ...device('adopted'),
+    id: 'cockpit',
+    name: 'Cockpit',
+    hello: { ...p4, deviceId: 'cockpit' },
+    layoutId: 'display-cockpit',
+  });
+  const withCockpit = () => {
+    const server = fakeServer([{ ...device('adopted'), name: 'Helm' }, cockpit()]);
+    server.layouts.set('display-cockpit', cockpitLayout);
+    return server;
+  };
+  const openShare = async () =>
+    fireEvent.click(await screen.findByRole('button', { name: 'Share' }, { timeout: 5000 }));
+  const lastLayoutPut = (server: ReturnType<typeof fakeServer>) =>
+    server.requests.filter((r) => r.method === 'PUT' && r.path.startsWith('/layouts/')).at(-1)?.body as Layout | undefined;
+
+  it('imports a file under this display’s id, remaps a missing path, and sends it', async () => {
+    const server = withCockpit();
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await openShare();
+    const file = new File([exportFile(cockpitLayout).text], 'esphelm-cockpit.json', { type: 'application/json' });
+    fireEvent.change(screen.getByLabelText('Layout file'), { target: { files: [file] } });
+    const confirm = await screen.findByRole('dialog', { name: 'Import layout' });
+    within(confirm).getByText(/“Cockpit”/);
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Replace' }));
+
+    const remap = await screen.findByRole('dialog', { name: 'Replace paths' });
+    fireEvent.click(within(remap).getByRole('button', { name: 'Replace with: electrical.batteries.house.voltage' }));
+    fireEvent.change(within(remap).getByLabelText('Search Replace with'), { target: { value: 'depth' } });
+    fireEvent.click(within(remap).getByRole('option', { name: /environment.depth.belowTransducer/ }));
+    fireEvent.click(within(remap).getByRole('button', { name: 'Replace 1' }));
+    expect(screen.queryByRole('dialog', { name: 'Replace paths' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await waitFor(() => expect(lastLayoutPut(server)).toBeDefined());
+    const sent = lastLayoutPut(server)!;
+    expect(sent.id).toBe(own);
+    expect(sent.name).toBe('Helm');
+    expect(sent.theme).toBe('day');
+    expect(pageTiles(sent.pages[0])[0]).toMatchObject({ path: 'environment.depth.belowTransducer', label: 'House' });
+  });
+
+  it('refuses a file that is not a layout', async () => {
+    render(<App api={withCockpit().api} live={fakeLive().factory} />);
+    await openShare();
+    const file = new File(['{"version":1}'], 'notes.json');
+    fireEvent.change(screen.getByLabelText('Layout file'), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/notes.json was not imported/));
+    expect(screen.queryByRole('dialog', { name: 'Import layout' })).toBeNull();
+  });
+
+  it('copies another display’s layout as its own', async () => {
+    const server = withCockpit();
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await openShare();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cockpit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await screen.findByRole('tab', { name: 'Battery' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await waitFor(() => expect(lastLayoutPut(server)?.id).toBe(own));
+    expect(server.requests).toContainEqual({ method: 'PUT', path: `/devices/${p4.deviceId}`, body: { layoutId: own } });
+  });
+
+  it('links to another display’s layout, and makes a separate copy again', async () => {
+    const server = withCockpit();
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await openShare();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cockpit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Link' }));
+    await waitFor(() =>
+      expect(server.requests).toContainEqual({
+        method: 'PUT',
+        path: `/devices/${p4.deviceId}`,
+        body: { layoutId: 'display-cockpit' },
+      }),
+    );
+    await screen.findByText(/Shared with Cockpit/);
+    await screen.findByRole('tab', { name: 'Battery' });
+
+    await openShare();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Make a separate copy/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await waitFor(() => expect(lastLayoutPut(server)?.id).toBe(own));
+    expect(server.layouts.get('display-cockpit')).toEqual(cockpitLayout);
   });
 });
