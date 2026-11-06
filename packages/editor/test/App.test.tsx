@@ -369,6 +369,26 @@ describe('editor', { timeout: 20000 }, () => {
     expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Autopilot');
   });
 
+  it('keeps the whole-layout controls in the layout bar, the grid size with the page', async () => {
+    const server = fakeServer([device('adopted')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    const bar = screen.getByRole('toolbar', { name: 'Layout' });
+    for (const name of ['Templates', 'Share', 'Display settings'])
+      expect(within(bar).getByRole('button', { name })).toBeTruthy();
+    expect(within(bar).getByRole('group', { name: 'Display theme' })).toBeTruthy();
+    const tabs = screen.getByRole('tablist', { name: 'Pages' });
+    expect(within(tabs).queryByRole('button', { name: 'Templates' })).toBeNull();
+    expect(within(bar).queryByLabelText('Columns')).toBeNull();
+    expect(screen.getByLabelText('Columns').closest('.page-tools')).toBeTruthy();
+    // A layout bar menu opens, and opening the other one closes it.
+    fireEvent.click(within(bar).getByRole('button', { name: 'Templates' }));
+    expect(screen.getByRole('menu', { name: 'Start from template' })).toBeTruthy();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Share' }));
+    expect(screen.queryByRole('menu', { name: 'Start from template' })).toBeNull();
+    expect(screen.getByRole('menu', { name: 'Share layout' })).toBeTruthy();
+  });
+
   it('sets the display theme in the layout, and the preview follows it', async () => {
     const server = fakeServer([device('adopted')]);
     render(<App api={server.api} live={fakeLive().factory} />);

@@ -16,7 +16,7 @@ Your choices:
 - **Import:** a list to replace the paths and charts this server doesn't have.
 
 ## Decision
-Sharing is done entirely in the editor, under a new *Share* menu next to *Templates*. The plugin, the schema and the firmware are unchanged.
+Sharing is done entirely in the editor, under a new *Share* menu next to *Templates* (both in the layout bar above the page tabs since the tab row was tidied). The plugin, the schema and the firmware are unchanged.
 
 - **The file is the layout itself:** plain layout v1 JSON, as the plugin stores it and as the starter templates are.
   - **Validation:** it validates against the published JSON Schema, so it can be checked or edited outside the editor.

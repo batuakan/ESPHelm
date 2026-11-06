@@ -286,15 +286,23 @@ select {
   flex-direction: column;
   align-items: center;
 }
-.page-bar {
+/* What applies to the whole layout, above the page tabs. */
+.layout-bar-wrap {
   width: min(100%, 560px);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.layout-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 8px 12px;
 }
-.page-bar input {
+.grid-size {
+  white-space: nowrap;
+}
+.grid-size input {
   width: 54px;
   margin: 0 4px;
 }
@@ -688,17 +696,23 @@ select {
 .page-tabs {
   width: min(100%, 560px);
   margin-bottom: 10px;
+}
+/* Holds a bar and its drop-down menus, which open just below it. */
+.menu-anchor {
   position: relative;
 }
+/* As many rows as the pages need; nothing to scroll sideways. */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
 }
 .tab {
   white-space: nowrap;
-  border-radius: 8px 8px 0 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 8px;
 }
 .tab.on {
   background: var(--accent);
@@ -715,25 +729,11 @@ select {
 .tab.add {
   font-weight: 700;
 }
-.tabs-row {
-  display: flex;
-  gap: 6px;
-}
-.tabs-row .tabs {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.tab-actions {
-  display: flex;
-  gap: 6px;
-  flex: none;
-  padding-bottom: 4px;
-}
 .menu {
   position: absolute;
   z-index: 5;
   right: 0;
-  top: 40px;
+  top: calc(100% + 4px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -746,6 +746,12 @@ select {
 }
 .menu button {
   text-align: left;
+}
+/* Templates and Share sit at the left of the layout bar. */
+.layout-bar-wrap .menu {
+  left: 0;
+  right: auto;
+  max-width: 100%;
 }
 .menu .confirm {
   display: flex;
@@ -798,9 +804,13 @@ select {
 
 .page-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
+}
+.page-tools .grid-size {
+  margin-left: auto;
 }
 .page-title input {
   width: 160px;
@@ -1251,9 +1261,6 @@ select.zone-emergency {
   }
   .display-frame {
     width: min(100%, calc(100vh - 320px));
-  }
-  .page-tools {
-    flex-wrap: wrap;
   }
   .drawer {
     position: fixed;
