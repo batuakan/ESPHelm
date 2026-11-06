@@ -64,7 +64,9 @@ class Firmware {
       cwd: this.work,
       stdio: ['ignore', 'pipe', 'pipe'],
       // The settings panel's values that change by themselves (uptime, deltas, ...) read "test".
-      env: { ...process.env, ESPHELM_TEST_INFO: 'fixed', ...env },
+      // ESPHome's preferences (the saved server, a pending access request) stay in the working
+      // directory, not in ~/.esphome/prefs where they would outlive the run.
+      env: { ...process.env, ESPHELM_TEST_INFO: 'fixed', ESPHOME_PREFDIR: this.work, ...env },
     });
     this.proc.stdout?.on('data', (d: Buffer) => (this.out += d.toString()));
     this.proc.stderr?.on('data', (d: Buffer) => (this.out += d.toString()));
@@ -177,6 +179,21 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw.screenshot('01-waiting-for-approval', shots);
+
+    // A restart while waiting asks the same request again: SignalK refuses a second request from
+    // the same device while the first is pending, and the refusal never gets a token.
+    await fw.stop();
+    fw.start();
+    check(
+      'after a restart the firmware waits for its first access request',
+      await fw.waitLog(/Waiting for the access request \/signalk\/v1\/requests\//, 20000),
+    );
+    await sleep(1500);
+    check(
+      'and sends no second request',
+      fw.count(/Trying to request access/) === 0,
+      String(fw.count(/Trying to request access/)),
+    );
 
     // 2. Approve it: the firmware gets its token, says hello and waits for adoption.
     await sk.approve(DEVICE_ID, 'readwrite');
