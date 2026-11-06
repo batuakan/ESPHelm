@@ -58,7 +58,7 @@ class SettingsPanel {
   bool is_open() const { return this->root_ != nullptr; }
 
   /// Test hook and the buttons: "close", "tab-settings", "tab-network", "tab-info", "day",
-  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "forget-wifi",
+  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "reset",
   /// "forget-server", "change-server", "server=<n>" (in the list), "confirm" and "cancel".
   /// Applied in tick().
   void tap(const std::string &part);
@@ -72,8 +72,8 @@ class SettingsPanel {
   /// The slider moved (live) or was let go there (`done`: save it).
   bool take_brightness(int &percent, bool &done);
   bool take_sleep() { return take(this->sleep_wanted_); }
-  /// Confirmed: forget the Wi-Fi network (the display restarts), or the SignalK server.
-  bool take_forget_wifi() { return take(this->forget_wifi_); }
+  /// Confirmed: reset the display (ESPHome's factory reset, then a restart), or forget the SignalK server.
+  bool take_reset() { return take(this->reset_wanted_); }
   bool take_forget_server() { return take(this->forget_server_); }
   /// "Change server" was pressed: search for servers.
   bool take_scan() { return take(this->scan_wanted_); }
@@ -100,7 +100,7 @@ class SettingsPanel {
 
   enum class Tab : uint8_t { SETTINGS, NETWORK, INFO };
   /// A forget waiting for "Yes".
-  enum class Confirm : uint8_t { NONE, WIFI, SERVER };
+  enum class Confirm : uint8_t { NONE, RESET, SERVER };
 
   Fonts fonts_;
   Tab tab_{Tab::SETTINGS};  // shown; only its objects exist
@@ -120,7 +120,7 @@ class SettingsPanel {
   Confirm confirm_{Confirm::NONE};
   bool listing_{false};  // the server list instead of the server buttons
   bool network_dirty_{false};
-  bool forget_wifi_{false};
+  bool reset_wanted_{false};
   bool forget_server_{false};
   bool scan_wanted_{false};
   int chosen_server_{-1};

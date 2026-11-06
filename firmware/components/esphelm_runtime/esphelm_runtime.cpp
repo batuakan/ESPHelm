@@ -10,6 +10,7 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include "esphome/core/preferences.h"
 #include "esphelm_wifi_setup.h"
 
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
@@ -17,7 +18,6 @@
 #include <esp_heap_caps.h>
 #include <esp_random.h>
 #include <esp_system.h>
-#include <nvs.h>
 #else
 #include <cstdlib>
 #endif
@@ -979,7 +979,7 @@ void EsphelmRuntime::tick_network_() {
   if (!this->wifi_seen_ && this->wifi_connected_()) {
     this->wifi_seen_ = true;
     // From the first connection on, losing the network (the boat's router switched off) never
-    // brings the setup network up: only a power-up without Wi-Fi, or "Forget Wi-Fi", does.
+    // brings the setup network up: only a power-up without Wi-Fi, or "Reset display", does.
     wifi::global_wifi_component->set_ap_timeout(0);
     ESP_LOGD(TAG, "Wi-Fi connected; the setup network stays off until the next power-up");
   }
@@ -1024,26 +1024,17 @@ const std::vector<signalk::ServerCandidate> &EsphelmRuntime::servers_() const {
   return this->test_servers_ ? this->test_server_list_ : this->signalk_->servers_found();
 }
 
-void EsphelmRuntime::forget_wifi_() {
-#if defined(USE_ESPHELM_WIFI_SETUP) && defined(USE_ESP32_FRAMEWORK_ESP_IDF)
-  // ESPHome can save a network but not forget one (an empty one still counts as set), so its
-  // record is erased: the key of a build without a compiled-in network (wifi_component.cpp,
-  // 88491487) and the fast-connect record after it. The layout, the token and the display's
-  // choices stay. After the restart the setup network comes up at once.
-  nvs_handle_t handle;
-  if (nvs_open("esphome", NVS_READWRITE, &handle) == ESP_OK) {
-    for (uint32_t key : {88491487u, 88491488u}) {
-      char name[12];
-      std::snprintf(name, sizeof(name), "%u", static_cast<unsigned>(key));
-      nvs_erase_key(handle, name);
-    }
-    nvs_commit(handle);
-    nvs_close(handle);
-  }
-  ESP_LOGW(TAG, "Wi-Fi network forgotten; restarting into the setup network");
+void EsphelmRuntime::factory_reset_() {
+#if defined(USE_ESPHELM_WIFI_SETUP) && defined(USE_ESP32)
+  // ESPHome's factory reset, as its factory_reset button does it. ESPHome can't forget one Wi-Fi network
+  // (an empty one still counts as set), and its preference reset erases the whole NVS partition: the
+  // network, the SignalK token and server, the cached layouts, the display's choices and the setup
+  // password (ADR-0026). After the restart the setup network comes up at once.
+  ESP_LOGW(TAG, "Resetting the display; restarting into the setup network");
+  global_preferences->reset();
   App.safe_reboot();
 #else
-  ESP_LOGW(TAG, "Forget Wi-Fi: this build has no saved network to forget");
+  ESP_LOGW(TAG, "Reset display: this build has no setup network to come back to");
 #endif
 }
 
@@ -1072,8 +1063,8 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
     this->panel_.close();
     this->sleep_();
   }
-  if (this->panel_.take_forget_wifi())
-    this->forget_wifi_();
+  if (this->panel_.take_reset())
+    this->factory_reset_();
   if (this->panel_.take_forget_server()) {
     ESP_LOGI(TAG, "Forget server from the settings");
     if (!this->test_servers_)

@@ -150,7 +150,7 @@ class EsphelmRuntime : public Component {
   // Setup without configuration (ADR-0026): the setup network, Wi-Fi and the SignalK server.
   void setup_ap_();
   void tick_network_();
-  void forget_wifi_();
+  void factory_reset_();
   bool ap_active_() const;
   std::string ap_ssid_() const;
   bool wifi_connected_() const;

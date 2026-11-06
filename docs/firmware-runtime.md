@@ -108,13 +108,13 @@ The P4 and C3 configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles 
   - **Clock:** UTC, its source, the time zone.
   - **Long values** are shortened with "..". Each section is a box with three labels (heading, names, values), so the row count of a section is fixed.
 - **Network tab** (ADR-0026), rows refreshed like *Info*, with controls below each section:
-  - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password. *Forget Wi-Fi* (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML) asks *Yes*, erases ESPHome's saved network (NVS keys `88491487` and `+1` in namespace `esphome`) and restarts.
+  - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password. *Reset display* (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML) asks *Yes*, then runs ESPHome's factory reset (`global_preferences->reset()`, which erases the whole NVS partition: Wi-Fi, token, server, cached layouts, the display's choices) and restarts into the setup network.
   - **SignalK server:** address, host name, stream. *Change server* runs `SignalK::scan_servers()` and lists up to 6 of `servers_found()`; a tap calls `choose_server()`. *Forget server* asks *Yes* and calls `forget_server()`. With `host:` in the YAML: "Set in the firmware".
 
 ## Setup without configuration (ADR-0026)
 - **Setup network password:** made once per display in `setup_ap_()` (before Wi-Fi starts: the runtime's setup priority is higher), 10 characters of `esphelm_wifi_setup.h`'s alphabet from the hardware RNG with `bootloader_random_enable()`, saved in `Slot::AP` (NVS key `ap`), checked on load. `__init__.py` refuses a `password` under `wifi: ap:`.
 - **When it opens:** ESPHome's rules with `ap_timeout: 2min` and `provisioning: timeout: 10min` (`firmware/wifi.yaml`); after the first connection the runtime sets the AP timeout to 0, so it never opens again until a power-up.
-- **Server binding:** ESPHomeSignalK saves the server it uses (`signalk_server` file on the host, pref 10001 on the device) and accepts only that one after a restart; see its `server_discovery.h`.
+- **Server binding:** ESPHomeSignalK saves the server it uses (ESPHome preference 10003, on the host build too: a file in `ESPHOME_PREFDIR`, default `~/.esphome/prefs/`) and accepts only that one after a restart; see its `server_discovery.h`.
 
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue.
@@ -363,6 +363,6 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - **Server:** the display joins, finds your SignalK server ("Looking for a SignalK server", then "Approve this display") and, once approved and adopted, shows its layout.
     - **Reboot:** it rejoins and goes back to the same server without asking for approval again.
     - **Router off:** switch the router off for 5 minutes or more after the display has connected. No `esphelm-p4-…` network appears on your phone, and the display keeps its pages with stale values.
-    - **Mistyped password:** in the panel's *Network* tab, *Forget Wi-Fi* → *Yes*: the display restarts into its setup network. Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
+    - **Mistyped password:** in the panel's *Network* tab, *Reset display* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
     - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
     - Check that the QR code scans from about 30 cm by day and at night.
