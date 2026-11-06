@@ -5,6 +5,8 @@
 import {
   posixTz,
   AUTOPILOT_DEFAULTS,
+  CHART_DEFAULTS,
+  SETTINGS_DEFAULTS,
   POSITION_DEFAULTS,
   WIND_ROSE_DEFAULTS,
   type DataItem,
@@ -551,6 +553,101 @@ export function setTileConfig(
         : merge(t, { config: undefined });
     }),
   }));
+}
+
+/** A field of a layout that names a SignalK path: the path it uses (defaults filled in) and where it is. */
+export interface PathRef {
+  path: string;
+  /** Keys from the layout down to the field; objects on the way may not exist yet (a default). */
+  at: (string | number)[];
+}
+
+const CHART_PATH_KEYS = ['positionPath', 'headingPath'] as const;
+const CHART_ANCHOR_PATH_KEYS = [
+  'anchorPositionPath',
+  'anchorRadiusPath',
+  'anchorAlarmPath',
+] as const;
+const AUTOPILOT_PATH_KEYS = ['statePath', 'targetPath', 'adjustPath', 'headingPath'] as const;
+const WIND_ROSE_PATH_KEYS = ['apparentAngle', 'trueDirection', 'heading'] as const;
+
+/**
+ * Every SignalK path the layout uses, read or written, with the defaults it relies on: an
+ * imported layout's paths can be checked against this server and replaced (replacePath).
+ */
+export function layoutPathRefs(layout: Layout): PathRef[] {
+  const refs: PathRef[] = [];
+  const add = (path: string, ...at: (string | number)[]) => refs.push({ path, at });
+  layout.pages.forEach((p, pi) => {
+    if (p.kind === 'chart') {
+      const c = { ...CHART_DEFAULTS, ...p.config };
+      const anchor = p.anchor ?? CHART_DEFAULTS.anchor;
+      for (const k of [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])])
+        add(c[k], 'pages', pi, 'config', k);
+      return;
+    }
+    p.tiles.forEach((t, ti) => {
+      const at = ['pages', pi, 'tiles', ti];
+      switch (t.type) {
+        case 'clock':
+          return; // the display's own clock (settings.clockPath below)
+        case 'position':
+          return add(t.path ?? POSITION_DEFAULTS.path, ...at, 'path');
+        case 'autopilot': {
+          const c = { ...AUTOPILOT_DEFAULTS, ...t.config };
+          for (const k of AUTOPILOT_PATH_KEYS) add(c[k], ...at, 'config', k);
+          return;
+        }
+        case 'heading_tape': {
+          const s = headingTapeSettings(t);
+          add(s.headingPath, ...at, 'config', 'headingPath');
+          for (const m of s.markers) add(s.paths[m], ...at, 'config', `${m}Path`);
+          return;
+        }
+        case 'wind_rose': {
+          const c = { ...WIND_ROSE_DEFAULTS, ...t.config };
+          for (const k of WIND_ROSE_PATH_KEYS) add(c[k], ...at, 'config', k);
+          for (const [name, slot] of Object.entries(t.slots))
+            if (slot) add(slot.path, ...at, 'slots', name, 'path');
+          return;
+        }
+        default:
+          return add(t.path, ...at, 'path');
+      }
+    });
+  });
+  const s = layout.settings;
+  if (s?.autoTheme === 'sun')
+    add(s.autoThemePath ?? SETTINGS_DEFAULTS.autoThemePath, 'settings', 'autoThemePath');
+  const clocks = layout.pages.some((p) => pageTiles(p).some((t) => t.type === 'clock'));
+  if (clocks || (s?.screenSaver ?? 'off') !== 'off')
+    add(s?.clockPath ?? SETTINGS_DEFAULTS.clockPath, 'settings', 'clockPath');
+  return refs.filter((r) => r.path !== ''); // a new tile has no path yet
+}
+
+/** Every use of path `from` becomes `to`; where a default was used, the field is written. */
+export function replacePath(layout: Layout, from: string, to: string): Layout {
+  const next = structuredClone(layout) as unknown as Record<string | number, unknown>;
+  for (const ref of layoutPathRefs(layout)) {
+    if (ref.path !== from) continue;
+    let o = next;
+    for (const k of ref.at.slice(0, -1)) {
+      o[k] ??= {};
+      o = o[k] as Record<string | number, unknown>;
+    }
+    o[ref.at[ref.at.length - 1]!] = to;
+  }
+  return next as unknown as Layout;
+}
+
+/** Chart pages showing chart `from` show `to`. */
+export function replaceChart(layout: Layout, from: string, to: string): Layout {
+  return {
+    ...layout,
+    pages: layout.pages.map((p) =>
+      p.kind === 'chart' && p.chart === from ? { ...p, chart: to } : p,
+    ),
+  };
 }
 
 /** What a validation error points at (e.g. "/pages/0/tiles/2/label"). */

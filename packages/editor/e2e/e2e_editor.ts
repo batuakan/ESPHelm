@@ -5,7 +5,7 @@
  * Drives the installed Google Chrome headless through playwright-core (CHROME=... to pick a
  * binary). Screenshots go to a temp dir (printed). Never touches ~/.signalk.
  */
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TEMPLATES } from '@esphelm/schema';
@@ -792,6 +792,118 @@ async function main(): Promise<void> {
         servedSettings.screenTimeout === 300,
       `${clockText} ${JSON.stringify(servedClock)} ${JSON.stringify(servedSettings)}`,
     );
+
+    // Sharing (ADR-0027): a second display, export, import with a remapped path, link, separate.
+    const DEVICE_ID2 = '0b0b0b0b-1111-2222-0ba2-0000ed170002';
+    const token2 = await sk.deviceToken(DEVICE_ID2, 'readwrite');
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', token2, {
+      ...hello,
+      deviceId: DEVICE_ID2,
+    });
+    await sk.json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID2}`, sk.admin, {
+      state: 'adopted',
+      name: 'Cockpit',
+    });
+    const helmLayout = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: 'light theme' }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: /^Export file/ }).click(),
+    ]);
+    const exported = join(SHOTS, download.suggestedFilename());
+    await download.saveAs(exported);
+    const exportedText = readFileSync(exported, 'utf8');
+    check(
+      'Export file downloads the layout',
+      /^esphelm-.+\.json$/.test(download.suggestedFilename()) &&
+        JSON.stringify(JSON.parse(exportedText)) === JSON.stringify(helmLayout.body),
+      download.suggestedFilename(),
+    );
+
+    // Another boat's file: SOG is on a path this server doesn't have.
+    const foreign = join(SHOTS, 'foreign.json');
+    writeFileSync(
+      foreign,
+      exportedText.replaceAll('"navigation.speedOverGround"', '"electrical.batteries.e2e.voltage"'),
+    );
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID2);
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await page.getByLabel('Layout file').setInputFiles(foreign);
+    await page
+      .getByRole('dialog', { name: 'Import layout' })
+      .getByRole('button', { name: 'Replace' })
+      .click();
+    const remap = page.getByRole('dialog', { name: 'Replace paths' });
+    const row = remap.getByRole('listitem').filter({ hasText: 'electrical.batteries.e2e.voltage' });
+    await row.getByRole('button', { name: /^Replace with: / }).click();
+    await row.getByLabel('Search Replace with').fill('speedOverGround');
+    await row.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
+    await shot(page, '15-desktop-import-remap');
+    await remap.getByRole('button', { name: /^Replace \d/ }).click();
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: 'Sent to Cockpit' }).waitFor();
+    const cockpitServed = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID2}/layout`,
+      token2,
+    );
+    const cockpitText = JSON.stringify(cockpitServed.body);
+    check(
+      'an imported layout gets the display’s own id, with the missing path replaced',
+      cockpitServed.status === 200 &&
+        (cockpitServed.body.id as string).endsWith(DEVICE_ID2.replace(/[^a-z0-9_-]/g, '')) &&
+        cockpitText.includes('"navigation.speedOverGround"') &&
+        !cockpitText.includes('electrical.batteries.e2e.voltage'),
+      `${String(cockpitServed.body.id)}`,
+    );
+
+    // Link the cockpit display to the helm's layout, then give it its own copy again.
+    const helmName = (await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin))
+      .body as unknown as {
+      id: string;
+      name?: string;
+      hello: { board?: string };
+    }[];
+    const helmDevice = helmName.find((d) => d.id === DEVICE_ID)!;
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: helmDevice.name ?? helmDevice.hello.board ?? DEVICE_ID })
+      .click();
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    await page.getByText(/^Shared with /).waitFor();
+    const devicesLinked = (await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin))
+      .body as unknown as { id: string; layoutId?: string }[];
+    const ids = (list: { id: string; layoutId?: string }[]) =>
+      [DEVICE_ID, DEVICE_ID2].map((id) => list.find((d) => d.id === id)?.layoutId);
+    const [sharedId, linkedId] = ids(devicesLinked);
+    check(
+      'Link gives both displays one layout',
+      !!sharedId && sharedId === linkedId,
+      `${sharedId} ${linkedId}`,
+    );
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await shot(page, '16-desktop-share-linked');
+    await page.getByRole('menuitem', { name: /^Make a separate copy/ }).click();
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: 'Sent to Cockpit' }).waitFor();
+    const [helmAfter, ownAfter] = ids(
+      (await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin)).body as unknown as {
+        id: string;
+        layoutId?: string;
+      }[],
+    );
+    check(
+      'Make a separate copy gives the display its own layout again',
+      helmAfter === sharedId && !!ownAfter && ownAfter !== helmAfter,
+      `${helmAfter} ${ownAfter}`,
+    );
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
 
     check(
       'no errors in the browser console',

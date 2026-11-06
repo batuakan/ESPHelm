@@ -25,6 +25,9 @@ import {
   addTemplatePages,
   addTile,
   applyTemplate,
+  layoutIdFor,
+  replaceChart,
+  replacePath,
   moveTile,
   movePage,
   newLayoutFor,
@@ -47,7 +50,9 @@ import {
 } from './layoutOps';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
-import { PageTabs } from './components/PageTabs';
+import { PageTabs, pageWidgets } from './components/PageTabs';
+import { ImportConfirm, RemapDialog } from './components/ShareDialogs';
+import { IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, exportFile, missingRefs, parseImport, type MissingRef } from './share';
 import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
 import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
@@ -120,6 +125,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newTileDrag, setNewTileDrag] = useState<NewTileDrag | null>(null);
+  // Layout files (ADR-0027): a checked file waiting for "Replace", then what to remap.
+  const [pendingImport, setPendingImport] = useState<{ layout: Layout; name: string; unsupported: string[] } | null>(
+    null,
+  );
+  const [remap, setRemap] = useState<MissingRef[] | null>(null);
 
   const device = devices.find((d) => d.id === deviceId);
 
@@ -157,6 +167,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   useEffect(() => {
     setSelection(undefined);
     setPageIndex(0);
+    setPendingImport(null);
+    setRemap(null);
     if (!device) {
       setLayout(null);
       return;
@@ -292,6 +304,106 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     }
   };
 
+  // Sharing (ADR-0027).
+  const displayName = (d: Device) => d.name ?? d.hello.board ?? d.id;
+  const others = device
+    ? devices.filter((d) => d.id !== device.id && d.layoutId && d.layoutId !== device.layoutId)
+    : [];
+  const sharedWith = device?.layoutId
+    ? devices.filter((d) => d.id !== device.id && d.layoutId === device.layoutId).map(displayName)
+    : [];
+
+  const exportLayout = () => {
+    if (!layout) return;
+    const { fileName, text } = exportFile(layout);
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    // Revoked later: the browser reads the URL after click() returns.
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setStatus({ kind: 'ok', text: `Exported ${fileName}.` });
+  };
+
+  const importFile = async (file: File) => {
+    if (!layout) return;
+    // A large file isn't read at all (parseImport checks the size of what it is given too).
+    const r =
+      file.size > IMPORT_MAX_BYTES
+        ? { ok: false as const, errors: [IMPORT_TOO_LARGE] }
+        : parseImport(await file.text(), layout);
+    if (!r.ok) {
+      setStatus({ kind: 'error', text: `${file.name} was not imported. ${r.errors.join('; ')}` });
+      return;
+    }
+    const unsupported = [...new Set(r.layout.pages.flatMap(pageWidgets))].filter((w) => !supported.has(w));
+    setPendingImport({ layout: r.layout, name: r.name ?? file.name, unsupported });
+  };
+
+  const applyImport = () => {
+    if (!pendingImport) return;
+    edit(pendingImport.layout);
+    showPage(0);
+    setPendingImport(null);
+    const missing = missingRefs(
+      pendingImport.layout,
+      new Set(paths.map((p) => p.path)),
+      new Set(charts.map((c) => c.identifier)),
+    );
+    setRemap(missing.length > 0 ? missing : null);
+    setStatus({ kind: 'info', text: `Imported “${pendingImport.name}”. Press Save & send to send it to the display.` });
+  };
+
+  const applyRemap = (replacements: { kind: MissingRef['kind']; from: string; to: string }[]) => {
+    if (!layout) return;
+    edit(
+      replacements.reduce(
+        (l, r) => (r.kind === 'path' ? replacePath(l, r.from, r.to) : replaceChart(l, r.from, r.to)),
+        layout,
+      ),
+    );
+    setRemap(null);
+  };
+
+  const copyFrom = async (otherId: string) => {
+    const other = devices.find((d) => d.id === otherId);
+    if (!layout || !device || !other?.layoutId) return;
+    try {
+      const { id: _id, name: _name, ...pages } = await api.layout(other.layoutId);
+      void _id;
+      void _name;
+      edit({
+        ...pages,
+        id: layoutIdFor(device.id),
+        ...(layout.name !== undefined ? { name: layout.name } : {}),
+      });
+      showPage(0);
+      setStatus({ kind: 'info', text: `Copied the layout of ${displayName(other)}. Press Save & send to send it.` });
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const linkTo = async (otherId: string) => {
+    const other = devices.find((d) => d.id === otherId);
+    if (!device || !other?.layoutId) return;
+    try {
+      const r = await api.updateDevice(device.id, { layoutId: other.layoutId });
+      await refreshDevices();
+      setStatus({
+        kind: r.warnings.length > 0 ? 'info' : 'ok',
+        text:
+          `${displayName(device)} now shows the layout of ${displayName(other)}.` +
+          (r.warnings.length > 0 ? ` Warning: ${r.warnings.map((w) => w.message).join('; ')}` : ''),
+      });
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
   const chartSelected = !!chartPage && selection?.id === chartPage.id;
   const drawerOpen = !!tile || chartSelected;
@@ -415,7 +527,45 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   showPage(Math.max(0, index - 1));
                 }
               }}
+              share={{
+                others: others.map((d) => ({ id: d.id, name: displayName(d) })),
+                sharedWith,
+                dirty,
+                onExport: exportLayout,
+                onImportFile: (f) => void importFile(f),
+                onCopyFrom: (id) => void copyFrom(id),
+                onLinkTo: (id) => void linkTo(id),
+                ...(device && layout.id !== layoutIdFor(device.id)
+                  ? {
+                      onSeparate: () => {
+                        edit({ ...layout, id: layoutIdFor(device.id) });
+                        setStatus({
+                          kind: 'info',
+                          text: 'Press Save & send to give this display its own copy of the layout.',
+                        });
+                      },
+                    }
+                  : {}),
+              }}
             />
+            {pendingImport && (
+              <ImportConfirm
+                name={pendingImport.name}
+                unsupported={pendingImport.unsupported}
+                onReplace={applyImport}
+                onCancel={() => setPendingImport(null)}
+              />
+            )}
+            {remap && (
+              <RemapDialog
+                missing={remap}
+                paths={paths}
+                values={shownValues}
+                charts={charts}
+                onApply={applyRemap}
+                onSkip={() => setRemap(null)}
+              />
+            )}
             {
               <div className="page-bar">
                 {grid && (
