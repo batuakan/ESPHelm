@@ -1,7 +1,20 @@
 ---
+# No network is compiled in (ADR-0026). The display's own setup network, named after the device
+# (esphelm-p4-a1b2c3), opens the captive portal, which saves the boat's network in flash.
+# - Password: esphelm_runtime makes one per display and shows it on the screen with a QR code.
+#   Don't set one here: the portal also accepts firmware, so joining must need the screen.
+# - When: at once while no network is saved. Otherwise only after a power-up that finds no Wi-Fi
+#   for 2 minutes (a mistyped password: power-cycle), and never once connected (the runtime turns
+#   the fallback off), so a router outage doesn't open it. It closes 10 minutes after power-up.
+# - "Forget Wi-Fi" in the settings panel's Network tab erases the saved network and restarts.
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  ap:
+    ap_timeout: 2min
+
+captive_portal:
+
+provisioning:
+  timeout: 10min
 
 # web_server:
 #   port: 80

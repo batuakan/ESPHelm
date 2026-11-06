@@ -150,6 +150,9 @@ async function main(): Promise<void> {
   const workBoot = join(work, 'boot');
   mkdirSync(workBoot);
   const fwBoot = new Firmware(workBoot);
+  const workSetup = join(work, 'setup');
+  mkdirSync(workSetup);
+  const fwSetup = new Firmware(workSetup);
   try {
     sk = await startSignalK({
       port: PORT,
@@ -662,6 +665,20 @@ async function main(): Promise<void> {
     check('panel: the Info tab shows the information', await waitNext(/Settings: information tab/));
     await sleep(1500);
     await fw.screenshot('66-settings-info', shots);
+    // The Network tab (ADR-0026): this build's server is set in the firmware, so no server buttons.
+    settingsTap('tab-network');
+    check(
+      'panel: the Network tab shows Wi-Fi and the server',
+      await waitNext(/Settings: network tab/),
+    );
+    await sleep(1500);
+    await fw.screenshot('67-settings-network', shots);
+    settingsTap('change-server');
+    await sleep(500);
+    check(
+      'panel: a server set in the firmware is not changed',
+      fw.count(/Server chosen in the settings/) === 0,
+    );
     settingsTap('tab-settings');
     check('panel: back to the Settings tab', await waitNext(/Settings: settings tab/));
     settingsTap('night');
@@ -1429,7 +1446,8 @@ async function main(): Promise<void> {
     // 12g. Clocks at 720, offline before any time arrived: "--", muted.
     const clock720 = readFileSync(join(FIXTURES, 'valid/clock.json'), 'utf8');
     writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(clock720, '"seed-clock"'));
-    fw720.start();
+    // Two made-up servers for the Network tab's list (12h); the LAN is never searched.
+    fw720.start({ ESPHELM_TEST_SERVERS: 'fixed' });
     check(
       '720 build shows the clock layout',
       await fw720.waitLog(/Showing cached layout "clock" \(1 pages/),
@@ -1446,6 +1464,37 @@ async function main(): Promise<void> {
     check('720 build shows the Info tab', await fw720.waitLog(/Settings: information tab/));
     await sleep(1500);
     await fw720.screenshot('720-12-settings-info', shots);
+    // The Network tab with a server found with mDNS (ADR-0026): change it from a list, or forget it.
+    const tap720 = (part: string) =>
+      writeFileSync(join(work720, 'esphelm_tap_request'), `@settings ${part}`);
+    tap720('tab-network');
+    check('720 build shows the Network tab', await fw720.waitLog(/Settings: network tab/));
+    await sleep(1500);
+    await fw720.screenshot('720-13-settings-network', shots);
+    tap720('change-server');
+    await sleep(1500);
+    await fw720.screenshot('720-14-server-list', shots);
+    tap720('server=1');
+    check(
+      'Network tab: a server picked from the list is used',
+      await fw720.waitLog(/Server chosen in the settings: 192\.168\.1\.31:3443/),
+    );
+    tap720('forget-server');
+    await sleep(1000);
+    await fw720.screenshot('720-15-forget-server', shots);
+    tap720('cancel');
+    await sleep(500);
+    check(
+      'Network tab: Cancel forgets nothing',
+      fw720.count(/Forget server from the settings/) === 0,
+    );
+    tap720('forget-server');
+    await sleep(500);
+    tap720('confirm');
+    check(
+      'Network tab: Yes forgets the server',
+      await fw720.waitLog(/Forget server from the settings/),
+    );
     await fw720.stop();
 
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the
@@ -1477,15 +1526,38 @@ async function main(): Promise<void> {
       (await fwBoot.waitLog(/cached layout "bad" skipped/)) &&
         (await fwBoot.waitLog(/Showing last known good layout/)),
     );
+
+    // 14. Setup without configuration (ADR-0026), offline and from an empty flash. The host build
+    //     has no Wi-Fi, so ESPHELM_TEST_SETUP stands in for it: the setup network's screen with
+    //     its QR code, the same network in the Network tab (the status page has the menu
+    //     button too), and the screen while joining.
+    fwSetup.start({ ESPHELM_TEST_SETUP: 'ap' });
+    check('setup: the setup network screen', await fwSetup.waitLog(/Status: Set up Wi-Fi/));
+    await sleep(1000);
+    await fwSetup.screenshot('68-setup-wifi', shots);
+    writeFileSync(join(workSetup, 'esphelm_tap_request'), '@menu');
+    check(
+      'setup: the status page menu opens the settings',
+      await fwSetup.waitLog(/Settings opened/),
+    );
+    writeFileSync(join(workSetup, 'esphelm_tap_request'), '@settings tab-network');
+    await fwSetup.waitLog(/Settings: network tab/);
+    await sleep(1500);
+    await fwSetup.screenshot('69-setup-network', shots);
+    await fwSetup.stop();
+    fwSetup.start({ ESPHELM_TEST_SETUP: 'joining' });
+    check('setup: joining the saved network', await fwSetup.waitLog(/Status: Joining Wi-Fi/));
   } finally {
     await fw.stop();
     await fw720.stop();
     await fwBoot.stop();
+    await fwSetup.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
       fw720.saveLog();
       fwBoot.saveLog();
+      fwSetup.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
     } else {
       rmSync(work, { recursive: true, force: true });

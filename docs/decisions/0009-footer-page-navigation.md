@@ -20,4 +20,4 @@ Boards without PSRAM (C3/C6, still in scope) can't hold several pages of LVGL ob
 - Memory is bounded by the largest page, not the whole layout. Switching pages costs one rebuild (a few ms on the host) plus a resubscribe on the same socket.
 - The footer takes about 11 % of the height (2.2 × small-font line height). The editor's canvas preview reserves the same strip.
 - Swipe navigation, page persistence across reboots and an auto-return to a home page are not built. They can be added later without a schema change.
-- Hardware feel (button size, touch accuracy on the P4 panel) is unverified until the hardware check.
+- Hardware feel (button size, touch accuracy on the P4 panel) was checked on the P4 (2026-11-05).

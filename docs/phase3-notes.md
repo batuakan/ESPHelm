@@ -1,6 +1,6 @@
 # Phase 3 notes: firmware vertical slice
 
-Status: **done, pending your review and a hardware check** · 2026-10-25
+Status: **done, checked on the P4** · 2026-11-05
 
 ## What exists now
 - **`legacy/`:** the static MFD configs, `modules/`, `server.py` (commit `7e4ffda`). `sdl_screenshot` moved to `firmware/components/`. The P4 hardware file takes `esp32_hosted_firmware` as a substitution, so configs outside `legacy/` can point at the coprocessor image.
@@ -38,7 +38,7 @@ Status: **done, pending your review and a hardware check** · 2026-10-25
 - A cached layout record written by an independent Python encoder is accepted, so the store format is pinned from both sides.
 
 ## Not verified
-- **No hardware run** (P4, S3, C3). NVS writes, Wi-Fi reconnects and the ESP-IDF chunked-frame reassembly have only been compiled, never executed. The checklist is in `docs/firmware-runtime.md`.
+- **Hardware:** checked on the P4 (2026-11-05). The S3 and C3 have only been compiled.
 - The Arduino transport of ESPHomeSignalK was edited but not compiled (no Arduino config here).
 - ESPHomeSignalK's own `tools/lint.sh` wasn't run (it installs a venv with pip).
 - C3 runtime heap is unmeasured; only static RAM is known.

@@ -1,6 +1,6 @@
 # Phase 5b notes: the wind rose becomes a tile
 
-Status: **done, pending your review and the P4 hardware check** · 2026-10-25
+Status: **done, checked on the P4** · 2026-11-05
 
 Phase 5 is now split into four parts:
 - 5a: tiles, multi-page with a footer, starter layouts
@@ -55,7 +55,7 @@ Design: ADR-0010.
   - C3 compile check (RAM 108,200 B; flash 65.9 %)
 
 ## Not verified / gaps
-- **Hardware:** nothing has run on the P4 yet (Phases 3–5b). The hardware check in `docs/firmware-runtime.md`, step 8, now includes the Sailing template.
+- **Hardware:** checked on the P4 (2026-11-05), including the Sailing template (step 8).
 - The editor's slot count in a compact rose is approximate: hello names fonts but doesn't give their sizes.
 - At 480, a 2×2 rose in a 3×3 grid (≈250 px) is just under the full tier, so it shows only two slots. That's by design, but you may prefer a lower `full` threshold once you've seen it on the panel.
 - Firmware 0.2.0 rejects rose layouts with `UNKNOWN_TILE_TYPE` and falls back to its last-known-good layout. Flash 0.3.0 before using roses.

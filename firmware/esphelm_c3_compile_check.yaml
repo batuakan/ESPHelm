@@ -17,6 +17,7 @@ packages:
 
 esphome:
   name: esphelm-c3-check
+  name_add_mac_suffix: true
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -52,7 +53,6 @@ display:
     auto_clear_enabled: false
 
 signalk:
-  host: !secret signalk_host
 
 lvgl:
   buffer_size: 10%

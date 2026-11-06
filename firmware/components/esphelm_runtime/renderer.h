@@ -27,9 +27,11 @@ class Renderer {
   /// Called from the footer's menu button (main loop, inside LVGL event handling).
   void set_menu(std::function<void()> menu) { this->menu_ = std::move(menu); }
 
-  /// Full-screen status text (no layout, waiting for approval, errors, ...).
+  /// Full-screen status text (no layout, waiting for approval, errors, ...), with the settings menu
+  /// button in a corner when `menu` (touch screens), and a QR code above the text when `qr` is not
+  /// empty (the setup network, ADR-0026).
   void show_status(const std::string &headline, const std::string &detail, const std::string &footer,
-                   esphelm::Theme theme);
+                   esphelm::Theme theme, bool menu = false, const std::string &qr = "");
 
   /// Build page `index` of `layout`. Returns its widgets, or an empty vector and false (with the
   /// container left empty) if memory runs low.
@@ -46,6 +48,8 @@ class Renderer {
  protected:
   void clear_(esphelm::Theme theme);
   void build_footer_(const esphelm::Layout &layout, size_t index, const Colors &colors);
+  /// The settings menu button (ADR-0025): three bars, as the fonts have no symbols.
+  lv_obj_t *menu_button_(lv_obj_t *parent, int32_t w, int32_t h, const Colors &c, lv_color_t bg);
 
   lv_obj_t *container_{nullptr};
   int32_t top_inset_{0};

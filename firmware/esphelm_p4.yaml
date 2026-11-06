@@ -1,6 +1,6 @@
 # Runtime firmware for the Waveshare ESP32-P4-86 (720x720).
 #   ~/venv/bin/esphome run firmware/esphelm_p4.yaml
-# Needs firmware/secrets.yaml (wifi_ssid, wifi_password, signalk_host); it is git-ignored.
+# Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
 substitutions:
   screen_width: "720"
   screen_height: "720"
@@ -20,6 +20,7 @@ packages:
 
 esphome:
   name: esphelm-p4
+  name_add_mac_suffix: true
   friendly_name: "ESPHelm display"
 
 external_components:
@@ -36,7 +37,6 @@ external_components:
     components: [esphelm_runtime]
 
 signalk:
-  host: !secret signalk_host
 
 lvgl:
   # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015), so the

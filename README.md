@@ -25,6 +25,8 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-clock-saver.png">
  <img width="200px" src="/docs/images/display-settings-day.png">
  <img width="200px" src="/docs/images/display-settings-info.png">
+ <img width="200px" src="/docs/images/display-settings-network.png">
+ <img width="200px" src="/docs/images/display-setup-wifi.png">
 </p>
 
 <p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day and night themes.</em></p>
@@ -79,7 +81,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
-- **Settings on the display itself:** the menu button in the footer opens a panel with two tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Info* shows what the display knows: its IP and Wi-Fi signal, the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
+- **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
+- **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
 - **Resolution agnostic:** layouts are grids, so the same layout works on 480×480 and 720×720.
@@ -98,7 +101,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
   - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
   - **Screen off,** when the layout has a screen timeout.
   - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
-  - **Info tab:** the display (id, firmware, uptime, free memory), the network (Wi-Fi, signal, IP), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
+  - **Network tab:** the Wi-Fi network, signal and IP, and the SignalK server. *Forget Wi-Fi* restarts the display into its setup network; *Change server* lists the servers on the network; *Forget server* drops the server and its approval. Both forgets ask *Yes* first.
+  - **Info tab:** the display (id, firmware, uptime, free memory), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
   - **Closing:** only the **X** closes it.
 - **Alarms:** tap the banner to see the next alarm, **ACK** to acknowledge it.
 - **Screen off** (screen timeout): the first touch only wakes the display, it never presses a button.
@@ -118,11 +122,20 @@ npm run build
 
 **Plugin and editor:** symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. (An npm / App Store package comes later.)
 
-**Firmware:** create `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`; it is git-ignored). The [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware](https://github.com/esphome/esp-hosted-firmware) (it is not in this repository). Then:
+**Firmware:** nothing to configure. The [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware](https://github.com/esphome/esp-hosted-firmware) (it is not in this repository). Then:
 
 ```bash
 esphome run firmware/esphelm_p4.yaml
 ```
+
+### 📶 Setting up a display
+
+1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
+2. **Pick the boat's Wi-Fi** on the page that opens (or at http://192.168.4.1). The display joins it and closes its setup network.
+3. **Approve it in SignalK.** The display finds the server with mDNS and asks for access: grant read/write under *Security → Access Requests*. It stays with that server from then on, also after a restart.
+4. **Adopt it in the editor** and assign a layout.
+
+Mistyped the password? Power-cycle the display: when it finds no Wi-Fi for 2 minutes after a power-up, it opens its setup network again (for the first 10 minutes after power-up). Once connected, losing the network never opens it, so switching the router off doesn't expose the display. To move to another network, use *Forget Wi-Fi* in the *Network* tab. More in [ADR-0026](docs/decisions/0026-zero-config-setup.md).
 
 The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which is handy for trying layouts without a display. More in [`docs/firmware-runtime.md`](docs/firmware-runtime.md), [`docs/editor.md`](docs/editor.md) and [`docs/plugin-api.md`](docs/plugin-api.md).
 
@@ -132,7 +145,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 72 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 78 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

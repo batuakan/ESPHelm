@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
 #include "esphome/core/log.h"
+#include "esphelm_wifi_setup.h"
 
 namespace esphome {
 namespace esphelm_runtime {
@@ -65,6 +67,10 @@ void SettingsPanel::open(const State &state, int32_t top) {
   this->pending_brightness_ = -1;
   this->tab_ = Tab::SETTINGS;
   this->pending_tab_ = -1;
+  this->confirm_ = Confirm::NONE;
+  this->listing_ = this->network_dirty_ = false;
+  this->forget_wifi_ = this->forget_server_ = this->scan_wanted_ = false;
+  this->chosen_server_ = -1;
   this->build_();
   ESP_LOGI(TAG, "Settings opened");
 }
@@ -89,8 +95,40 @@ void SettingsPanel::tap(const std::string &part) {
     return;
   if (part == "close") {
     this->pending_close_ = true;
-  } else if (part == "tab-settings" || part == "tab-info") {
-    this->pending_tab_ = part == "tab-info" ? static_cast<int8_t>(Tab::INFO) : static_cast<int8_t>(Tab::SETTINGS);
+  } else if (part == "tab-settings" || part == "tab-network" || part == "tab-info") {
+    const Tab tab = part == "tab-info" ? Tab::INFO : part == "tab-network" ? Tab::NETWORK : Tab::SETTINGS;
+    this->pending_tab_ = static_cast<int8_t>(tab);
+  } else if (this->tab_ == Tab::NETWORK && (part == "forget-wifi" || part == "forget-server")) {
+    if (part == "forget-wifi" ? this->state_.wifi : this->state_.server_choice) {
+      this->confirm_ = part == "forget-wifi" ? Confirm::WIFI : Confirm::SERVER;
+      this->listing_ = false;
+      this->network_dirty_ = true;
+    }
+  } else if (this->tab_ == Tab::NETWORK && part == "confirm") {
+    if (this->confirm_ == Confirm::WIFI)
+      this->forget_wifi_ = true;
+    else if (this->confirm_ == Confirm::SERVER)
+      this->forget_server_ = true;
+    this->confirm_ = Confirm::NONE;
+    this->network_dirty_ = true;
+  } else if (this->tab_ == Tab::NETWORK && part == "cancel") {
+    this->confirm_ = Confirm::NONE;
+    this->listing_ = false;
+    this->network_dirty_ = true;
+  } else if (this->tab_ == Tab::NETWORK && part == "change-server") {
+    if (this->state_.server_choice) {
+      this->confirm_ = Confirm::NONE;
+      this->listing_ = true;
+      this->scan_wanted_ = true;
+      this->network_dirty_ = true;
+    }
+  } else if (this->tab_ == Tab::NETWORK && part.compare(0, 7, "server=") == 0) {
+    const int n = std::atoi(part.c_str() + 7);
+    if (this->listing_ && !this->state_.scanning && n >= 0 && n < static_cast<int>(this->state_.servers.size())) {
+      this->chosen_server_ = n;
+      this->listing_ = false;
+      this->network_dirty_ = true;
+    }
   } else if (part == "sleep") {
     if (this->state_.can_sleep)
       this->sleep_wanted_ = true;
@@ -113,6 +151,14 @@ bool SettingsPanel::take_choice(int8_t &choice) {
     return false;
   choice = this->pending_choice_;
   this->pending_choice_ = -2;
+  return true;
+}
+
+bool SettingsPanel::take_server(int &index) {
+  if (this->chosen_server_ < 0)
+    return false;
+  index = this->chosen_server_;
+  this->chosen_server_ = -1;
   return true;
 }
 
@@ -142,12 +188,22 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
     if (tab != this->tab_) {
       this->tab_ = tab;
       rebuild = true;  // only the shown tab's objects exist
-      ESP_LOGD(TAG, "Settings: %s tab", tab == Tab::INFO ? "information" : "settings");
+      this->confirm_ = Confirm::NONE;
+      this->listing_ = false;
+      ESP_LOGD(TAG, "Settings: %s tab", tab == Tab::INFO ? "information" : tab == Tab::NETWORK ? "network" : "settings");
     }
   }
-  rebuild = rebuild || state.theme != this->state_.theme ||
-                       state.can_sleep != this->state_.can_sleep || state.min_brightness != this->state_.min_brightness ||
-                       top != this->top_;
+  // The Network tab shows its buttons, the setup network and the server list as they are.
+  const bool network_changed = this->tab_ == Tab::NETWORK &&
+                               (state.ap_active != this->state_.ap_active || state.ap_ssid != this->state_.ap_ssid ||
+                                state.ap_password != this->state_.ap_password ||
+                                state.server_choice != this->state_.server_choice ||
+                                (this->listing_ && (state.scanning != this->state_.scanning ||
+                                                    state.servers != this->state_.servers)));
+  rebuild = rebuild || this->network_dirty_ || network_changed || state.theme != this->state_.theme ||
+            state.can_sleep != this->state_.can_sleep || state.min_brightness != this->state_.min_brightness ||
+            top != this->top_;
+  this->network_dirty_ = false;
   const State before = this->state_;
   this->state_ = state;
   this->top_ = top;
@@ -208,11 +264,11 @@ void SettingsPanel::build_() {
   lv_obj_set_pos(this->root_, 0, this->top_);
   lv_obj_set_size(this->root_, sw, sh - this->top_);
 
-  // Header: the two tabs, and the close button.
-  static const char *const TAB_TEXT[2] = {"Settings", "Info"};
-  static const char *const TAB_PARTS[2] = {"tab-settings", "tab-info"};
-  const int32_t tab_w = (inner_w - btn_h - 2 * 8) / 2;
-  for (int i = 0; i < 2; i++) {
+  // Header: the three tabs, and the close button.
+  static const char *const TAB_TEXT[3] = {"Settings", "Network", "Info"};
+  static const char *const TAB_PARTS[3] = {"tab-settings", "tab-network", "tab-info"};
+  const int32_t tab_w = (inner_w - btn_h - 3 * 8) / 3;
+  for (int i = 0; i < 3; i++) {
     const bool on = static_cast<int>(this->tab_) == i;
     this->tabs_[i] = button(this->root_, c, tab_w, btn_h);
     lv_obj_set_pos(this->tabs_[i], i * (tab_w + 8), 0);
@@ -236,6 +292,8 @@ void SettingsPanel::build_() {
   this->rows_.clear();
   if (this->tab_ == Tab::SETTINGS)
     this->build_settings_(body, inner_w, btn_h);
+  else if (this->tab_ == Tab::NETWORK)
+    this->build_network_(body, inner_w, btn_h, line_small);
   else
     this->build_info_(body, inner_w, line_small);
 }
@@ -306,7 +364,120 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
   }
 }
 
+// The Network tab's rows come in two sections, "Wi-Fi" and "SignalK server" (fill_info_); the
+// controls go below each.
+static const char *const WIFI_SECTION = "Wi-Fi";
+static const char *const SERVER_SECTION = "SignalK server";
+// At most this many servers are listed (a boat has one or two).
+static const size_t MAX_LISTED_SERVERS = 6;
+
+void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int32_t line_small) {
+  const Colors c = colors_for(this->state_.theme);
+  const lv_font_t *big = this->fonts_.label;
+  const lv_font_t *small = this->fonts_.small;
+  const auto wide_button = [&](lv_obj_t *parent, int32_t bw, const char *text, const char *part) {
+    lv_obj_t *b = button(parent, c, bw, btn_h);
+    lv_obj_t *l = label(b, big, c.text, text);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_width(l, std::min<int32_t>(bw - 16, text_width(text, big)));
+    lv_obj_center(l);
+    on_part(b, this, part);
+    return b;
+  };
+  const auto note = [&](const char *text) {
+    lv_obj_t *l = label(body, small, c.muted, text);
+    lv_obj_set_width(l, w);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+  };
+  this->build_rows_(body, w, line_small, [&](const char *section) {
+    if (std::strcmp(section, WIFI_SECTION) == 0) {
+      if (this->state_.ap_active)
+        this->build_setup_network_(body, w);
+      if (!this->state_.wifi)
+        return;
+      if (this->confirm_ == Confirm::WIFI)
+        this->build_confirm_(body, w, btn_h, "Forget this Wi-Fi network? The display restarts and opens its setup network.");
+      else
+        wide_button(body, w, "Forget Wi-Fi", "forget-wifi");
+    } else if (std::strcmp(section, SERVER_SECTION) == 0) {
+      if (!this->state_.server_choice) {
+        note("Set in the firmware.");
+      } else if (this->confirm_ == Confirm::SERVER) {
+        this->build_confirm_(body, w, btn_h, "Forget this server? The display looks for one again and asks it for access.");
+      } else if (this->listing_) {
+        if (this->state_.scanning) {
+          note("Looking for SignalK servers...");
+        } else if (this->state_.servers.empty()) {
+          note("No SignalK server found.");
+        } else {
+          static const char *const PARTS[MAX_LISTED_SERVERS] = {"server=0", "server=1", "server=2",
+                                                                 "server=3", "server=4", "server=5"};
+          for (size_t i = 0; i < this->state_.servers.size() && i < MAX_LISTED_SERVERS; i++)
+            wide_button(body, w, this->state_.servers[i].c_str(), PARTS[i]);
+        }
+        wide_button(body, w, "Cancel", "cancel");
+      } else {
+        lv_obj_t *row = box(body, w);
+        lv_obj_set_height(row, btn_h);
+        const int32_t half = (w - 8) / 2;
+        wide_button(row, half, "Change server", "change-server");
+        lv_obj_set_pos(wide_button(row, half, "Forget server", "forget-server"), half + 8, 0);
+      }
+    }
+  });
+}
+
+void SettingsPanel::build_setup_network_(lv_obj_t *body, int32_t w) {
+  const Colors c = colors_for(this->state_.theme);
+  const lv_font_t *big = this->fonts_.label;
+  // The QR code beside the name and password; phone cameras join the network from it. Dark modules
+  // on light ones by day; at night the light ones are the dim red text colour.
+  const int32_t size = std::min<int32_t>(w / 3, 240);
+  lv_obj_t *row = box(body, w);
+  lv_obj_t *qr = lv_qrcode_create(row);
+  lv_qrcode_set_size(qr, size);
+  const bool night = this->state_.theme == esphelm::Theme::NIGHT;
+  lv_qrcode_set_dark_color(qr, night ? c.background : c.text);
+  lv_qrcode_set_light_color(qr, night ? c.text : c.background);
+  lv_qrcode_set_quiet_zone(qr, true);
+  const std::string text = esphelm::wifi_qr_text(this->state_.ap_ssid, this->state_.ap_password);
+  lv_qrcode_update(qr, text.data(), text.size());
+  lv_obj_t *words = box(row, w - size - 16);
+  lv_obj_set_pos(words, size + 16, 0);
+  lv_obj_set_flex_flow(words, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(words, 4, LV_PART_MAIN);
+  label(words, this->fonts_.small, c.accent, "Setup network");
+  label(words, big, c.text, this->state_.ap_ssid.c_str());
+  label(words, this->fonts_.small, c.muted, "Password");
+  label(words, big, c.text, this->state_.ap_password.c_str());
+}
+
+void SettingsPanel::build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question) {
+  const Colors c = colors_for(this->state_.theme);
+  lv_obj_t *q = label(body, this->fonts_.small, c.text, question);
+  lv_obj_set_width(q, w);
+  lv_label_set_long_mode(q, LV_LABEL_LONG_MODE_WRAP);
+  lv_obj_t *row = box(body, w);
+  lv_obj_set_height(row, btn_h);
+  const int32_t half = (w - 8) / 2;
+  static const char *const TEXT[2] = {"Yes", "Cancel"};
+  static const char *const PARTS[2] = {"confirm", "cancel"};
+  for (int i = 0; i < 2; i++) {
+    lv_obj_t *b = button(row, c, half, btn_h);
+    lv_obj_set_pos(b, i * (half + 8), 0);
+    if (i == 0)
+      lv_obj_set_style_bg_color(b, c.zone[2], LV_PART_MAIN);  // the alarm colour: this can't be undone
+    lv_obj_center(label(b, this->fonts_.label, i == 0 ? c.background : c.text, TEXT[i]));
+    on_part(b, this, PARTS[i]);
+  }
+}
+
 void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t line_small) {
+  this->build_rows_(body, w, line_small, [](const char *) {});
+}
+
+void SettingsPanel::build_rows_(lv_obj_t *body, int32_t w, int32_t line_small,
+                                const std::function<void(const char *section)> &after) {
   const Colors c = colors_for(this->state_.theme);
   const lv_font_t *small = this->fonts_.small;
   // Per section a heading, the names and the values (one label each, line by line), one section
@@ -315,9 +486,10 @@ void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t line_small) {
   lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(body, line_small / 2, LV_PART_MAIN);
   if (this->fill_)
-    this->fill_(this->rows_);
+    this->fill_(this->rows_, this->tab_ == Tab::NETWORK);
   std::string names;
   lv_obj_t *block = nullptr;
+  const char *heading = "";
   const auto finish = [&]() {
     if (block == nullptr)
       return;
@@ -326,10 +498,12 @@ void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t line_small) {
     lv_obj_set_style_text_align(values, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_align(values, LV_ALIGN_TOP_RIGHT, 0, 0);
     this->sections_.back().values = values;
+    after(heading);
   };
   for (const InfoRow &r : this->rows_) {
     if (r.section != nullptr || block == nullptr) {
       finish();
+      heading = r.section != nullptr ? r.section : "";
       lv_obj_t *section = box(body, col_w);
       lv_obj_set_flex_flow(section, LV_FLEX_FLOW_COLUMN);
       lv_obj_set_style_pad_row(section, 4, LV_PART_MAIN);
@@ -352,7 +526,7 @@ void SettingsPanel::refresh_info_() {
   if (!this->fill_ || this->sections_.empty())
     return;
   this->rows_.clear();
-  this->fill_(this->rows_);
+  this->fill_(this->rows_, this->tab_ == Tab::NETWORK);
   const lv_font_t *small = this->fonts_.small;
   const int32_t width = lv_obj_get_width(lv_obj_get_parent(this->sections_.front().values));
   size_t r = 0;

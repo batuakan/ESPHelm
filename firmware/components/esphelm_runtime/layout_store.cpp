@@ -28,6 +28,8 @@ static const char *slot_key(Slot slot) {
       return "lkg";
     case Slot::PREFS:
       return "prefs";
+    case Slot::AP:
+      return "ap";
     default:
       return "boot";
   }

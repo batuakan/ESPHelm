@@ -13,8 +13,7 @@ external_components:
   - source: { type: local, path: components }
     components: [esphelm_runtime]
 
-signalk:
-  host: !secret signalk_host      # update_interval defaults to 1s
+signalk:                          # no host: found with mDNS (ADR-0026); update_interval defaults to 1s
 
 lvgl:
   pages:
@@ -54,13 +53,16 @@ Ready-made configs:
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
-The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`, `signalk_host`); it is git-ignored.
+The P4 and C3 configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
 
 ## What the display does
 
 | Situation | Screen |
 |---|---|
 | Boot with a cached layout | the cached layout (`cur`, else `lkg`), before any network traffic |
+| The setup network is up (ADR-0026) | "Set up Wi-Fi": a QR code to join it, its name and this display's password, then "choose the boat's network"; the menu button is in the corner |
+| Wi-Fi not connected | "Joining Wi-Fi" |
+| No server found yet (mDNS) | "Looking for a SignalK server" |
 | No SignalK connection or token yet | "Connecting to SignalK" + host:port |
 | Access request pending | "Approve this display in SignalK": *Security → Access Requests*, grant **read/write** |
 | Approved, not adopted | "Adopt this display in ESPHelm" + device id |
@@ -68,7 +70,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 | Layout rejected | "Layout rejected", with the first error code and pointer (only when nothing else is shown) |
 | Value not updated within `staleAfter` | `--`, dimmed (gauge and bar keep their last position, dimmed; wind pointers dim) |
 | Any layout | a footer with the page title and the settings menu button (ADR-0025); with more than one page also `<` and `>` (disabled at the ends) and "n/m" |
-| The footer's menu button (ADR-0025) | the settings panel below the banner, in two tabs: *Settings* (brightness, Day / Night / Auto, *Screen off* with a screen timeout) and *Info* (the display, the network, SignalK, the layout and the clock); only its close button closes it |
+| The footer's menu button (ADR-0025), or the status page's | the settings panel below the banner, in three tabs: *Settings* (brightness, Day / Night / Auto, *Screen off* with a screen timeout), *Network* (Wi-Fi and the SignalK server, ADR-0026) and *Info* (the display, SignalK, the layout and the clock); only its close button closes it |
 | Zones change in the server's metadata (ADR-0020) | within seconds (at most about a minute) the visible tiles use them, replacing their own; the page is rebuilt once, without a new layout |
 | A tap on a value tile or wind rose that records (ADR-0018, ADR-0019) | its history popup below the banner: a button per value for a rose, live value, min/max, a line graph of the last 10 min / 1 h / 6 h (6 h with PSRAM only; angles drawn around their mean so north doesn't jump), "Collecting..." until there are two points; only its close button closes it |
 | An active SignalK notification (`alert` … `emergency`) | the alarm banner at the top, which pushes the page down (ADR-0014): the worst unacknowledged alarm, "+N", ACK; a thin strip once acknowledged; "(offline)" without a server |
@@ -91,7 +93,7 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
 - There is no swiping; the legacy apps keep theirs.
 
 ## Settings panel (ADR-0025)
-- **Opening and closing:** the footer's menu button opens `SettingsPanel` on LVGL's top layer, below the alarm banner, on its *Settings* tab; *Info* is the other tab. Only the tab shown is built. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
+- **Opening and closing:** the footer's menu button (or the status page's, before there is a layout) opens `SettingsPanel` on LVGL's top layer, below the alarm banner, on its *Settings* tab; *Network* and *Info* are the others. Only the tab shown is built. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
 - **Brightness** is a slider for the theme shown: day 5–100 %, night 1–100 %. It dims live and is saved when let go. On a board without a backlight it is only logged.
 - **Theme:** *Day* and *Night* override the layout's theme and the sun; *Auto* hands it back.
 - **Screen off,** shown when the layout has a screen timeout, switches off (or to the screen saver) at once.
@@ -101,11 +103,18 @@ The P4 and C3 configs need `firmware/secrets.yaml` (`wifi_ssid`, `wifi_password`
   - **Dropped:** when a layout brings a different `theme`/`autoTheme` (theme choice) or `brightness.day`/`.night` (that override), and a day/night choice when the sun changes. The first sun value after a boot is not a change.
 - **Information** (the *Info* tab, one column of sections that scrolls) is refreshed once a second while it shows.
   - **Display:** id, board, firmware, screen, uptime, free memory (internal, and PSRAM). Free memory is not on the host.
-  - **Network:** Wi-Fi and signal (`USE_WIFI`), IP (`USE_NETWORK`).
   - **SignalK:** server, stream, deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
   - **Layout:** name, version, where it came from (fetched, cached, last known good), pages, the plugin's state for the device.
   - **Clock:** UTC, its source, the time zone.
   - **Long values** are shortened with "..". Each section is a box with three labels (heading, names, values), so the row count of a section is fixed.
+- **Network tab** (ADR-0026), rows refreshed like *Info*, with controls below each section:
+  - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password. *Forget Wi-Fi* (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML) asks *Yes*, erases ESPHome's saved network (NVS keys `88491487` and `+1` in namespace `esphome`) and restarts.
+  - **SignalK server:** address, host name, stream. *Change server* runs `SignalK::scan_servers()` and lists up to 6 of `servers_found()`; a tap calls `choose_server()`. *Forget server* asks *Yes* and calls `forget_server()`. With `host:` in the YAML: "Set in the firmware".
+
+## Setup without configuration (ADR-0026)
+- **Setup network password:** made once per display in `setup_ap_()` (before Wi-Fi starts: the runtime's setup priority is higher), 10 characters of `esphelm_wifi_setup.h`'s alphabet from the hardware RNG with `bootloader_random_enable()`, saved in `Slot::AP` (NVS key `ap`), checked on load. `__init__.py` refuses a `password` under `wifi: ap:`.
+- **When it opens:** ESPHome's rules with `ap_timeout: 2min` and `provisioning: timeout: 10min` (`firmware/wifi.yaml`); after the first connection the runtime sets the AP timeout to 0, so it never opens again until a power-up.
+- **Server binding:** ESPHomeSignalK saves the server it uses (`signalk_server` file on the host, pref 10001 on the device) and accepts only that one after a restart; see its `server_discovery.h`.
 
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue.
@@ -245,7 +254,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); switching the theme on the display (`esphelm_tap_request @theme`) from night to day holds while the sun stays down and is handed back to `autoTheme` at sunrise
 
-  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and at 720); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
+  17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and at 720); `@settings tab-network` shows *Network* ("Set in the firmware" at 480; at 720 with `ESPHELM_TEST_SERVERS=fixed`: the server buttons, the list of two made-up servers, picking one, the *Forget server* question, *Cancel* and *Yes*); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
 
   18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
@@ -259,10 +268,13 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21d. **heading tapes** (ADR-0022, `fixtures/valid/heading-tape.json`): three tapes at 480 with live values (across north, COG right of centre, the target left, the waypoint bearing off the left edge; a magnetic 60° tape; a 1x1 tape without markers), a turn to 20°, a marker gone stale on its own, night; and offline at 720 (muted, "--", no markers)
   21e. **centre-zero gauges and bars** (ADR-0023, `fixtures/valid/center-zero.json`): a rudder and a rate of turn (port/starboard), a house current (−50…20, plus/minus) and a vertical start current, with live values one way, then the other way round, and at night; offline at 720 (no fill, "--")
 
+  21g. **setup** (ADR-0026, offline from an empty flash, `ESPHELM_TEST_SETUP=ap|joining` standing in for Wi-Fi): the *Set up Wi-Fi* screen with its QR code, the status page's menu button opening the panel, the *Network* tab with the setup network, and "Joining Wi-Fi"
   21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
   Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
+All steps below were checked on the P4-86 (2026-11-05). Keep them for new boards and for changes that touch them.
+
 Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
 1. The display shows **"Approve this display in SignalK"**. In the SignalK admin UI, *Security → Access Requests* lists "ESPHome device: esphelm-p4" asking for read/write. Approve it.
 2. Within a few seconds the screen shows **"Adopt this display in ESPHelm"** with the device id. `GET /plugins/esphelm/api/devices` lists it as pending.
@@ -346,3 +358,11 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The *Info* tab shows the display's IP and Wi-Fi signal (check them against your router), the SignalK server's address, and a *Deltas* count that rises while you watch.
     - Change the night brightness in the editor and Save & send: the display takes the editor's value.
     - Check that the menu button, the slider and the three theme buttons are easy to hit with a wet thumb, and that the panel is readable at night.
+25. **Setup without configuration (ADR-0026).** Erase the flash first (`esptool.py erase_flash`, or `esphome run` after an erase): this wipes the token and the layout, so the display has to be approved and adopted again.
+    - **Setup screen:** it shows *Set up Wi-Fi* with a QR code, the network `esphelm-p4-` + six characters and a password. Scan the QR code with a phone camera: the phone joins, and the portal page opens (else go to http://192.168.4.1). Pick your network.
+    - **Server:** the display joins, finds your SignalK server ("Looking for a SignalK server", then "Approve this display") and, once approved and adopted, shows its layout.
+    - **Reboot:** it rejoins and goes back to the same server without asking for approval again.
+    - **Router off:** switch the router off for 5 minutes or more after the display has connected. No `esphelm-p4-…` network appears on your phone, and the display keeps its pages with stale values.
+    - **Mistyped password:** in the panel's *Network* tab, *Forget Wi-Fi* → *Yes*: the display restarts into its setup network. Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
+    - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
+    - Check that the QR code scans from about 30 cm by day and at night.

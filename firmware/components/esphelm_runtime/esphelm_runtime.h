@@ -110,7 +110,7 @@ class EsphelmRuntime : public Component {
   void handle_meta_(const HttpResult &result);
   bool apply_server_zones_();
   void update_status_();
-  void show_status_(const std::string &headline, const std::string &detail);
+  void show_status_(const std::string &headline, const std::string &detail, const std::string &qr = "");
   void send_hello_();
   void send_fetch_();
   std::string base_url_() const;
@@ -145,8 +145,17 @@ class EsphelmRuntime : public Component {
   // Settings panel and the display's own choices (ADR-0025)
   SettingsPanel::State panel_state_() const;
   void tick_panel_(uint32_t now);
-  void fill_info_(std::vector<InfoRow> &rows) const;
+  void fill_info_(std::vector<InfoRow> &rows, bool network) const;
   void save_prefs_();
+  // Setup without configuration (ADR-0026): the setup network, Wi-Fi and the SignalK server.
+  void setup_ap_();
+  void tick_network_();
+  void forget_wifi_();
+  bool ap_active_() const;
+  std::string ap_ssid_() const;
+  bool wifi_connected_() const;
+  /// The servers the panel lists (the last search; made up under ESPHELM_TEST_SERVERS).
+  const std::vector<signalk::ServerCandidate> &servers_() const;
 
   signalk::SignalK *signalk_{nullptr};
   Renderer renderer_;
@@ -190,6 +199,15 @@ class EsphelmRuntime : public Component {
   SettingsPanel panel_;
   const char *layout_origin_{""};  // where the shown layout came from: fetched, cached, ...
   bool info_fixed_{false};  // test hook ESPHELM_TEST_INFO=fixed: values that change by themselves read "test"
+  // Setup (ADR-0026). The setup network's password, made once per display and saved.
+  std::string ap_password_;
+  bool wifi_seen_{false};  // Wi-Fi connected since boot: the setup network stays off from then on
+  // Test hooks: ESPHELM_TEST_SERVERS=fixed lists two made-up servers instead of searching the LAN
+  // (choosing or forgetting one is only logged); ESPHELM_TEST_SETUP=ap|joining shows that setup
+  // screen on the host build, which has no Wi-Fi.
+  bool test_servers_{false};
+  std::vector<signalk::ServerCandidate> test_server_list_;
+  std::string test_setup_;
   std::vector<std::unique_ptr<Widget>> widgets_;
   esphelm::Theme theme_{esphelm::Theme::NIGHT};
   std::string etag_;
