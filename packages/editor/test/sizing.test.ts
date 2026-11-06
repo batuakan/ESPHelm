@@ -90,7 +90,11 @@ describe('valueTextSize', () => {
     label: 'SOG',
     unit: 'kn',
   } as const;
-  const px = (cqh: string, height: number) => (parseFloat(cqh) / 100) * height;
+  /** Display pixels of a preview size min(Xcqh, Ycqw) on a box of the given height. */
+  const px = (css: string, height: number) =>
+    (parseFloat(/([\d.]+)cqh/.exec(css)![1]!) / 100) * height;
+  const cqw = (css: string, width: number) =>
+    (parseFloat(/([\d.]+)cqw/.exec(css)![1]!) / 100) * width;
 
   it('gives a big tile bigger text than a small one, in display pixels', () => {
     const big = valueTextSize(P4, { width: 680, height: 290 }, tile);
@@ -103,6 +107,23 @@ describe('valueTextSize', () => {
 
   it('the caption stays well below the number', () => {
     const t = valueTextSize(P4, { width: 680, height: 290 }, tile);
-    expect(parseFloat(t.caption)).toBeLessThan(parseFloat(t.value) / 2);
+    expect(px(t.caption, 290)).toBeLessThan(px(t.value, 290) / 2);
+  });
+
+  it('scales with the width too, so a value as wide as the sample fits a narrower preview', () => {
+    // The 1x1 depth tile of the Sailing layout on a 720 display: 10.7 is as wide as 88.8.
+    const box = { width: 152, height: 141 };
+    const t = valueTextSize(P4, box, { ...tile, decimals: 1 }, '10.7');
+    expect(t.value).toMatch(/^min\([\d.]+cqh, [\d.]+cqw\)$/);
+    // Both shares name the same font size in display pixels.
+    expect(cqw(t.value, box.width)).toBeCloseTo(px(t.value, box.height), 1);
+    // A preview tile 5 % narrower than the display's in proportion gets a 5 % smaller font, so
+    // the text keeps the share of the width it has on the display.
+    const preview = { width: box.width * 0.95, height: box.height };
+    const font = Math.min(
+      (parseFloat(/([\d.]+)cqh/.exec(t.value)![1]!) / 100) * preview.height,
+      (parseFloat(/([\d.]+)cqw/.exec(t.value)![1]!) / 100) * preview.width,
+    );
+    expect(font).toBeCloseTo(px(t.value, box.height) * 0.95, 1);
   });
 });

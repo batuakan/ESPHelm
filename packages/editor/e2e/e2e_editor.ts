@@ -237,7 +237,8 @@ async function main(): Promise<void> {
     };
     check(
       "a value tile previews the display's text size",
-      /--tile-value-size: [\d.]+cqh/.test(text.style) && text.value > 2 * text.caption,
+      /--tile-value-size: min\([\d.]+cqh, [\d.]+cqw\)/.test(text.style) &&
+        text.value > 2 * text.caption,
       JSON.stringify(text),
     );
 

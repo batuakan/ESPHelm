@@ -73,7 +73,17 @@ async function main(): Promise<void> {
       value: { units: 'm', zones },
     });
     check('the server takes zones for a path', r.status === 202, String(r.status));
+    // signalk-server 2.30+ only lists paths that have had a value (getAvailablePaths), as on a
+    // boat with a depth sounder: send one.
+    const depthSource = await sk.stream(admin);
+    depthSource.ws.send(
+      JSON.stringify({
+        context: 'vessels.self',
+        updates: [{ values: [{ path: 'environment.depth.belowKeel', value: 4.2 }] }],
+      }),
+    );
     await new Promise((res) => setTimeout(res, 500));
+    depthSource.ws.close();
     r = await json('GET', '/plugins/esphelm/api/paths', admin);
     const listed = (r.body as unknown as { path: string; zones: unknown }[]).find(
       (p) => p.path === 'environment.depth.belowKeel',

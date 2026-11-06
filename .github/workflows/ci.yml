@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  SIGNALK_SERVER_VERSION: '2.26.0'
+  SIGNALK_SERVER_VERSION: '2.36.0'
 
 jobs:
   # Unit tests, types, lint, and the plugin and editor against a real signalk-server.

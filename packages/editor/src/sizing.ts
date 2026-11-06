@@ -57,7 +57,7 @@ export const ROSE_TIER_TEXT: Record<RoseTier, string> = {
   pointers: 'pointers only; too small for centre values',
 };
 
-/** CSS font sizes for a value tile's preview, relative to the tile's height (cqh). */
+/** CSS font sizes for a value tile's preview: min(share of its height, share of its width). */
 export interface ValueTextSize {
   value: string;
   caption: string;
@@ -83,9 +83,13 @@ export function valueTextSize(
     unit: !!tile.unit && UNITS[tile.unit].label !== '',
     text,
   });
-  const cqh = (line: number) =>
-    `${((fontSize(line) / Math.max(1, box.height)) * 100).toFixed(2)}cqh`;
-  return { value: cqh(fit.value), caption: cqh(fit.caption) };
+  // Scaled by the tile's height or its width, whichever is less: the preview tile's padding is
+  // fixed in CSS pixels, so it is a little narrower than the display's in proportion, and a value
+  // as wide as the sample (10.7 for 88.8) must still fit it as it fits the display.
+  const share = (line: number, side: number) =>
+    ((fontSize(line) / Math.max(1, side)) * 100).toFixed(2);
+  const css = (line: number) => `min(${share(line, box.height)}cqh, ${share(line, box.width)}cqw)`;
+  return { value: css(fit.value), caption: css(fit.caption) };
 }
 
 export type AutopilotTier = 'controls' | 'status';
