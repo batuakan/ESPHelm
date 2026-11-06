@@ -48,7 +48,10 @@ Your choices:
 - **Settings panel: a third tab, *Network*** (between *Settings* and *Info*; the old Info section *Network* moves here):
   - **Wi-Fi:**
     - It shows the network, signal, IP and whether the setup network is on. While it is on, the panel shows its name, password and QR code.
-    - *Forget Wi-Fi*, confirmed with *Yes*, erases ESPHome's saved network and restarts into the setup network. ESPHome can't forget a network (an empty one still counts as set), so the runtime erases its NVS record. The key is fixed for builds without a compiled-in network.
+    - *Reset display*, confirmed with *Yes*, is ESPHome's factory reset (`global_preferences->reset()`, as its `factory_reset` button does) and restarts into the setup network.
+      - **Why not only the Wi-Fi network:** ESPHome can't forget one network (an empty one still counts as set). The first version erased ESPHome's NVS record by its key (`88491487`), which depends on ESPHome internals.
+      - **What it erases:** ESPHome's reset erases the whole NVS partition: Wi-Fi, the SignalK token and server, the cached layouts, the display's choices and the setup password. The display then starts like a new one; the plugin still knows its id and gives it its layout back once it is approved again.
+      - **Changed** 2026-11-06 from *Forget Wi-Fi*, to use what ESPHome provides.
     - **Kept:** the layout, the token and the display's choices.
   - **SignalK server:**
     - It shows the address and host name, and the stream state.
@@ -68,7 +71,7 @@ Your choices:
   - **What it is:** the captive portal (with its web server and web OTA), `provisioning`, LVGL's QR code and canvas, and the Network tab.
 - **Memory:** the Network tab is about 30 LVGL objects. The QR code is a 1-bit canvas of size² / 8 bytes while it shows (about 7 KB at 240 px), and nothing when closed.
 - **Test hooks:**
-  - `@settings tab-network`, `forget-wifi`, `forget-server`, `change-server`, `server=N`, `confirm`, `cancel`.
+  - `@settings tab-network`, `reset`, `forget-server`, `change-server`, `server=N`, `confirm`, `cancel`.
   - `ESPHELM_TEST_SERVERS=fixed`: two made-up servers, so the e2e never searches the LAN, where it would find a real server.
   - `ESPHELM_TEST_SETUP=ap|joining`: the setup screens on the host build, which has no Wi-Fi.
 - **Not done:**

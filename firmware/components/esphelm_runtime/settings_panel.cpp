@@ -69,7 +69,7 @@ void SettingsPanel::open(const State &state, int32_t top) {
   this->pending_tab_ = -1;
   this->confirm_ = Confirm::NONE;
   this->listing_ = this->network_dirty_ = false;
-  this->forget_wifi_ = this->forget_server_ = this->scan_wanted_ = false;
+  this->reset_wanted_ = this->forget_server_ = this->scan_wanted_ = false;
   this->chosen_server_ = -1;
   this->build_();
   ESP_LOGI(TAG, "Settings opened");
@@ -98,15 +98,15 @@ void SettingsPanel::tap(const std::string &part) {
   } else if (part == "tab-settings" || part == "tab-network" || part == "tab-info") {
     const Tab tab = part == "tab-info" ? Tab::INFO : part == "tab-network" ? Tab::NETWORK : Tab::SETTINGS;
     this->pending_tab_ = static_cast<int8_t>(tab);
-  } else if (this->tab_ == Tab::NETWORK && (part == "forget-wifi" || part == "forget-server")) {
-    if (part == "forget-wifi" ? this->state_.wifi : this->state_.server_choice) {
-      this->confirm_ = part == "forget-wifi" ? Confirm::WIFI : Confirm::SERVER;
+  } else if (this->tab_ == Tab::NETWORK && (part == "reset" || part == "forget-server")) {
+    if (part == "reset" ? this->state_.wifi : this->state_.server_choice) {
+      this->confirm_ = part == "reset" ? Confirm::RESET : Confirm::SERVER;
       this->listing_ = false;
       this->network_dirty_ = true;
     }
   } else if (this->tab_ == Tab::NETWORK && part == "confirm") {
-    if (this->confirm_ == Confirm::WIFI)
-      this->forget_wifi_ = true;
+    if (this->confirm_ == Confirm::RESET)
+      this->reset_wanted_ = true;
     else if (this->confirm_ == Confirm::SERVER)
       this->forget_server_ = true;
     this->confirm_ = Confirm::NONE;
@@ -395,10 +395,12 @@ void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int
         this->build_setup_network_(body, w);
       if (!this->state_.wifi)
         return;
-      if (this->confirm_ == Confirm::WIFI)
-        this->build_confirm_(body, w, btn_h, "Forget this Wi-Fi network? The display restarts and opens its setup network.");
+      if (this->confirm_ == Confirm::RESET)
+        this->build_confirm_(body, w, btn_h,
+                             "Reset this display? It forgets Wi-Fi, its SignalK server and approval, its cached "
+                             "layout and its settings, then restarts into its setup network.");
       else
-        wide_button(body, w, "Forget Wi-Fi", "forget-wifi");
+        wide_button(body, w, "Reset display", "reset");
     } else if (std::strcmp(section, SERVER_SECTION) == 0) {
       if (!this->state_.server_choice) {
         note("Set in the firmware.");
