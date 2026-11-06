@@ -50,6 +50,7 @@ import {
 } from './layoutOps';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
+import { LayoutBar } from './components/LayoutBar';
 import { PageTabs, pageWidgets } from './components/PageTabs';
 import { ImportConfirm, RemapDialog } from './components/ShareDialogs';
 import { IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, exportFile, missingRefs, parseImport, type MissingRef } from './share';
@@ -486,46 +487,14 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         )}
         {layout && page ? (
           <>
-            <PageTabs
-              layout={layout}
-              index={index}
+            <LayoutBar
               supported={supported}
               largeDisplay={largeDisplay}
-              onSelect={(i) => showPage(i)}
-              onAdd={(kind) => {
-                const r = addPage(layout, kind, index);
-                edit(r.layout);
-                const added = r.layout.pages[r.index];
-                const first = added?.kind === 'chart' ? added : pageTiles(added)[0];
-                showPage(r.index, first ? { id: first.id } : undefined);
-              }}
-              onAddTemplate={(id) => {
-                const t = template(id);
-                if (!t) return;
-                const r = addTemplatePages(layout, t, index);
-                edit(r.layout);
-                showPage(r.index);
-              }}
               onApplyTemplate={(id) => {
                 const t = template(id);
                 if (!t) return;
                 edit(applyTemplate(layout, t));
                 showPage(0);
-              }}
-              onRename={(title) => edit(renamePage(layout, index, title))}
-              onMove={(delta) => {
-                const next = movePage(layout, index, delta);
-                if (next) {
-                  edit(next);
-                  setPageIndex(index + delta);
-                }
-              }}
-              onDelete={() => {
-                const next = removePage(layout, index);
-                if (next) {
-                  edit(next);
-                  showPage(Math.max(0, index - 1));
-                }
               }}
               share={{
                 others: others.map((d) => ({ id: d.id, name: displayName(d) })),
@@ -547,29 +516,78 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     }
                   : {}),
               }}
-            />
-            {pendingImport && (
-              <ImportConfirm
-                name={pendingImport.name}
-                unsupported={pendingImport.unsupported}
-                onReplace={applyImport}
-                onCancel={() => setPendingImport(null)}
-              />
-            )}
-            {remap && (
-              <RemapDialog
-                missing={remap}
-                paths={paths}
-                values={shownValues}
-                charts={charts}
-                onApply={applyRemap}
-                onSkip={() => setRemap(null)}
-              />
-            )}
-            {
-              <div className="page-bar">
-                {grid && (
-                <label>
+            >
+              <div
+                className="display-theme"
+                role="group"
+                aria-label="Display theme"
+                title="The display's colours; sent to the display with Save & send"
+              >
+                <span>Display theme</span>
+                {(['day', 'night'] as const).map((t) => (
+                  <button
+                    key={t}
+                    className={`small ${layout.theme === t ? 'on' : ''}`}
+                    aria-pressed={layout.theme === t}
+                    onClick={() => edit({ ...layout, theme: t })}
+                  >
+                    {t === 'day' ? 'Day' : 'Night'}
+                  </button>
+                ))}
+              </div>
+              <button
+                className={`small ${settingsOpen ? 'on' : ''}`}
+                aria-pressed={settingsOpen}
+                onClick={() => {
+                  setSelection(undefined);
+                  setSettingsOpen((open) => !open);
+                }}
+                title="Brightness, start page, auto day/night, screen timeout"
+              >
+                Display settings
+              </button>
+              <span className="device-size">
+                {device?.hello.display.width}×{device?.hello.display.height}
+              </span>
+            </LayoutBar>
+            <PageTabs
+              layout={layout}
+              index={index}
+              supported={supported}
+              largeDisplay={largeDisplay}
+              onSelect={(i) => showPage(i)}
+              onAdd={(kind) => {
+                const r = addPage(layout, kind, index);
+                edit(r.layout);
+                const added = r.layout.pages[r.index];
+                const first = added?.kind === 'chart' ? added : pageTiles(added)[0];
+                showPage(r.index, first ? { id: first.id } : undefined);
+              }}
+              onAddTemplate={(id) => {
+                const t = template(id);
+                if (!t) return;
+                const r = addTemplatePages(layout, t, index);
+                edit(r.layout);
+                showPage(r.index);
+              }}
+              onRename={(title) => edit(renamePage(layout, index, title))}
+              onMove={(delta) => {
+                const next = movePage(layout, index, delta);
+                if (next) {
+                  edit(next);
+                  setPageIndex(index + delta);
+                }
+              }}
+              onDelete={() => {
+                const next = removePage(layout, index);
+                if (next) {
+                  edit(next);
+                  showPage(Math.max(0, index - 1));
+                }
+              }}
+            >
+              {grid && (
+                <label className="grid-size">
                   grid{' '}
                   <input
                     type="number"
@@ -589,41 +607,26 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     aria-label="Rows"
                   />
                 </label>
-                )}
-                <div
-                  className="display-theme"
-                  role="group"
-                  aria-label="Display theme"
-                  title="The display's colours; sent to the display with Save & send"
-                >
-                  <span>Display theme</span>
-                  {(['day', 'night'] as const).map((t) => (
-                    <button
-                      key={t}
-                      className={`small ${layout.theme === t ? 'on' : ''}`}
-                      aria-pressed={layout.theme === t}
-                      onClick={() => edit({ ...layout, theme: t })}
-                    >
-                      {t === 'day' ? 'Day' : 'Night'}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className={`small ${settingsOpen ? 'on' : ''}`}
-                  aria-pressed={settingsOpen}
-                  onClick={() => {
-                    setSelection(undefined);
-                    setSettingsOpen((open) => !open);
-                  }}
-                  title="Brightness, start page, auto day/night, screen timeout"
-                >
-                  Display settings
-                </button>
-                <span className="device-size">
-                  {device?.hello.display.width}×{device?.hello.display.height}
-                </span>
-              </div>
-            }
+              )}
+            </PageTabs>
+            {pendingImport && (
+              <ImportConfirm
+                name={pendingImport.name}
+                unsupported={pendingImport.unsupported}
+                onReplace={applyImport}
+                onCancel={() => setPendingImport(null)}
+              />
+            )}
+            {remap && (
+              <RemapDialog
+                missing={remap}
+                paths={paths}
+                values={shownValues}
+                charts={charts}
+                onApply={applyRemap}
+                onSkip={() => setRemap(null)}
+              />
+            )}
             <div className="display-frame" data-theme-preview={layout.theme}>
               {grid && (
                 <GridCanvas

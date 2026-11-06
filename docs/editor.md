@@ -5,7 +5,9 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 ## Using it
 1. **Log in to SignalK as an administrator** (admin UI). The editor uses that login: its API lives under `/plugins/esphelm/api`, which SignalK restricts to admins. Without a login the editor shows a *Log in* link.
 2. **Displays** (left column, or the drop-down on a phone): every display that has said hello. A new one is *pending*: press **Adopt**. A display only appears after its own SignalK access request was approved with read/write permission (*Security → Access Requests*).
-3. **Pages.** Each display has one layout, created on the first save. The tabs above the canvas are its pages, in the order the display shows them (its footer buttons step through them; the canvas shows a preview of that footer, which every layout has: the page title and the display's settings menu button, ADR-0025, plus the page buttons when there are several pages):
+3. **Pages.** Each display has one layout, created on the first save.
+   - **The layout bar** at the top holds what applies to the whole layout: **Templates** and **Share** (below), **Display theme** and **Display settings**, and the display's size.
+   - **The tabs** under it are the pages, in the order the display shows them. They wrap onto more rows when there are many. The display's footer buttons step through them; the canvas shows a preview of that footer, which every layout has: the page title and the display's settings menu button, ADR-0025, plus the page buttons when there are several pages.
    - **+** adds a **grid page**, a **wind rose page** (a 1x1 grid with one wind rose tile filling the screen), or one page from a starter layout, after the current page.
    - **Templates** replaces *all* pages (and the theme) with a starter layout: Wind, Speeds, Energy, Engine, Switchboard, Autopilot, or the denser *Sailing*, *Wind and engine* and *Helm* (rose and autopilot side by side) layouts for large displays (listed first when the display's shorter side is at least 600 px). It asks first.
    - **Share** (ADR-0027):
@@ -15,10 +17,10 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
        - Paths and charts this server doesn't have are then listed with a picker each. A replacement applies to every use; *Keep as is* skips them.
      - **Use another display's layout:** pick a display, then **Copy** (its pages become this display's own layout, sent with *Save & send*) or **Link** (both displays show one layout at once, and editing it changes both; the editor says "Shared with …").
      - **Make a separate copy** (on a linked display) gives it its own layout again with the next *Save & send*.
-   - The current page's **title** (shown in the display's footer), **← →** to reorder, **Delete** (asks first; the last page can't be deleted).
+   - Under the tabs, the current page's **title** (shown in the display's footer), **← →** to reorder, **Delete** (asks first; the last page can't be deleted), and a grid page's size.
    - Pages or templates that need widgets this display's firmware lacks are struck through or disabled.
 4. **Edit a grid page:**
-   - **Grid size:** columns × rows above the canvas. The canvas has the display's aspect ratio.
+   - **Grid size:** columns × rows, next to the page title. The canvas has the display's aspect ratio.
    - **Add a tile:** click a tile type in *Tiles* (first free cell), or drag it onto a free cell. Types the display's firmware can't render are disabled and marked `n/a` (from its hello).
    - **Move:** drag a tile. **Resize:** drag its bottom-right corner. Cells snap; a red outline means it won't fit there.
    - **Settings** (right drawer, a bottom sheet on a phone):
