@@ -50,10 +50,13 @@ Ready-made configs:
 |---|---|---|
 | `firmware/esphelm_sdl.yaml` | desktop, 480×480 | compile, run, e2e test. Test hooks: `esphelm_shot_request <file>`, `esphelm_page_request <n>`, `esphelm_tap_request <tile> [button]` (autopilot buttons: `-10 -1 +1 +10 auto wind route standby`; a value tile or a wind rose that records opens its history, `@history close\|10m\|1h\|6h\|<rose value name>` works its popup), `esphelm_exit_request`. `ESPHELM_TEST_HISTORY=<key>[,<key>…]` (a tile id, or `<rose id>/<name>`) seeds those values with a fixed curve, across north for angles, and keeps them still (goldens) |
 | `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, 720 renders in the e2e test. It repeats `signalk_host`/`signalk_port` because `-s` on the command line does not override substitutions of the included `esphelm_sdl.yaml`; the e2e test refuses to run a build that isn't compiled for its test port |
-| `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles; **not yet run on hardware** |
+| `firmware/esphelm_sdl_cyd.yaml` | desktop, 320×240 with the CYD font sizes | compile; a preview of layouts on the CYD (not in the e2e test) |
+| `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles, checked on hardware |
+| `firmware/esphelm_guition_4848s040.yaml` | Guition ESP32-S3-4848S040, 4" 480×480, S3 with PSRAM (`hardware/guition-esp32-s3-4848s040.yaml`: ESPHome's `mipi_rgb` model `GUITION-4848S040`, GT911 touch, backlight GPIO38). The 480 font sizes of the SDL build | compiles (flash 1,799,787 B of 8 MB, static RAM 121,647 B); **not yet run on hardware** |
+| `firmware/esphelm_cyd.yaml` | ESP32-2432S028R "cheap yellow display", 2.8" 320×240, ESP32 without PSRAM (`hardware/esp32-2432s028r.yaml`: ESPHome's `mipi_spi` model `ESP32-2432S028`, the micro-USB ILI9341 revision, turned to landscape by the panel; XPT2046 resistive touch, backlight GPIO21). No chart pages, 6 recorded values; dense layouts need bigger tiles at this size | compiles (flash 1,491,819 B, 81 % of its 1.75 MB app partition; static RAM 55,524 B); **not yet run on hardware**, touch calibration and orientation unchecked |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
-The P4 and C3 configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
+The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
 
 ## What the display does
 

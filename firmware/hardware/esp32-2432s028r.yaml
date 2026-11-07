@@ -1,0 +1,99 @@
+# ESP32-2432S028R, the "cheap yellow display" (CYD): 2.8" 320x240, ESP32 without PSRAM and 4 MB
+# flash, ILI9341 SPI panel (ESPHome's mipi_spi model ESP32-2432S028, the micro-USB revision),
+# XPT2046 resistive touch on its own SPI bus. Used turned to landscape.
+# The RGB LED (GPIO4/16/17) and the light sensor (GPIO34) are not used.
+substitutions:
+  screen_width: "320"
+  screen_height: "240"
+
+esphome:
+  min_version: 2026.1.1
+
+esp32:
+  board: esp32dev
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+logger:
+
+json:
+
+preferences:
+  flash_write_interval: 5min
+
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin:
+      number: GPIO12
+      ignore_strapping_warning: true
+  - id: touch_spi
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+display:
+  - platform: mipi_spi
+    model: ESP32-2432S028
+    spi_id: lcd_spi
+    # Landscape by the panel itself (no second LVGL buffer, which rotation would need).
+    dimensions:
+      width: 320
+      height: 240
+    transform:
+      swap_xy: true
+      mirror_x: false
+      mirror_y: false
+    auto_clear_enabled: false
+    update_interval: never
+
+touchscreen:
+  - platform: xpt2046
+    id: touchscreen_
+    spi_id: touch_spi
+    cs_pin: GPIO33
+    interrupt_pin: GPIO36
+    # Typical values for this board; a resistive panel varies, check the corners on yours.
+    calibration:
+      x_min: 280
+      x_max: 3860
+      y_min: 340
+      y_max: 3860
+    transform:
+      swap_xy: true
+    # A touch while the screen is off wakes it (the runtime sees the light come on).
+    on_release:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - light.turn_on: display_backlight
+
+output:
+  - platform: ledc
+    id: backlight_
+    pin: GPIO21
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    name: "Backlight"
+    output: backlight_
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+    on_turn_on:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+    on_turn_off:
+      - lvgl.pause:
+
+lvgl:
+  id: lvgl_component
+  # No PSRAM: a partial buffer in internal RAM (CLAUDE.md §6 design floor), about 15 KB.
+  buffer_size: 10%
