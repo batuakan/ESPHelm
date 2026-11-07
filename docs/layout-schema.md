@@ -38,7 +38,12 @@ Page = GridPage | ChartPage           (discriminator: kind)
 GridPage                              kind: "grid"
 ├─ id: Id, title?: Label
 ├─ grid: { cols ≥ 1, rows ≥ 1 }
-└─ tiles: Tile[]            (at least 1)
+├─ tiles: Tile[]            (at least 1)
+└─ arrangements?: { square?, landscape?, portrait?: Arrangement }   (ADR-0028, below)
+
+Arrangement
+├─ grid: { cols ≥ 1, rows ≥ 1 }
+└─ tiles: { id, x, y, w, h }[]   (at least 1; ids of the page's tiles)
 
 Tile = value | gauge | bar | switch | position | wind_rose | autopilot   (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
@@ -93,6 +98,26 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
 **Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
+
+### Arrangements per screen shape (ADR-0028)
+A grid page can arrange its tiles once more for each screen shape. A display uses the arrangement for its own shape, and the page's `grid` and the tiles' own `x/y/w/h` (the default arrangement) for a shape without one.
+- **Shapes,** from the screen's width and height after rotation (`displayShape()` in `src/shape.ts`, `esphelm_shape.h`): **landscape** when `width ≥ 1.25 × height`, **portrait** when `height ≥ 1.25 × width`, else **square**. 480², 720² and 800×720 are square; 1280×800, 1024×600 and 800×480 landscape. `fixtures/shape.cases.json` holds the cases both implementations pass.
+- **An arrangement** has its own `grid` and places tiles of the page by `id`, with `x`, `y`, `w`, `h` only (settings stay in the page's tile). A tile it doesn't place is **hidden on that shape**.
+- **Rules:** each placement names a tile of the page (`UNKNOWN_TILE`), at most once (`DUPLICATE_ID`), inside the arrangement's grid (`TILE_OUT_OF_GRID`) and on cells of its own (`TILE_OVERLAP`); an arrangement places at least one tile (`EMPTY_PAGE`). Pointers lead into the arrangement, e.g. `/pages/0/arrangements/landscape/tiles/2`.
+- **Older firmware** ignores `arrangements` and shows the default.
+
+```json
+"arrangements": {
+  "portrait": {
+    "grid": { "cols": 1, "rows": 3 },
+    "tiles": [
+      { "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1 },
+      { "id": "stw", "x": 0, "y": 1, "w": 1, "h": 1 },
+      { "id": "depth", "x": 0, "y": 2, "w": 1, "h": 1 }
+    ]
+  }
+}
+```
 
 ### Centre-zero gauges and bars (ADR-0023)
 For values either side of zero: rudder angle, heel, rate of turn, battery current, trim.
@@ -313,14 +338,15 @@ Names are numeric in `<...>` (as the tz database writes them) or three or more l
 | `TOO_FEW` | structure | array shorter than allowed (fields without a more specific code) |
 | `UNSUPPORTED_VERSION` | structure | `version` isn't 1; validation stops here |
 | `NO_PAGES` | structure | `pages` is empty |
-| `EMPTY_PAGE` | structure | grid page without tiles |
+| `EMPTY_PAGE` | structure | grid page, or an arrangement, without tiles |
 | `INVALID_ID` / `INVALID_LABEL` / `INVALID_PATH` | structure | primitive rule failed (§2) |
 | `UNKNOWN_UNIT` | structure | unit not in `units.json` |
 | `UNKNOWN_PAGE_KIND` / `UNKNOWN_TILE_TYPE` | structure | discriminator not in the catalog (`kind: "widget"` included, ADR-0010) |
 | `UNKNOWN_SLOT` | structure | slot name not defined by the tile type |
-| `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use) |
-| `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
-| `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
+| `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use); a tile placed twice in one arrangement |
+| `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` (of the page's grid, or of an arrangement's) |
+| `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile), on the page's grid or an arrangement's |
+| `UNKNOWN_TILE` | semantic | an arrangement places an id that isn't a tile of the page |
 | `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max`; a centre-zero gauge/bar whose range doesn't cross zero; a graph with only one of `min`/`max`, or `min` not below `max` |
 | `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value or graph zone with neither `from` nor `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
@@ -378,7 +404,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `fw.version` | firmware version string |
 | `schema.major` | highest layout major the firmware parses |
 | `board` | board/model name |
-| `display` | `width`, `height` (px), `rotation` (0/90/180/270) |
+| `display` | `width`, `height` (px) as turned, and `rotation` (0/90/180/270), chosen on the display (ADR-0028); the editor arranges for the shape these give |
 | `widgets` | tile types this firmware renders |
 | `fonts?` | semantic font sizes available |
 | `fontLineHeights?` | line heights (px) of the fonts tile text can use, smallest first; the editor sizes its preview text from them (ADR-0017). Integers ≥ 1 |
@@ -393,6 +419,7 @@ See `packages/schema/fixtures/valid/`:
 - `minimal.json`: one tile.
 - `grid-2x2-values-480.json`: four speeds on a 480² screen.
 - `mixed-720.json`: gauge, bar, value and switch, with multi-cell tiles.
+- `arrangements.json`: one page arranged for each shape (a tile hidden on two of them), one with only the default.
 - `three-pages-wind-rose.json`: a full-screen wind rose with three slots, a grid page, and a rose with empty slots.
 - `legacy-port.json`: today's wind, grid, energy and engine apps, using their real SignalK paths.
 - `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.

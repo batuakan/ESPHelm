@@ -691,6 +691,13 @@ select {
   border-color: var(--danger);
   margin-top: auto;
 }
+/* Hiding a tile on one shape (ADR-0028) sits just above deleting it. */
+.drawer-hide {
+  margin-top: auto;
+}
+.drawer-hide + .danger {
+  margin-top: 8px;
+}
 
 /* Page tabs and tools */
 .page-tabs {
@@ -817,6 +824,43 @@ select {
 }
 .page-tools .danger {
   margin-top: 0;
+}
+
+/* The shape's arrangement of the page (ADR-0028), between the page tools and the canvas. */
+.arrangement {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.arrangement-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.arrangement-row > span:first-child {
+  margin-right: auto;
+}
+.arrangement .menu {
+  left: auto;
+  right: 0;
+}
+.arrangement-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.danger-inline {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.chip {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 13px;
 }
 
 /* Display footer preview (ESPHelm runtime: < title n/m >) */

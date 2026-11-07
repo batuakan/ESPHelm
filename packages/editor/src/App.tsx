@@ -9,7 +9,9 @@ import {
   GRAPH_FIT,
   TEMPLATES,
   TILE_TYPES,
+  displayShape,
   historyCount,
+  pageArrangement,
   validateLayout,
   type Layout,
   type Page,
@@ -58,6 +60,8 @@ import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
 import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
 import { ChartPreview } from './components/ChartPreview';
+import { ArrangementBar } from './components/ArrangementBar';
+import { SHAPE_TITLES, arrangeFor, arrangedPage, dropArrangement, inShape, showOnShape } from './arrangements';
 import {
   AUTOPILOT_TIER_TEXT,
   ROSE_TIER_TEXT,
@@ -207,7 +211,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   }, [props.live]);
   const index = layout ? Math.min(pageIndex, layout.pages.length - 1) : 0;
   const page = layout?.pages[index];
-  const grid = page?.kind === 'grid' ? page : undefined;
+  const display = device?.hello.display ?? { width: 480, height: 480 };
+  // The page as this display's shape arranges it (ADR-0028); grid edits go to that arrangement.
+  const shape = displayShape(display.width, display.height);
+  const basePage = page?.kind === 'grid' ? page : undefined;
+  const arrangement = useMemo(() => (basePage ? pageArrangement(basePage, shape) : undefined), [basePage, shape]);
+  const grid = useMemo(() => (basePage ? arrangedPage(basePage, shape) : undefined), [basePage, shape]);
+  const viewLayout = useMemo(
+    () => (layout && grid ? { ...layout, pages: layout.pages.map((p, i) => (i === index ? grid : p)) } : layout),
+    [layout, grid, index],
+  );
   const chartPage: ChartPage | undefined = page?.kind === 'chart' ? page : undefined;
   useEffect(() => {
     live?.setPaths(pagePaths(page));
@@ -237,9 +250,12 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const problemTileIds = useMemo(
     () =>
       new Set(
-        problemTargets.filter((t) => t.target?.page === index && t.target.tileId).map((t) => t.target!.tileId!),
+        problemTargets
+          // a problem in another shape's arrangement isn't on this canvas
+          .filter((t) => t.target?.page === index && t.target.tileId && (!t.target.shape || t.target.shape === shape))
+          .map((t) => t.target!.tileId!),
       ),
-    [problemTargets, index],
+    [problemTargets, index, shape],
   );
   const supported = useMemo(() => new Set(device?.hello.widgets ?? []), [device]);
   const dirty = layout !== null && JSON.stringify(layout) !== savedJson;
@@ -255,11 +271,20 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 
   const add = (type: TileType, at?: { x: number; y: number }) => {
     if (!layout) return;
-    const r = addTile(layout, index, type, at);
-    if (!r) return edit(null, 'No free cell there. Make the grid bigger or move a tile.');
+    let id = '';
+    const next = inShape(layout, index, shape, (l) => {
+      const r = addTile(l, index, type, at);
+      id = r?.id ?? '';
+      return r?.layout ?? null;
+    });
+    if (!next) return edit(null, 'No free cell there. Make the grid bigger or move a tile.');
     // A first clock gets this computer's time zone, so it shows what the clock on the wall does.
-    edit(type === 'clock' ? withBrowserTimeZone(r.layout) : r.layout);
-    setSelection({ id: r.id });
+    edit(type === 'clock' ? withBrowserTimeZone(next) : next);
+    setSelection({ id });
+    const before = layout.pages[index];
+    const after = next.pages[index];
+    if (arrangement?.own && before?.kind === 'grid' && after?.kind === 'grid' && after.grid.rows > before.grid.rows)
+      setStatus({ kind: 'info', text: 'The default arrangement was full: it got a row for the new tile.' });
   };
 
   const showPage = (i: number, sel?: Selection) => {
@@ -408,9 +433,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
   const chartSelected = !!chartPage && selection?.id === chartPage.id;
   const drawerOpen = !!tile || chartSelected;
-  const display = device?.hello.display ?? { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
-  const tileBox = (t: Tile) => (layout ? tilePixels(display, layout, index, t) : { width: 0, height: 0 });
+  const tileBox = (t: Tile) => (viewLayout ? tilePixels(display, viewLayout, index, t) : { width: 0, height: 0 });
   const tilePx = (t: Tile) => {
     const { width, height } = tileBox(t);
     return Math.min(width, height);
@@ -594,7 +618,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     min={1}
                     max={8}
                     value={grid.grid.cols}
-                    onChange={(e) => edit(setGrid(layout, index, Math.max(1, Number(e.target.value)), grid.grid.rows))}
+                    onChange={(e) =>
+                      edit(
+                        inShape(layout, index, shape, (l) =>
+                          setGrid(l, index, Math.max(1, Number(e.target.value)), grid.grid.rows),
+                        ),
+                      )
+                    }
                     aria-label="Columns"
                   />
                   ×
@@ -603,7 +633,13 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                     min={1}
                     max={8}
                     value={grid.grid.rows}
-                    onChange={(e) => edit(setGrid(layout, index, grid.grid.cols, Math.max(1, Number(e.target.value))))}
+                    onChange={(e) =>
+                      edit(
+                        inShape(layout, index, shape, (l) =>
+                          setGrid(l, index, grid.grid.cols, Math.max(1, Number(e.target.value))),
+                        ),
+                      )
+                    }
                     aria-label="Rows"
                   />
                 </label>
@@ -625,6 +661,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 charts={charts}
                 onApply={applyRemap}
                 onSkip={() => setRemap(null)}
+              />
+            )}
+            {grid && arrangement && (
+              <ArrangementBar
+                shape={shape}
+                own={arrangement.own}
+                hidden={arrangement.hidden}
+                onArrange={(turned) => edit(arrangeFor(layout, index, shape, turned))}
+                onDrop={() => edit(dropArrangement(layout, index, shape))}
+                onShow={(id) => edit(showOnShape(layout, index, shape, id))}
               />
             )}
             <div className="display-frame" data-theme-preview={layout.theme}>
@@ -657,8 +703,18 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   newTileDrag={newTileDrag}
                   onSelect={(id) => setSelection(id ? { id } : undefined)}
                   onSelectSlot={(id, slot) => setSelection({ id, slot })}
-                  onMove={(id, x, y) => edit(moveTile(layout, index, id, x, y), 'That spot is taken.')}
-                  onResize={(id, w, h) => edit(resizeTile(layout, index, id, w, h), 'Not enough room to grow there.')}
+                  onMove={(id, x, y) =>
+                    edit(
+                      inShape(layout, index, shape, (l) => moveTile(l, index, id, x, y)),
+                      'That spot is taken.',
+                    )
+                  }
+                  onResize={(id, w, h) =>
+                    edit(
+                      inShape(layout, index, shape, (l) => resizeTile(l, index, id, w, h)),
+                      'Not enough room to grow there.',
+                    )
+                  }
                   onDropNew={(type, cell) => add(type, cell)}
                   onDragNewEnd={() => setNewTileDrag(null)}
                 />
@@ -755,6 +811,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
             edit(removeTile(layout, index, tile.id));
             setSelection(undefined);
           }}
+          hide={
+            arrangement?.own
+              ? {
+                  text: `Hide on ${SHAPE_TITLES[shape].toLowerCase()}`,
+                  onHide: () => {
+                    edit(inShape(layout, index, shape, (l) => removeTile(l, index, tile.id)));
+                    setSelection(undefined);
+                  },
+                }
+              : undefined
+          }
           onClose={() => setSelection(undefined)}
         />
       )}
@@ -799,6 +866,7 @@ const PROBLEM_TEXT: Record<string, string> = {
   INVALID_ZONE: 'a zone ends before it starts',
   ZONE_OUT_OF_RANGE: 'a zone lies outside min..max',
   DUPLICATE_ID: 'the same id is used twice',
+  UNKNOWN_TILE: 'the arrangement places a tile the page does not have',
 };
 
 function describeProblem(
@@ -820,6 +888,7 @@ function describeProblem(
         : (PROBLEM_TEXT[code] ?? `${code} at ${pointer}`);
   const where = [
     layout.pages.length > 1 && page ? (page.title ?? page.id) : undefined,
+    target?.shape ? `${SHAPE_TITLES[target.shape].toLowerCase()} arrangement` : undefined,
     target?.tileId,
     target?.slot ? SLOT_TITLES[target.slot] : undefined,
   ].filter(Boolean);

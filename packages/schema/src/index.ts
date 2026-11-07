@@ -9,6 +9,7 @@ export * from './serverZones.js';
 export * from './textFit.js';
 export * from './history.js';
 export * from './pages.js';
+export * from './shape.js';
 export * from './layout.js';
 export * from './settings.js';
 export * from './hello.js';

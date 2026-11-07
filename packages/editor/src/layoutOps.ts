@@ -23,6 +23,8 @@ import {
   HEADING_TAPE_MARKERS,
   type HeadingTapeMarker,
   type HeadingTapeTile,
+  SHAPES,
+  type Shape,
 } from '@esphelm/schema';
 
 export interface Rect {
@@ -277,8 +279,23 @@ export function resizeTile(
   return t ? placeTile(layout, index, id, { x: t.x, y: t.y, w, h }) : null;
 }
 
+/** Delete a tile from the page and from every arrangement of it; an arrangement left empty goes. */
 export function removeTile(layout: Layout, index: number, id: string): Layout {
-  return withGrid(layout, index, (p) => ({ ...p, tiles: p.tiles.filter((t) => t.id !== id) }));
+  return withGrid(layout, index, (p) => {
+    const tiles = p.tiles.filter((t) => t.id !== id);
+    if (!p.arrangements) return { ...p, tiles };
+    const arrangements: NonNullable<GridPage['arrangements']> = {};
+    for (const shape of SHAPES) {
+      const a = p.arrangements[shape];
+      const placed = a?.tiles.filter((t) => t.id !== id);
+      if (a && placed && placed.length > 0) arrangements[shape] = { ...a, tiles: placed };
+    }
+    const { arrangements: _old, ...rest } = p;
+    void _old;
+    return Object.keys(arrangements).length > 0
+      ? { ...rest, tiles, arrangements }
+      : { ...rest, tiles };
+  });
 }
 
 /** Merge `patch` into `target`; undefined values remove the field (e.g. clearing the unit). */
@@ -381,11 +398,25 @@ export function addTemplatePages(
     used.add(free);
     return free;
   };
-  const pages = template.pages.map((p): Page =>
-    p.kind === 'grid'
-      ? { ...p, id: claim(p.id), tiles: p.tiles.map((t) => ({ ...t, id: claim(t.id) })) }
-      : { ...p, id: claim(p.id) },
-  );
+  const pages = template.pages.map((p): Page => {
+    if (p.kind !== 'grid') return { ...p, id: claim(p.id) };
+    const ids = new Map(p.tiles.map((t) => [t.id, claim(t.id)]));
+    const page: GridPage = {
+      ...p,
+      id: claim(p.id),
+      tiles: p.tiles.map((t) => ({ ...t, id: ids.get(t.id) ?? t.id })),
+    };
+    if (p.arrangements) {
+      // Arrangements name tiles by id: follow the renames (ADR-0028).
+      page.arrangements = Object.fromEntries(
+        Object.entries(p.arrangements).map(([shape, a]) => [
+          shape,
+          { ...a, tiles: a.tiles.map((t) => ({ ...t, id: ids.get(t.id) ?? t.id })) },
+        ]),
+      );
+    }
+    return page;
+  });
   return insertPages(layout, pages, after);
 }
 
@@ -655,9 +686,29 @@ export interface ProblemTarget {
   page: number;
   tileId?: string;
   slot?: SlotName;
+  /** The problem is in this shape's arrangement of the page. */
+  shape?: Shape;
 }
 
 export function targetForPointer(layout: Layout, pointer: string): ProblemTarget | undefined {
+  // A tile placed in an arrangement (ADR-0028): /pages/1/arrangements/landscape/tiles/2
+  const a =
+    /^\/pages\/(\d+)\/arrangements\/(square|landscape|portrait)(?:\/tiles\/(\d+))?(\/|$)/.exec(
+      pointer,
+    );
+  if (a) {
+    const index = Number(a[1]);
+    const page = layout.pages[index];
+    if (!page) return undefined;
+    const shape = a[2] as Shape;
+    const placed =
+      page.kind === 'grid' && a[3] !== undefined
+        ? page.arrangements?.[shape]?.tiles[Number(a[3])]
+        : undefined;
+    const tileId =
+      placed && pageTiles(page).some((t) => t.id === placed.id) ? placed.id : undefined;
+    return { page: index, shape, ...(tileId ? { tileId } : {}) };
+  }
   const m = /^\/pages\/(\d+)(?:\/tiles\/(\d+)(?:\/slots\/([^/]+))?)?(\/|$)/.exec(pointer);
   if (!m) return undefined;
   const index = Number(m[1]);

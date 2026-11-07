@@ -1,0 +1,19 @@
+{
+  "description": "Screen shapes (ADR-0028): displayShape() in src/shape.ts and esphelm_shape.h must agree.",
+  "cases": [
+    { "width": 480, "height": 480, "expected": "square" },
+    { "width": 720, "height": 720, "expected": "square" },
+    { "width": 800, "height": 720, "expected": "square" },
+    { "width": 720, "height": 800, "expected": "square" },
+    { "width": 1000, "height": 801, "expected": "square" },
+    { "width": 1000, "height": 800, "expected": "landscape" },
+    { "width": 800, "height": 1000, "expected": "portrait" },
+    { "width": 1280, "height": 800, "expected": "landscape" },
+    { "width": 1024, "height": 600, "expected": "landscape" },
+    { "width": 800, "height": 480, "expected": "landscape" },
+    { "width": 800, "height": 1280, "expected": "portrait" },
+    { "width": 480, "height": 800, "expected": "portrait" },
+    { "width": 320, "height": 240, "expected": "landscape" },
+    { "width": 1, "height": 1, "expected": "square" }
+  ]
+}

@@ -125,7 +125,11 @@ class Firmware {
 
 async function main(): Promise<void> {
   if (!process.env.DISPLAY) throw new Error('SDL needs an X display (DISPLAY is not set)');
-  for (const config of ['firmware/esphelm_sdl.yaml', 'firmware/esphelm_sdl_720.yaml']) {
+  for (const config of [
+    'firmware/esphelm_sdl.yaml',
+    'firmware/esphelm_sdl_720.yaml',
+    'firmware/esphelm_sdl_wide.yaml',
+  ]) {
     console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
     execFileSync(
       ESPHOME,
@@ -135,7 +139,7 @@ async function main(): Promise<void> {
   }
   // Never let a test build talk to a real SignalK server (e.g. the default :3000): check that
   // the compiled code really uses the test port before starting any firmware.
-  for (const name of ['esphelm-sdl', 'esphelm-sdl-720']) {
+  for (const name of ['esphelm-sdl', 'esphelm-sdl-720', 'esphelm-sdl-wide']) {
     const main = readFileSync(join(FIRMWARE, `.esphome/build/${name}/src/main.cpp`), 'utf8');
     if (!main.includes(`set_port(${PORT});`) || !main.includes('set_host("127.0.0.1");'))
       throw new Error(`${name} was not built for 127.0.0.1:${PORT}; refusing to run it`);
@@ -149,6 +153,9 @@ async function main(): Promise<void> {
   const work720 = join(work, '720');
   mkdirSync(work720);
   const fw720 = new Firmware(work720, binary('esphelm-sdl-720'));
+  const workWide = join(work, 'wide');
+  mkdirSync(workWide);
+  const fwWide = new Firmware(workWide, binary('esphelm-sdl-wide'));
   const workBoot = join(work, 'boot');
   mkdirSync(workBoot);
   const fwBoot = new Firmware(workBoot);
@@ -744,6 +751,36 @@ async function main(): Promise<void> {
     check(
       'panel: Auto hands the theme back to the layout',
       await waitNext(/Theme on the display: automatic \(day\)/),
+    );
+    // Rotation (ADR-0028): the display says hello again with its rotation, so the editor knows.
+    const helloRotation = async () => {
+      const devices = (await json('GET', '/plugins/esphelm/api/devices', admin))
+        .body as unknown as {
+        id: string;
+        hello: { display: { width: number; height: number; rotation: number } };
+      }[];
+      return devices.find((d) => d.id === DEVICE_ID)?.hello.display;
+    };
+    const helloTurnedTo = async (degrees: number) => {
+      for (let t0 = Date.now(); Date.now() - t0 < 15000; await sleep(250)) {
+        if ((await helloRotation())?.rotation === degrees) return true;
+      }
+      return false;
+    };
+    settingsTap('rotate=90');
+    check(
+      'rotation: 90 degrees turns the picture',
+      await waitNext(/Rotation: 90 degrees, 480 x 480/),
+    );
+    check(
+      'rotation: the hello tells the plugin',
+      await helloTurnedTo(90),
+      JSON.stringify(await helloRotation()),
+    );
+    settingsTap('rotate=0');
+    check(
+      'rotation: back to 0 degrees',
+      (await waitNext(/Rotation: 0 degrees, 480 x 480/)) && (await helloTurnedTo(0)),
     );
     settingsTap('sleep');
     check(
@@ -1514,6 +1551,68 @@ async function main(): Promise<void> {
     );
     await fw720.stop();
 
+    // 12i. Screen shapes (ADR-0028) on the 1280x800 build, offline from a seeded cache: a page
+    //      with its own landscape arrangement, one with only the default, the settings panel
+    //      wide; then Settings > Rotation > 90 degrees turns it to 800x1280, where the page shows
+    //      its portrait arrangement, and the rotation is kept after a restart.
+    const shaped = readFileSync(join(FIXTURES, 'valid/arrangements.json'), 'utf8');
+    writeFileSync(join(workWide, 'esphelm_cur.bin'), cacheRecord(shaped, '"seed-shapes"'));
+    const tapWide = (target: string) =>
+      writeFileSync(join(workWide, 'esphelm_tap_request'), target);
+    const wideNext = (re: RegExp) => fwWide.waitLog(re, 15000, fwWide.count(re) + 1);
+    fwWide.start();
+    check(
+      'shapes: the wide build shows the seeded layout',
+      await fwWide.waitLog(/Showing cached layout "arrangements" \(2 pages/),
+    );
+    check(
+      'shapes: 1280x800 shows the landscape arrangement',
+      await fwWide.waitLog(/Page 1\/2 "speeds" \(landscape\): 4 widgets/),
+    );
+    await sleep(1500);
+    await fwWide.screenshot('wide-01-landscape', shots);
+    writeFileSync(join(workWide, 'esphelm_page_request'), '1');
+    check(
+      'shapes: a page without one stretches its default arrangement',
+      await fwWide.waitLog(/Page 2\/2 "wind" \(landscape, default arrangement\)/),
+    );
+    await sleep(1500);
+    await fwWide.screenshot('wide-02-default', shots);
+    writeFileSync(join(workWide, 'esphelm_page_request'), '0');
+    await fwWide.waitLog(/Page 1\/2 "speeds" \(landscape\)/, 15000, 2);
+    tapWide('@menu');
+    check('shapes: the settings panel opens wide', await fwWide.waitLog(/Settings opened/));
+    await sleep(1000);
+    await fwWide.screenshot('wide-03-settings-panel', shots);
+    tapWide('@settings rotate=90');
+    check(
+      'rotation: 90 degrees makes the wide screen portrait',
+      await fwWide.waitLog(/Rotation: 90 degrees, 800 x 1280/),
+    );
+    check(
+      'rotation: the page is built again with its portrait arrangement (one tile hidden)',
+      await fwWide.waitLog(/Page 1\/2 "speeds" \(portrait\): 3 widgets/),
+    );
+    await sleep(1000);
+    await fwWide.screenshot('wide-04-settings-portrait', shots);
+    tapWide('@settings tab-info');
+    await wideNext(/Settings: information tab/);
+    await sleep(1500);
+    await fwWide.screenshot('wide-05-info-portrait', shots);
+    tapWide('@settings close');
+    await wideNext(/Settings closed/);
+    await sleep(1000);
+    await fwWide.screenshot('wide-06-portrait', shots);
+    await fwWide.stop();
+    fwWide.start();
+    check(
+      'rotation: kept after a restart, before the page is built',
+      (await fwWide.waitLog(/Rotation: 90 degrees, 800 x 1280/)) &&
+        (await fwWide.waitLog(/Page 1\/2 "speeds" \(portrait\)/)) &&
+        fwWide.count(/\(landscape\)/) === 0,
+    );
+    await fwWide.stop();
+
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the
     //     last known good one is shown, and it stays skipped after a normal restart.
     const good = readFileSync(join(FIXTURES, 'valid/minimal.json'), 'utf8');
@@ -1567,12 +1666,14 @@ async function main(): Promise<void> {
   } finally {
     await fw.stop();
     await fw720.stop();
+    await fwWide.stop();
     await fwBoot.stop();
     await fwSetup.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
       fw720.saveLog();
+      fwWide.saveLog();
       fwBoot.saveLog();
       fwSetup.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);

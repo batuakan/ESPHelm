@@ -21,6 +21,12 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
    - Pages or templates that need widgets this display's firmware lacks are struck through or disabled.
 4. **Edit a grid page:**
    - **Grid size:** columns × rows, next to the page title. The canvas has the display's aspect ratio.
+   - **Arrangement per screen shape** (ADR-0028): the bar above the canvas says which arrangement the selected display's shape (square, landscape or portrait, from its turned size) shows.
+     - **"Landscape: uses the default arrangement":** the page's own grid, which every shape without an arrangement of its own shows (stretched). Edits change it for all of them.
+     - ***Arrange for landscape*** gives the page an arrangement for that shape, starting from the default as it is, or turned (rows become columns). Only displays of that shape show it.
+     - **In an arrangement,** moves, resizes, the grid size and new tiles change only that shape. A tile's settings are still shared. A tile added there is also placed in the default (its first free cell, or a new row, which the editor mentions).
+     - ***Hide on landscape*** (tile drawer) leaves a tile out of that shape only; *Delete tile everywhere* deletes it. Hidden tiles are listed under the bar: a tap puts one back.
+     - ***Use the default again*** drops the arrangement (asks first).
    - **Add a tile:** click a tile type in *Tiles* (first free cell), or drag it onto a free cell. Types the display's firmware can't render are disabled and marked `n/a` (from its hello).
    - **Move:** drag a tile. **Resize:** drag its bottom-right corner. Cells snap; a red outline means it won't fit there.
    - **Settings** (right drawer, a bottom sheet on a phone):
@@ -101,6 +107,7 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
     - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, and the display downloads the page
     - sharing: a second display; *Export file* downloads exactly the layout the display gets; a file with a path the server lacks is imported on the second display, the path replaced in the list, and the display gets it under its own id; *Link* gives both displays one layout and *Make a separate copy* separates them again
+    - screen shapes: the display says hello as a 1280×800 landscape screen; *Arrange for landscape* → *Copy turned*, a wider grid and a hidden tile are saved in the page's landscape arrangement with the default untouched; the tile is shown again, and *Use the default again* removes the arrangement
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer
 
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.
@@ -108,5 +115,6 @@ A display that skipped a layout because it crashed while showing it (boot guard,
 ## Not covered yet
 - A list of the boat's active alarms (the display shows them; the editor doesn't yet).
 - Copying tiles between pages, undo.
+- Editing the arrangement of a shape the selected display doesn't have (ADR-0028).
 - Preview is an HTML approximation of the display (open question 7); SDL-rendered previews could come later.
 - Tested in Chrome (desktop and emulated phone with touch) only; Safari/Firefox and real phones are unverified.

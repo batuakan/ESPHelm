@@ -92,11 +92,21 @@ The P4 and C3 configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles 
 - The page index survives a layout update with the same layout id (clamped if pages were removed). A new layout id starts at page 1. A reboot starts at page 1.
 - There is no swiping; the legacy apps keep theirs.
 
+## Screen shapes and rotation (ADR-0028)
+- **Arrangement:** when the renderer builds a grid page it measures the screen (`lv_display_get_horizontal_resolution` and `_vertical_`, so after rotation), takes its shape from `esphelm_shape.h` (`display_shape()`, ratio `SHAPE_RATIO_PERCENT` from the generated `esphelm_sizes.h`), and uses the page's arrangement for that shape, else its default grid and tile positions. It builds only the tiles the arrangement places; the DEBUG page line says which (`Page 1/2 "speeds" (portrait): 3 widgets`, or `(landscape, default arrangement)`).
+- **Parsing:** `layout_parser.cpp` keeps a `Placement` per arranged tile (the tile's index in the page, `x/y/w/h`) and an `Arrangement` per shape in `Page`; unknown or repeated ids, bounds and overlaps are checked like the TS validator (`UNKNOWN_TILE`, `DUPLICATE_ID`, `TILE_OUT_OF_GRID`, `TILE_OVERLAP`), so a bad arrangement refuses the layout like any other error.
+- **Rotation** (`USE_ESPHELM_ROTATION`): set when the board's `lvgl:` config has `rotation:` (ESPHome then allocates its rotation buffer and turns touch as well). The runtime gets the `LvglComponent` from `__init__.py`.
+  - **Chosen** in the panel's *Settings* tab (*Rotation*: 0°, 90°, 180°, 270°; tap parts `rotate=<degrees>`), and saved as an ESPHome preference of its own (`ROTATION_PREF_KEY`, a `uint16_t`), synced at once.
+  - **At boot** it is read and applied (`LvglComponent::set_rotation()`) before the cached layout is built. A saved value that isn't a multiple of 90 below 360 is ignored.
+  - **A change** rebuilds the page (or the status screen), closes the history popup, rebuilds the open panel at the new size, and sends a `hello` at once with the turned `width`/`height` and the `rotation`. The *Info* tab's Screen row adds "turned 90°".
+  - **Boards:** on for `esphelm_p4.yaml` (the PPA turns the buffer, which is in PSRAM) and the SDL builds; off for the C3 (a second 10 % draw buffer would cost about 46 KB of internal RAM).
+
 ## Settings panel (ADR-0025)
 - **Opening and closing:** the footer's menu button (or the status page's, before there is a layout) opens `SettingsPanel` on LVGL's top layer, below the alarm banner, on its *Settings* tab; *Network* and *Info* are the others. Only the tab shown is built. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
 - **Brightness** is a slider for the theme shown: day 5–100 %, night 1–100 %. It dims live and is saved when let go. On a board without a backlight it is only logged.
 - **Theme:** *Day* and *Night* override the layout's theme and the sun; *Auto* hands it back.
 - **Screen off,** shown when the layout has a screen timeout, switches off (or to the screen saver) at once.
+- **Rotation,** below it on boards that allow it, turns the picture (ADR-0028, above).
 - **Saved choices** are kept in `Slot::PREFS` (NVS key `prefs`; `esphelm_prefs.bin` on the host) by `display_prefs.cpp`.
   - **Format:** a self-checking record, `v=1;th=…;bd=…;bn=…` plus the layout values they were chosen against.
   - **Read:** before the first layout, so they survive a reboot. A record that doesn't parse or has a value out of range is ignored.
@@ -212,6 +222,8 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes, now on every layout, with the menu button's three bars |
 | Settings panel (ADR-0025) | about 20 LVGL objects with the *Settings* tab, about 30 with *Info* (four per section), none when closed; the saved choices are one record of under 100 B in NVS |
+| Arrangements (ADR-0028) | 12 B per placed tile and a few bytes per arrangement in the model; hidden tiles build nothing |
+| Rotation (ADR-0028) | ESPHome's second draw buffer, as large as LVGL's (in PSRAM on the P4), allocated at boot when `lvgl: rotation:` is set; the saved angle is one 2-byte preference |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
 | P4 runtime firmware, static | RAM 98,742 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 15.5 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
 | C3 compile check, static | RAM 112,768 B of 321,296 B (35.1 %), flash 1.48 MB of 1.8 MB (80.7 %) |
@@ -270,8 +282,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21e. **centre-zero gauges and bars** (ADR-0023, `fixtures/valid/center-zero.json`): a rudder and a rate of turn (port/starboard), a house current (−50…20, plus/minus) and a vertical start current, with live values one way, then the other way round, and at night; offline at 720 (no fill, "--")
 
   21g. **setup** (ADR-0026, offline from an empty flash, `ESPHELM_TEST_SETUP=ap|joining` standing in for Wi-Fi): the *Set up Wi-Fi* screen with its QR code, the status page's menu button opening the panel, the *Network* tab with the setup network, and "Joining Wi-Fi"
+  21h. **screen shapes and rotation** (ADR-0028), on the 1280×800 build (`esphelm_sdl_wide.yaml`), offline from `fixtures/valid/arrangements.json`: a page with its landscape arrangement, a page with only the default, the settings panel wide; *Rotation* → 90° turns it to 800×1280 and the page shows its portrait arrangement (one tile hidden), the panel and *Info* tab turned, and the rotation is applied again after a restart before the page is built. Online at 480, 90° and back send a hello the plugin stores with the rotation
   21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
-  Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
+  Eighty-four screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
 All steps below were checked on the P4-86 (2026-11-05). Keep them for new boards and for changes that touch them.
@@ -367,3 +380,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - **Mistyped password:** at the bottom of the panel's *Network* tab, *Factory reset* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
     - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
     - Check that the QR code scans from about 30 cm by day and at night.
+26. **Screen shapes and rotation (ADR-0028).** On any layout, open the settings panel: *Rotation* is below *Screen off*.
+    - **Turning:** tap 90°. The picture turns a quarter clockwise at once; tap buttons in the panel and check each press lands on the button drawn under your finger. The editor lists the display as 720×720, turned (still square, so it shows the same arrangement).
+    - **The other angles:** 180° and 270°, then back to 0°.
+    - **Kept:** choose 90°, power-cycle: the display starts turned, before its layout appears. Set it back to 0°.
+    - **Layouts:** existing layouts look exactly as before at 0°.

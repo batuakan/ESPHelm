@@ -124,3 +124,12 @@ export interface ClockCases {
 export const CLOCK_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'clock.cases.json'), 'utf8'),
 ) as ClockCases;
+
+/** Screen shape cases (ADR-0028), shared by the TS and C++ tests. */
+export interface ShapeCases {
+  cases: { width: number; height: number; expected: string }[];
+}
+
+export const SHAPE_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'shape.cases.json'), 'utf8'),
+) as ShapeCases;

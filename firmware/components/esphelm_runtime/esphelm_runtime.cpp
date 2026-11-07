@@ -27,6 +27,12 @@ namespace esphelm_runtime {
 
 static const char *const TAG = "esphelm";
 
+#ifdef USE_ESPHELM_ROTATION
+// The rotation chosen on the display (ADR-0028): its own ESPHome preference, apart from the
+// display choices, which follow the layout; a factory reset erases it with the rest.
+static const uint32_t ROTATION_PREF_KEY = 0x45485230;  // "EHR0"
+#endif
+
 static const uint32_t DRAW_INTERVAL_MS = 250;       // at most 4 redraws per tile per second
 static const uint32_t POLL_INTERVAL_MS = 5 * 60 * 1000;  // fallback when a version delta is missed
 static const uint32_t LKG_AFTER_MS = 30 * 1000;      // rendered this long without trouble -> last known good
@@ -151,6 +157,18 @@ void EsphelmRuntime::setup() {
     else
       ESP_LOGW(TAG, "Saved display choices are not valid; ignoring them");
   }
+
+#ifdef USE_ESPHELM_ROTATION
+  // The rotation chosen on the display, before anything is built for the screen's size.
+  this->rotation_pref_ = global_preferences->make_preference<uint16_t>(ROTATION_PREF_KEY, true);
+  uint16_t degrees = 0;
+  if (this->rotation_pref_.load(&degrees)) {
+    if (degrees < 360 && degrees % 90 == 0)
+      this->rotate_(degrees, false);
+    else
+      ESP_LOGW(TAG, "Saved rotation %u is not valid; ignoring it", (unsigned) degrees);
+  }
+#endif
 
   // Offline first: show what we had before any network traffic. The boot guard first decides
   // whether the cached layout is the one that keeps crashing the display (ADR-0013).
@@ -294,7 +312,7 @@ void EsphelmRuntime::send_hello_() {
   lv_display_t *disp = lv_display_get_default();
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
-  doc["display"]["rotation"] = 0;
+  doc["display"]["rotation"] = this->rotation_();  // width and height are as rotated
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
   for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock"})
@@ -919,6 +937,10 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
   s.brightness = this->brightness_percent_();
   s.min_brightness = this->theme_ == esphelm::Theme::NIGHT ? esphelm::PREFS_MIN_NIGHT : esphelm::PREFS_MIN_DAY;
   s.can_sleep = this->layout_.settings.screen_timeout > 0;
+#ifdef USE_ESPHELM_ROTATION
+  s.can_rotate = this->lvgl_ != nullptr;
+#endif
+  s.rotation = this->rotation_();
 #ifdef USE_ESPHELM_WIFI_SETUP
   s.wifi = true;
 #endif
@@ -1038,6 +1060,47 @@ void EsphelmRuntime::factory_reset_() {
 #endif
 }
 
+int EsphelmRuntime::rotation_() const {
+#ifdef USE_ESPHELM_ROTATION
+  if (this->lvgl_ != nullptr)
+    return static_cast<int>(this->lvgl_->get_rotation());  // DisplayRotation is in degrees
+#endif
+  return 0;
+}
+
+void EsphelmRuntime::rotate_(int degrees, bool save) {
+#ifdef USE_ESPHELM_ROTATION
+  if (this->lvgl_ == nullptr || degrees < 0 || degrees >= 360 || degrees % 90 != 0)
+    return;
+  if (save) {
+    uint16_t value = static_cast<uint16_t>(degrees);
+    if (!this->rotation_pref_.save(&value) || !global_preferences->sync())
+      ESP_LOGW(TAG, "Could not save the rotation; it will not survive a reboot");
+  }
+  if (degrees == this->rotation_())
+    return;
+  this->lvgl_->set_rotation(degrees);
+  lv_display_t *disp = lv_display_get_default();
+  ESP_LOGI(TAG, "Rotation: %d degrees, %d x %d", degrees, (int) lv_display_get_horizontal_resolution(disp),
+           (int) lv_display_get_vertical_resolution(disp));
+  // The screen has another size, maybe another shape: build what shows for it again.
+  if (this->popup_.is_open())
+    this->popup_.close();
+  if (this->has_layout_) {
+    this->build_page_(this->page_);
+  } else {
+    this->status_key_.clear();
+    this->update_status_();
+  }
+  // The editor previews this display at its size.
+  this->hello_due_ = true;
+  this->next_hello_ms_ = 0;
+#else
+  (void) degrees;
+  (void) save;
+#endif
+}
+
 void EsphelmRuntime::tick_panel_(uint32_t now) {
   if (!this->panel_.is_open())
     return;
@@ -1057,6 +1120,11 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
       ESP_LOGI(TAG, "Brightness chosen on the display: %d %% (%s)", percent, night ? "night" : "day");
       this->save_prefs_();
     }
+  }
+  int degrees;
+  if (this->panel_.take_rotation(degrees)) {
+    ESP_LOGI(TAG, "Rotation chosen on the display: %d degrees", degrees);
+    this->rotate_(degrees, true);
   }
   if (this->panel_.take_sleep()) {
     ESP_LOGI(TAG, "Screen off from the settings");
@@ -1165,8 +1233,13 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
   rows.push_back({"Display", "Id", this->device_id_});
   rows.push_back({nullptr, "Board", this->board_});
   rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
-  std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
-                (int) lv_display_get_vertical_resolution(disp));
+  const int degrees = this->rotation_();
+  if (degrees == 0)
+    std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
+                  (int) lv_display_get_vertical_resolution(disp));
+  else
+    std::snprintf(buf, sizeof(buf), "%d x %d, turned %d°", (int) lv_display_get_horizontal_resolution(disp),
+                  (int) lv_display_get_vertical_resolution(disp), degrees);
   rows.push_back({nullptr, "Screen", buf});
   rows.push_back({nullptr, "Up", uptime_text(millis_64() / 1000)});
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF

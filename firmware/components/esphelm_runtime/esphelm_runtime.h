@@ -23,6 +23,10 @@
 #ifdef USE_ESPHELM_TIME
 #include "esphome/components/time/real_time_clock.h"
 #endif
+#ifdef USE_ESPHELM_ROTATION
+#include "esphome/components/lvgl/lvgl_esphome.h"
+#include "esphome/core/preferences.h"
+#endif
 #ifdef USE_WIFI
 #include "esphome/components/wifi/wifi_component.h"
 #endif
@@ -72,6 +76,10 @@ class EsphelmRuntime : public Component {
 #endif
 #ifdef USE_ESPHELM_TIME
   void set_time(time::RealTimeClock *time) { this->time_ = time; }
+#endif
+#ifdef USE_ESPHELM_ROTATION
+  /// ESPHome's LVGL, which turns the picture (and touch) at runtime (`lvgl: rotation:` set).
+  void set_lvgl(lvgl::LvglComponent *lvgl) { this->lvgl_ = lvgl; }
 #endif
 
   void setup() override;
@@ -151,6 +159,9 @@ class EsphelmRuntime : public Component {
   void setup_ap_();
   void tick_network_();
   void factory_reset_();
+  /// Turn the picture clockwise (ADR-0028), rebuild what is shown for the new size, tell the plugin.
+  void rotate_(int degrees, bool save);
+  int rotation_() const;
   bool ap_active_() const;
   std::string ap_ssid_() const;
   bool wifi_connected_() const;
@@ -254,6 +265,10 @@ class EsphelmRuntime : public Component {
   std::string clock_source_;  // what set it last, for the settings panel
   uint32_t clock_listener_{0};
   uint32_t next_clock_check_ms_{0};
+#ifdef USE_ESPHELM_ROTATION
+  lvgl::LvglComponent *lvgl_{nullptr};
+  ESPPreferenceObject rotation_pref_;
+#endif
 #ifdef USE_ESPHELM_TIME
   time::RealTimeClock *time_{nullptr};
 #endif

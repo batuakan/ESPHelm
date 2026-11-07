@@ -75,8 +75,51 @@ const withTile = (patch: Record<string, unknown>) => ({
   pages: [{ ...minimal.pages[0], tiles: [{ ...minimal.pages[0]?.tiles[0], ...patch }] }],
 });
 
+const arranged = JSON.parse(readFileSync(join(FIXTURES, 'valid/arrangements.json'), 'utf8')) as {
+  pages: Record<string, unknown>[];
+} & Record<string, unknown>;
+const withPage = (patch: Record<string, unknown>) => ({
+  ...arranged,
+  pages: [{ ...arranged.pages[0], ...patch }, ...arranged.pages.slice(1)],
+});
+const landscape = (patch: unknown) => withPage({ arrangements: { landscape: patch } });
+
 /** Extra mutations beyond the fixtures, compared the same way (differential test). */
 const mutations: { name: string; doc: unknown }[] = [
+  { name: 'arrangements not an object', doc: withPage({ arrangements: [] }) },
+  { name: 'an arrangement not an object', doc: landscape('wide') },
+  {
+    name: 'arrangement tiles not an array',
+    doc: landscape({ grid: { cols: 2, rows: 1 }, tiles: {} }),
+  },
+  { name: 'arrangement without tiles', doc: landscape({ grid: { cols: 2, rows: 1 } }) },
+  {
+    name: 'arrangement grid of the wrong type, a placement not an object',
+    doc: landscape({ grid: { cols: '2', rows: 0 }, tiles: ['sog'] }),
+  },
+  {
+    name: 'placement with a bad id and a negative x',
+    doc: landscape({ grid: { cols: 2, rows: 1 }, tiles: [{ id: 'Sog', x: -1, y: 0, w: 1, h: 1 }] }),
+  },
+  {
+    name: 'placement missing its size',
+    doc: landscape({ grid: { cols: 2, rows: 1 }, tiles: [{ id: 'sog', x: 0, y: 0 }] }),
+  },
+  {
+    name: 'page tiles missing beside a broken arrangement',
+    doc: withPage({ tiles: undefined, arrangements: { portrait: { grid: { cols: 1, rows: 1 } } } }),
+  },
+  {
+    name: 'unknown tile and an overlap in one arrangement',
+    doc: landscape({
+      grid: { cols: 2, rows: 1 },
+      tiles: [
+        { id: 'sog', x: 0, y: 0, w: 2, h: 1 },
+        { id: 'cog', x: 0, y: 0, w: 1, h: 1 },
+        { id: 'stw', x: 1, y: 0, w: 1, h: 1 },
+      ],
+    }),
+  },
   { name: 'integer written as 2.0', doc: withTile({ w: 1.0, decimals: 2.0 }) },
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
   { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },

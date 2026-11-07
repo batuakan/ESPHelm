@@ -71,6 +71,12 @@ Layouts can be shared: export one as a file and import it on another display, or
  <img width="800px" src="/docs/images/editor-share.png">
 </p>
 
+For a display of another shape, *Arrange for landscape* (or portrait) gives the page an arrangement of its own: move, resize and hide tiles for that shape while the other displays keep the default.
+
+<p align="center">
+ <img width="800px" src="/docs/images/editor-landscape.png">
+</p>
+
 It works on a phone too, and has day, dark and night (red) themes of its own, separate from the display's theme.
 
 <p align="center">
@@ -88,17 +94,22 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
-- **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Night / Auto and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
+- **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Night / Auto, *Screen off* and *Rotation*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
-- **Resolution agnostic:** layouts are grids, so the same layout works on 480×480 and 720×720.
+- **Any screen size and shape:** layouts are grids, so the same layout works on 480×480 and 720×720. For landscape and portrait screens (1280×800, 800×480, or a display mounted on its side), a page can be arranged again in the editor for that shape: other cells, other sizes, tiles left out. Displays of that shape show it, the others keep the default. A display can be turned 90°, 180° or 270° from its own settings, and then shows the arrangement for its new shape.
 - Everything stays on the boat's LAN: no cloud, no telemetry.
 
 <p align="center">
  <img width="360px" src="/docs/images/display-sailing-720-night.png">
 </p>
 <p align="center"><em>The "Sailing" template on a 720×720 display, night theme.</em></p>
+
+<p align="center">
+ <img width="480px" src="/docs/images/display-landscape.png">
+</p>
+<p align="center"><em>A page with its own landscape arrangement on a 1280×800 display.</em></p>
 
 ## 👆 On the display
 
@@ -107,6 +118,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
   - **Brightness:** a slider for the theme shown (day and night are kept separately).
   - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
   - **Screen off,** when the layout has a screen timeout.
+  - **Rotation:** 0°, 90°, 180° or 270°, for a display mounted another way round. Touch turns with the picture, and the editor sees the display's new shape.
   - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
   - **Network tab:** the Wi-Fi network, signal and IP, and the SignalK server. *Change server* lists the servers on the network; *Forget server* drops the server and its approval. At the bottom, *Factory reset* is ESPHome's factory reset: the display forgets Wi-Fi, its server and approval, its cached layout and its settings, and restarts into its setup network. *Forget server* and *Factory reset* ask *Yes* first.
   - **Info tab:** the display (id, firmware, uptime, free memory), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.

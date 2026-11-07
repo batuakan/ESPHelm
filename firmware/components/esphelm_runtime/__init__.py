@@ -7,7 +7,7 @@ from esphome.components.lvgl.types import lv_obj_t
 from esphome.components.lvgl.widgets import get_widgets
 from esphome.components.signalk import signalk as SignalKComponent
 import esphome.config_validation as cv
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_ROTATION
 from esphome.core import CORE
 
 CODEOWNERS = ["@batuakan"]
@@ -136,3 +136,10 @@ async def to_code(config):
     if CONF_TIME_ID in config:
         cg.add_define("USE_ESPHELM_TIME")
         cg.add(var.set_time(await cg.get_variable(config[CONF_TIME_ID])))
+    # Rotation chosen on the display (ADR-0028): ESPHome's LVGL turns the picture and touch at
+    # runtime once `rotation:` is in its config. Software rotation needs a second draw buffer, so
+    # a board without the RAM leaves it out (the C3).
+    lvgl_confs = CORE.config.get("lvgl") or []
+    if lvgl_confs and CONF_ROTATION in lvgl_confs[0]:
+        cg.add_define("USE_ESPHELM_ROTATION")
+        cg.add(var.set_lvgl(await cg.get_variable(lvgl_confs[0][CONF_ID])))

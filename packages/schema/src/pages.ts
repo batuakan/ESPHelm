@@ -1,6 +1,30 @@
 import Type from 'typebox';
 import { ChartId, Id, Label, SkPath } from './primitives.js';
-import { Tile } from './tiles.js';
+import { Placement, Tile } from './tiles.js';
+
+const Grid = Type.Object(
+  {
+    cols: Type.Integer({ minimum: 1 }),
+    rows: Type.Integer({ minimum: 1 }),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * The page's tiles placed again on a grid of its own, for one screen shape (ADR-0028). A tile of
+ * the page that isn't placed here is hidden on that shape; its settings stay in the page's tiles.
+ */
+export const Arrangement = Type.Object(
+  {
+    grid: Grid,
+    tiles: Type.Array(Type.Object(Placement, { additionalProperties: false }), {
+      minItems: 1,
+      errorCode: 'EMPTY_PAGE',
+    }),
+  },
+  { additionalProperties: false },
+);
+export type Arrangement = Type.Static<typeof Arrangement>;
 
 /** A page of tiles placed on a cols x rows grid. */
 export const GridPage = Type.Object(
@@ -8,14 +32,19 @@ export const GridPage = Type.Object(
     kind: Type.Literal('grid'),
     id: Id,
     title: Type.Optional(Label),
-    grid: Type.Object(
-      {
-        cols: Type.Integer({ minimum: 1 }),
-        rows: Type.Integer({ minimum: 1 }),
-      },
-      { additionalProperties: false },
-    ),
+    grid: Grid,
     tiles: Type.Array(Tile, { minItems: 1, errorCode: 'EMPTY_PAGE' }),
+    /** Per screen shape; a shape without one uses `grid` and the tiles' own x/y/w/h. */
+    arrangements: Type.Optional(
+      Type.Object(
+        {
+          square: Type.Optional(Arrangement),
+          landscape: Type.Optional(Arrangement),
+          portrait: Type.Optional(Arrangement),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );

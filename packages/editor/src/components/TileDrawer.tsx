@@ -1336,6 +1336,8 @@ export function TileDrawer(
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
     onDelete(): void;
+    /** On a shape with its own arrangement (ADR-0028): hide the tile there, e.g. "Hide on portrait". */
+    hide?: { text: string; onHide(): void };
   },
 ) {
   const { tile, onChange } = props;
@@ -1453,8 +1455,13 @@ export function TileDrawer(
           )}
         </>
       )}
+      {props.hide && (
+        <button className="drawer-hide" onClick={props.hide.onHide}>
+          {props.hide.text}
+        </button>
+      )}
       <button className="danger" onClick={props.onDelete}>
-        Delete tile
+        {props.hide ? 'Delete tile everywhere' : 'Delete tile'}
       </button>
     </Drawer>
   );

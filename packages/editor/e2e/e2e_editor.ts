@@ -906,6 +906,94 @@ async function main(): Promise<void> {
     );
     await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
 
+    // Screen shapes (ADR-0028): the helm display comes back as a 1280x800 landscape screen. Its
+    // page gets an arrangement of its own there; the default (what square displays show) stays.
+    const storedHelm = async () => {
+      const devices = (await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin))
+        .body as unknown as { id: string; layoutId?: string }[];
+      const id = devices.find((d) => d.id === DEVICE_ID)?.layoutId;
+      return (await sk.json('GET', `/plugins/esphelm/api/layouts/${String(id)}`, sk.admin))
+        .body as unknown as {
+        pages: {
+          kind: string;
+          title?: string;
+          grid?: { cols: number; rows: number };
+          tiles?: { id: string }[];
+          arrangements?: Record<
+            string,
+            { grid: { cols: number; rows: number }; tiles: { id: string }[] }
+          >;
+        }[];
+      };
+    };
+    const before = await storedHelm();
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, {
+      ...hello,
+      display: { width: 1280, height: 800, rotation: 0 },
+    });
+    await page.reload();
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
+    // A page with two tiles or more, so one can be hidden and one still shows.
+    const pageIndex = before.pages.findIndex(
+      (p) => p.kind === 'grid' && (p.tiles?.length ?? 0) >= 2,
+    );
+    await page.getByRole('tablist', { name: 'Pages' }).getByRole('tab').nth(pageIndex).click();
+    const bar = page.getByRole('region', { name: 'Arrangement' });
+    check(
+      'shapes: a landscape display shows the default arrangement',
+      await bar
+        .getByText(/uses the default arrangement/)
+        .waitFor({ timeout: 10000 })
+        .then(
+          () => true,
+          () => false,
+        ),
+    );
+    await bar.getByRole('button', { name: 'Arrange for landscape' }).click();
+    await bar.getByRole('menuitem', { name: /^Copy turned/ }).click();
+    await bar.getByText(/Landscape arrangement/).waitFor();
+    const cols = page.getByLabel('Columns');
+    await cols.fill(String(Number(await cols.inputValue()) + 1));
+    await shot(page, '17-desktop-landscape-arrangement');
+    const firstTile = page.getByTestId('grid').locator('[data-testid^="tile-"]').first();
+    const hiddenId = ((await firstTile.getAttribute('data-testid')) ?? '').replace(/^tile-/, '');
+    await firstTile.click();
+    await page.getByRole('button', { name: 'Hide on landscape' }).click();
+    const chips = page
+      .getByRole('region', { name: 'Arrangement' })
+      .getByRole('button', { name: /^\+ / });
+    check('shapes: a hidden tile is listed to show again', (await chips.count()) === 1);
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: /^Sent/ }).waitFor();
+    const after = await storedHelm();
+    const index = pageIndex;
+    const own = after.pages[index]?.arrangements?.landscape;
+    check(
+      'shapes: Save & send stores the landscape arrangement, the default untouched',
+      !!own &&
+        JSON.stringify(after.pages[index]?.grid) === JSON.stringify(before.pages[index]?.grid) &&
+        JSON.stringify(after.pages[index]?.tiles?.map((t) => t.id)) ===
+          JSON.stringify(before.pages[index]?.tiles?.map((t) => t.id)) &&
+        own?.grid.cols === (before.pages[index]?.grid?.rows ?? 0) + 1 &&
+        !own.tiles.some((t) => t.id === hiddenId),
+      JSON.stringify(own),
+    );
+    await chips.first().click();
+    check('shapes: the hidden tile can be shown again', (await chips.count()) === 0);
+    await page.getByRole('button', { name: 'Use the default again' }).click();
+    await page.getByRole('button', { name: 'Use the default', exact: true }).click();
+    await bar.getByText(/uses the default arrangement/).waitFor();
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: /^Sent/ }).waitFor();
+    check(
+      'shapes: dropping it goes back to the default',
+      !(await storedHelm()).pages.some((p) => p.arrangements),
+    );
+    // Back to its own shape for the rest.
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, hello);
+    await page.reload();
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

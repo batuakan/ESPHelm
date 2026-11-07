@@ -1982,6 +1982,216 @@
                 },
                 "minItems": 1,
                 "errorCode": "EMPTY_PAGE"
+              },
+              "arrangements": {
+                "type": "object",
+                "properties": {
+                  "square": {
+                    "type": "object",
+                    "required": [
+                      "grid",
+                      "tiles"
+                    ],
+                    "properties": {
+                      "grid": {
+                        "type": "object",
+                        "required": [
+                          "cols",
+                          "rows"
+                        ],
+                        "properties": {
+                          "cols": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "rows": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "tiles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                              "errorCode": "INVALID_ID",
+                              "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                            },
+                            "x": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "y": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "w": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "h": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "errorCode": "EMPTY_PAGE"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "landscape": {
+                    "type": "object",
+                    "required": [
+                      "grid",
+                      "tiles"
+                    ],
+                    "properties": {
+                      "grid": {
+                        "type": "object",
+                        "required": [
+                          "cols",
+                          "rows"
+                        ],
+                        "properties": {
+                          "cols": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "rows": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "tiles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                              "errorCode": "INVALID_ID",
+                              "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                            },
+                            "x": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "y": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "w": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "h": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "errorCode": "EMPTY_PAGE"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "portrait": {
+                    "type": "object",
+                    "required": [
+                      "grid",
+                      "tiles"
+                    ],
+                    "properties": {
+                      "grid": {
+                        "type": "object",
+                        "required": [
+                          "cols",
+                          "rows"
+                        ],
+                        "properties": {
+                          "cols": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "rows": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "tiles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                              "errorCode": "INVALID_ID",
+                              "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                            },
+                            "x": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "y": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "w": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "h": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "errorCode": "EMPTY_PAGE"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false

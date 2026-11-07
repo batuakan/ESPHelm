@@ -208,3 +208,21 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **SDL e2e:** 212 checks. Seven goldens re-recorded and reviewed by eye (the three tabs, and the status page's menu button); six new: the Network tab at 480 and 720, the server list, the *Forget server* question, the setup screen and the Network tab with the setup network.
 - **Build size against `main`:** P4 flash +74.3 KB (3,442,920 B, 20.8 %), C3 +125.8 KB (1,606,628 B, 87.6 %); RAM +724 / +694 B. Mostly the captive portal with its web server and web OTA.
 - **Checked on the P4** (2026-11-05, hardware step 25): the setup network, the portal, the QR code, *Forget Wi-Fi*, and choosing, forgetting and the restart behaviour of the server binding.
+
+## Screen shapes and rotation (ADR-0028, branch `feat/screen-shapes`)
+
+- **What:**
+  - **Arrangements per shape:** a grid page may carry `arrangements.square|landscape|portrait`, each with its own grid and the page's tiles placed again by id (positions only; a tile left out is hidden on that shape). A shape without one shows the default, so existing layouts are unchanged and older firmware ignores the field.
+  - **Shapes:** landscape when width ≥ 1.25 × height, portrait the other way, else square, from the screen after rotation. `displayShape()` (TS) and `display_shape()` (`esphelm_shape.h`) share `SHAPE_RATIO_PERCENT` through the generated `esphelm_sizes.h`, and `fixtures/shape.cases.json`.
+  - **Firmware:** the parser checks arrangements like the validator (new code `UNKNOWN_TILE`); the renderer builds only the tiles placed for its shape.
+  - **Rotation:** a *Rotation* row in the panel's *Settings* tab (below *Screen off*), using ESPHome's LVGL rotation (`lvgl: rotation: 0` in the board YAML). Saved as an ESPHome preference of its own, applied at boot before the first page, reported in `hello`. A change rebuilds the page and panel and says hello at once. On for the P4 (PPA) and the SDL builds, off for the C3 (a second draw buffer).
+  - **Editor:** the page as the selected display's shape arranges it; *Arrange for landscape* (copy, or turned), edits that stay in the arrangement, *Hide on landscape* and the hidden tiles to show again, *Use the default again*. Problems in an arrangement name the shape.
+- **Tests:**
+  - **Schema:** valid `arrangements.json`, eight invalid fixtures (unknown tile, a tile twice, out of grid, overlap, empty, unknown shape, a setting in a placement, no grid); the shape cases in TS and g++.
+  - **Parser:** C++ and TS agree on every fixture and nine new mutations (176 cases).
+  - **Editor unit:** `arrangements.test.ts` (12 tests: edits stay in the arrangement, hiding and showing, a tile added in an arrangement, deleting everywhere, dropping, template renames, problem pointers).
+  - **SDL e2e:** 230 checks. New `firmware/esphelm_sdl_wide.yaml` (1280×800): the landscape arrangement, a default page stretched, the panel wide; *Rotation* 90° → 800×1280 with the portrait arrangement (a tile hidden), the panel and *Info* turned, the rotation kept after a restart. At 480 online: 90° and back reach the plugin in the hello. Six new goldens; three re-recorded for the Rotation row (the *Settings* tab by day, at night and at 720). All reviewed by eye.
+  - **Editor e2e:** the display says hello as 1280×800; *Arrange for landscape* → *Copy turned*, a wider grid, a hidden tile, *Save & send* stores the arrangement with the default untouched; shown again; *Use the default again* removes it.
+- **Build size:** P4 flash 3,447,210 B (20.9 %), RAM 99,514 B (17.3 %); C3 flash 1,609,994 B (87.7 %), RAM 113,494 B (35.3 %). Not measured against `main` separately. Rotation's buffer is allocated at boot, not static.
+- **Checked on the P4** (2026-11-07, hardware step 26 in `docs/firmware-runtime.md`): rotation, touch and keeping it after a power cycle.
+- **Not verified:** a real landscape or portrait display.

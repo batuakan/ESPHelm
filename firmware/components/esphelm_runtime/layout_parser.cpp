@@ -707,6 +707,68 @@ void check_chart_page(Checker &chk, JsonObjectConst obj, const std::string &ptr,
   page.chart = std::move(chart);
 }
 
+/// One shape's arrangement: its grid, and placements of the page's tiles (only x/y/w/h; ids are
+/// matched to the page's tiles here, unknown or repeated ones reported by check_semantics).
+void check_arrangement(Checker &chk, JsonVariantConst v, const std::string &ptr, const Page &page,
+                       Arrangement &out) {
+  if (!v.is<JsonObjectConst>()) {
+    chk.add(ptr, "INVALID_TYPE");
+    return;
+  }
+  JsonObjectConst obj = v.as<JsonObjectConst>();
+  out.present = true;
+  long long n;
+  if (!has(obj, "grid")) {
+    chk.add(ptr + "/grid", "MISSING_FIELD");
+  } else if (!obj["grid"].is<JsonObjectConst>()) {
+    chk.add(ptr + "/grid", "INVALID_TYPE");
+  } else {
+    JsonObjectConst grid = obj["grid"].as<JsonObjectConst>();
+    if (int_field(chk, grid, ptr + "/grid", "cols", true, 1, 0xFFFF, n))
+      out.cols = static_cast<uint16_t>(n);
+    if (int_field(chk, grid, ptr + "/grid", "rows", true, 1, 0xFFFF, n))
+      out.rows = static_cast<uint16_t>(n);
+  }
+  const std::string tp = ptr + "/tiles";
+  if (!has(obj, "tiles")) {
+    chk.add(tp, "MISSING_FIELD");
+    return;
+  }
+  if (!obj["tiles"].is<JsonArrayConst>()) {
+    chk.add(tp, "INVALID_TYPE");
+    return;
+  }
+  JsonArrayConst arr = obj["tiles"].as<JsonArrayConst>();
+  if (arr.size() == 0)
+    chk.add(tp, "EMPTY_PAGE");
+  size_t j = 0;
+  for (JsonVariantConst t : arr) {
+    const std::string pp = tp + "/" + std::to_string(j++);
+    if (!t.is<JsonObjectConst>()) {
+      chk.add(pp, "INVALID_TYPE");
+      continue;
+    }
+    JsonObjectConst po = t.as<JsonObjectConst>();
+    Placement p{};
+    std::string id;
+    string_field(chk, po, pp, "id", true, StrKind::ID, id);
+    for (size_t k = 0; k < page.tiles.size() && p.tile < 0; k++) {
+      if (page.tiles[k].id == id)
+        p.tile = static_cast<int32_t>(k);
+    }
+    const long long big = 0xFFFF;
+    if (int_field(chk, po, pp, "x", true, 0, big, n))
+      p.x = static_cast<uint16_t>(n);
+    if (int_field(chk, po, pp, "y", true, 0, big, n))
+      p.y = static_cast<uint16_t>(n);
+    if (int_field(chk, po, pp, "w", true, 1, big, n))
+      p.w = static_cast<uint16_t>(n);
+    if (int_field(chk, po, pp, "h", true, 1, big, n))
+      p.h = static_cast<uint16_t>(n);
+    out.tiles.push_back(p);
+  }
+}
+
 void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, Page &page) {
   string_field(chk, obj, ptr, "id", true, StrKind::ID, page.id);
   string_field(chk, obj, ptr, "title", false, StrKind::LABEL, page.title);
@@ -722,28 +784,39 @@ void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
     if (int_field(chk, grid, ptr + "/grid", "rows", true, 1, 0xFFFF, v))
       page.rows = static_cast<uint16_t>(v);
   }
+  JsonVariantConst tiles = obj["tiles"];
   if (!has(obj, "tiles")) {
     chk.add(ptr + "/tiles", "MISSING_FIELD");
-    return;
-  }
-  JsonVariantConst tiles = obj["tiles"];
-  if (!tiles.is<JsonArrayConst>()) {
+  } else if (!tiles.is<JsonArrayConst>()) {
     chk.add(ptr + "/tiles", "INVALID_TYPE");
+  } else {
+    JsonArrayConst arr = tiles.as<JsonArrayConst>();
+    if (arr.size() == 0)
+      chk.add(ptr + "/tiles", "EMPTY_PAGE");
+    size_t j = 0;
+    for (JsonVariantConst t : arr) {
+      const std::string tp = ptr + "/tiles/" + std::to_string(j++);
+      if (!t.is<JsonObjectConst>()) {
+        chk.add(tp, "INVALID_TYPE");
+        continue;
+      }
+      Tile tile{};
+      check_tile(chk, t.as<JsonObjectConst>(), tp, tile);
+      page.tiles.push_back(std::move(tile));
+    }
+  }
+  if (!has(obj, "arrangements"))
+    return;
+  // After the tiles: a placement keeps the index of the tile it names (ADR-0028).
+  const std::string ap = ptr + "/arrangements";
+  if (!obj["arrangements"].is<JsonObjectConst>()) {
+    chk.add(ap, "INVALID_TYPE");
     return;
   }
-  JsonArrayConst arr = tiles.as<JsonArrayConst>();
-  if (arr.size() == 0)
-    chk.add(ptr + "/tiles", "EMPTY_PAGE");
-  size_t j = 0;
-  for (JsonVariantConst t : arr) {
-    const std::string tp = ptr + "/tiles/" + std::to_string(j++);
-    if (!t.is<JsonObjectConst>()) {
-      chk.add(tp, "INVALID_TYPE");
-      continue;
-    }
-    Tile tile{};
-    check_tile(chk, t.as<JsonObjectConst>(), tp, tile);
-    page.tiles.push_back(std::move(tile));
+  JsonObjectConst shapes = obj["arrangements"].as<JsonObjectConst>();
+  for (int s = 0; s < SHAPE_COUNT; s++) {
+    if (has(shapes, SHAPE_NAMES[s]))
+      check_arrangement(chk, shapes[SHAPE_NAMES[s]], ap + "/" + SHAPE_NAMES[s], page, page.arrangements[s]);
   }
 }
 
@@ -904,6 +977,41 @@ void check_semantics(Checker &chk, const Layout &layout) {
             chk.add(zp, "ZONE_OUT_OF_RANGE");
           }
         }
+      }
+    }
+    // Each arrangement places tiles of this page, each at most once, on its own grid (ADR-0028).
+    for (int s = 0; s < SHAPE_COUNT; s++) {
+      const Arrangement &a = page.arrangements[s];
+      if (!a.present)
+        continue;
+      const std::string ap = pp + "/arrangements/" + SHAPE_NAMES[s] + "/tiles/";
+      std::vector<size_t> on_grid;  // indices in a.tiles
+      for (size_t j = 0; j < a.tiles.size(); j++) {
+        const Placement &p = a.tiles[j];
+        const std::string tp = ap + std::to_string(j);
+        if (p.tile < 0) {
+          chk.add(tp + "/id", "UNKNOWN_TILE");
+          continue;
+        }
+        bool repeated = false;
+        for (size_t k = 0; k < j && !repeated; k++)
+          repeated = a.tiles[k].tile == p.tile;
+        if (repeated) {
+          chk.add(tp + "/id", "DUPLICATE_ID");
+          continue;
+        }
+        if (p.x + p.w > a.cols || p.y + p.h > a.rows) {
+          chk.add(tp, "TILE_OUT_OF_GRID");
+          continue;
+        }
+        for (size_t k : on_grid) {
+          const Placement &o = a.tiles[k];
+          if (p.x < o.x + o.w && o.x < p.x + p.w && p.y < o.y + o.h && o.y < p.y + p.h) {
+            chk.add(tp, "TILE_OVERLAP");
+            break;
+          }
+        }
+        on_grid.push_back(j);
       }
     }
   }

@@ -3,7 +3,7 @@ import { CLOCK_DATE_FORMATS } from './clock.js';
 import { DataItem, Decimals, Id, Label, SkPath } from './primitives.js';
 
 /** Placement of a tile on its page grid, in cells (0-based; a tile may span several cells). */
-const Placement = {
+export const Placement = {
   id: Id,
   x: Type.Integer({ minimum: 0 }),
   y: Type.Integer({ minimum: 0 }),

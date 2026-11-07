@@ -30,6 +30,8 @@ signalk:
 
 lvgl:
   id: lvgl_component
+  # Lets the runtime turn the picture and touch at runtime: Settings > Rotation (ADR-0028).
+  rotation: 0
   pages:
     - id: esphelm_page
       widgets:

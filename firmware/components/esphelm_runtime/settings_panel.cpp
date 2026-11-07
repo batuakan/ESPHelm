@@ -17,6 +17,9 @@ static const char *const CHOICE_TEXT[3] = {"Day", "Night", "Auto"};
 
 /// Choice button index of a choice (-1 auto, else Theme).
 static int choice_index(int8_t choice) { return choice < 0 ? 2 : choice; }
+static const int ROTATIONS[4] = {0, 90, 180, 270};
+static const char *const ROTATION_PARTS[4] = {"rotate=0", "rotate=90", "rotate=180", "rotate=270"};
+static const char *const ROTATION_TEXT[4] = {"0°", "90°", "180°", "270°"};
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, const char *text) {
   lv_obj_t *l = lv_label_create(parent);
@@ -63,6 +66,7 @@ void SettingsPanel::open(const State &state, int32_t top) {
   this->state_ = state;
   this->top_ = top;
   this->pending_close_ = this->closed_ = this->sleep_wanted_ = this->brightness_done_ = false;
+  this->pending_rotation_ = -1;
   this->pending_choice_ = -2;
   this->pending_brightness_ = -1;
   this->tab_ = Tab::SETTINGS;
@@ -81,6 +85,8 @@ void SettingsPanel::close() {
   lv_obj_delete(this->root_);
   this->root_ = this->brightness_value_ = this->slider_ = nullptr;
   for (lv_obj_t *&b : this->choices_)
+    b = nullptr;
+  for (lv_obj_t *&b : this->rotations_)
     b = nullptr;
   for (lv_obj_t *&b : this->tabs_)
     b = nullptr;
@@ -129,6 +135,11 @@ void SettingsPanel::tap(const std::string &part) {
       this->listing_ = false;
       this->network_dirty_ = true;
     }
+  } else if (part.compare(0, 7, "rotate=") == 0) {
+    for (int i = 0; i < 4; i++) {
+      if (this->state_.can_rotate && part == ROTATION_PARTS[i])
+        this->pending_rotation_ = ROTATIONS[i];
+    }
   } else if (part == "sleep") {
     if (this->state_.can_sleep)
       this->sleep_wanted_ = true;
@@ -151,6 +162,14 @@ bool SettingsPanel::take_choice(int8_t &choice) {
     return false;
   choice = this->pending_choice_;
   this->pending_choice_ = -2;
+  return true;
+}
+
+bool SettingsPanel::take_rotation(int &degrees) {
+  if (this->pending_rotation_ < 0)
+    return false;
+  degrees = this->pending_rotation_;
+  this->pending_rotation_ = -1;
   return true;
 }
 
@@ -202,6 +221,8 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
                                                     state.servers != this->state_.servers)));
   rebuild = rebuild || this->network_dirty_ || network_changed || state.theme != this->state_.theme ||
             state.can_sleep != this->state_.can_sleep || state.min_brightness != this->state_.min_brightness ||
+            // a rotation changes the screen's size: the panel is built for it
+            state.rotation != this->state_.rotation || state.can_rotate != this->state_.can_rotate ||
             top != this->top_;
   this->network_dirty_ = false;
   const State before = this->state_;
@@ -237,6 +258,13 @@ void SettingsPanel::style_choices_() {
     lv_obj_set_style_bg_color(this->choices_[i], on ? c.accent : c.tile, LV_PART_MAIN);
     lv_obj_t *text = lv_obj_get_child(this->choices_[i], 0);
     lv_obj_set_style_text_color(text, on ? c.background : c.text, LV_PART_MAIN);
+  }
+  for (int i = 0; i < 4; i++) {
+    if (this->rotations_[i] == nullptr)
+      continue;
+    const bool on = ROTATIONS[i] == this->state_.rotation;
+    lv_obj_set_style_bg_color(this->rotations_[i], on ? c.accent : c.tile, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lv_obj_get_child(this->rotations_[i], 0), on ? c.background : c.text, LV_PART_MAIN);
   }
 }
 
@@ -355,13 +383,27 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
     lv_obj_center(label(this->choices_[i], big, c.text, CHOICE_TEXT[i]));
     on_part(this->choices_[i], this, CHOICE_PARTS[i]);
   }
-  this->style_choices_();
   if (this->state_.can_sleep) {
     lv_obj_t *sleep = button(body, c, w, btn_h);
     lv_obj_set_style_margin_top(sleep, 16, LV_PART_MAIN);
     lv_obj_center(label(sleep, big, c.text, "Screen off"));
     on_part(sleep, this, "sleep");
   }
+  if (this->state_.can_rotate) {
+    // Turns the picture clockwise for a display mounted another way round (ADR-0028).
+    lv_obj_t *heading = label(body, big, c.muted, "Rotation");
+    lv_obj_set_style_margin_top(heading, 16, LV_PART_MAIN);
+    lv_obj_t *turns = box(body, w);
+    lv_obj_set_height(turns, btn_h);
+    const int32_t turn_w = (w - 3 * 8) / 4;
+    for (int i = 0; i < 4; i++) {
+      this->rotations_[i] = button(turns, c, turn_w, btn_h);
+      lv_obj_set_pos(this->rotations_[i], i * (turn_w + 8), 0);
+      lv_obj_center(label(this->rotations_[i], big, c.text, ROTATION_TEXT[i]));
+      on_part(this->rotations_[i], this, ROTATION_PARTS[i]);
+    }
+  }
+  this->style_choices_();
 }
 
 // The Network tab's rows come in two sections, "Wi-Fi" and "SignalK server" (fill_info_); the

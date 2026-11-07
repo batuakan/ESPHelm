@@ -257,21 +257,30 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
   }
   lv_obj_set_style_pad_row(area, 8, LV_PART_MAIN);
   lv_obj_set_style_pad_column(area, 8, LV_PART_MAIN);
-  this->col_dsc_.assign(page.cols, LV_GRID_FR(1));
+  // The arrangement for this screen's shape (after rotation), else the page's default (ADR-0028).
+  lv_display_t *disp = lv_display_get_default();
+  const esphelm::Shape shape =
+      disp != nullptr ? esphelm::display_shape(lv_display_get_horizontal_resolution(disp),
+                                               lv_display_get_vertical_resolution(disp))
+                      : esphelm::Shape::SQUARE;
+  const esphelm::Arrangement &own = page.arrangements[static_cast<int>(shape)];
+  const size_t count = own.present ? own.tiles.size() : page.tiles.size();
+  this->col_dsc_.assign(own.present ? own.cols : page.cols, LV_GRID_FR(1));
   this->col_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
-  this->row_dsc_.assign(page.rows, LV_GRID_FR(1));
+  this->row_dsc_.assign(own.present ? own.rows : page.rows, LV_GRID_FR(1));
   this->row_dsc_.push_back(LV_GRID_TEMPLATE_LAST);
   lv_obj_set_grid_dsc_array(area, this->col_dsc_.data(), this->row_dsc_.data());
   lv_obj_set_layout(area, LV_LAYOUT_GRID);
-  for (size_t i = 0; i < page.tiles.size(); i++) {
+  for (size_t i = 0; i < count; i++) {
     if (low_memory()) {
-      ESP_LOGE(TAG, "Low memory after %u of %u tiles; not showing this page", (unsigned) i,
-               (unsigned) page.tiles.size());
+      ESP_LOGE(TAG, "Low memory after %u of %u tiles; not showing this page", (unsigned) i, (unsigned) count);
       this->clear_(layout.theme);
       widgets.clear();
       return false;
     }
-    const esphelm::Tile &tile = page.tiles[i];
+    // The parser checked each placement names a tile of the page.
+    const esphelm::Placement *at = own.present ? &own.tiles[i] : nullptr;
+    const esphelm::Tile &tile = at != nullptr ? page.tiles[at->tile] : page.tiles[i];
 #ifdef USE_HOST
     // Test hook (SDL e2e of the boot guard): crash while building this tile, as a renderer bug would.
     const char *crash_on = std::getenv("ESPHELM_TEST_CRASH_ON");
@@ -281,15 +290,19 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
     }
 #endif
     lv_obj_t *cell = lv_obj_create(area);
-    lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, tile.x, tile.w, LV_GRID_ALIGN_STRETCH, tile.y, tile.h);
+    if (at != nullptr)
+      lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, at->x, at->w, LV_GRID_ALIGN_STRETCH, at->y, at->h);
+    else
+      lv_obj_set_grid_cell(cell, LV_GRID_ALIGN_STRETCH, tile.x, tile.w, LV_GRID_ALIGN_STRETCH, tile.y, tile.h);
     widgets.push_back(make_tile_widget(cell, tile, env));
   }
   lv_obj_update_layout(this->container_);
   for (auto &w : widgets)
     w->layout_done();
   const size_t used = heap_used() - used_before;
-  ESP_LOGD(TAG, "Page %u/%u \"%s\": %u widgets, %u bytes of LVGL objects", (unsigned) index + 1,
-           (unsigned) layout.pages.size(), page.id.c_str(), (unsigned) widgets.size(), (unsigned) used);
+  ESP_LOGD(TAG, "Page %u/%u \"%s\" (%s%s): %u widgets, %u bytes of LVGL objects", (unsigned) index + 1,
+           (unsigned) layout.pages.size(), page.id.c_str(), esphelm::SHAPE_NAMES[static_cast<int>(shape)],
+           own.present ? "" : ", default arrangement", (unsigned) widgets.size(), (unsigned) used);
   return true;
 }
 

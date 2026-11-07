@@ -1,0 +1,197 @@
+{
+  "description": "A placement carries a tile setting; settings stay in the page's tiles",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/pages/0/arrangements/landscape/tiles/0/label"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "arrangements",
+    "name": "Speeds by screen shape",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "speeds",
+        "title": "Speeds",
+        "grid": {
+          "cols": 2,
+          "rows": 2
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround",
+            "unit": "kn",
+            "decimals": 1,
+            "label": "SOG"
+          },
+          {
+            "type": "value",
+            "id": "stw",
+            "x": 1,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedThroughWater",
+            "unit": "kn",
+            "decimals": 1,
+            "label": "STW"
+          },
+          {
+            "type": "value",
+            "id": "aws",
+            "x": 0,
+            "y": 1,
+            "w": 1,
+            "h": 1,
+            "path": "environment.wind.speedApparent",
+            "unit": "kn",
+            "decimals": 1,
+            "label": "AWS"
+          },
+          {
+            "type": "bar",
+            "id": "depth",
+            "x": 1,
+            "y": 1,
+            "w": 1,
+            "h": 1,
+            "path": "environment.depth.belowTransducer",
+            "unit": "m",
+            "min": 0,
+            "max": 30,
+            "label": "Depth"
+          }
+        ],
+        "arrangements": {
+          "landscape": {
+            "grid": {
+              "cols": 4,
+              "rows": 2
+            },
+            "tiles": [
+              {
+                "id": "sog",
+                "x": 0,
+                "y": 0,
+                "w": 2,
+                "h": 2,
+                "label": "Speed"
+              },
+              {
+                "id": "stw",
+                "x": 2,
+                "y": 0,
+                "w": 1,
+                "h": 1
+              },
+              {
+                "id": "aws",
+                "x": 3,
+                "y": 0,
+                "w": 1,
+                "h": 1
+              },
+              {
+                "id": "depth",
+                "x": 2,
+                "y": 1,
+                "w": 2,
+                "h": 1
+              }
+            ]
+          },
+          "portrait": {
+            "grid": {
+              "cols": 1,
+              "rows": 3
+            },
+            "tiles": [
+              {
+                "id": "sog",
+                "x": 0,
+                "y": 0,
+                "w": 1,
+                "h": 1
+              },
+              {
+                "id": "stw",
+                "x": 0,
+                "y": 1,
+                "w": 1,
+                "h": 1
+              },
+              {
+                "id": "depth",
+                "x": 0,
+                "y": 2,
+                "w": 1,
+                "h": 1
+              }
+            ]
+          },
+          "square": {
+            "grid": {
+              "cols": 2,
+              "rows": 2
+            },
+            "tiles": [
+              {
+                "id": "sog",
+                "x": 0,
+                "y": 0,
+                "w": 2,
+                "h": 1
+              },
+              {
+                "id": "stw",
+                "x": 0,
+                "y": 1,
+                "w": 1,
+                "h": 1
+              },
+              {
+                "id": "depth",
+                "x": 1,
+                "y": 1,
+                "w": 1,
+                "h": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "kind": "grid",
+        "id": "wind",
+        "title": "Wind",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "tws",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "environment.wind.speedTrue",
+            "unit": "kn",
+            "decimals": 1,
+            "label": "TWS"
+          }
+        ]
+      }
+    ]
+  }
+}

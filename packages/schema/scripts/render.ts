@@ -201,10 +201,11 @@ function renderSizesHeader(
   serverZones: { maxPerPath: number },
   graph: { axisHeight: number },
   tape: { minorTickPx: number; label10Px: number },
+  shape: { ratioPercent: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
-    '// Widget size tiers shared with the TS schema package (*_FIT in src/tiles.ts).',
+    '// Widget size tiers shared with the TS schema package (*_FIT in src/tiles.ts and src/shape.ts).',
     '#pragma once',
     '',
     'namespace esphelm {',
@@ -242,6 +243,9 @@ function renderSizesHeader(
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
+    '',
+    '// Screen shapes (ADR-0028): landscape when width * 100 >= height * this, portrait the other way.',
+    `inline constexpr int SHAPE_RATIO_PERCENT = ${shape.ratioPercent};`,
     '',
     '}  // namespace sizes',
     '}  // namespace esphelm',
@@ -341,6 +345,7 @@ export async function renderAll(): Promise<Record<string, string>> {
     GRAPH_FIT,
     HEADING_TAPE_FIT,
   } = await import('../src/tiles.js');
+  const { SHAPE_FIT } = await import('../src/shape.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -356,6 +361,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       SERVER_ZONES,
       GRAPH_FIT,
       HEADING_TAPE_FIT,
+      SHAPE_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -365,6 +371,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       SERVER_ZONES,
       GRAPH_FIT,
       HEADING_TAPE_FIT,
+      SHAPE_FIT,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

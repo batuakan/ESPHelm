@@ -2,6 +2,7 @@ import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
 import { Hello } from './hello.js';
 import { Layout } from './layout.js';
 import { ChartPage, GridPage } from './pages.js';
+import { SHAPES } from './shape.js';
 import { TILE_TYPES } from './tiles.js';
 
 /**
@@ -36,6 +37,7 @@ export const SEMANTIC_CODES = [
   'INVALID_ZONE',
   'ZONE_OUT_OF_RANGE',
   'UNKNOWN_PAGE',
+  'UNKNOWN_TILE',
 ] as const;
 export type ErrorCode = (typeof STRUCTURAL_CODES)[number] | (typeof SEMANTIC_CODES)[number];
 
@@ -207,38 +209,42 @@ function validateSemantics(layout: Layout): ValidationError[] {
     }
   };
 
+  /** Bounds and overlaps of tiles placed on one grid (the page's, or an arrangement's). */
+  const placeOn = (grid: { cols: number; rows: number }, tilesBase: string) => {
+    const placed: { x: number; y: number; w: number; h: number; j: number }[] = [];
+    return (t: { id: string; x: number; y: number; w: number; h: number }, j: number) => {
+      const tbase = `${tilesBase}/${j}`;
+      if (t.x + t.w > grid.cols || t.y + t.h > grid.rows) {
+        errors.push({
+          pointer: tbase,
+          code: 'TILE_OUT_OF_GRID',
+          message: `tile "${t.id}" (${t.x},${t.y} ${t.w}x${t.h}) exceeds the ${grid.cols}x${grid.rows} grid`,
+        });
+        return;
+      }
+      const hit = placed.find(
+        (p) => t.x < p.x + p.w && p.x < t.x + t.w && t.y < p.y + p.h && p.y < t.y + t.h,
+      );
+      if (hit) {
+        errors.push({
+          pointer: tbase,
+          code: 'TILE_OVERLAP',
+          message: `tile "${t.id}" overlaps ${tilesBase}/${hit.j}`,
+        });
+      }
+      placed.push({ x: t.x, y: t.y, w: t.w, h: t.h, j });
+    };
+  };
+
   layout.pages.forEach((page, i) => {
     const base = `/pages/${i}`;
     claimId(page.id, `${base}/id`);
     if (page.kind !== 'grid') return;
-    const { cols, rows } = page.grid;
-    const placed: { x: number; y: number; w: number; h: number; j: number }[] = [];
+    const place = placeOn(page.grid, `${base}/tiles`);
     page.tiles.forEach((tile, j) => {
       const tbase = `${base}/tiles/${j}`;
       claimId(tile.id, `${tbase}/id`);
-      if (tile.x + tile.w > cols || tile.y + tile.h > rows) {
-        errors.push({
-          pointer: tbase,
-          code: 'TILE_OUT_OF_GRID',
-          message: `tile "${tile.id}" (${tile.x},${tile.y} ${tile.w}x${tile.h}) exceeds the ${cols}x${rows} grid`,
-        });
-      } else {
-        const hit = placed.find(
-          (p) =>
-            tile.x < p.x + p.w &&
-            p.x < tile.x + tile.w &&
-            tile.y < p.y + p.h &&
-            p.y < tile.y + tile.h,
-        );
-        if (hit) {
-          errors.push({
-            pointer: tbase,
-            code: 'TILE_OVERLAP',
-            message: `tile "${tile.id}" overlaps ${base}/tiles/${hit.j}`,
-          });
-        }
-        placed.push({ x: tile.x, y: tile.y, w: tile.w, h: tile.h, j });
-      }
+      place(tile, j);
       if (tile.type === 'graph' && (tile.min !== undefined || tile.max !== undefined)) {
         // A fixed y range needs both ends, the top above the bottom.
         if (tile.min === undefined || tile.max === undefined || !(tile.min < tile.max)) {
@@ -309,6 +315,35 @@ function validateSemantics(layout: Layout): ValidationError[] {
         });
       }
     });
+    // Each arrangement places tiles of this page, each at most once, on its own grid (ADR-0028).
+    const pageTiles = new Set(page.tiles.map((t) => t.id));
+    for (const shape of SHAPES) {
+      const arrangement = page.arrangements?.[shape];
+      if (!arrangement) continue;
+      const abase = `${base}/arrangements/${shape}/tiles`;
+      const placeHere = placeOn(arrangement.grid, abase);
+      const seen = new Set<string>();
+      arrangement.tiles.forEach((t, j) => {
+        if (!pageTiles.has(t.id)) {
+          errors.push({
+            pointer: `${abase}/${j}/id`,
+            code: 'UNKNOWN_TILE',
+            message: `"${t.id}" is not a tile of this page`,
+          });
+          return;
+        }
+        if (seen.has(t.id)) {
+          errors.push({
+            pointer: `${abase}/${j}/id`,
+            code: 'DUPLICATE_ID',
+            message: `tile "${t.id}" is placed twice on ${shape}`,
+          });
+          return;
+        }
+        seen.add(t.id);
+        placeHere(t, j);
+      });
+    }
   });
   const start = layout.settings?.startPage;
   if (start !== undefined && !layout.pages.some((p) => p.id === start)) {

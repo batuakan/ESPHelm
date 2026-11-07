@@ -1,6 +1,6 @@
 #pragma once
 // Parsed, validated layout (schema v1). Pure C++: no ESPHome or LVGL dependencies.
-// Mirrors packages/schema/src/{layout,pages,tiles,settings,primitives}.ts.
+// Mirrors packages/schema/src/{layout,pages,tiles,settings,primitives,shape}.ts.
 
 #include <cstdint>
 #include <memory>
@@ -10,6 +10,7 @@
 #include "esphelm_center_zero.h"
 #include "esphelm_clock.h"
 #include "esphelm_position.h"
+#include "esphelm_shape.h"
 #include "esphelm_units.h"
 #include "esphelm_value_zones.h"
 
@@ -137,13 +138,27 @@ struct ChartConfig {
   std::string anchor_alarm_path{"notifications.navigation.anchor"};
 };
 
+/// A tile of the page placed on an arrangement's grid (ADR-0028).
+struct Placement {
+  int32_t tile{-1};  // index in Page::tiles; -1: no tile of the page has that id (UNKNOWN_TILE)
+  uint16_t x{0}, y{0}, w{1}, h{1};
+};
+
+/// The page's tiles placed again for one screen shape; tiles not placed are hidden there.
+struct Arrangement {
+  bool present{false};
+  uint16_t cols{0}, rows{0};
+  std::vector<Placement> tiles;
+};
+
 struct Page {
   PageKind kind{PageKind::GRID};
   std::string id;
   std::string title;
-  // grid pages
+  // grid pages: the default arrangement (cols, rows and each tile's x/y/w/h), and one per shape
   uint16_t cols{0}, rows{0};
   std::vector<Tile> tiles;
+  Arrangement arrangements[SHAPE_COUNT];
   // chart pages
   std::shared_ptr<const ChartConfig> chart;
 };
