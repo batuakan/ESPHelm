@@ -1,0 +1,50 @@
+# Runtime firmware for the Guition ESP32-S3-4848S040 (4", 480x480, PSRAM).
+#   ~/venv/bin/esphome run firmware/esphelm_guition_4848s040.yaml
+# Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
+# The 480 font sizes of fonts.yaml, as the SDL build (and its goldens) use.
+packages:
+  hardware: !include hardware/guition-esp32-s3-4848s040.yaml
+  wifi: !include wifi.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-guition
+  name_add_mac_suffix: true
+  friendly_name: "ESPHelm display"
+
+external_components:
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: main
+      path: components
+    components: [signalk]
+  - source:
+      type: local
+      path: components
+    components: [esphelm_runtime]
+
+signalk:
+
+lvgl:
+  # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015).
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+esphelm_runtime:
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: guition-esp32-s3-4848s040
+  backlight: display_backlight
+  touch: true

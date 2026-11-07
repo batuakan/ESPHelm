@@ -1,0 +1,27 @@
+# Runtime firmware on the desktop (SDL host build), 320x240 with the font sizes of the
+# ESP32-2432S028R "cheap yellow display" (esphelm_cyd.yaml): how layouts look on the CYD.
+# Same as esphelm_sdl.yaml (test hooks included).
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl_cyd.yaml
+substitutions:
+  # Repeated here on purpose: `-s` on the command line only overrides this file's own
+  # substitutions, not those of the included esphelm_sdl.yaml.
+  signalk_host: "127.0.0.1"
+  signalk_port: "3000"
+  screen_width: "320"
+  screen_height: "240"
+  font_digits_huge_size: "96"
+  font_digits_large_size: "64"
+  font_huge_size: "48"
+  font_value_size: "32"
+  font_medium_size: "24"
+  font_label_size: "16"
+  font_small_size: "12"
+
+packages:
+  base: !include esphelm_sdl.yaml
+
+esphome:
+  name: esphelm-sdl-cyd
+
+esphelm_runtime:
+  board: sdl-cyd

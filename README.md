@@ -37,7 +37,7 @@ I have always wanted to have a multi function display (MFD) on the electric pane
 
 This project started as a collection of ESPHome recipes that together function as an MFD (they live on in the [`ESPHelmv1` tag](https://github.com/batuakan/ESPHelm/tree/ESPHelmv1/legacy), see [the original apps](#the-original-static-apps) below). It has since grown into a display whose screens you can change at any time from a browser, on the boat, from your phone.
 
-For this project I have chosen the [ESP32-P4 Smart 86 display from Waveshare](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) for its "classic" square look and its high resolution, high-performance, dual-core RISC-V architecture. ESP32-S3 boards with PSRAM and the smaller ESP32-C3 and C6 boards are targets too (the C3 build compiles; chart pages need PSRAM).
+For this project I have chosen the [ESP32-P4 Smart 86 display from Waveshare](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) for its "classic" square look and its high resolution, high-performance, dual-core RISC-V architecture. ESP32-S3 boards with PSRAM and the smaller ESP32-C3 and C6 boards are targets too (the C3 build compiles; chart pages need PSRAM). Ready-made configs also exist for two cheap boards: the [Guition ESP32-S3-4848S040](https://community.home-assistant.io/t/guition-4-480x480-esp32-s3-4848s040-smart-display-with-lvgl/729271) (4", 480×480) and the ESP32-2432S028R "cheap yellow display" (2.8", 320×240).
 
 ## 🧭 How it works
 
@@ -116,7 +116,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🚀 Getting started
 
-> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards aren't tested on hardware yet (the C3 build compiles). Expect rough edges, and please report them.
+> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards, the Guition 4848S040 and the cheap yellow display aren't tested on hardware yet (their builds compile). Expect rough edges, and please report them.
 
 You need a SignalK server, Node 22, and [ESPHome](https://esphome.io/) for the firmware.
 
@@ -132,12 +132,14 @@ npm run build
 **Firmware:** nothing to configure. The [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware](https://github.com/esphome/esp-hosted-firmware) (it is not in this repository). Then:
 
 ```bash
-esphome run firmware/esphelm_p4.yaml
+esphome run firmware/esphelm_p4.yaml                # Waveshare ESP32-P4-86
+esphome run firmware/esphelm_guition_4848s040.yaml  # Guition ESP32-S3-4848S040
+esphome run firmware/esphelm_cyd.yaml               # ESP32-2432S028R (cheap yellow display)
 ```
 
 ### 📶 Setting up a display
 
-1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
+1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-`, `esphelm-guition-` or `esphelm-cyd-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
 2. **Pick the boat's Wi-Fi** on the page that opens (or at http://192.168.4.1). The display joins it and closes its setup network.
 3. **Approve it in SignalK.** The display finds the server with mDNS and asks for access: grant read/write under *Security → Access Requests*. It stays with that server from then on, also after a restart.
 4. **Adopt it in the editor** and assign a layout.

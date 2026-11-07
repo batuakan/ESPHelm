@@ -1,0 +1,100 @@
+# Guition ESP32-S3-4848S040: 4" 480x480, ESP32-S3 with 8 MB octal PSRAM and 16 MB flash,
+# ST7701S RGB panel (ESPHome's mipi_rgb model GUITION-4848S040), GT911 touch.
+# Pins from ESPHome's model and the Home Assistant community thread
+# (community.home-assistant.io/t/guition-4-480x480-esp32-s3-4848s040-smart-display-with-lvgl/729271).
+# The board's relay (GPIO40) is not used.
+substitutions:
+  screen_width: "480"
+  screen_height: "480"
+
+esphome:
+  min_version: 2026.1.1
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      # Code and constants in PSRAM keep the RGB panel fed while flash is written (preferences,
+      # the cached layout), which would otherwise make the picture jump.
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+
+logger:
+  # The USB port goes through a USB-serial chip to UART0; GPIO19/20 (the S3's own USB) carry
+  # touch and the panel.
+  hardware_uart: UART0
+
+json:
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+preferences:
+  flash_write_interval: 5min
+
+# The panel's init commands go over this 3-wire SPI bus; the picture goes over the RGB bus.
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO48
+    mosi_pin: GPIO47
+
+display:
+  - platform: mipi_rgb
+    model: GUITION-4848S040
+    spi_id: lcd_spi
+    auto_clear_enabled: false
+    update_interval: never
+
+i2c:
+  - id: i2c_bus
+    sda: GPIO19
+    scl:
+      number: GPIO45
+      ignore_strapping_warning: true
+
+touchscreen:
+  - platform: gt911
+    id: touchscreen_
+    i2c_id: i2c_bus
+    # A touch while the screen is off wakes it (the runtime sees the light come on).
+    on_release:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - light.turn_on: display_backlight
+
+output:
+  - platform: ledc
+    id: backlight_
+    pin: GPIO38
+    frequency: 100Hz
+
+light:
+  - platform: monochromatic
+    name: "Backlight"
+    output: backlight_
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+    on_turn_on:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+    on_turn_off:
+      - lvgl.pause:
+
+lvgl:
+  id: lvgl_component
+  buffer_size: 25%
