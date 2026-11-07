@@ -979,7 +979,7 @@ void EsphelmRuntime::tick_network_() {
   if (!this->wifi_seen_ && this->wifi_connected_()) {
     this->wifi_seen_ = true;
     // From the first connection on, losing the network (the boat's router switched off) never
-    // brings the setup network up: only a power-up without Wi-Fi, or "Reset display", does.
+    // brings the setup network up: only a power-up without Wi-Fi, or a factory reset, does.
     wifi::global_wifi_component->set_ap_timeout(0);
     ESP_LOGD(TAG, "Wi-Fi connected; the setup network stays off until the next power-up");
   }
@@ -1030,11 +1030,11 @@ void EsphelmRuntime::factory_reset_() {
   // (an empty one still counts as set), and its preference reset erases the whole NVS partition: the
   // network, the SignalK token and server, the cached layouts, the display's choices and the setup
   // password (ADR-0026). After the restart the setup network comes up at once.
-  ESP_LOGW(TAG, "Resetting the display; restarting into the setup network");
+  ESP_LOGW(TAG, "Factory reset; restarting into the setup network");
   global_preferences->reset();
   App.safe_reboot();
 #else
-  ESP_LOGW(TAG, "Reset display: this build has no setup network to come back to");
+  ESP_LOGW(TAG, "Factory reset: this build has no setup network to come back to");
 #endif
 }
 
@@ -1063,7 +1063,7 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
     this->panel_.close();
     this->sleep_();
   }
-  if (this->panel_.take_reset())
+  if (this->panel_.take_factory_reset())
     this->factory_reset_();
   if (this->panel_.take_forget_server()) {
     ESP_LOGI(TAG, "Forget server from the settings");

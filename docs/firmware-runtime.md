@@ -108,8 +108,9 @@ The P4 and C3 configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles 
   - **Clock:** UTC, its source, the time zone.
   - **Long values** are shortened with "..". Each section is a box with three labels (heading, names, values), so the row count of a section is fixed.
 - **Network tab** (ADR-0026), rows refreshed like *Info*, with controls below each section:
-  - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password. *Reset display* (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML) asks *Yes*, then runs ESPHome's factory reset (`global_preferences->reset()`, which erases the whole NVS partition: Wi-Fi, token, server, cached layouts, the display's choices) and restarts into the setup network.
+  - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password.
   - **SignalK server:** address, host name, stream. *Change server* runs `SignalK::scan_servers()` and lists up to 6 of `servers_found()`; a tap calls `choose_server()`. *Forget server* asks *Yes* and calls `forget_server()`. With `host:` in the YAML: "Set in the firmware".
+  - **Factory reset:** last, under its own heading (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML; tap part `factory-reset`). It asks *Yes*, then runs ESPHome's factory reset (`global_preferences->reset()`, which erases the whole NVS partition: Wi-Fi, token, server, cached layouts, the display's choices) and restarts into the setup network.
 
 ## Setup without configuration (ADR-0026)
 - **Setup network password:** made once per display in `setup_ap_()` (before Wi-Fi starts: the runtime's setup priority is higher), 10 characters of `esphelm_wifi_setup.h`'s alphabet from the hardware RNG with `bootloader_random_enable()`, saved in `Slot::AP` (NVS key `ap`), checked on load. `__init__.py` refuses a `password` under `wifi: ap:`.
@@ -363,6 +364,6 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - **Server:** the display joins, finds your SignalK server ("Looking for a SignalK server", then "Approve this display") and, once approved and adopted, shows its layout.
     - **Reboot:** it rejoins and goes back to the same server without asking for approval again.
     - **Router off:** switch the router off for 5 minutes or more after the display has connected. No `esphelm-p4-…` network appears on your phone, and the display keeps its pages with stale values.
-    - **Mistyped password:** in the panel's *Network* tab, *Reset display* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
+    - **Mistyped password:** at the bottom of the panel's *Network* tab, *Factory reset* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
     - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
     - Check that the QR code scans from about 30 cm by day and at night.

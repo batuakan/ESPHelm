@@ -58,7 +58,7 @@ class SettingsPanel {
   bool is_open() const { return this->root_ != nullptr; }
 
   /// Test hook and the buttons: "close", "tab-settings", "tab-network", "tab-info", "day",
-  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "reset",
+  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "factory-reset",
   /// "forget-server", "change-server", "server=<n>" (in the list), "confirm" and "cancel".
   /// Applied in tick().
   void tap(const std::string &part);
@@ -72,8 +72,8 @@ class SettingsPanel {
   /// The slider moved (live) or was let go there (`done`: save it).
   bool take_brightness(int &percent, bool &done);
   bool take_sleep() { return take(this->sleep_wanted_); }
-  /// Confirmed: reset the display (ESPHome's factory reset, then a restart), or forget the SignalK server.
-  bool take_reset() { return take(this->reset_wanted_); }
+  /// Confirmed: a factory reset (ESPHome's, then a restart), or forget the SignalK server.
+  bool take_factory_reset() { return take(this->factory_reset_); }
   bool take_forget_server() { return take(this->forget_server_); }
   /// "Change server" was pressed: search for servers.
   bool take_scan() { return take(this->scan_wanted_); }
@@ -94,13 +94,14 @@ class SettingsPanel {
   void build_rows_(lv_obj_t *body, int32_t w, int32_t line_small,
                    const std::function<void(const char *section)> &after);
   void build_setup_network_(lv_obj_t *body, int32_t w);
-  void build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question);
+  /// The question and a Yes / Cancel row; returns the row.
+  lv_obj_t *build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question);
   void refresh_info_();
   void style_choices_();
 
   enum class Tab : uint8_t { SETTINGS, NETWORK, INFO };
   /// A forget waiting for "Yes".
-  enum class Confirm : uint8_t { NONE, RESET, SERVER };
+  enum class Confirm : uint8_t { NONE, FACTORY_RESET, SERVER };
 
   Fonts fonts_;
   Tab tab_{Tab::SETTINGS};  // shown; only its objects exist
@@ -120,7 +121,7 @@ class SettingsPanel {
   Confirm confirm_{Confirm::NONE};
   bool listing_{false};  // the server list instead of the server buttons
   bool network_dirty_{false};
-  bool reset_wanted_{false};
+  bool factory_reset_{false};
   bool forget_server_{false};
   bool scan_wanted_{false};
   int chosen_server_{-1};

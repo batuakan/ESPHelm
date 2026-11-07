@@ -69,7 +69,7 @@ void SettingsPanel::open(const State &state, int32_t top) {
   this->pending_tab_ = -1;
   this->confirm_ = Confirm::NONE;
   this->listing_ = this->network_dirty_ = false;
-  this->reset_wanted_ = this->forget_server_ = this->scan_wanted_ = false;
+  this->factory_reset_ = this->forget_server_ = this->scan_wanted_ = false;
   this->chosen_server_ = -1;
   this->build_();
   ESP_LOGI(TAG, "Settings opened");
@@ -98,15 +98,15 @@ void SettingsPanel::tap(const std::string &part) {
   } else if (part == "tab-settings" || part == "tab-network" || part == "tab-info") {
     const Tab tab = part == "tab-info" ? Tab::INFO : part == "tab-network" ? Tab::NETWORK : Tab::SETTINGS;
     this->pending_tab_ = static_cast<int8_t>(tab);
-  } else if (this->tab_ == Tab::NETWORK && (part == "reset" || part == "forget-server")) {
-    if (part == "reset" ? this->state_.wifi : this->state_.server_choice) {
-      this->confirm_ = part == "reset" ? Confirm::RESET : Confirm::SERVER;
+  } else if (this->tab_ == Tab::NETWORK && (part == "factory-reset" || part == "forget-server")) {
+    if (part == "factory-reset" ? this->state_.wifi : this->state_.server_choice) {
+      this->confirm_ = part == "factory-reset" ? Confirm::FACTORY_RESET : Confirm::SERVER;
       this->listing_ = false;
       this->network_dirty_ = true;
     }
   } else if (this->tab_ == Tab::NETWORK && part == "confirm") {
-    if (this->confirm_ == Confirm::RESET)
-      this->reset_wanted_ = true;
+    if (this->confirm_ == Confirm::FACTORY_RESET)
+      this->factory_reset_ = true;
     else if (this->confirm_ == Confirm::SERVER)
       this->forget_server_ = true;
     this->confirm_ = Confirm::NONE;
@@ -365,7 +365,7 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
 }
 
 // The Network tab's rows come in two sections, "Wi-Fi" and "SignalK server" (fill_info_); the
-// controls go below each.
+// controls go below each, and the factory reset at the bottom, apart from them.
 static const char *const WIFI_SECTION = "Wi-Fi";
 static const char *const SERVER_SECTION = "SignalK server";
 // At most this many servers are listed (a boat has one or two).
@@ -389,23 +389,17 @@ void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int
     lv_obj_set_width(l, w);
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
   };
+  lv_obj_t *confirm = nullptr;  // the Yes / Cancel row, scrolled into view once the tab is built
   this->build_rows_(body, w, line_small, [&](const char *section) {
     if (std::strcmp(section, WIFI_SECTION) == 0) {
       if (this->state_.ap_active)
         this->build_setup_network_(body, w);
-      if (!this->state_.wifi)
-        return;
-      if (this->confirm_ == Confirm::RESET)
-        this->build_confirm_(body, w, btn_h,
-                             "Reset this display? It forgets Wi-Fi, its SignalK server and approval, its cached "
-                             "layout and its settings, then restarts into its setup network.");
-      else
-        wide_button(body, w, "Reset display", "reset");
     } else if (std::strcmp(section, SERVER_SECTION) == 0) {
       if (!this->state_.server_choice) {
         note("Set in the firmware.");
       } else if (this->confirm_ == Confirm::SERVER) {
-        this->build_confirm_(body, w, btn_h, "Forget this server? The display looks for one again and asks it for access.");
+        confirm = this->build_confirm_(body, w, btn_h,
+                                       "Forget this server? The display looks for one again and asks it for access.");
       } else if (this->listing_) {
         if (this->state_.scanning) {
           note("Looking for SignalK servers...");
@@ -427,6 +421,20 @@ void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int
       }
     }
   });
+  if (this->state_.wifi) {
+    // It erases everything the display saved, so it sits apart, last.
+    lv_obj_t *heading = label(body, small, c.accent, "Factory reset");
+    lv_obj_set_style_margin_top(heading, 16, LV_PART_MAIN);
+    if (this->confirm_ == Confirm::FACTORY_RESET)
+      confirm = this->build_confirm_(body, w, btn_h,
+                                     "Factory reset this display? It forgets Wi-Fi, its SignalK server and approval, "
+                                     "its cached layout and its settings, then restarts into its setup network.");
+    else
+      wide_button(body, w, "Factory reset", "factory-reset");
+  }
+  // The tab is built anew at the top; without this the buttons can be below the fold.
+  if (confirm != nullptr)
+    lv_obj_scroll_to_view(confirm, LV_ANIM_OFF);
 }
 
 void SettingsPanel::build_setup_network_(lv_obj_t *body, int32_t w) {
@@ -454,7 +462,7 @@ void SettingsPanel::build_setup_network_(lv_obj_t *body, int32_t w) {
   label(words, big, c.text, this->state_.ap_password.c_str());
 }
 
-void SettingsPanel::build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question) {
+lv_obj_t *SettingsPanel::build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, const char *question) {
   const Colors c = colors_for(this->state_.theme);
   lv_obj_t *q = label(body, this->fonts_.small, c.text, question);
   lv_obj_set_width(q, w);
@@ -472,6 +480,7 @@ void SettingsPanel::build_confirm_(lv_obj_t *body, int32_t w, int32_t btn_h, con
     lv_obj_center(label(b, this->fonts_.label, i == 0 ? c.background : c.text, TEXT[i]));
     on_part(b, this, PARTS[i]);
   }
+  return row;
 }
 
 void SettingsPanel::build_info_(lv_obj_t *body, int32_t w, int32_t line_small) {

@@ -6,8 +6,8 @@
 # - When: at once while no network is saved. Otherwise only after a power-up that finds no Wi-Fi
 #   for 2 minutes (a mistyped password: power-cycle), and never once connected (the runtime turns
 #   the fallback off), so a router outage doesn't open it. It closes 10 minutes after power-up.
-# - "Reset display" in the settings panel's Network tab is ESPHome's factory reset (everything saved goes)
-#   and restarts into the setup network.
+# - "Factory reset" at the bottom of the settings panel's Network tab is ESPHome's factory reset
+#   (everything saved goes) and restarts into the setup network.
 wifi:
   ap:
     ap_timeout: 2min
