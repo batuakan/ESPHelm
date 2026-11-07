@@ -108,7 +108,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
   - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
   - **Screen off,** when the layout has a screen timeout.
   - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
-  - **Network tab:** the Wi-Fi network, signal and IP, and the SignalK server. *Forget Wi-Fi* restarts the display into its setup network; *Change server* lists the servers on the network; *Forget server* drops the server and its approval. Both forgets ask *Yes* first.
+  - **Network tab:** the Wi-Fi network, signal and IP, and the SignalK server. *Change server* lists the servers on the network; *Forget server* drops the server and its approval. At the bottom, *Factory reset* is ESPHome's factory reset: the display forgets Wi-Fi, its server and approval, its cached layout and its settings, and restarts into its setup network. *Forget server* and *Factory reset* ask *Yes* first.
   - **Info tab:** the display (id, firmware, uptime, free memory), SignalK (server, connection, deltas received and dropped, the last delta's age), the layout and the clock.
   - **Closing:** only the **X** closes it.
 - **Alarms:** tap the banner to see the next alarm, **ACK** to acknowledge it.
@@ -142,7 +142,7 @@ esphome run firmware/esphelm_p4.yaml
 3. **Approve it in SignalK.** The display finds the server with mDNS and asks for access: grant read/write under *Security → Access Requests*. It stays with that server from then on, also after a restart.
 4. **Adopt it in the editor** and assign a layout.
 
-Mistyped the password? Power-cycle the display: when it finds no Wi-Fi for 2 minutes after a power-up, it opens its setup network again (for the first 10 minutes after power-up). Once connected, losing the network never opens it, so switching the router off doesn't expose the display. To move to another network, use *Forget Wi-Fi* in the *Network* tab. More in [ADR-0026](docs/decisions/0026-zero-config-setup.md).
+Mistyped the password? Power-cycle the display: when it finds no Wi-Fi for 2 minutes after a power-up, it opens its setup network again (for the first 10 minutes after power-up). Once connected, losing the network never opens it, so switching the router off doesn't expose the display. To move to another network, use *Factory reset* at the bottom of the *Network* tab, then approve the display again in SignalK; the plugin gives it its layout back. More in [ADR-0026](docs/decisions/0026-zero-config-setup.md).
 
 The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which is handy for trying layouts without a display. More in [`docs/firmware-runtime.md`](docs/firmware-runtime.md), [`docs/editor.md`](docs/editor.md) and [`docs/plugin-api.md`](docs/plugin-api.md).
 

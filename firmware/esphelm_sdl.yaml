@@ -1,6 +1,7 @@
 # Runtime firmware on the desktop (SDL host build), 480x480.
 #   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl.yaml
-# The SignalK token and the cached layout are stored in the working directory of the binary.
+# The cached layout is stored in the working directory of the binary; the SignalK token and server in
+# ESPHome's preferences (ESPHOME_PREFDIR, default ~/.esphome/prefs/esphelm-sdl.prefs).
 substitutions:
   screen_width: "480"
   screen_height: "480"
