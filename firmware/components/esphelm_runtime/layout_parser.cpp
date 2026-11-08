@@ -3,6 +3,9 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <utility>
+
+#include "esphelm_sizes.h"
 
 // Mirrors packages/schema/src/validate.ts: structural checks first (dispatching on page `kind`
 // and tile `type`, so each problem is reported once at the field that is wrong), then
@@ -282,12 +285,27 @@ void check_wind_rose(Checker &chk, JsonObjectConst obj, const std::string &ptr, 
       string_field(chk, c, cp, "apparentAngle", false, StrKind::PATH, rose.apparent_angle);
       string_field(chk, c, cp, "trueDirection", false, StrKind::PATH, rose.true_direction);
       string_field(chk, c, cp, "heading", false, StrKind::PATH, rose.heading);
-      if (has(c, "showTrueWind")) {
-        if (!c["showTrueWind"].is<bool>())
-          chk.add(cp + "/showTrueWind", "INVALID_TYPE");
+      const std::pair<const char *, bool *> switches[] = {{"showTrueWind", &rose.show_true_wind},
+                                                          {"showLaylines", &rose.show_laylines},
+                                                          {"showWaypoint", &rose.show_waypoint},
+                                                          {"showTarget", &rose.show_target}};
+      for (const auto &sw : switches) {
+        if (!has(c, sw.first))
+          continue;
+        if (!c[sw.first].is<bool>())
+          chk.add(cp + "/" + sw.first, "INVALID_TYPE");
         else
-          rose.show_true_wind = c["showTrueWind"].as<bool>();
+          *sw.second = c[sw.first].as<bool>();
       }
+      string_field(chk, c, cp, "beatAngle", false, StrKind::PATH, rose.beat_angle);
+      string_field(chk, c, cp, "gybeAngle", false, StrKind::PATH, rose.gybe_angle);
+      string_field(chk, c, cp, "targetAngle", false, StrKind::PATH, rose.target_angle);
+      string_field(chk, c, cp, "waypointBearing", false, StrKind::PATH, rose.waypoint_bearing);
+      long long angle;
+      if (int_field(chk, c, cp, "fixedBeat", false, sizes::WIND_ROSE_BEAT_MIN, sizes::WIND_ROSE_BEAT_MAX, angle))
+        rose.fixed_beat = static_cast<int>(angle);
+      if (int_field(chk, c, cp, "fixedGybe", false, sizes::WIND_ROSE_GYBE_MIN, sizes::WIND_ROSE_GYBE_MAX, angle))
+        rose.fixed_gybe = static_cast<int>(angle);
     }
   }
   const std::string sp = ptr + "/slots";

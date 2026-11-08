@@ -222,3 +222,17 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Editor:** unit tests for the turned size and shapes; e2e for following a new size without a reload, *Mounted → 90°*, the portrait preview inside the window, the stored `settings.rotation` and the link warning.
 - **Build sizes:** P4 flash 3,443,280 B (20.8 %), static RAM 99,482 B; C3 (no rotation) flash 1,606,468 B (87.5 %).
 - **Checked on the P4** (2026-11-08, hardware step 26). **Not verified:** the Guition 4848S040 (compile only).
+
+## Wind rose performance (ADR-0029, branch `feat/rose-laylines`)
+- **What:** optional laylines (both tacks, upwind at the beat angle and downwind at the gybe angle, switching at the beam), a waypoint W marker and a target angle bar on the `wind_rose` tile. All three are off unless the layout turns them on; the *Wind* and *Sailing* starters have laylines and the waypoint on.
+- **Angles:** SignalK's `performance.beatAngle` / `gybeAngle` while fresh and plausible (beat 20–80°, gybe 100–175°), else the tile's `fixedBeat` / `fixedGybe` (45° / 150°), so laylines work without a polar plugin. The target bar uses `performance.targetAngle` only.
+- **Safety:** each graphic needs all its values fresh; with a stale true wind or heading the laylines and the bar disappear rather than showing old guidance.
+- **Shared geometry:** `packages/schema/src/windRose.ts` and `esphelm_wind_rose.h`, 19 cases in `fixtures/wind-rose.cases.json` checked by vitest and by g++.
+- **Tests:**
+  - **Schema and parser:** new valid and invalid fixtures; the C++ parser agrees on all of them.
+  - **SDL e2e:** four new goldens at 480 (fixed angle with W, SignalK's beat angle with the target bar, downwind, true wind stale), reviewed by eye. The first version drew the laylines only across the card band, which read as ticks, and the test's target angles sat under the A/T triangles; the laylines now cross the ring at `d/60` wide and the test angles were moved.
+  - **Editor:** the drawer's *Performance* section, the preview's two laylines from a live true wind, and the stored config, in the editor e2e; the share/import path list knows the new paths (only while their graphic is on).
+  - **Not done:** a 720 render: the 720 build runs offline in the e2e, and offline the graphics are (correctly) hidden.
+- **Build sizes:** P4 flash 3,446,310 B (20.9 %, +2.4 KB), static RAM 99,594 B; Guition flash 1,803,063 B; C3 flash 1,609,482 B (87.7 %).
+- **Not checked on hardware yet** (hardware step 27).
+

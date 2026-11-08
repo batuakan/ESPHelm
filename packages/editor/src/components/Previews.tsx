@@ -13,6 +13,9 @@ import {
   formatPosition,
   type PositionTile,
   WIND_ROSE_DEFAULTS,
+  roseLaylines,
+  roseRelative,
+  roseTarget,
   toDisplay,
   type DataItem,
   type Layout,
@@ -687,6 +690,50 @@ export function WindRosePreview(props: {
             )}
           </g>
         )}
+        {/* Performance graphics (ADR-0029), under the wind markers, as on the display. */}
+        {cfg.showLaylines &&
+          twd !== undefined &&
+          hdg !== undefined &&
+          (() => {
+            const deg = (v: number | undefined) => (v === undefined ? undefined : v * RAD);
+            const l = roseLaylines(twd * RAD, hdg * RAD, deg(num(cfg.beatAngle)), deg(num(cfg.gybeAngle)), {
+              beat: cfg.fixedBeat,
+              gybe: cfg.fixedGybe,
+            });
+            const inner = tier === 'pointers' ? 200 / 6 : CARD_R - BAND;
+            return (['starboard', 'port'] as const).map((side) => {
+              const [x1, y1] = polar(0, 0, inner, l[side]);
+              const [x2, y2] = polar(0, 0, R - 1, l[side]);
+              return (
+                <line
+                  key={side}
+                  className={`layline ${side === 'starboard' ? 'stbd' : 'port'}`}
+                  data-testid={`layline-${side}`}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                />
+              );
+            });
+          })()}
+        {cfg.showTarget &&
+          twd !== undefined &&
+          hdg !== undefined &&
+          (() => {
+            const target = num(cfg.targetAngle);
+            const t = target === undefined ? undefined : roseTarget(twd * RAD, hdg * RAD, target * RAD);
+            if (t === undefined) return null;
+            const [x1, y1] = polar(0, 0, R - RING, t);
+            const [x2, y2] = polar(0, 0, R, t);
+            return <line className="target-bar" x1={x1} y1={y1} x2={x2} y2={y2} />;
+          })()}
+        {cfg.showWaypoint &&
+          hdg !== undefined &&
+          (() => {
+            const b = num(cfg.waypointBearing);
+            return b === undefined ? null : marker(roseRelative(b * RAD, hdg * RAD), 'waypoint', 'W');
+          })()}
         {cfg.showTrueWind && twd !== undefined && hdg !== undefined && marker((twd - hdg) * RAD, 'true', 'T')}
         {awa !== undefined && marker(awa * RAD, 'apparent', 'A')}
       </svg>

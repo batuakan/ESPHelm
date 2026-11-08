@@ -10,6 +10,7 @@
 #include "esphelm_center_zero.h"
 #include "esphelm_clock.h"
 #include "esphelm_position.h"
+#include "esphelm_sizes.h"
 #include "esphelm_units.h"
 #include "esphelm_value_zones.h"
 
@@ -42,6 +43,13 @@ struct RoseConfig {
   std::string true_direction{"environment.wind.directionTrue"};
   std::string heading{"navigation.headingTrue"};
   bool show_true_wind{true};
+  // Performance graphics (ADR-0029), each off unless the layout turns it on.
+  bool show_laylines{false}, show_waypoint{false}, show_target{false};
+  std::string beat_angle{"performance.beatAngle"};
+  std::string gybe_angle{"performance.gybeAngle"};
+  std::string target_angle{"performance.targetAngle"};
+  std::string waypoint_bearing{"navigation.course.calcValues.bearingTrue"};
+  int fixed_beat{sizes::WIND_ROSE_BEAT_FIXED}, fixed_gybe{sizes::WIND_ROSE_GYBE_FIXED};
   // Which values record (ADR-0019), in ROSE_HISTORY_NAMES order: the slots, then the angles.
   static constexpr int HISTORY_KEYS = MAX_SLOTS + 3;
   static constexpr int HISTORY_APPARENT = MAX_SLOTS, HISTORY_TRUE = MAX_SLOTS + 1, HISTORY_HEADING = MAX_SLOTS + 2;

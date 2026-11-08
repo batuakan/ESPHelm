@@ -570,6 +570,12 @@ const CHART_ANCHOR_PATH_KEYS = [
 ] as const;
 const AUTOPILOT_PATH_KEYS = ['statePath', 'targetPath', 'adjustPath', 'headingPath'] as const;
 const WIND_ROSE_PATH_KEYS = ['apparentAngle', 'trueDirection', 'heading'] as const;
+/** A rose's performance paths (ADR-0029), used only while their graphic is on. */
+const WIND_ROSE_PERFORMANCE_KEYS = {
+  showLaylines: ['beatAngle', 'gybeAngle'],
+  showWaypoint: ['waypointBearing'],
+  showTarget: ['targetAngle'],
+} as const;
 
 /**
  * Every SignalK path the layout uses, read or written, with the defaults it relies on: an
@@ -607,6 +613,9 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
         case 'wind_rose': {
           const c = { ...WIND_ROSE_DEFAULTS, ...t.config };
           for (const k of WIND_ROSE_PATH_KEYS) add(c[k], ...at, 'config', k);
+          for (const [on, keys] of Object.entries(WIND_ROSE_PERFORMANCE_KEYS))
+            if (c[on as keyof typeof WIND_ROSE_PERFORMANCE_KEYS])
+              for (const k of keys) add(c[k], ...at, 'config', k);
           for (const [name, slot] of Object.entries(t.slots))
             if (slot) add(slot.path, ...at, 'slots', name, 'path');
           return;

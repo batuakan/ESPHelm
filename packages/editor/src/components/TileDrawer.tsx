@@ -32,6 +32,7 @@ import {
   UNIT_IDS,
   UNITS,
   WIND_ROSE_DEFAULTS,
+  WIND_ROSE_TACK,
   quantityForSignalKUnits,
   unitsForSignalKUnits,
   type AutopilotMode,
@@ -836,6 +837,38 @@ const ROSE_PATHS: { key: 'apparentAngle' | 'trueDirection' | 'heading'; label: s
   { key: 'heading', label: 'Heading' },
 ];
 
+type RosePerformancePath = 'beatAngle' | 'gybeAngle' | 'waypointBearing' | 'targetAngle';
+
+/** The rose's performance graphics (ADR-0029), each with the paths it reads. */
+const ROSE_PERFORMANCE: {
+  key: 'showLaylines' | 'showWaypoint' | 'showTarget';
+  name: string;
+  shape: string;
+  paths: { key: RosePerformancePath; label: string }[];
+}[] = [
+  {
+    key: 'showLaylines',
+    name: 'Laylines',
+    shape: 'green and red lines',
+    paths: [
+      { key: 'beatAngle', label: 'Beat angle' },
+      { key: 'gybeAngle', label: 'Gybe angle' },
+    ],
+  },
+  {
+    key: 'showWaypoint',
+    name: 'Waypoint',
+    shape: 'W marker',
+    paths: [{ key: 'waypointBearing', label: 'Bearing to the waypoint' }],
+  },
+  {
+    key: 'showTarget',
+    name: 'Target angle',
+    shape: 'bar on the ring',
+    paths: [{ key: 'targetAngle', label: 'Target true wind angle' }],
+  },
+];
+
 /** A "record history" checkbox for one wind rose value. */
 function RoseHistoryCheck(props: {
   tile: WindRoseTile;
@@ -950,6 +983,90 @@ function RoseFields(
         />
         Show the true wind pointer
       </label>
+      <fieldset className="modes" data-testid="rose-performance">
+        <legend>Performance</legend>
+        {ROSE_PERFORMANCE.map(({ key, name, shape }) => (
+          <div key={key}>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config[key] ?? WIND_ROSE_DEFAULTS[key]}
+                onChange={(e) => props.onConfig({ [key]: e.target.checked || undefined })}
+                aria-label={name}
+              />
+              {name} ({shape})
+            </label>
+            {config[key] && key === 'showLaylines' && (
+              <>
+                <label className="field">
+                  <span>Beat angle when SignalK has none (degrees)</span>
+                  <input
+                    type="number"
+                    min={WIND_ROSE_TACK.beat.min}
+                    max={WIND_ROSE_TACK.beat.max}
+                    placeholder={String(WIND_ROSE_DEFAULTS.fixedBeat)}
+                    value={config.fixedBeat !== undefined ? String(config.fixedBeat) : ''}
+                    onChange={(e) => props.onConfig({ fixedBeat: numberOrUndefined(e.target.value) })}
+                    aria-label="Fixed beat angle"
+                  />
+                </label>
+                <label className="field">
+                  <span>Gybe angle when SignalK has none (degrees)</span>
+                  <input
+                    type="number"
+                    min={WIND_ROSE_TACK.gybe.min}
+                    max={WIND_ROSE_TACK.gybe.max}
+                    placeholder={String(WIND_ROSE_DEFAULTS.fixedGybe)}
+                    value={config.fixedGybe !== undefined ? String(config.fixedGybe) : ''}
+                    onChange={(e) => props.onConfig({ fixedGybe: numberOrUndefined(e.target.value) })}
+                    aria-label="Fixed gybe angle"
+                  />
+                </label>
+              </>
+            )}
+          </div>
+        ))}
+        <small className="hint">
+          Laylines show the heading on each tack: the beat angle upwind, the gybe angle downwind.
+          The angles come from a polar plugin (performance.beatAngle) when one runs. Each graphic
+          shows only while its values are fresh.
+        </small>
+      </fieldset>
+      {ROSE_PERFORMANCE.some(({ key }) => config[key]) && (
+        <details className="slot-section" data-testid="rose-performance-sources">
+          <summary>Performance sources</summary>
+          {ROSE_PERFORMANCE.filter(({ key }) => config[key])
+            .flatMap(({ paths }) => paths)
+            .map((p) => (
+              <div key={p.key}>
+                <PathPicker
+                  path={config[p.key] ?? ''}
+                  paths={props.paths}
+                  values={props.values}
+                  label={p.label}
+                  placeholder={`default: ${WIND_ROSE_DEFAULTS[p.key]}`}
+                  onPick={(path) => props.onConfig({ [p.key]: path || undefined })}
+                />
+                {config[p.key] && (
+                  <button className="link" onClick={() => props.onConfig({ [p.key]: undefined })}>
+                    use the default ({WIND_ROSE_DEFAULTS[p.key]})
+                  </button>
+                )}
+              </div>
+            ))}
+        </details>
+      )}
+      {config.showWaypoint &&
+        (() => {
+          const h = north(config.heading ?? WIND_ROSE_DEFAULTS.heading);
+          const b = north(config.waypointBearing ?? WIND_ROSE_DEFAULTS.waypointBearing);
+          return h !== undefined && b !== undefined && h !== b ? (
+            <p className="warn rose-north">
+              The heading is {h}; the waypoint bearing isn't, so the W marker will be off by the
+              magnetic variation.
+            </p>
+          ) : null;
+        })()}
       <details className="slot-section" data-testid="rose-history">
         <summary>
           History

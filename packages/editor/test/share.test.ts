@@ -115,6 +115,10 @@ describe('layoutPathRefs and replacePath', () => {
         'apparentAngle',
         'trueDirection',
         'heading', // wind rose
+        'beatAngle',
+        'gybeAngle',
+        'targetAngle',
+        'waypointBearing', // wind rose performance (ADR-0029)
         'positionPath',
         'anchorPositionPath',
         'anchorRadiusPath',

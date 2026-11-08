@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "rose-performance",
+  "name": "Laylines",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "wind",
+      "title": "Wind",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "wind_rose",
+          "id": "rose",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "config": {
+            "showLaylines": true,
+            "showWaypoint": true,
+            "showTarget": true,
+            "beatAngle": "performance.beatAngle",
+            "gybeAngle": "performance.gybeAngle",
+            "targetAngle": "performance.targetAngle",
+            "waypointBearing": "navigation.course.calcValues.bearingTrue",
+            "fixedBeat": 42,
+            "fixedGybe": 155
+          },
+          "slots": {
+            "center1": {
+              "path": "environment.wind.speedApparent",
+              "unit": "kn",
+              "decimals": 1,
+              "label": "AWS"
+            },
+            "center2": {
+              "path": "performance.velocityMadeGood",
+              "unit": "kn",
+              "decimals": 1,
+              "label": "VMG"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

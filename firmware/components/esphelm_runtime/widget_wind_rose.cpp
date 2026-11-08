@@ -3,9 +3,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 #include "esphome/core/hal.h"
 #include "esphelm_sizes.h"
+#include "esphelm_wind_rose.h"
 
 namespace esphome {
 namespace esphelm_runtime {
@@ -38,6 +40,8 @@ static lv_style_t *sector_style(int side, lv_color_t color, int32_t width) {
  * degrees, wide red/green close-hauled sectors), a compass card inside it turning with the
  * heading, triangle markers for apparent (A) and true (T) wind on the ring, the heading at the
  * top and up to three big values in the middle. Everything is drawn to the tile's size.
+ * Optional performance graphics (ADR-0029): laylines, the waypoint bearing (W) and the polar's
+ * target angle, each drawn only while its values are fresh.
  */
 class WindRoseWidget : public Widget {
  public:
@@ -46,11 +50,20 @@ class WindRoseWidget : public Widget {
     static const esphelm::RoseConfig DEFAULTS;
     const esphelm::RoseConfig &cfg = tile.rose ? *tile.rose : DEFAULTS;
     show_true_ = cfg.show_true_wind;
+    laylines_ = cfg.show_laylines;
+    waypoint_ = cfg.show_waypoint;
+    target_on_ = cfg.show_target;
+    fixed_beat_ = cfg.fixed_beat;
+    fixed_gybe_ = cfg.fixed_gybe;
     const esphelm::units::UnitDef *deg = esphelm::units::find_unit("deg");
     apparent_.item.path = cfg.apparent_angle;
     true_dir_.item.path = cfg.true_direction;
     heading_.item.path = cfg.heading;
-    for (Binding *b : {&apparent_, &true_dir_, &heading_}) {
+    beat_.item.path = cfg.beat_angle;
+    gybe_.item.path = cfg.gybe_angle;
+    target_.item.path = cfg.target_angle;
+    bearing_.item.path = cfg.waypoint_bearing;
+    for (Binding *b : {&apparent_, &true_dir_, &heading_, &beat_, &gybe_, &target_, &bearing_}) {
       b->item.unit = deg;
       b->item.decimals = 0;
       b->stale_ms = env.default_stale_ms;
@@ -173,8 +186,16 @@ class WindRoseWidget : public Widget {
   void paths(std::vector<std::string> &out) const override {
     out.push_back(apparent_.item.path);
     out.push_back(heading_.item.path);
-    if (show_true_)
+    if (show_true_ || laylines_ || target_on_)
       out.push_back(true_dir_.item.path);
+    if (laylines_) {
+      out.push_back(beat_.item.path);
+      out.push_back(gybe_.item.path);
+    }
+    if (target_on_)
+      out.push_back(target_.item.path);
+    if (waypoint_)
+      out.push_back(bearing_.item.path);
     for (const auto &s : slots_)
       out.push_back(s.b.item.path);
     for (const auto &s : corners_)
@@ -220,6 +241,10 @@ class WindRoseWidget : public Widget {
     lv_obj_center(markers_);
     marker_ = std::max<int32_t>(8, ring_w * 6 / 5);
     ring_r_ = d / 2;
+    ring_w_ = ring_w;
+    line_w_ = std::max<int32_t>(3, d / 60);
+    // Laylines run from the edge of the centre values (the middle of the rose without them) across the ring.
+    line_in_ = full_ || compact ? card_d / 2 - band : d / 6;
 
     // The values go inside the card band; the font steps down until every slot fits.
     const int32_t inner = card_d / 2 - band;
@@ -266,7 +291,7 @@ class WindRoseWidget : public Widget {
   }
 
   void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now) override {
-    for (Binding *b : {&apparent_, &true_dir_, &heading_}) {
+    for (Binding *b : {&apparent_, &true_dir_, &heading_, &beat_, &gybe_, &target_, &bearing_}) {
       if (path == b->item.path)
         b->set(v, now);
     }
@@ -288,6 +313,14 @@ class WindRoseWidget : public Widget {
     if (true_dir_.due(now, stale)) {
       markers = true;
       true_stale_ = stale;
+    }
+    const std::pair<Binding *, bool *> performance[] = {
+        {&beat_, &beat_stale_}, {&gybe_, &gybe_stale_}, {&target_, &target_stale_}, {&bearing_, &bearing_stale_}};
+    for (const auto &p : performance) {
+      if (p.first->due(now, stale)) {
+        markers = true;
+        *p.second = stale;
+      }
     }
     if (heading_.due(now, stale)) {
       markers = true;
@@ -411,10 +444,46 @@ class WindRoseWidget : public Widget {
     lv_draw_label(layer, &label, &area);
   }
 
+  /// A line along the ray at `deg` clockwise from the bow, from radius r1 to r2.
+  void draw_ray_(lv_layer_t *layer, const lv_area_t &box, double deg, double r1, double r2, int32_t width,
+                 lv_color_t color) {
+    const double a = deg * M_PI / 180.0;
+    const double ux = std::sin(a), uy = -std::cos(a);
+    const double cx = (box.x1 + box.x2) / 2.0, cy = (box.y1 + box.y2) / 2.0;
+    lv_draw_line_dsc_t line;
+    lv_draw_line_dsc_init(&line);
+    line.color = color;
+    line.opa = LV_OPA_COVER;
+    line.width = width;
+    line.p1 = {static_cast<lv_value_precise_t>(cx + ux * r1), static_cast<lv_value_precise_t>(cy + uy * r1)};
+    line.p2 = {static_cast<lv_value_precise_t>(cx + ux * r2), static_cast<lv_value_precise_t>(cy + uy * r2)};
+    lv_draw_line(layer, &line);
+  }
+
+  /// Laylines, the target angle and the waypoint (ADR-0029), under the wind markers; each only
+  /// while its values are fresh, so the rose never steers by old data.
+  void draw_performance_(lv_layer_t *layer, const lv_area_t &box) {
+    const bool wind = true_dir_.has_number && !true_stale_ && heading_.has_number && !heading_stale_;
+    if (laylines_ && wind) {
+      const auto l = esphelm::wind_rose::laylines(true_dir_.number, heading_.number, beat_.has_number && !beat_stale_,
+                                                  beat_.number, gybe_.has_number && !gybe_stale_, gybe_.number,
+                                                  fixed_beat_, fixed_gybe_);
+      draw_ray_(layer, box, l.starboard, line_in_, ring_r_ - 1, line_w_, colors_.starboard);
+      draw_ray_(layer, box, l.port, line_in_, ring_r_ - 1, line_w_, colors_.port);
+    }
+    double t;
+    if (target_on_ && wind && target_.has_number && !target_stale_ &&
+        esphelm::wind_rose::target(true_dir_.number, heading_.number, target_.number, t))
+      draw_ray_(layer, box, t, ring_r_ - ring_w_, ring_r_, line_w_ * 3 / 2, colors_.true_wind);
+    if (waypoint_ && bearing_.has_number && !bearing_stale_ && heading_.has_number && !heading_stale_)
+      draw_marker_(layer, box, esphelm::wind_rose::relative(bearing_.number, heading_.number), colors_.zone[0], "W");
+  }
+
   void draw_markers_(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     lv_area_t box;
     lv_obj_get_coords(markers_, &box);
+    draw_performance_(layer, box);
     if (show_true_ && true_dir_.has_number && heading_.has_number) {
       // True wind relative to the bow: direction minus heading.
       const double rel = std::fmod(true_dir_.number - heading_.number + 720.0, 360.0);
@@ -429,16 +498,20 @@ class WindRoseWidget : public Widget {
   Fonts fonts_;
   lv_obj_t *area_;
   bool show_true_{true};
+  bool laylines_{false}, waypoint_{false}, target_on_{false};
+  int fixed_beat_{esphelm::sizes::WIND_ROSE_BEAT_FIXED}, fixed_gybe_{esphelm::sizes::WIND_ROSE_GYBE_FIXED};
   Binding apparent_, true_dir_, heading_;
+  Binding beat_, gybe_, target_, bearing_;  // used only when their graphic is on
   lv_obj_t *mark_{nullptr};
   std::function<void(const std::string &)> open_history_;
   bool apparent_stale_{true}, true_stale_{true}, heading_stale_{true};
+  bool beat_stale_{true}, gybe_stale_{true}, target_stale_{true}, bearing_stale_{true};
   std::string heading_suffix_;
   lv_obj_t *ring_, *card_, *markers_, *center_, *heading_label_;
   lv_scale_section_t *sections_[2]{};
   std::string heading_shown_;
   bool full_{false};
-  int32_t marker_{12}, ring_r_{0};
+  int32_t marker_{12}, ring_r_{0}, ring_w_{6}, line_w_{2}, line_in_{0};
   std::vector<Slot> slots_;    // the centre stack
   std::vector<Slot> corners_;  // corner values
 };

@@ -848,6 +848,54 @@
                             },
                             "showTrueWind": {
                               "type": "boolean"
+                            },
+                            "showLaylines": {
+                              "type": "boolean",
+                              "description": "Laylines: the heading on each tack at the beat angle (upwind) or gybe angle (downwind)."
+                            },
+                            "showWaypoint": {
+                              "type": "boolean",
+                              "description": "A W marker at the bearing to the next waypoint."
+                            },
+                            "showTarget": {
+                              "type": "boolean",
+                              "description": "A bar at the polar's target true wind angle."
+                            },
+                            "beatAngle": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "gybeAngle": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "targetAngle": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "waypointBearing": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "fixedBeat": {
+                              "type": "integer",
+                              "minimum": 20,
+                              "maximum": 80,
+                              "description": "Beat angle in degrees when SignalK has none. Absent: 45."
+                            },
+                            "fixedGybe": {
+                              "type": "integer",
+                              "minimum": 100,
+                              "maximum": 175,
+                              "description": "Gybe angle in degrees when SignalK has none. Absent: 150."
                             }
                           },
                           "additionalProperties": false

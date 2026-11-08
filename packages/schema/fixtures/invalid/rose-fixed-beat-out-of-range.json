@@ -1,0 +1,53 @@
+{
+  "description": "fixedBeat is 20 to 80 degrees",
+  "expect": [
+    {
+      "code": "OUT_OF_RANGE",
+      "pointer": "/pages/0/tiles/0/config/fixedBeat"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "wind",
+        "title": "Wind",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "wind_rose",
+            "id": "rose",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "config": {
+              "showLaylines": true,
+              "fixedBeat": 90
+            },
+            "slots": {
+              "center1": {
+                "path": "environment.wind.speedApparent",
+                "unit": "kn",
+                "decimals": 1,
+                "label": "AWS"
+              },
+              "center2": {
+                "path": "performance.velocityMadeGood",
+                "unit": "kn",
+                "decimals": 1,
+                "label": "VMG"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
