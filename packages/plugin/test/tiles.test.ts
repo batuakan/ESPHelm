@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   chartInfo,
   decodeTile,
+  resourcesChartSource,
   TILE_BYTES,
   tileRequest,
   tileUrl,
@@ -113,6 +114,38 @@ describe('tile conversion', () => {
       url: 'https://tiles.example/1/0/0.png',
       headers: {},
     });
+  });
+});
+
+describe('resourcesChartSource', () => {
+  const chart = {
+    name: 'Sat',
+    format: 'jpg',
+    type: 'tilelayer',
+    url: 'https://example/{z}/{x}/{y}',
+  };
+  it("finds a chart the default provider doesn't have in the merged list", async () => {
+    // The server's getResource asks only the default charts provider; listResources merges all.
+    const resources = {
+      getResource: async () => {
+        throw new Error('No such resource charts google-satellite');
+      },
+      listResources: async () => ({ 'google-satellite': chart }),
+    };
+    const source = resourcesChartSource(resources as never, () => 3000);
+    expect((await source.getChart('google-satellite'))?.name).toBe('Sat');
+    expect(await source.getChart('missing')).toBeUndefined();
+  });
+
+  it('uses the default provider when it has the chart', async () => {
+    const resources = {
+      getResource: async () => chart,
+      listResources: async () => {
+        throw new Error('not asked');
+      },
+    };
+    const source = resourcesChartSource(resources as never, () => 3000);
+    expect((await source.getChart('sat'))?.name).toBe('Sat');
   });
 });
 

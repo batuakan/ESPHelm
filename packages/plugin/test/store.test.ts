@@ -77,6 +77,37 @@ describe('Store', () => {
     });
   });
 
+  it('migrates a stored layout with the old chart page kind (ADR-0030)', () => {
+    mkdirSync(join(dir, 'layouts'), { recursive: true });
+    const old = {
+      ...minimal,
+      id: 'charts',
+      pages: [
+        ...minimal.pages,
+        { kind: 'chart', id: 'nav', title: 'Chart', chart: 'osm', zoom: 12 },
+      ],
+    };
+    writeFileSync(join(dir, 'layouts', 'charts.json'), JSON.stringify(old));
+    const logs: string[] = [];
+    const s = new Store(
+      dir,
+      (m) => problems.push(m),
+      (m) => logs.push(m),
+    );
+    s.load();
+    expect(problems).toEqual([]);
+    expect(logs).toEqual([
+      expect.stringContaining('charts.json: wind-rose and chart pages migrated'),
+    ]);
+    expect(s.getLayout('charts')?.layout.pages[1]).toEqual({
+      kind: 'grid',
+      id: 'nav',
+      title: 'Chart',
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'chart', id: 'nav-chart', x: 0, y: 0, w: 1, h: 1, chart: 'osm', zoom: 12 }],
+    });
+  });
+
   it('migrates a stored layout with the old wind-rose page kind, once', () => {
     mkdirSync(join(dir, 'layouts'), { recursive: true });
     const old = {
@@ -102,7 +133,7 @@ describe('Store', () => {
     );
     s.load();
     expect(problems).toEqual([]);
-    expect(logs).toEqual([expect.stringContaining('old.json: wind-rose pages migrated')]);
+    expect(logs).toEqual([expect.stringContaining('old.json: wind-rose and chart pages migrated')]);
     const page = s.getLayout('old')?.layout.pages[1];
     expect(page).toMatchObject({
       kind: 'grid',

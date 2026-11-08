@@ -243,8 +243,18 @@ export function resourcesChartSource(
     },
     async getChart(id) {
       if (!resources) return undefined;
-      const raw = (await resources.getResource('charts', id).catch(() => undefined)) as
-        Record<string, unknown> | undefined;
+      // getResource asks only the default charts provider (e.g. resources-provider's file
+      // store), while listResources merges every provider, as the editor's list does: a chart of
+      // another provider (e.g. the charts plugin) is found in the list.
+      const raw =
+        ((await resources.getResource('charts', id).catch(() => undefined)) as
+          Record<string, unknown> | undefined) ??
+        (
+          (await resources.listResources('charts', {}).catch(() => ({}))) as Record<
+            string,
+            Record<string, unknown> | undefined
+          >
+        )[id];
       return raw ? chartInfo(id, raw) : undefined;
     },
     async fetchTile(url, authorization) {

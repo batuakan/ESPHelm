@@ -58,7 +58,7 @@ export function RemapDialog(props: {
             <code>{m.value}</code>
             <span className="hint">
               {' '}
-              {m.uses} {m.kind === 'chart' ? (m.uses === 1 ? 'page' : 'pages') : m.uses === 1 ? 'use' : 'uses'}
+              {m.uses} {m.kind === 'chart' ? (m.uses === 1 ? 'tile' : 'tiles') : m.uses === 1 ? 'use' : 'uses'}
             </span>
             {m.kind === 'path' ? (
               <PathPicker

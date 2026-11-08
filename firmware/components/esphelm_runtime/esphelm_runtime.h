@@ -189,6 +189,7 @@ class EsphelmRuntime : public Component {
   LayoutStore store_;
   LayoutClient client_;
   LayoutClient tiles_;  // chart tiles, so they never delay hellos and layout fetches
+  ChartTileStore charts_;  // the map tiles every chart tile shares (ADR-0030)
 
   std::string board_;
   bool touch_{true};

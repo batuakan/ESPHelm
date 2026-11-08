@@ -357,8 +357,8 @@ async function main(): Promise<void> {
     await goTo(3, 'Helm');
     await fw.screenshot('09-multi-helm', shots);
 
-    // 8b. A chart page (ADR-0012): tiles of the charts stand-in through the plugin, the vessel
-    //     in the middle, the anchor and its alarm radius. Then back to the multi-page layout.
+    // 8b. A chart filling its page (ADR-0012, a tile since ADR-0030): tiles of the charts
+    //     stand-in through the plugin, the vessel in the middle, the anchor and its alarm radius.
     const charts = fixture('valid/chart-page.json');
     await json('PUT', `/plugins/esphelm/api/layouts/${String(charts.id)}`, admin, charts);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: charts.id });
@@ -379,8 +379,8 @@ async function main(): Promise<void> {
     publish({ 'navigation.position': { latitude: 60.1532, longitude: 24.95 } });
     await sleep(4000);
     await fw.screenshot('17-chart-moved', shots);
-    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'chart zoom_in');
-    check('chart zooms in through its + button', await fw.waitLog(/Chart chart: zoom 16/));
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'map zoom_in');
+    check('chart zooms in through its + button', await fw.waitLog(/Chart map: zoom 16/));
     await sleep(6000);
     await fw.screenshot('18-chart-zoomed', shots);
     publish({
@@ -404,6 +404,62 @@ async function main(): Promise<void> {
       'the anchor alarm clears the banner',
       await fw.waitLog(/notifications\.navigation\.anchor cleared/),
     );
+
+    // 8b2. Chart tiles (ADR-0030): a 2x2 chart beside a rose and a 1x1 chart of the same chart
+    //      and zoom. They share their map tiles: each is fetched once, and the small chart, which
+    //      shows the middle of the big one, costs nothing. Zooming the big one fetches only its
+    //      new zoom; leaving the page and coming back fetches nothing.
+    const chartTiles = fixture('valid/chart-tiles.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(chartTiles.id)}`, admin, chartTiles);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: chartTiles.id,
+    });
+    check(
+      'chart tiles: the layout renders',
+      await fw.waitLog(/Showing fetched layout "chart-tiles" \(2 pages/),
+    );
+    const loaded = (zoom: number) =>
+      [
+        ...fw.log().matchAll(new RegExp(`Chart tile test-chart/${zoom}/(\\d+/\\d+) loaded`, 'g')),
+      ].map((m) => m[1]);
+    const before15 = loaded(15).length;
+    const before16 = loaded(16).length;
+    // Away from where 8b fetched: the store keeps map tiles across layouts that have charts.
+    publish({
+      'navigation.position': { latitude: 60.2, longitude: 25.05 },
+      'navigation.headingTrue': 0.8,
+      'environment.wind.angleApparent': -0.6,
+      'environment.wind.directionTrue': 0.4,
+    });
+    await sleep(5000);
+    await fw.screenshot('74-chart-tiles', shots);
+    const shared = loaded(15).slice(before15);
+    check(
+      'chart tiles: two charts of one chart and zoom fetch each map tile once',
+      shared.length > 0 && shared.length <= 9 && new Set(shared).size === shared.length,
+      shared.join(' '),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'big zoom_in');
+    check('chart tiles: the big chart zooms in', await fw.waitLog(/Chart big: zoom 16/));
+    await sleep(5000);
+    await fw.screenshot('75-chart-tiles-zoomed', shots);
+    check(
+      'chart tiles: zooming one chart fetches its new zoom, the other keeps its tiles',
+      loaded(16).length > before16 && loaded(15).length === before15 + shared.length,
+      `z15 ${loaded(15).length - before15}, z16 ${loaded(16).length - before16}`,
+    );
+    const beforeTrip = loaded(15).length + loaded(16).length;
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
+    await fw.waitLog(/Page 2\/2 "Depth"/);
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '0');
+    await fw.waitLog(/Page 1\/2 "Helm"/, 15000, 2);
+    await sleep(2000);
+    check(
+      'chart tiles: back on the page, the charts draw from the store without fetching',
+      loaded(15).length + loaded(16).length === beforeTrip,
+      String(loaded(15).length + loaded(16).length - beforeTrip),
+    );
+
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'back to the multi-page layout',

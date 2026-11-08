@@ -250,6 +250,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return make_heading_tape_widget(cell, tile, env);
     case esphelm::TileType::CLOCK:
       return make_clock_widget(cell, tile, env);
+    case esphelm::TileType::CHART:
+      return make_chart_widget(cell, tile, env);
     case esphelm::TileType::VALUE:
     default:
       return make_value_widget(cell, tile, env);

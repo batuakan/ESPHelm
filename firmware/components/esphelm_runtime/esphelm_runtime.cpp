@@ -83,6 +83,18 @@ void EsphelmRuntime::setup() {
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
   this->tiles_.start();
+  this->charts_.set_fetch([this](const std::string &path, uint32_t tag, size_t max_body) {
+    if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
+      return false;
+    HttpRequest req;
+    req.kind = RequestKind::TILE;
+    req.url = this->base_url_() + path;
+    req.token = this->signalk_->get_token();
+    req.max_body = max_body;
+    req.tag = tag;
+    this->tiles_.submit(std::move(req));
+    return true;
+  });
   const char *clock_test = std::getenv("ESPHELM_TEST_CLOCK");
   this->clock_frozen_ = clock_test != nullptr && std::strcmp(clock_test, "frozen") == 0;
   const char *info_test = std::getenv("ESPHELM_TEST_INFO");
@@ -190,11 +202,9 @@ void EsphelmRuntime::loop() {
   HttpResult result;
   while (this->client_.poll(result))
     this->handle_result_(result);
-  // Chart tiles go back to the widgets of the visible page.
-  while (this->tiles_.poll(result)) {
-    for (auto &w : this->widgets_)
-      w->on_http(result);
-  }
+  // Map tiles go to the store every chart tile shares.
+  while (this->tiles_.poll(result))
+    this->charts_.on_http(result, now);
 
   const bool connected = this->signalk_->is_stream_connected();
   if (connected && !this->was_connected_) {
@@ -239,6 +249,7 @@ void EsphelmRuntime::loop() {
     }
     for (auto &w : this->widgets_)
       w->tick(now);
+    this->charts_.pump(now);
     history_closed = this->history_.tick(now);
     if (!this->history_wanted_.empty()) {
       this->open_history_(this->history_wanted_);
@@ -490,6 +501,13 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->apply_server_zones_();
   this->zones_dirty_ = false;  // the page is built next
   this->configure_history_();
+  // Map tiles are kept across pages while the layout has charts (ADR-0030).
+  bool charts = false;
+  for (const auto &p : this->layout_.pages)
+    for (const auto &t : p.tiles)
+      charts = charts || t.type == esphelm::TileType::CHART;
+  if (!charts)
+    this->charts_.clear();
   // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
   // or what was chosen on the display, unless this layout brings other values for it (ADR-0025).
   if (esphelm::reconcile_prefs(this->prefs_, this->layout_.settings, this->layout_.theme)) {
@@ -1314,18 +1332,7 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.utc_now = [this](int64_t &utc) { return this->utc_now_(utc); };
   env.time_zone = this->layout_.settings.time_zone;
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
-  env.fetch = [this](const std::string &path, uint32_t tag, size_t max_body) {
-    if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
-      return false;
-    HttpRequest req;
-    req.kind = RequestKind::TILE;
-    req.url = this->base_url_() + path;
-    req.token = this->signalk_->get_token();
-    req.max_body = max_body;
-    req.tag = tag;
-    this->tiles_.submit(std::move(req));
-    return true;
-  };
+  env.charts = &this->charts_;
   if (!this->renderer_.show_page(this->layout_, index, env, this->widgets_))
     return false;
   this->page_ = index;

@@ -8,7 +8,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   pageTiles,
-  updateChartPage,
+  updateChartTile,
   addPage,
   addTemplatePages,
   addTile,
@@ -312,45 +312,74 @@ describe('pages', () => {
   });
 });
 
-describe('chart pages', () => {
-  it('adds a chart page that asks for its chart, then edits it', () => {
+describe('chart tiles (ADR-0030)', () => {
+  it('adds a chart page with a chart tile that asks for its chart, then edits it', () => {
     let l = withTiles(1);
     l = updateTile(l, 0, 'tile-1', { path: 'navigation.speedOverGround' });
     const r = addPage(l, 'chart');
     l = r.layout;
-    expect(l.pages[r.index]).toEqual({ kind: 'chart', id: 'chart-1', title: 'Chart', chart: '' });
+    expect(l.pages[r.index]).toEqual({
+      kind: 'grid',
+      id: 'chart-1',
+      title: 'Chart',
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'chart', id: 'chart-1-map', x: 0, y: 0, w: 1, h: 1, chart: '' }],
+    });
     expect(validateLayout(l).errors.map((e) => [e.code, e.pointer])).toEqual([
-      ['INVALID_ID', '/pages/1/chart'],
+      ['INVALID_ID', '/pages/1/tiles/0/chart'],
     ]);
-    expect(targetForPointer(l, '/pages/1/chart')).toEqual({ page: 1 });
-    l = updateChartPage(l, 1, {
+    expect(targetForPointer(l, '/pages/1/tiles/0/chart')).toEqual({
+      page: 1,
+      tileId: 'chart-1-map',
+    });
+    l = updateChartTile(l, 1, 'chart-1-map', {
       chart: 'sea',
       zoom: 13,
       anchor: false,
       config: { headingPath: 'navigation.headingMagnetic' },
     });
-    expect(l.pages[1]).toEqual({
-      kind: 'chart',
-      id: 'chart-1',
-      title: 'Chart',
+    expect(l.pages[1]?.tiles[0]).toEqual({
+      type: 'chart',
+      id: 'chart-1-map',
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
       chart: 'sea',
       zoom: 13,
       anchor: false,
       config: { headingPath: 'navigation.headingMagnetic' },
     });
-    l = updateChartPage(l, 1, { zoom: undefined, config: { headingPath: undefined } });
-    expect(l.pages[1]).toEqual({
-      kind: 'chart',
-      id: 'chart-1',
-      title: 'Chart',
+    l = updateChartTile(l, 1, 'chart-1-map', {
+      zoom: undefined,
+      config: { headingPath: undefined },
+    });
+    expect(l.pages[1]?.tiles[0]).toEqual({
+      type: 'chart',
+      id: 'chart-1-map',
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
       chart: 'sea',
       anchor: false,
     });
     expect(validateLayout(l).errors).toEqual([]);
-    // Tile operations leave chart pages alone; chart edits leave grid pages alone.
-    expect(addTile(l, 1, 'value')).toBeNull();
-    expect(updateChartPage(l, 0, { chart: 'x' })).toEqual(l);
-    expect(pageTiles(l.pages[1])).toEqual([]);
+    // Chart edits leave other tiles alone.
+    expect(updateChartTile(l, 0, 'tile-1', { chart: 'x' })).toEqual(l);
+  });
+
+  it('adds a chart tile from the library, 2x2 where it fits', () => {
+    const r = addTile(withTiles(0), 0, 'chart');
+    expect(r?.layout.pages[0]?.tiles[0]).toEqual({
+      type: 'chart',
+      id: 'chart-1',
+      x: 0,
+      y: 0,
+      w: 2,
+      h: 2,
+      chart: '',
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import Type from 'typebox';
 import { CLOCK_DATE_FORMATS } from './clock.js';
-import { DataItem, Decimals, Id, Label, SkPath } from './primitives.js';
+import { ChartId, DataItem, Decimals, Id, Label, SkPath } from './primitives.js';
 
 /** Placement of a tile on its page grid, in cells (0-based; a tile may span several cells). */
 const Placement = {
@@ -537,6 +537,53 @@ export const SERVER_ZONES = {
   maxPerPath: 16,
 } as const;
 
+/**
+ * Chart (ADR-0030, before that a page kind, ADR-0012): map tiles of a SignalK chart centred on
+ * the vessel, north up, with the vessel, and the anchor position and alarm radius when `anchor`
+ * is on. Charts on one display share their map tiles. Only displays with PSRAM render it (they
+ * list "chart" in hello.widgets).
+ */
+export const ChartTile = Type.Object(
+  {
+    type: Type.Literal('chart'),
+    ...Placement,
+    chart: ChartId,
+    zoom: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+    anchor: Type.Optional(Type.Boolean()),
+    config: Type.Optional(
+      Type.Object(
+        {
+          positionPath: Type.Optional(SkPath),
+          headingPath: Type.Optional(SkPath),
+          anchorPositionPath: Type.Optional(SkPath),
+          anchorRadiusPath: Type.Optional(SkPath),
+          anchorAlarmPath: Type.Optional(SkPath),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted chart fields (the paths the legacy chart app uses). */
+export const CHART_DEFAULTS = {
+  zoom: 15,
+  anchor: true,
+  positionPath: 'navigation.position',
+  headingPath: 'navigation.headingTrue',
+  anchorPositionPath: 'navigation.anchor.position',
+  anchorRadiusPath: 'navigation.anchor.maxRadius',
+  anchorAlarmPath: 'notifications.navigation.anchor',
+} as const;
+
+/**
+ * What a chart draws for the shorter side of its cell, in device pixels (ADR-0030): the zoom
+ * buttons from `buttons`, the position line from `info`; below `buttons` an anchor alarm is a
+ * red border instead of a banner. Generated into esphelm_sizes.h; the editor's size hint uses it.
+ */
+export const CHART_FIT = { buttons: 200, info: 260 } as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,
@@ -549,6 +596,7 @@ export const TILE_TYPES = {
   graph: GraphTile,
   heading_tape: HeadingTapeTile,
   clock: ClockTile,
+  chart: ChartTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -568,6 +616,7 @@ export const Tile = Type.Union([
   GraphTile,
   HeadingTapeTile,
   ClockTile,
+  ChartTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -579,4 +628,5 @@ export type AutopilotTile = Type.Static<typeof AutopilotTile>;
 export type GraphTile = Type.Static<typeof GraphTile>;
 export type HeadingTapeTile = Type.Static<typeof HeadingTapeTile>;
 export type ClockTile = Type.Static<typeof ClockTile>;
+export type ChartTile = Type.Static<typeof ChartTile>;
 export type Tile = Type.Static<typeof Tile>;

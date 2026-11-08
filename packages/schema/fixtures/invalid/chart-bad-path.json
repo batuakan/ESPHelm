@@ -3,7 +3,7 @@
   "expect": [
     {
       "code": "INVALID_PATH",
-      "pointer": "/pages/0/config/anchorRadiusPath"
+      "pointer": "/pages/0/tiles/0/config/anchorRadiusPath"
     }
   ],
   "layout": {
@@ -11,7 +11,28 @@
     "id": "minimal",
     "theme": "day",
     "pages": [
-      { "kind": "chart", "id": "c", "chart": "x", "config": { "anchorRadiusPath": "navigation anchor" } }
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "chart",
+            "id": "c",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "chart": "x",
+            "config": {
+              "anchorRadiusPath": "navigation anchor"
+            }
+          }
+        ]
+      }
     ]
   }
 }

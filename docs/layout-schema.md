@@ -15,7 +15,7 @@ Regenerate after any change with `npm run generate`. `npm test` fails while gene
 ## 1. Versioning and compatibility
 - `version` is the **major** version (`1`). A device rejects any layout whose major it doesn't support (`hello.schema.major`), keeps its last-known-good layout, and logs `UNSUPPORTED_VERSION`.
 - Within a major, changes are **additive only**: new optional fields, new tile types, new page kinds.
-  - One exception, approved before any release: Phase 5b removed the `kind: "widget"` wind-rose page in favour of the `wind_rose` tile (ADR-0010). The plugin migrates stored layouts on load (`migrateLayout`); the validator rejects the old shape with `UNKNOWN_PAGE_KIND`.
+  - Two exceptions, approved before any release, both pages that became tiles: Phase 5b removed the `kind: "widget"` wind-rose page in favour of the `wind_rose` tile (ADR-0010), and ADR-0030 removed the `kind: "chart"` page in favour of the `chart` tile. The plugin migrates stored layouts on load and the editor imported ones (`migrateLayout`: a 1x1 grid page with the tile); the validator rejects the old shapes with `UNKNOWN_PAGE_KIND`. A display with new firmware refuses an old cached chart layout for the same reason, and shows its built-in page until the plugin serves the migrated one.
   - The plugin and editor validate strictly (`additionalProperties: false`).
   - **Firmware ignores unknown fields** but validates every field it knows. That lets older firmware accept a layout written for newer firmware of the same major. Verified by `firmware/test/parser.cpp.test.ts`: the C++ parser reports exactly the TS codes and pointers on every fixture and extra mutations, except `UNKNOWN_FIELD`.
   - Slot names are part of a tile type's contract, so an unknown slot is still `UNKNOWN_SLOT` on the device.
@@ -33,24 +33,18 @@ Layout
 ├─ pages: Page[]            (at least 1)
 └─ settings?: Settings      display settings (Phase 6, see below)
 
-Page = GridPage | ChartPage           (discriminator: kind)
+Page = GridPage                       (discriminator: kind; the only kind)
 
 GridPage                              kind: "grid"
 ├─ id: Id, title?: Label
 ├─ grid: { cols ≥ 1, rows ≥ 1 }
 └─ tiles: Tile[]            (at least 1)
 
-Tile = value | gauge | bar | switch | position | wind_rose | autopilot   (discriminator: type)
+Tile = value | gauge | bar | switch | position | wind_rose | autopilot | graph | heading_tape
+     | clock | chart                         (discriminator: type)
   common: id, x ≥ 0, y ≥ 0, w ≥ 1, h ≥ 1   (grid cells, 0-based)
 
-ChartPage                             kind: "chart"   (Phase 5d, ADR-0012)
-├─ id: Id, title?: Label
-├─ chart: ChartId            SignalK chart identifier ([A-Za-z0-9][A-Za-z0-9._-]*)
-├─ zoom?: 1..20              default 15
-├─ anchor?: boolean          default true (anchor watch overlay)
-└─ config?: { positionPath?, headingPath?, anchorPositionPath?, anchorRadiusPath?, anchorAlarmPath? }
-
-A full-screen wind rose is a 1x1 grid page with one wind_rose tile.
+A full-screen wind rose or chart is a 1x1 grid page with one such tile.
 ```
 
 ### Primitives
@@ -158,8 +152,10 @@ A `fixedBeat`/`fixedGybe` outside its range gives `OUT_OF_RANGE`, a fraction `IN
 
 The editor shows the expected tier for the selected display.
 
-### Chart pages
-A full-page map (ADR-0012): tiles of a SignalK chart centred on the vessel, north up, with the vessel, and the anchor position, alarm radius and alarm when `anchor` is on. Only displays with PSRAM render it; they list `chart` in `hello.widgets` (page kinds other than grid count as widget names), so the plugin refuses chart layouts for others. Defaults are exported as `CHART_DEFAULTS`:
+### Chart tiles
+A map (ADR-0012; a tile since ADR-0030, a page before): tiles of a SignalK chart centred on the vessel, north up, with the vessel, and the anchor position, alarm radius and alarm when `anchor` is on. Only displays with PSRAM render it; they list `chart` in `hello.widgets`, so the plugin refuses chart layouts for others. Several chart tiles can share a page or a layout: the display keeps one store of map tiles for all of them, so charts of the same chart and zoom cost no extra memory.
+
+`ChartTile`: `type: "chart"`, the common placement, `chart` (ChartId: `[A-Za-z0-9][A-Za-z0-9._-]*`, a SignalK chart identifier), `zoom?` (1–20), `anchor?` (boolean) and `config?` with the paths below. Defaults are exported as `CHART_DEFAULTS`:
 
 | Field | Default |
 |---|---|
@@ -171,7 +167,9 @@ A full-page map (ADR-0012): tiles of a SignalK chart centred on the vessel, nort
 | `config.anchorRadiusPath` | `navigation.anchor.maxRadius` (metres) |
 | `config.anchorAlarmPath` | `notifications.navigation.anchor` (alarm when `state` is not `normal`/`nominal`) |
 
-A bad or missing `chart` is `INVALID_ID` / `MISSING_FIELD` at `/pages/i/chart`; `zoom` outside 1–20 is `OUT_OF_RANGE`.
+A bad or missing `chart` is `INVALID_ID` / `MISSING_FIELD` at `/pages/i/tiles/j/chart`; `zoom` outside 1–20 is `OUT_OF_RANGE`.
+
+**Size is the device's business** (`CHART_FIT`, generated into `esphelm_sizes.h`): the zoom buttons show from 200 px on the cell's shorter side and the position line from 260 px; below 200 px an anchor alarm frames the tile in red instead of the banner (the alarm banner above the page names it).
 
 ### Position tiles
 GPS position as text: latitude over longitude. The display picks the largest font that fits the tile.
@@ -410,7 +408,8 @@ See `packages/schema/fixtures/valid/`:
 - `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
-- `chart-page.json`: a default chart page, an anchor page with every path set, and a grid page.
+- `chart-page.json`: a page with a default chart tile filling it, an anchor page with every path set, and a value page.
+- `chart-tiles.json`: a 2x2 chart beside a wind rose and a 1x1 chart of the same chart (they share their map tiles), and a value page.
 - `settings.json`: every display setting, with the second page as start page.
 - `position.json`: the four position formats, one with custom decimals.
 

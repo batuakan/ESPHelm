@@ -1,0 +1,21 @@
+{
+  "description": "The chart is a tile since ADR-0030; a chart page is an unknown page kind (the plugin migrates stored ones)",
+  "expect": [
+    {
+      "code": "UNKNOWN_PAGE_KIND",
+      "pointer": "/pages/0/kind"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "chart",
+        "id": "c",
+        "chart": "x"
+      }
+    ]
+  }
+}

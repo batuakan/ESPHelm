@@ -78,7 +78,9 @@ export class Store {
           const entry = stored(result.value);
           if (migrated.changed) {
             writeAtomic(join(this.layoutsDir, file), entry.bytes);
-            this.log(`layout ${file}: wind-rose pages migrated to wind_rose tiles (ADR-0010)`);
+            this.log(
+              `layout ${file}: wind-rose and chart pages migrated to tiles (ADR-0010, ADR-0030)`,
+            );
           }
           this.layouts.set(id, entry);
         }

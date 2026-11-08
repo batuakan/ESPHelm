@@ -1,7 +1,8 @@
-// Chart page preview: the chart's own PNG/JPEG tiles, loaded by the browser from its tilemapUrl
-// (same server, same login), centred on the live position at the page's zoom, north up, with
-// the vessel and the anchor overlay. The display draws the same from RGB565 tiles (ADR-0012).
-import { CHART_DEFAULTS, type ChartPage } from '@esphelm/schema';
+// Chart tile preview: the chart's own PNG/JPEG tiles, loaded by the browser from its tilemapUrl
+// (same server, same login), centred on the live position at the tile's zoom, north up, with
+// the vessel and the anchor overlay, drawn at the tile's size on the display and for its size
+// tier (CHART_FIT). The display draws the same from RGB565 tiles (ADR-0012, ADR-0030).
+import { CHART_DEFAULTS, CHART_FIT, type ChartTile } from '@esphelm/schema';
 import type { ReactElement } from 'react';
 import type { ChartInfo } from '../api';
 
@@ -34,19 +35,22 @@ export function tileHref(template: string, z: number, x: number, y: number): str
 }
 
 export function ChartPreview(props: {
-  page: ChartPage;
+  tile: ChartTile;
   chart: ChartInfo | undefined;
   values: Map<string, unknown>;
-  /** The chart area on the display, in display pixels. */
+  /** The tile on the display, in display pixels. */
   width: number;
   height: number;
   night: boolean;
-  onSelect(): void;
 }) {
-  const { page, chart, values, width: W, height: H } = props;
-  const cfg = { ...CHART_DEFAULTS, ...page.config };
-  const zoom = page.zoom ?? CHART_DEFAULTS.zoom;
-  const anchorOn = page.anchor ?? CHART_DEFAULTS.anchor;
+  const { tile, chart, values } = props;
+  const W = Math.max(1, Math.round(props.width));
+  const H = Math.max(1, Math.round(props.height));
+  const shorter = Math.min(W, H);
+  const small = shorter < CHART_FIT.buttons;
+  const cfg = { ...CHART_DEFAULTS, ...tile.config };
+  const zoom = tile.zoom ?? CHART_DEFAULTS.zoom;
+  const anchorOn = tile.anchor ?? CHART_DEFAULTS.anchor;
   const pos = asPosition(values.get(cfg.positionPath));
   const heading = values.get(cfg.headingPath);
   const anchorPos = asPosition(values.get(cfg.anchorPositionPath));
@@ -58,7 +62,7 @@ export function ChartPreview(props: {
   if (!chart || !chart.supported || !chart.tilemapUrl) {
     body = (
       <text x={W / 2} y={H / 2} className="chart-message">
-        {!page.chart ? 'Choose a chart' : !chart ? `Chart "${page.chart}" not found` : 'This chart cannot be shown on a display'}
+        {!tile.chart ? 'Choose a chart' : !chart ? `Chart "${tile.chart}" not found` : 'This chart cannot be shown on a display'}
       </text>
     );
   } else if (!pos) {
@@ -105,7 +109,7 @@ export function ChartPreview(props: {
       );
     }
     const h = typeof heading === 'number' ? heading * RAD : 0;
-    const s = Math.max(14, Math.min(W, H) / 22);
+    const s = Math.max(small ? 8 : 14, shorter / 22);
     body = (
       <>
         <g className={props.night ? 'chart-tiles night' : 'chart-tiles'}>{tiles}</g>
@@ -113,7 +117,7 @@ export function ChartPreview(props: {
         <g transform={`translate(${W / 2} ${H / 2}) rotate(${h})`} className="chart-vessel">
           <polygon points={`0,${-s} ${s * 0.48},${s * 0.64} 0,${s * 0.25} ${-s * 0.48},${s * 0.64}`} />
         </g>
-        {(() => {
+        {shorter >= CHART_FIT.info && (() => {
           const info = `${Math.abs(pos.latitude).toFixed(4)} ${pos.latitude >= 0 ? 'N' : 'S'}  ${Math.abs(pos.longitude).toFixed(4)} ${pos.longitude >= 0 ? 'E' : 'W'}   z${zoom}`;
           const w = info.length * 11 + 24;
           return (
@@ -128,30 +132,30 @@ export function ChartPreview(props: {
       </>
     );
   }
+  // The zoom buttons as the display sizes them (at least 48 px, a ninth of the shorter side).
+  const b = Math.max(48, shorter / 9);
   return (
-    <div className="canvas-frame chart-frame" style={{ aspectRatio: `${W} / ${H}` }}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="chart-preview"
-        onClick={props.onSelect}
-        role="button"
-        aria-label="Chart page settings"
-        data-testid={`chart-${page.id}`}
-      >
+    <span
+      className={`tile-graphic chart-tile ${anchorOn && alarmOn && small ? 'alarm' : ''}`}
+      data-testid={`chart-${tile.id}`}
+    >
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart-preview" preserveAspectRatio="none" aria-hidden>
         <rect width={W} height={H} className="chart-bg" />
         {body}
-        {anchorOn && alarmOn && (
+        {anchorOn && alarmOn && !small && (
           <text x={W / 2} y={32} className="chart-alarm">
             ANCHOR ALARM
           </text>
         )}
-        <g className="chart-zoom" aria-hidden>
-          <rect x={W - 60} y={8} width={52} height={52} rx={10} />
-          <text x={W - 34} y={42}>+</text>
-          <rect x={W - 60} y={68} width={52} height={52} rx={10} />
-          <text x={W - 34} y={102}>-</text>
-        </g>
+        {!small && (
+          <g className="chart-zoom">
+            <rect x={W - 8 - b} y={8} width={b} height={b} rx={10} />
+            <text x={W - 8 - b / 2} y={8 + b / 2 + 10}>+</text>
+            <rect x={W - 8 - b} y={16 + b} width={b} height={b} rx={10} />
+            <text x={W - 8 - b / 2} y={16 + b * 1.5 + 10}>-</text>
+          </g>
+        )}
       </svg>
-    </div>
+    </span>
   );
 }

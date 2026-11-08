@@ -11,6 +11,7 @@ import {
 import type { GridPage, Tile, TileType } from '@esphelm/schema';
 import { fits, type Rect, type SlotName } from '../layoutOps';
 import type { AutopilotTier, RoseTier, ValueTextSize } from '../sizing';
+import type { ChartInfo } from '../api';
 import { TilePreview } from './Previews';
 
 export interface NewTileDrag {
@@ -37,6 +38,10 @@ interface Props {
   tileWidth(tile: Tile): number;
   /** The layout's time zone as a POSIX rule, for clock previews; absent: UTC. */
   timeZone?: string;
+  /** Chart tiles: the server's charts, a tile's size on the display, and the night theme. */
+  charts?: ChartInfo[];
+  tileSize?(tile: Tile): { width: number; height: number };
+  night?: boolean;
   /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
   textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
@@ -189,7 +194,7 @@ export function GridCanvas(props: Props) {
               data-testid={`tile-${tile.id}`}
             >
               <span className="tile-label">
-                {tile.type === 'wind_rose'
+                {tile.type === 'wind_rose' || tile.type === 'chart'
                   ? ''
                   : tile.type === 'clock'
                     ? [tile.label, tile.utc ? 'UTC' : ''].filter(Boolean).join(' ')
@@ -206,6 +211,15 @@ export function GridCanvas(props: Props) {
                 graphAxis={tile.type === 'graph' ? props.graphAxis(tile) : undefined}
                 tapeWidth={tile.type === 'heading_tape' ? props.tileWidth(tile) : undefined}
                 timeZone={tile.type === 'clock' ? props.timeZone : undefined}
+                chart={
+                  tile.type === 'chart'
+                    ? {
+                        info: props.charts?.find((c) => c.identifier === tile.chart),
+                        ...(props.tileSize?.(tile) ?? { width: 480, height: 480 }),
+                        night: props.night ?? false,
+                      }
+                    : undefined
+                }
                 selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />

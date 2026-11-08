@@ -202,6 +202,7 @@ function renderSizesHeader(
   graph: { axisHeight: number },
   tape: { minorTickPx: number; label10Px: number },
   tack: Record<'beat' | 'gybe', { min: number; max: number; fixed: number }>,
+  chart: { buttons: number; info: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -248,6 +249,10 @@ function renderSizesHeader(
     `inline constexpr int WIND_ROSE_GYBE_MIN = ${tack.gybe.min};`,
     `inline constexpr int WIND_ROSE_GYBE_MAX = ${tack.gybe.max};`,
     `inline constexpr int WIND_ROSE_GYBE_FIXED = ${tack.gybe.fixed};`,
+    '',
+    '// Chart tile (ADR-0030): shorter side in pixels from which it shows its zoom buttons and position line.',
+    `inline constexpr int CHART_BUTTONS = ${chart.buttons};`,
+    `inline constexpr int CHART_INFO = ${chart.info};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -350,6 +355,7 @@ export async function renderAll(): Promise<Record<string, string>> {
     GRAPH_FIT,
     HEADING_TAPE_FIT,
     WIND_ROSE_TACK,
+    CHART_FIT,
   } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
@@ -367,6 +373,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       GRAPH_FIT,
       HEADING_TAPE_FIT,
       WIND_ROSE_TACK,
+      CHART_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -377,6 +384,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       GRAPH_FIT,
       HEADING_TAPE_FIT,
       WIND_ROSE_TACK,
+      CHART_FIT,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

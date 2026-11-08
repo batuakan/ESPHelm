@@ -236,3 +236,15 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Build sizes:** P4 flash 3,446,310 B (20.9 %, +2.4 KB), static RAM 99,594 B; Guition flash 1,803,063 B; C3 flash 1,609,482 B (87.7 %).
 - **Not checked on hardware yet** (hardware step 27).
 
+## Chart tile (ADR-0030, branch `feat/chart-tile`)
+- **What:** the chart is a tile instead of a page kind, so it can sit beside a wind rose or depth. Stored chart pages are migrated to a 1x1 grid page with a chart tile (`migrateLayout`, by the plugin on load and the editor on import); the validator and the firmware refuse the old page kind (`UNKNOWN_PAGE_KIND`). "+ → Chart page" makes the 1x1 page; the library has a Chart tile (2x2 where it fits) with a size hint.
+- **Shared map tiles:** one `ChartTileStore` for every chart on the display, with a budget of 16–48 tiles from free PSRAM instead of a 3.2 MB picture per chart. Charts say which tiles cover their view; the store fetches each once, keeps tiles any chart showed in the last second, evicts the least recently wanted, and keeps everything across page changes while the layout has charts. Charts draw tiles straight from the store; the old buffer shifting is gone.
+- **Size tiers:** zoom buttons from 200 px, the position line from 260 px, and a red frame instead of the anchor alarm banner below 200 px (`CHART_FIT`).
+- **Tests:**
+  - **Schema:** converted fixtures, `valid/chart-tiles.json`, `invalid/old-chart-page.json`, migration tests; the C++ parser agrees on all of them.
+  - **SDL e2e:** goldens 16–20 re-recorded (the chart now sits in a tile: rounded corners, page padding; the map, overlay and alarm unchanged, compared by eye with the old ones), and two new: a 2x2 chart beside a rose and a 1x1 chart. The log shows each map tile fetched once for both charts (6), zooming the big one fetching only its new zoom (6 at z16, none again at z15), and leaving the page and coming back fetching nothing.
+  - **Plugin:** an old chart page on disk is migrated on load. **Editor:** unit tests and the e2e (chart page, a value added beside the chart, the stored tiles).
+- **Plugin fix found on the P4:** tiles of a chart from the charts plugin came back 404 when another provider (`@signalk/resources-provider`) was the server's default for charts: `getResource('charts', id)` asks only the default provider, while the editor's list (`listResources`) merges all. The plugin now looks the chart up in the merged list when `getResource` has nothing. This predates the chart tile; the old chart page had it too.
+- **Build sizes:** P4 flash 3,447,548 B (20.9 %), static RAM 99,682 B; Guition flash 1,803,835 B; C3 flash 1,610,780 B (87.8 %; no chart).
+- **Not checked on hardware yet** (hardware step 28): drawing up to 16 tiles per refresh instead of one picture is the thing to watch on the P4.
+

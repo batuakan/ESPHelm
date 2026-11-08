@@ -17,7 +17,19 @@
 namespace esphelm {
 
 enum class Theme : uint8_t { DAY, NIGHT };
-enum class TileType : uint8_t { VALUE, GAUGE, BAR, SWITCH, WIND_ROSE, AUTOPILOT, POSITION, GRAPH, HEADING_TAPE, CLOCK };
+enum class TileType : uint8_t {
+  VALUE,
+  GAUGE,
+  BAR,
+  SWITCH,
+  WIND_ROSE,
+  AUTOPILOT,
+  POSITION,
+  GRAPH,
+  HEADING_TAPE,
+  CLOCK,
+  CHART
+};
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
 /// Value tile colour names (schema VALUE_COLORS); the theme decides the actual colour.
@@ -101,6 +113,18 @@ struct ClockConfig {
   bool utc{false};
 };
 
+/// Chart tile settings (ADR-0030): which SignalK chart, zoom, and the paths it follows.
+struct ChartConfig {
+  std::string chart;
+  int zoom{15};
+  bool anchor{true};
+  std::string position_path{"navigation.position"};
+  std::string heading_path{"navigation.headingTrue"};
+  std::string anchor_position_path{"navigation.anchor.position"};
+  std::string anchor_radius_path{"navigation.anchor.maxRadius"};
+  std::string anchor_alarm_path{"notifications.navigation.anchor"};
+};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -128,32 +152,16 @@ struct Tile {
   std::shared_ptr<const HeadingTapeConfig> tape;
   // clock
   ClockConfig clock;
+  // chart
+  std::shared_ptr<const ChartConfig> chart;
 };
 
-/// A grid page (the only page kind in v1).
-enum class PageKind : uint8_t { GRID, CHART };
-
-/// Chart page settings (Phase 5d): which SignalK chart, zoom, and the paths it follows.
-struct ChartConfig {
-  std::string chart;
-  int zoom{15};
-  bool anchor{true};
-  std::string position_path{"navigation.position"};
-  std::string heading_path{"navigation.headingTrue"};
-  std::string anchor_position_path{"navigation.anchor.position"};
-  std::string anchor_radius_path{"navigation.anchor.maxRadius"};
-  std::string anchor_alarm_path{"notifications.navigation.anchor"};
-};
-
+/// A grid page, the only page kind (the wind rose and the chart were page kinds; ADR-0010, ADR-0030).
 struct Page {
-  PageKind kind{PageKind::GRID};
   std::string id;
   std::string title;
-  // grid pages
   uint16_t cols{0}, rows{0};
   std::vector<Tile> tiles;
-  // chart pages
-  std::shared_ptr<const ChartConfig> chart;
 };
 
 enum class AutoTheme : uint8_t { OFF, SUN };
