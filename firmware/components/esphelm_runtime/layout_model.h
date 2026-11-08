@@ -164,6 +164,7 @@ struct Settings {
   std::string clock_path{"navigation.datetime"};
   ClockShow screen_saver{ClockShow::OFF};
   uint8_t screen_saver_brightness{30};  // %
+  uint16_t rotation{0};                 // degrees clockwise: how the display is mounted (ADR-0028)
 };
 
 struct Layout {

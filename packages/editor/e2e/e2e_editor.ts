@@ -906,6 +906,92 @@ async function main(): Promise<void> {
     );
     await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
 
+    // Mounting rotation (ADR-0028): the helm display says hello as a 1280x800 panel that can turn.
+    // The editor follows without a reload; Display settings > Mounted > 90 degrees previews it as
+    // 800x1280 at once and Save & send puts the rotation in the layout. Linking a square display
+    // to it warns.
+    const frame = page.locator('.display-frame');
+    const viewport = page.viewportSize();
+    const sizeShown = (text: string) =>
+      page
+        .locator('.device-size')
+        .getByText(text, { exact: true })
+        .waitFor({ timeout: 15000 })
+        .then(
+          () => true,
+          () => false,
+        );
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, {
+      ...hello,
+      display: { width: 1280, height: 800, rotation: 0 },
+    });
+    check(
+      'rotation: the editor follows a new display size without a reload',
+      await sizeShown('1280×800'),
+    );
+    await page.waitForTimeout(300);
+    const wide = await frame.boundingBox();
+    check(
+      'rotation: a landscape preview is wider than a square one',
+      !!wide && !!viewport && wide.width > 600 && wide.y + wide.height <= viewport.height,
+      JSON.stringify(wide),
+    );
+    await shot(page, '17-desktop-landscape');
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    const mounting = page.getByRole('complementary', { name: 'Display settings' });
+    await mounting.getByLabel('Rotation').selectOption('90');
+    check(
+      'rotation: Mounted turned 90 degrees previews the turned screen',
+      await sizeShown('800×1280'),
+    );
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    await page.waitForTimeout(300);
+    const tall = await frame.boundingBox();
+    check(
+      'rotation: a portrait preview fits the window',
+      !!tall && !!viewport && tall.y + tall.height <= viewport.height && tall.height > tall.width,
+      JSON.stringify(tall),
+    );
+    await shot(page, '18-desktop-portrait');
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: /^Sent/ }).waitFor();
+    const turnedLayout = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    check(
+      'rotation: Save & send puts it in the layout',
+      (turnedLayout.body.settings as { rotation?: number } | undefined)?.rotation === 90,
+      JSON.stringify(turnedLayout.body.settings),
+    );
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID2);
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: helmDevice.name ?? helmDevice.hello.board ?? DEVICE_ID })
+      .click();
+    check(
+      'rotation: linking displays of different shapes warns',
+      await page
+        .getByText(/Its screen is landscape \(1280×800\)/)
+        .waitFor({ timeout: 5000 })
+        .then(
+          () => true,
+          () => false,
+        ),
+    );
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.keyboard.press('Escape');
+    // Back as it was for the rest: not turned, the display's own size.
+    await page.getByRole('combobox', { name: 'Display', exact: true }).selectOption(DEVICE_ID);
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    await mounting.getByLabel('Rotation').selectOption('0');
+    await page.getByRole('button', { name: 'Display settings' }).click();
+    await page.getByRole('button', { name: 'Save & send' }).click();
+    await page.getByRole('status').filter({ hasText: /^Sent/ }).waitFor();
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, hello);
+    await sizeShown('720×720');
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

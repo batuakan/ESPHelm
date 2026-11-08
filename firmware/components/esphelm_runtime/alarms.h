@@ -84,6 +84,7 @@ class AlarmBanner {
   int32_t height_{0};
   // What was drawn last, to redraw only on change.
   esphelm::Theme drawn_theme_{esphelm::Theme::DAY};
+  int32_t drawn_width_{0};
   bool drawn_online_{true};
   bool drawn_can_ack_{true};
 

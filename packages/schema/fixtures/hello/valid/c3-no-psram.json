@@ -26,6 +26,7 @@
   },
   "capabilities": {
     "touch": false,
-    "put": true
+    "put": true,
+    "rotation": false
   }
 }

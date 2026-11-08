@@ -66,6 +66,12 @@ export const Hello = Type.Object(
             description: 'The firmware can dim the backlight (settings.brightness).',
           }),
         ),
+        rotation: Type.Optional(
+          Type.Boolean({
+            description:
+              'The firmware can turn the picture (settings.rotation, ADR-0028); width and height are as turned.',
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

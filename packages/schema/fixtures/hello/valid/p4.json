@@ -53,7 +53,8 @@
   "capabilities": {
     "touch": true,
     "put": true,
-    "backlight": true
+    "backlight": true,
+    "rotation": true
   },
   "layoutEtag": "\"7f3a9c\""
 }

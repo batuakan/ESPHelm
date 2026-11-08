@@ -153,6 +153,10 @@
         "backlight": {
           "type": "boolean",
           "description": "The firmware can dim the backlight (settings.brightness)."
+        },
+        "rotation": {
+          "type": "boolean",
+          "description": "The firmware can turn the picture (settings.rotation, ADR-0028); width and height are as turned."
         }
       },
       "additionalProperties": false

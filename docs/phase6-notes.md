@@ -208,3 +208,17 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **SDL e2e:** 212 checks. Seven goldens re-recorded and reviewed by eye (the three tabs, and the status page's menu button); six new: the Network tab at 480 and 720, the server list, the *Forget server* question, the setup screen and the Network tab with the setup network.
 - **Build size against `main`:** P4 flash +74.3 KB (3,442,920 B, 20.8 %), C3 +125.8 KB (1,606,628 B, 87.6 %); RAM +724 / +694 B. Mostly the captive portal with its web server and web OTA.
 - **Checked on the P4** (2026-11-05, hardware step 25): the setup network, the portal, the QR code, *Forget Wi-Fi*, and choosing, forgetting and the restart behaviour of the server binding.
+
+## Mounting rotation (ADR-0028, branch `feat/mount-rotation`)
+
+- **Why this shape:** a first attempt (per-shape arrangements in every page, rotation as an everyday setting on the display; closed PR #14) was dropped. A display stays the way it was installed, so a layout only ever needs to fit one shape, and the rotation is decided when the layout is designed.
+- **What:**
+  - **Schema:** `settings.rotation` (0, 90, 180, 270; absent 0) and `hello.capabilities.rotation`. Fixtures: `valid/rotation.json` (a portrait helm), `invalid/settings-unknown-rotation.json`, `invalid/settings-rotation-not-a-number.json`; the firmware parser reports the same codes.
+  - **Firmware:** the layout's rotation is applied with ESPHome's `LvglComponent::set_rotation()` just before its page is built, so a cached layout boots turned; a new `hello` reports the turned size. On for the P4, the Guition and the SDL builds (`lvgl: rotation: 0`); the C3 and the CYD ignore it (logged once).
+  - **Editor:** *Display settings → Mounted*; the preview turns at once (the panel's size from `hello`, turned by the layout's rotation), keeps its proportions and fits the window; the displays are reloaded every 5 s; linking displays of different shapes warns and suggests *Copy*.
+  - **Fixes on the way:** the settings panel kept pointers to the previous tab's deleted objects until it closed (a brightness change while another tab showed could touch the deleted slider); every tab build forgets them now. The alarm banner cuts its text again when the screen's width changes.
+- **Tests:**
+  - **SDL e2e:** online at 480, a rotation layout turns the display, `hello` reports it, a restart boots turned, a layout without it turns it back. A new 1280×800 build (`esphelm_sdl_wide.yaml`) with four new goldens (a square layout stretched, the panel, the rotation layout's page and panel at 800×1280), reviewed by eye.
+  - **Editor:** unit tests for the turned size and shapes; e2e for following a new size without a reload, *Mounted → 90°*, the portrait preview inside the window, the stored `settings.rotation` and the link warning.
+- **Build sizes:** P4 flash 3,443,280 B (20.8 %), static RAM 99,482 B; C3 (no rotation) flash 1,606,468 B (87.5 %).
+- **Checked on the P4** (2026-11-08, hardware step 26). **Not verified:** the Guition 4848S040 (compile only).

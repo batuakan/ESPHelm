@@ -125,7 +125,11 @@ class Firmware {
 
 async function main(): Promise<void> {
   if (!process.env.DISPLAY) throw new Error('SDL needs an X display (DISPLAY is not set)');
-  for (const config of ['firmware/esphelm_sdl.yaml', 'firmware/esphelm_sdl_720.yaml']) {
+  for (const config of [
+    'firmware/esphelm_sdl.yaml',
+    'firmware/esphelm_sdl_720.yaml',
+    'firmware/esphelm_sdl_wide.yaml',
+  ]) {
     console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
     execFileSync(
       ESPHOME,
@@ -135,7 +139,7 @@ async function main(): Promise<void> {
   }
   // Never let a test build talk to a real SignalK server (e.g. the default :3000): check that
   // the compiled code really uses the test port before starting any firmware.
-  for (const name of ['esphelm-sdl', 'esphelm-sdl-720']) {
+  for (const name of ['esphelm-sdl', 'esphelm-sdl-720', 'esphelm-sdl-wide']) {
     const main = readFileSync(join(FIRMWARE, `.esphome/build/${name}/src/main.cpp`), 'utf8');
     if (!main.includes(`set_port(${PORT});`) || !main.includes('set_host("127.0.0.1");'))
       throw new Error(`${name} was not built for 127.0.0.1:${PORT}; refusing to run it`);
@@ -149,6 +153,9 @@ async function main(): Promise<void> {
   const work720 = join(work, '720');
   mkdirSync(work720);
   const fw720 = new Firmware(work720, binary('esphelm-sdl-720'));
+  const workWide = join(work, 'wide');
+  mkdirSync(workWide);
+  const fwWide = new Firmware(workWide, binary('esphelm-sdl-wide'));
   const workBoot = join(work, 'boot');
   mkdirSync(workBoot);
   const fwBoot = new Firmware(workBoot);
@@ -1322,14 +1329,58 @@ async function main(): Promise<void> {
       await fw.waitLog(/Clock: ignoring 2015-03-01T10:00:00Z/),
     );
 
+    // 9l. Mounting rotation (ADR-0028): a layout designed for a display mounted sideways
+    //     (settings.rotation 90) turns it before its page is built, and the display says hello
+    //     again with its rotation, so the editor knows. Kept with the cached layout over a
+    //     restart; a layout without it turns the display back.
+    const helloRotation = async () => {
+      const devices = (await json('GET', '/plugins/esphelm/api/devices', admin))
+        .body as unknown as {
+        id: string;
+        hello: { display: { width: number; height: number; rotation: number } };
+      }[];
+      return devices.find((d) => d.id === DEVICE_ID)?.hello.display;
+    };
+    const helloTurnedTo = async (degrees: number) => {
+      for (let t0 = Date.now(); Date.now() - t0 < 15000; await sleep(250)) {
+        if ((await helloRotation())?.rotation === degrees) return true;
+      }
+      return false;
+    };
+    const rotated = fixture('valid/rotation.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(rotated.id)}`, admin, rotated);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: rotated.id,
+    });
+    check(
+      'rotation: a layout with settings.rotation 90 turns the display',
+      (await fw.waitLog(/Showing fetched layout "rotation"/)) &&
+        (await fw.waitLog(/Rotation: 90 degrees, 480 x 480/)),
+    );
+    check(
+      'rotation: the hello tells the plugin',
+      await helloTurnedTo(90),
+      JSON.stringify(await helloRotation()),
+    );
+
     await fw.stop();
     fw.start();
-    await fw.waitLog(/Showing cached layout "clock"/);
+    await fw.waitLog(/Showing cached layout "rotation"/);
+    check(
+      'rotation: the cached layout turns the display at boot, before its page is built',
+      fw.log().indexOf('Rotation: 90 degrees') >= 0 &&
+        fw.log().indexOf('Rotation: 90 degrees') <
+          fw.log().indexOf('Showing cached layout "rotation"'),
+    );
     await fw.waitLog(/Sending hello/, 15000);
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(
       'settings: back to the multi-page layout (no settings: its first page, never off)',
       await fw.waitLog(/Showing fetched layout "multi-480"/, 15000, 1),
+    );
+    check(
+      'rotation: a layout without it turns the display back',
+      (await fw.waitLog(/Rotation: 0 degrees, 480 x 480/)) && (await helloTurnedTo(0)),
     );
     writeFileSync(join(fw.workDir, 'esphelm_page_request'), '4');
     await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 2);
@@ -1514,6 +1565,44 @@ async function main(): Promise<void> {
     );
     await fw720.stop();
 
+    // 12i. Screens that aren't square (ADR-0028), the 1280x800 build offline from seeded caches:
+    //      a square layout stretched to it and the settings panel; then a layout designed for
+    //      the screen mounted sideways (settings.rotation 90): turned to 800x1280 before its page
+    //      is built.
+    const wideLayout = readFileSync(join(FIXTURES, 'valid/rose-and-engine-720.json'), 'utf8');
+    writeFileSync(join(workWide, 'esphelm_cur.bin'), cacheRecord(wideLayout, '"seed-wide"'));
+    const tapWide = (target: string) =>
+      writeFileSync(join(workWide, 'esphelm_tap_request'), target);
+    fwWide.start();
+    check(
+      'wide: the 1280x800 build shows the seeded layout',
+      await fwWide.waitLog(/Showing cached layout "rose-engine-720" \(2 pages/),
+    );
+    await sleep(1500);
+    await fwWide.screenshot('wide-01-landscape', shots);
+    tapWide('@menu');
+    check('wide: the settings panel opens', await fwWide.waitLog(/Settings opened/));
+    await sleep(1000);
+    await fwWide.screenshot('wide-02-settings-panel', shots);
+    await fwWide.stop();
+    const portrait = readFileSync(join(FIXTURES, 'valid/rotation.json'), 'utf8');
+    writeFileSync(join(workWide, 'esphelm_cur.bin'), cacheRecord(portrait, '"seed-portrait"'));
+    fwWide.start();
+    check(
+      'rotation: a layout turned 90 degrees makes the wide screen portrait before its page is built',
+      (await fwWide.waitLog(/Showing cached layout "rotation"/)) &&
+        fwWide.log().indexOf('Rotation: 90 degrees, 800 x 1280') >= 0 &&
+        fwWide.log().indexOf('Rotation: 90 degrees, 800 x 1280') <
+          fwWide.log().indexOf('Showing cached layout "rotation"'),
+    );
+    await sleep(1500);
+    await fwWide.screenshot('wide-03-portrait', shots);
+    tapWide('@menu');
+    await fwWide.waitLog(/Settings opened/, 15000, 1);
+    await sleep(1000);
+    await fwWide.screenshot('wide-04-settings-portrait', shots);
+    await fwWide.stop();
+
     // 13. Boot guard, offline: a cached layout that crashes the display is tried twice, then the
     //     last known good one is shown, and it stays skipped after a normal restart.
     const good = readFileSync(join(FIXTURES, 'valid/minimal.json'), 'utf8');
@@ -1567,12 +1656,14 @@ async function main(): Promise<void> {
   } finally {
     await fw.stop();
     await fw720.stop();
+    await fwWide.stop();
     await fwBoot.stop();
     await fwSetup.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
       fw720.saveLog();
+      fwWide.saveLog();
       fwBoot.saveLog();
       fwSetup.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);

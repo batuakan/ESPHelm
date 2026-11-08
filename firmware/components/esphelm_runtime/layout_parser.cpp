@@ -787,6 +787,21 @@ void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
     settings.screen_saver = SAVER_SHOWS[saver];
   if (int_field(chk, obj, sp, "screenSaverBrightness", false, 1, 100, n))
     settings.screen_saver_brightness = static_cast<uint8_t>(n);
+  if (has(obj, "rotation")) {
+    // A union of number literals: reported like enum_field (the per-branch type failure, anyOf).
+    const std::string rp = sp + "/rotation";
+    JsonVariantConst v = obj["rotation"];
+    if (!is_number(v)) {
+      chk.add(rp, "INVALID_TYPE");
+      chk.add(rp, "INVALID_VALUE");
+    } else {
+      const double d = v.as<double>();
+      if (d == 0 || d == 90 || d == 180 || d == 270)
+        settings.rotation = static_cast<uint16_t>(d);
+      else
+        chk.add(rp, "INVALID_VALUE");
+    }
+  }
 }
 
 void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {

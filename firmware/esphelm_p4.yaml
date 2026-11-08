@@ -42,6 +42,9 @@ lvgl:
   # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015), so the
   # hardware package's fixed idle timeout is removed.
   on_idle: !remove
+  # Lets the runtime turn the picture and touch to the layout's rotation, set in the editor for
+  # how the display is mounted (ADR-0028).
+  rotation: 0
   pages:
     - id: esphelm_page
       widgets:

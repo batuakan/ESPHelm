@@ -8,6 +8,8 @@ import { orderedTemplates, templateSupported } from './PageTabs';
 export interface OtherDisplay {
   id: string;
   name: string;
+  /** Set when its screen has another shape than this one's, e.g. "portrait (800×1280)". */
+  otherShape?: string;
 }
 
 /** The Share menu (ADR-0027). */
@@ -134,6 +136,8 @@ export function LayoutBar(props: Props) {
                   <span>
                     <b>Copy</b> puts its pages here to edit on their own. <b>Link</b> makes both displays
                     show one layout; editing it changes both.
+                    {o.otherShape &&
+                      ` Its screen is ${o.otherShape}: a linked layout is stretched to fit both and turned the same way on both, so Copy and arrange it for each.`}
                     {share.dirty && ' Your changes not yet sent are lost.'}
                   </span>
                   <button className="small" onClick={() => (share.onCopyFrom(o.id), close())}>

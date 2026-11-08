@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "id": "rotation",
+  "name": "Portrait helm",
+  "theme": "night",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "helm",
+      "title": "Helm",
+      "grid": {
+        "cols": 2,
+        "rows": 4
+      },
+      "tiles": [
+        {
+          "type": "wind_rose",
+          "id": "rose",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 2,
+          "slots": {
+            "center1": {
+              "path": "navigation.speedOverGround",
+              "unit": "kn",
+              "decimals": 1,
+              "label": "SOG"
+            },
+            "center2": {
+              "path": "environment.wind.speedTrue",
+              "unit": "kn",
+              "decimals": 1,
+              "label": "TWS"
+            },
+            "center3": {
+              "path": "environment.wind.speedApparent",
+              "unit": "kn",
+              "decimals": 1,
+              "label": "AWS"
+            }
+          }
+        },
+        {
+          "type": "value",
+          "id": "depth",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "environment.depth.belowTransducer",
+          "unit": "m",
+          "decimals": 1,
+          "label": "Depth"
+        },
+        {
+          "type": "value",
+          "id": "stw",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedThroughWater",
+          "unit": "kn",
+          "decimals": 1,
+          "label": "STW"
+        },
+        {
+          "type": "gauge",
+          "id": "rpm",
+          "x": 0,
+          "y": 3,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.revolutions",
+          "unit": "rpm",
+          "decimals": 0,
+          "label": "RPM",
+          "min": 0,
+          "max": 4000,
+          "zones": [
+            {
+              "from": 3200,
+              "to": 4000,
+              "state": "alarm"
+            }
+          ]
+        },
+        {
+          "type": "gauge",
+          "id": "coolant",
+          "x": 1,
+          "y": 3,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.temperature",
+          "unit": "degC",
+          "decimals": 0,
+          "label": "Coolant",
+          "min": 40,
+          "max": 120,
+          "zones": [
+            {
+              "from": 95,
+              "to": 120,
+              "state": "alarm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "rotation": 90
+  }
+}

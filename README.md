@@ -71,6 +71,12 @@ Layouts can be shared: export one as a file and import it on another display, or
  <img width="800px" src="/docs/images/editor-share.png">
 </p>
 
+A display mounted sideways or upside down is set up in the editor (*Display settings → Mounted*): the display turns its picture and touch, and you design the pages for the turned screen. A portrait display gets a tall canvas, a landscape one a wide canvas.
+
+<p align="center">
+ <img width="800px" src="/docs/images/editor-portrait.png">
+</p>
+
 It works on a phone too, and has day, dark and night (red) themes of its own, separate from the display's theme.
 
 <p align="center">

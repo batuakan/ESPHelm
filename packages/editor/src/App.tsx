@@ -1,7 +1,14 @@
 // ESPHelm editor: pick a display, edit the pages of its layout with live values (grids of
 // tiles; wind roses are tiles with centre slots), Save & send. One layout per display (created
 // on first save).
-import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   CHART_DEFAULTS,
   DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
@@ -48,6 +55,7 @@ import {
   updateTile,
   type SlotName,
 } from './layoutOps';
+import { screenShape, shownSize } from './rotation';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { GridCanvas, type NewTileDrag } from './components/GridCanvas';
 import { LayoutBar } from './components/LayoutBar';
@@ -151,7 +159,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     }
   }, [api, fail]);
 
-  // Initial load; paths refresh every 15 s (new sources appear while the editor is open).
+  // Initial load; paths refresh every 15 s (new sources appear while the editor is open), the
+  // displays every 5 s (new displays appear, and a display turned on its Network tab reports its
+  // new size in hello, ADR-0028).
   useEffect(() => {
     void refreshDevices().then((list) => {
       if (list.length > 0) setDeviceId((cur) => cur ?? list.find((d) => d.state === 'adopted')?.id ?? list[0]?.id);
@@ -160,8 +170,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     api.charts().then(setCharts, () => undefined);
     const loadPaths = () => api.paths().then(setPaths, () => undefined);
     void loadPaths();
-    const timer = setInterval(loadPaths, 15000);
-    return () => clearInterval(timer);
+    const pathsTimer = setInterval(loadPaths, 15000);
+    const pollDevices = () =>
+      api.devices().then(
+        (list) => setDevices((cur) => (JSON.stringify(cur) === JSON.stringify(list) ? cur : list)),
+        () => undefined,
+      );
+    const devicesTimer = setInterval(pollDevices, 5000);
+    return () => {
+      clearInterval(pathsTimer);
+      clearInterval(devicesTimer);
+    };
   }, [api, refreshDevices]);
 
   // Load (or start) the layout of the selected display.
@@ -408,7 +427,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
   const chartSelected = !!chartPage && selection?.id === chartPage.id;
   const drawerOpen = !!tile || chartSelected;
-  const display = device?.hello.display ?? { width: 480, height: 480 };
+  // The screen this layout gets: turned by its settings.rotation where the display can (ADR-0028).
+  const display = device ? shownSize(device.hello, layout?.settings?.rotation) : { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
   const tileBox = (t: Tile) => (layout ? tilePixels(display, layout, index, t) : { width: 0, height: 0 });
   const tilePx = (t: Tile) => {
@@ -476,7 +496,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         />
       </div>
 
-      <main className="workspace">
+      <main className="workspace" style={{ '--ratio': display.width / display.height } as CSSProperties}>
         {device?.state === 'pending' && (
           <div className="banner info">
             This display is waiting to be adopted.{' '}
@@ -497,7 +517,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 showPage(0);
               }}
               share={{
-                others: others.map((d) => ({ id: d.id, name: displayName(d) })),
+                others: others.map((d) => {
+                  const shape = screenShape(d.hello.display);
+                  return {
+                    id: d.id,
+                    name: displayName(d),
+                    ...(shape !== screenShape(display)
+                      ? { otherShape: `${shape} (${d.hello.display.width}×${d.hello.display.height})` }
+                      : {}),
+                  };
+                }),
                 sharedWith,
                 dirty,
                 onExport: exportLayout,
@@ -547,7 +576,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 Display settings
               </button>
               <span className="device-size">
-                {device?.hello.display.width}×{device?.hello.display.height}
+                {display.width}×{display.height}
               </span>
             </LayoutBar>
             <PageTabs
@@ -631,7 +660,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
               {grid && (
                 <GridCanvas
                   page={grid}
-                  aspect={aspectFor(device)}
+                  aspect={aspectFor(device ? display : undefined)}
                   values={shownValues}
                   serverZones={serverZones}
                   selectedId={tile?.id}
@@ -710,6 +739,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         <SettingsDrawer
           layout={layout}
           backlight={device?.hello.capabilities.backlight === true}
+          canRotate={device?.hello.capabilities.rotation === true}
           paths={paths}
           values={shownValues}
           onChange={(patch) => edit(updateSettings(layout, patch))}
@@ -781,10 +811,10 @@ function graphHint(box: { width: number; height: number }, known: boolean): stri
   return `About ${box.width}×${box.height} px ${where}: ${what}.`;
 }
 
-function aspectFor(device: { hello: { display: { width: number; height: number } } } | undefined) {
-  if (!device) return 1;
+function aspectFor(display: { width: number; height: number } | undefined) {
+  if (!display) return 1;
   // The footer takes a strip at the bottom of the display (ADR-0025: on every layout).
-  return device.hello.display.width / (device.hello.display.height * 0.89);
+  return display.width / (display.height * 0.89);
 }
 
 const PROBLEM_TEXT: Record<string, string> = {

@@ -27,6 +27,7 @@ namespace esphelm_runtime {
 
 static const char *const TAG = "esphelm";
 
+
 static const uint32_t DRAW_INTERVAL_MS = 250;       // at most 4 redraws per tile per second
 static const uint32_t POLL_INTERVAL_MS = 5 * 60 * 1000;  // fallback when a version delta is missed
 static const uint32_t LKG_AFTER_MS = 30 * 1000;      // rendered this long without trouble -> last known good
@@ -294,7 +295,7 @@ void EsphelmRuntime::send_hello_() {
   lv_display_t *disp = lv_display_get_default();
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
-  doc["display"]["rotation"] = 0;
+  doc["display"]["rotation"] = this->rotation_();  // width and height are as rotated
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
   for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock"})
@@ -317,6 +318,11 @@ void EsphelmRuntime::send_hello_() {
   doc["capabilities"]["touch"] = this->touch_;
   doc["capabilities"]["put"] = true;
   doc["capabilities"]["backlight"] = this->has_backlight_();
+#ifdef USE_ESPHELM_ROTATION
+  doc["capabilities"]["rotation"] = this->lvgl_ != nullptr;
+#else
+  doc["capabilities"]["rotation"] = false;
+#endif
   if (!this->etag_.empty())
     doc["layoutEtag"] = this->etag_;
   if (!this->bad_etag_.empty())
@@ -499,6 +505,8 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->boot_attempts_ = etag == this->boot_etag_ ? this->boot_attempts_ + 1 : 1;
   this->boot_etag_ = etag;
   this->save_boot_record_();
+  // How the display is mounted (ADR-0028): the page is built for the turned screen.
+  this->rotate_(this->layout_.settings.rotation);
   if (!this->build_page_(page)) {
     this->boot_attempts_ = 0;  // refused cleanly, not a crash
     this->save_boot_record_();
@@ -1038,6 +1046,39 @@ void EsphelmRuntime::factory_reset_() {
 #endif
 }
 
+int EsphelmRuntime::rotation_() const {
+#ifdef USE_ESPHELM_ROTATION
+  if (this->lvgl_ != nullptr)
+    return static_cast<int>(this->lvgl_->get_rotation());  // DisplayRotation is in degrees
+#endif
+  return 0;
+}
+
+void EsphelmRuntime::rotate_(int degrees) {
+#ifdef USE_ESPHELM_ROTATION
+  if (this->lvgl_ != nullptr) {
+    if (degrees == this->rotation_())
+      return;
+    this->lvgl_->set_rotation(degrees);
+    lv_display_t *disp = lv_display_get_default();
+    ESP_LOGI(TAG, "Rotation: %d degrees, %d x %d", degrees, (int) lv_display_get_horizontal_resolution(disp),
+             (int) lv_display_get_vertical_resolution(disp));
+    if (this->popup_.is_open())
+      this->popup_.close();
+    if (this->panel_.is_open())
+      this->panel_.close();
+    // The editor previews this display at its turned size.
+    this->hello_due_ = true;
+    this->next_hello_ms_ = 0;
+    return;
+  }
+#endif
+  if (degrees != 0 && !this->rotation_ignored_logged_) {
+    ESP_LOGW(TAG, "The layout turns the display %d degrees, but this board can't turn (no lvgl rotation:)", degrees);
+    this->rotation_ignored_logged_ = true;
+  }
+}
+
 void EsphelmRuntime::tick_panel_(uint32_t now) {
   if (!this->panel_.is_open())
     return;
@@ -1165,8 +1206,13 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
   rows.push_back({"Display", "Id", this->device_id_});
   rows.push_back({nullptr, "Board", this->board_});
   rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
-  std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
-                (int) lv_display_get_vertical_resolution(disp));
+  const int degrees = this->rotation_();
+  if (degrees == 0)
+    std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
+                  (int) lv_display_get_vertical_resolution(disp));
+  else
+    std::snprintf(buf, sizeof(buf), "%d x %d, turned %d°", (int) lv_display_get_horizontal_resolution(disp),
+                  (int) lv_display_get_vertical_resolution(disp), degrees);
   rows.push_back({nullptr, "Screen", buf});
   rows.push_back({nullptr, "Up", uptime_text(millis_64() / 1000)});
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
