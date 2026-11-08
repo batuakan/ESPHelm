@@ -201,6 +201,7 @@ function renderSizesHeader(
   serverZones: { maxPerPath: number },
   graph: { axisHeight: number },
   tape: { minorTickPx: number; label10Px: number },
+  tack: Record<'beat' | 'gybe', { min: number; max: number; fixed: number }>,
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -239,6 +240,14 @@ function renderSizesHeader(
     '// Heading tape (ADR-0022): minor ticks from this spacing, every 10 degrees labelled from this width.',
     `inline constexpr int HEADING_TAPE_MINOR_TICK_PX = ${tape.minorTickPx};`,
     `inline constexpr int HEADING_TAPE_LABEL10_PX = ${tape.label10Px};`,
+    '',
+    '// Wind rose laylines (ADR-0029): plausible beat and gybe angles in degrees, and the fixed ones.',
+    `inline constexpr int WIND_ROSE_BEAT_MIN = ${tack.beat.min};`,
+    `inline constexpr int WIND_ROSE_BEAT_MAX = ${tack.beat.max};`,
+    `inline constexpr int WIND_ROSE_BEAT_FIXED = ${tack.beat.fixed};`,
+    `inline constexpr int WIND_ROSE_GYBE_MIN = ${tack.gybe.min};`,
+    `inline constexpr int WIND_ROSE_GYBE_MAX = ${tack.gybe.max};`,
+    `inline constexpr int WIND_ROSE_GYBE_FIXED = ${tack.gybe.fixed};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -340,6 +349,7 @@ export async function renderAll(): Promise<Record<string, string>> {
     SERVER_ZONES,
     GRAPH_FIT,
     HEADING_TAPE_FIT,
+    WIND_ROSE_TACK,
   } = await import('../src/tiles.js');
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
@@ -356,6 +366,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       SERVER_ZONES,
       GRAPH_FIT,
       HEADING_TAPE_FIT,
+      WIND_ROSE_TACK,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -365,6 +376,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       SERVER_ZONES,
       GRAPH_FIT,
       HEADING_TAPE_FIT,
+      WIND_ROSE_TACK,
     ),
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),

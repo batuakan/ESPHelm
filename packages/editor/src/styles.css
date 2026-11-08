@@ -1073,6 +1073,22 @@ select.zone-emergency {
 .marker.true polygon {
   fill: var(--rose-true);
 }
+.marker.waypoint polygon {
+  fill: var(--zone-normal);
+}
+.layline {
+  stroke-width: 3.3;
+}
+.layline.stbd {
+  stroke: var(--rose-stbd);
+}
+.layline.port {
+  stroke: var(--rose-port);
+}
+.target-bar {
+  stroke: var(--rose-true);
+  stroke-width: 5;
+}
 .marker-letter {
   fill: var(--canvas-bg);
   font-size: 8px;

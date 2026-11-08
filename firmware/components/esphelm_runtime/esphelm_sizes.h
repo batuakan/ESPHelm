@@ -35,6 +35,14 @@ inline constexpr int GRAPH_AXIS_HEIGHT = 120;
 inline constexpr int HEADING_TAPE_MINOR_TICK_PX = 6;
 inline constexpr int HEADING_TAPE_LABEL10_PX = 40;
 
+// Wind rose laylines (ADR-0029): plausible beat and gybe angles in degrees, and the fixed ones.
+inline constexpr int WIND_ROSE_BEAT_MIN = 20;
+inline constexpr int WIND_ROSE_BEAT_MAX = 80;
+inline constexpr int WIND_ROSE_BEAT_FIXED = 45;
+inline constexpr int WIND_ROSE_GYBE_MIN = 100;
+inline constexpr int WIND_ROSE_GYBE_MAX = 175;
+inline constexpr int WIND_ROSE_GYBE_FIXED = 150;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

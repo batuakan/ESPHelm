@@ -1,0 +1,92 @@
+{
+  "description": "Wind rose performance geometry (ADR-0029): roseLaylines() and roseTarget() in src/windRose.ts and esphelm_wind_rose.h must both reproduce these; degrees clockwise from the bow, to 0.001. A missing beat/gybe is no SignalK value; a missing fixed is the defaults (45/150).",
+  "laylines": [
+    {
+      "note": "upwind, starboard tack at the fixed angle: its layline on the bow",
+      "twd": 45,
+      "heading": 0,
+      "expected": { "upwind": true, "angle": 45, "starboard": 0, "port": 90 }
+    },
+    {
+      "note": "upwind, port tack",
+      "twd": 315,
+      "heading": 0,
+      "expected": { "upwind": true, "angle": 45, "starboard": 270, "port": 0 }
+    },
+    {
+      "note": "SignalK's beat angle",
+      "twd": 40,
+      "heading": 0,
+      "beat": 38,
+      "expected": { "upwind": true, "angle": 38, "starboard": 2, "port": 78 }
+    },
+    {
+      "note": "a negative beat angle counts by its size",
+      "twd": 40,
+      "heading": 0,
+      "beat": -38,
+      "expected": { "upwind": true, "angle": 38, "starboard": 2, "port": 78 }
+    },
+    {
+      "note": "an implausible beat angle: the fixed one",
+      "twd": 40,
+      "heading": 0,
+      "beat": 10,
+      "expected": { "upwind": true, "angle": 45, "starboard": 355, "port": 85 }
+    },
+    {
+      "note": "the tile's own fixed beat angle",
+      "twd": 40,
+      "heading": 0,
+      "fixed": { "beat": 50, "gybe": 150 },
+      "expected": { "upwind": true, "angle": 50, "starboard": 350, "port": 90 }
+    },
+    {
+      "note": "downwind, starboard gybe at the fixed angle",
+      "twd": 150,
+      "heading": 0,
+      "expected": { "upwind": false, "angle": 150, "starboard": 0, "port": 300 }
+    },
+    {
+      "note": "downwind with SignalK's gybe angle, wind from port",
+      "twd": 200,
+      "heading": 10,
+      "gybe": 140,
+      "expected": { "upwind": false, "angle": 140, "starboard": 50, "port": 330 }
+    },
+    {
+      "note": "an implausible gybe angle: the fixed one; dead downwind",
+      "twd": 180,
+      "heading": 0,
+      "gybe": 178,
+      "expected": { "upwind": false, "angle": 150, "starboard": 30, "port": 330 }
+    },
+    {
+      "note": "the wind on the beam counts as downwind",
+      "twd": 90,
+      "heading": 0,
+      "expected": { "upwind": false, "angle": 150, "starboard": 300, "port": 240 }
+    },
+    {
+      "note": "just forward of the beam is upwind",
+      "twd": 89.5,
+      "heading": 0,
+      "expected": { "upwind": true, "angle": 45, "starboard": 44.5, "port": 134.5 }
+    },
+    {
+      "note": "wrapping round north",
+      "twd": 10,
+      "heading": 350,
+      "expected": { "upwind": true, "angle": 45, "starboard": 335, "port": 65 }
+    }
+  ],
+  "targets": [
+    { "note": "wind from starboard", "twd": 45, "heading": 0, "target": 42, "expected": 42 },
+    { "note": "wind from port", "twd": 315, "heading": 0, "target": 42, "expected": 318 },
+    { "note": "a negative target counts by its size", "twd": 45, "heading": 0, "target": -42, "expected": 42 },
+    { "note": "downwind, wind from port", "twd": 200, "heading": 10, "target": 150, "expected": 210 },
+    { "note": "dead ahead counts as starboard", "twd": 0, "heading": 0, "target": 40, "expected": 40 },
+    { "note": "zero is no target", "twd": 45, "heading": 0, "target": 0, "expected": null },
+    { "note": "180 is no target", "twd": 45, "heading": 0, "target": 180, "expected": null }
+  ]
+}

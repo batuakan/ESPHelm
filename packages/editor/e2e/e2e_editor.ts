@@ -393,6 +393,38 @@ async function main(): Promise<void> {
       roseMark !== null && roseMark.width <= 24 && roseMark.height <= 12,
       JSON.stringify(roseMark),
     );
+    // Performance (ADR-0029): laylines at a fixed beat angle, drawn from the live true wind
+    // direction (the sample data has none, so the test sends one) and heading.
+    await drawer.getByLabel('Laylines').check();
+    await drawer.getByLabel('Fixed beat angle').fill('40');
+    const roseOne = page.getByTestId('rose-rose-1');
+    const sendTrueWind = () =>
+      ws.send(
+        JSON.stringify({
+          context: 'vessels.self',
+          updates: [
+            {
+              values: [
+                { path: 'environment.wind.directionTrue', value: 1.0 },
+                { path: 'navigation.headingTrue', value: 0.3 },
+              ],
+            },
+          ],
+        }),
+      );
+    sendTrueWind();
+    const windTimer = setInterval(sendTrueWind, 1000);
+    let laylinesShown = false;
+    for (let i = 0; i < 40 && !laylinesShown; i++) {
+      laylinesShown = (await roseOne.locator('.layline').count()) === 2;
+      if (!laylinesShown) await page.waitForTimeout(250);
+    }
+    clearInterval(windTimer);
+    check(
+      'the rose previews two laylines from the live true wind',
+      laylinesShown && (await roseOne.locator('.marker.true').count()) === 1,
+      String(await roseOne.locator('.layline').count()),
+    );
     await page.getByText('No problems').waitFor();
     await shot(page, '05-desktop-night-gauge-and-rose');
 
@@ -440,7 +472,7 @@ async function main(): Promise<void> {
             label: 'SOG',
             zones: [{ from: 9.6, to: 12, state: 'warn' }],
           }) &&
-        JSON.stringify(rose) ===
+        JSON.stringify({ ...rose, config: undefined }) ===
           JSON.stringify({
             type: 'wind_rose',
             id: 'rose-1',
@@ -452,6 +484,11 @@ async function main(): Promise<void> {
             history: ['heading'],
           }),
       JSON.stringify(pages),
+    );
+    check(
+      'the display gets the laylines and the fixed beat angle',
+      JSON.stringify(rose?.config) === JSON.stringify({ showLaylines: true, fixedBeat: 40 }),
+      JSON.stringify(rose?.config),
     );
     check(
       "the display gets the wind rose's recorded values in their order",

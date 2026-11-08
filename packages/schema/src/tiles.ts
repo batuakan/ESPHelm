@@ -343,6 +343,16 @@ export const RoseHistoryKey = Type.Union([
 export type RoseHistoryKey = Type.Static<typeof RoseHistoryKey>;
 export const ROSE_HISTORY_KEYS = RoseHistoryKey.anyOf.map((l) => l.const) as RoseHistoryKey[];
 
+/**
+ * Wind rose laylines (ADR-0029): a beat or gybe angle from SignalK outside min..max degrees is
+ * ignored and the tile's fixed angle (absent: `fixed`) used instead. min/max also bound the
+ * tile's fixedBeat/fixedGybe. Generated into the firmware's esphelm_sizes.h.
+ */
+export const WIND_ROSE_TACK = {
+  beat: { min: 20, max: 80, fixed: 45 },
+  gybe: { min: 100, max: 175, fixed: 150 },
+} as const;
+
 export const WindRoseTile = Type.Object(
   {
     type: Type.Literal('wind_rose'),
@@ -354,6 +364,37 @@ export const WindRoseTile = Type.Object(
           trueDirection: Type.Optional(SkPath),
           heading: Type.Optional(SkPath),
           showTrueWind: Type.Optional(Type.Boolean()),
+          // Performance graphics (ADR-0029), each off when absent.
+          showLaylines: Type.Optional(
+            Type.Boolean({
+              description:
+                'Laylines: the heading on each tack at the beat angle (upwind) or gybe angle (downwind).',
+            }),
+          ),
+          showWaypoint: Type.Optional(
+            Type.Boolean({ description: 'A W marker at the bearing to the next waypoint.' }),
+          ),
+          showTarget: Type.Optional(
+            Type.Boolean({ description: "A bar at the polar's target true wind angle." }),
+          ),
+          beatAngle: Type.Optional(SkPath),
+          gybeAngle: Type.Optional(SkPath),
+          targetAngle: Type.Optional(SkPath),
+          waypointBearing: Type.Optional(SkPath),
+          fixedBeat: Type.Optional(
+            Type.Integer({
+              minimum: WIND_ROSE_TACK.beat.min,
+              maximum: WIND_ROSE_TACK.beat.max,
+              description: `Beat angle in degrees when SignalK has none. Absent: ${WIND_ROSE_TACK.beat.fixed}.`,
+            }),
+          ),
+          fixedGybe: Type.Optional(
+            Type.Integer({
+              minimum: WIND_ROSE_TACK.gybe.min,
+              maximum: WIND_ROSE_TACK.gybe.max,
+              description: `Gybe angle in degrees when SignalK has none. Absent: ${WIND_ROSE_TACK.gybe.fixed}.`,
+            }),
+          ),
         },
         { additionalProperties: false },
       ),
@@ -376,6 +417,15 @@ export const WIND_ROSE_DEFAULTS = {
   trueDirection: 'environment.wind.directionTrue',
   heading: 'navigation.headingTrue',
   showTrueWind: true,
+  showLaylines: false,
+  showWaypoint: false,
+  showTarget: false,
+  beatAngle: 'performance.beatAngle',
+  gybeAngle: 'performance.gybeAngle',
+  targetAngle: 'performance.targetAngle',
+  waypointBearing: 'navigation.course.calcValues.bearingTrue',
+  fixedBeat: WIND_ROSE_TACK.beat.fixed,
+  fixedGybe: WIND_ROSE_TACK.gybe.fixed,
 } as const;
 
 /**

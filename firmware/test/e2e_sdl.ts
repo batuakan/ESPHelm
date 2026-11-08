@@ -1329,6 +1329,50 @@ async function main(): Promise<void> {
       await fw.waitLog(/Clock: ignoring 2015-03-01T10:00:00Z/),
     );
 
+    // 9m. Performance on the wind rose (ADR-0029): laylines at the tile's fixed beat angle (42)
+    //     with the waypoint (W), then at SignalK's beat angle with the target bar, downwind at
+    //     the gybe angle; with the true wind stale the laylines and the bar go, A and W stay.
+    const perf = fixture('valid/rose-performance.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(perf.id)}`, admin, perf);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: perf.id });
+    check(
+      'rose performance: the layout renders',
+      await fw.waitLog(/Showing fetched layout "rose-performance" \(1 pages/),
+    );
+    const roseWind = (heading: number, twd: number, awa: number) => ({
+      'navigation.headingTrue': rad(heading),
+      'environment.wind.directionTrue': rad(twd),
+      'environment.wind.angleApparent': rad(awa),
+      'environment.wind.speedApparent': 7.0, // 13.6 kn
+      'performance.velocityMadeGood': 2.6, // 5.1 kn
+      'navigation.course.calcValues.bearingTrue': rad(heading - 25),
+    });
+    // Starboard tack, true wind 45 degrees on the bow: its layline 3 degrees right of the bow.
+    publish(roseWind(20, 65, 38));
+    await sleep(1500);
+    await fw.screenshot('70-rose-laylines-fixed', shots);
+    publish({ 'performance.beatAngle': rad(36), 'performance.targetAngle': rad(55) });
+    await sleep(1500);
+    await fw.screenshot('71-rose-laylines-polar', shots);
+    // Downwind on port: true wind 160 degrees to port, the gybe angle from SignalK.
+    publish({
+      ...roseWind(20, 220, -150),
+      'performance.gybeAngle': rad(145),
+      'performance.targetAngle': rad(135),
+    });
+    await sleep(1500);
+    await fw.screenshot('72-rose-laylines-downwind', shots);
+    // The true wind goes stale (15 s); the heading, apparent wind and bearing stay fresh.
+    const roseTimer = setInterval(() => {
+      const fresh = Object.entries(roseWind(20, 220, -150)).filter(
+        ([path]) => path !== 'environment.wind.directionTrue',
+      );
+      publish(Object.fromEntries(fresh));
+    }, 1000);
+    await sleep(17000);
+    clearInterval(roseTimer);
+    await fw.screenshot('73-rose-laylines-stale', shots);
+
     // 9l. Mounting rotation (ADR-0028): a layout designed for a display mounted sideways
     //     (settings.rotation 90) turns it before its page is built, and the display says hello
     //     again with its rotation, so the editor knows. Kept with the cached layout over a

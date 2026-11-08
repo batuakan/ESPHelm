@@ -132,6 +132,16 @@ A `wind_rose` tile draws a fixed design and exposes **named slots at predetermin
 
 An unknown slot name gives `UNKNOWN_SLOT`. Defaults are exported as `WIND_ROSE_DEFAULTS`, slot names as `TILE_SLOTS.wind_rose`.
 
+**Performance graphics** (optional `config` keys, ADR-0029). Each is off unless turned on and drawn only while its values are fresh:
+
+| Key | Draws | Reads |
+|---|---|---|
+| `showLaylines` | the heading on each tack: green for starboard tack (TWA − angle), red for port tack (TWA + angle); the beat angle while \|TWA\| < 90, else the gybe angle | `beatAngle` (default `performance.beatAngle`), `gybeAngle` (default `performance.gybeAngle`); used while fresh and within `WIND_ROSE_TACK` (beat 20–80°, gybe 100–175°, any sign), else `fixedBeat` (integer 20–80, absent 45) / `fixedGybe` (integer 100–175, absent 150) |
+| `showWaypoint` | a W triangle on the ring at the bearing | `waypointBearing` (default `navigation.course.calcValues.bearingTrue`) |
+| `showTarget` | a bar across the ring at the target true wind angle, on the side the wind comes from | `targetAngle` (default `performance.targetAngle`); no fallback |
+
+A `fixedBeat`/`fixedGybe` outside its range gives `OUT_OF_RANGE`, a fraction `INVALID_TYPE`; a switch that isn't a boolean gives `INVALID_TYPE`. The geometry is `roseLaylines()`/`roseTarget()` in `src/windRose.ts`, mirrored by the firmware's `esphelm_wind_rose.h` (`fixtures/wind-rose.cases.json`).
+
 **History** (optional, ADR-0019): the values the rose records, e.g. `"history": ["center1", "apparentAngle"]`.
 - Names (`ROSE_HISTORY_KEYS`): the seven slots, then `apparentAngle`, `trueDirection`, `heading`.
 - An unknown or repeated name gives `INVALID_VALUE`; a name whose slot is empty records nothing.
@@ -395,6 +405,7 @@ See `packages/schema/fixtures/valid/`:
 - `grid-2x2-values-480.json`: four speeds on a 480² screen.
 - `mixed-720.json`: gauge, bar, value and switch, with multi-cell tiles.
 - `three-pages-wind-rose.json`: a full-screen wind rose with three slots, a grid page, and a rose with empty slots.
+- `rose-performance.json`: a full-screen rose with laylines (fixed angles 42/155), the waypoint and the target angle, and AWS and VMG in the centre.
 - `legacy-port.json`: today's wind, grid, energy and engine apps, using their real SignalK paths.
 - `multi-page-widgets-480.json`: every tile type over four pages, including a 2x2 and a 1x1 rose next to engine tiles.
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.

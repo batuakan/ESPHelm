@@ -96,6 +96,30 @@ export const TAPE_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'heading-tape.cases.json'), 'utf8'),
 ) as TapeCases;
 
+/** Wind rose performance cases (ADR-0029), shared by the TS and C++ tests. */
+export interface RoseCases {
+  laylines: {
+    note: string;
+    twd: number;
+    heading: number;
+    beat?: number;
+    gybe?: number;
+    fixed?: { beat: number; gybe: number };
+    expected: { upwind: boolean; angle: number; starboard: number; port: number };
+  }[];
+  targets: {
+    note: string;
+    twd: number;
+    heading: number;
+    target: number;
+    expected: number | null;
+  }[];
+}
+
+export const ROSE_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'wind-rose.cases.json'), 'utf8'),
+) as RoseCases;
+
 /** Centre-zero text cases (ADR-0023), shared by the TS and C++ tests. */
 export interface CenterZeroCases {
   text: { n: number; decimals?: number; sides: string; expected: { text: string; side: string } }[];

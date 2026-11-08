@@ -143,6 +143,8 @@ Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `
 - **compact** (≥ 150 px): ticks every 30°, only N/E/S/W on the card, no heading; as many slots as fit.
 - **pointers** (< 150 px): ring, sectors and markers only.
 
+**Performance graphics** (ADR-0029, `esphelm_wind_rose.h`): laylines, the waypoint W and the target angle bar are drawn on the markers overlay before the T and A markers, in every tier. Laylines run from the edge of the centre values (a sixth of the rose in the pointers tier) across the ring, `d/60` wide (the target bar half as wide again, across the ring only). Each graphic needs all its values fresh, else it isn't drawn; a SignalK beat or gybe angle that is stale or implausible gives way to the tile's fixed one. The rose subscribes to the extra paths only for the graphics that are on.
+
 **Corner values** (`topLeft`, `topRight`, `bottomLeft`, `bottomRight`): a value over its caption, pushed into the tile's corner and aligned to its side. Each shows only in the full tier and when its box (value in the label font, else the small font, and the caption) lies outside the ring; otherwise it's hidden.
 
 Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy page). The rose tile uses the page background instead of the tile colour. Zone styles are kept per (state, arc width), so a gauge and a rose on the same page keep their own arc widths.
@@ -213,6 +215,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `graph` tile (ADR-0021) | its recorded value (the row below) and, while its page is shown, ≈8.8 KB of LVGL objects with its 1.9 KB point buffer (four graphs with two zones = 35,152 B) |
 | centre-zero gauge / bar (ADR-0023) | one more LVGL arc (gauge) or line (bar) and two labels for the ends |
 | `clock` tile (ADR-0024) | up to four labels and a few bytes of state; nothing per update. The screen saver adds two labels to the sleep cover, created on first use |
+| Wind rose performance graphics (ADR-0029) | four more bindings per rose (about 4 × 60 B plus their path strings), always made, subscribed only when their graphic is on; no LVGL objects (drawn on the markers overlay), nothing per update |
 | `heading_tape` tile (ADR-0022) | four LVGL objects; the ticks are drawn in its draw callback from a stack list (at most 37) |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
@@ -279,6 +282,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21g. **setup** (ADR-0026, offline from an empty flash, `ESPHELM_TEST_SETUP=ap|joining` standing in for Wi-Fi): the *Set up Wi-Fi* screen with its QR code, the status page's menu button opening the panel, the *Network* tab with the setup network, and "Joining Wi-Fi"
   21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
   21h. **mounting rotation** (ADR-0028, `fixtures/valid/rotation.json`): at 480 online, a layout with `settings.rotation: 90` turns the display and the plugin's device list shows the new `hello` (rotation 90); after a restart the cached layout turns it before its page is built; a layout without it turns it back. The 1280×800 build offline: a square layout stretched to it, the panel, then the rotation layout turns it to 800×1280 (portrait page and panel)
+  21i. **wind rose performance** (ADR-0029, `fixtures/valid/rose-performance.json`): at 480 with live values, upwind on starboard tack with the laylines at the fixed beat angle and the waypoint W; SignalK's beat angle moves them and the target bar appears; downwind on port at SignalK's gybe angle; the true wind gone stale: the laylines and the bar go, A and W stay
   Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
@@ -379,3 +383,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The display's picture turns clockwise and touch follows it (the buttons react where you press).
     - The editor showed the turned screen as soon as you picked it, and its size stays so after the display's next hello.
     - Power-cycle: the display starts turned, before the page appears. Set *As built (0°)* and *Save & send* to go back.
+27. **Wind rose performance (ADR-0029).** Give a wind rose *Laylines* and *Waypoint* in the editor's *Performance* section (the *Wind* starter has them), with live wind and heading, and a route if you have one:
+    - Close-hauled, the line for your tack (green on starboard tack, red on port) lies on the bow, and the other one shows the heading after a tack, about twice the beat angle away.
+    - Bear away past the beam: the lines jump to the gybe angle, behind the beam.
+    - Without a polar plugin they use the fixed angles (45° / 150°, or the ones set in the drawer); with one, they follow `performance.beatAngle` / `gybeAngle`.
+    - W points at the active waypoint, as on the heading tape. Unplug the wind sensor: within 15 s the laylines go, and the rose doesn't show stale guidance.

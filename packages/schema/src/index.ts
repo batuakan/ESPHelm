@@ -2,6 +2,7 @@ export * from './primitives.js';
 export * from './tiles.js';
 export * from './position.js';
 export * from './headingTape.js';
+export * from './windRose.js';
 export * from './centerZero.js';
 export * from './clock.js';
 export * from './valueZones.js';
