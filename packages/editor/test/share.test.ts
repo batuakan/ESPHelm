@@ -9,7 +9,13 @@ import {
   type Layout,
 } from '@esphelm/schema';
 import { describe, expect, it } from 'vitest';
-import { layoutPathRefs, newLayoutFor, replaceChart, replacePath } from '../src/layoutOps';
+import {
+  layoutCharts,
+  layoutPathRefs,
+  newLayoutFor,
+  replaceChart,
+  replacePath,
+} from '../src/layoutOps';
 import { IMPORT_MAX_BYTES, exportFile, missingRefs, parseImport } from '../src/share';
 
 const FIXTURES = fileURLToPath(new URL('../../schema/fixtures/valid', import.meta.url));
@@ -159,11 +165,10 @@ describe('layoutPathRefs and replacePath', () => {
 
   it('replaces a chart', () => {
     const l = fixture('chart-page.json');
-    const chart = l.pages.find((p) => p.kind === 'chart');
-    expect(chart?.kind).toBe('chart');
-    if (chart?.kind !== 'chart') return;
-    const r = replaceChart(l, chart.chart, 'other-chart');
-    expect(r.pages.find((p) => p.kind === 'chart')).toMatchObject({ chart: 'other-chart' });
+    const [first] = layoutCharts(l);
+    expect(first).toBe('test-chart');
+    const r = replaceChart(l, first!, 'other-chart');
+    expect(layoutCharts(r)).toEqual(['other-chart', 'OSM.raster_v2']);
   });
 });
 
@@ -180,7 +185,7 @@ describe('missingRefs', () => {
       uses: all.filter((p) => p === first).length,
     });
     expect(m.some((x) => x.kind === 'chart')).toBe(true);
-    const chartIds = new Set(l.pages.flatMap((p) => (p.kind === 'chart' ? [p.chart] : [])));
+    const chartIds = new Set(layoutCharts(l));
     expect(missingRefs(l, new Set(all), chartIds)).toEqual([]);
   });
 });

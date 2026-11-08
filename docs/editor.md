@@ -44,11 +44,13 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
    - a **size hint**: *course and mode buttons*, or *status only* when the tile is too small for safe controls
 
    The editor never commands the autopilot. On the display, engaging takes a second, confirming tap, STANDBY is one tap, and the course buttons work only while engaged (ADR-0011).
-7. **Chart pages:** **+ → Chart page** (only for displays with PSRAM, which list `chart`). Tap the map for its settings:
+7. **Chart tiles** (ADR-0030; only for displays with PSRAM, which list `chart`): add one from *Tiles* (2x2 where it fits) beside a rose or depth, or with **+ → Chart page** (a 1x1 page with one chart filling it). Several charts can share a page: the display keeps one store of map tiles for all of them, so charts of the same chart and zoom cost no extra memory. Tap a chart for its settings:
    - **Chart:** the charts of your SignalK charts plugin; vector or other non-raster charts are listed but can't be picked.
    - **Zoom** (1–20, default 15), **anchor watch** on/off, and the **SignalK paths** (position, heading, anchor position, radius, alarm; empty means the standard paths).
 
-   The preview draws the chart's own tiles at the live position and zoom, with the vessel, the anchor radius and the alarm, in the display theme (red-tinted at night like the display). Until a chart is picked, the problems list says "choose a chart".
+   - A **size hint** says what the display draws at this size: the map with zoom buttons and the position line, without the line, or the map alone (an anchor alarm then frames it in red).
+
+   The preview draws the chart's own tiles at the live position and zoom, at the tile's size on the display and for its size, with the vessel, the anchor radius and the alarm, in the display theme (red-tinted at night like the display). Until a chart is picked, the problems list says "choose a chart". Layouts with chart pages from before are converted to chart tiles when the plugin loads them or when you import one.
 8. **Problems** under the canvas list everything the display would reject (same validator as the plugin and firmware), on every page. Clicking one opens its page and selects its tile or slot. **Save & send** stays disabled until there are none.
 9. **Save & send** stores the layout, assigns it to the display, and the display picks it up within seconds through its version subscription. No reboot. Warnings, e.g. a layout larger than the display's reported capacity, are shown after sending.
 
@@ -102,7 +104,7 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - a wind page from a template with a slot changed to depth (live pointer and value, size hint "full"), a new grid page with a gauge, a zone and a rose tile next to it (laylines on at a fixed beat angle of 40°, previewed with the true wind), moving the wind page to the front, and that the display downloads the three pages in that order
     - on the 720 display the large-display templates come first; *Sailing (large display)* is delivered exactly as the template
     - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
-    - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, and the display downloads the page
+    - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, a value added beside the chart, and the display downloads the chart tile and the value
     - sharing: a second display; *Export file* downloads exactly the layout the display gets; a file with a path the server lacks is imported on the second display, the path replaced in the list, and the display gets it under its own id; *Link* gives both displays one layout and *Make a separate copy* separates them again
     - rotation: the display says hello as a 1280×800 panel that can turn; the editor follows without a reload with a wider preview (`17-desktop-landscape`); *Display settings → Mounted → 90°* previews 800×1280 at once, fitting the window (`18-desktop-portrait`), and *Save & send* puts `settings.rotation: 90` in the layout; linking a square display to it warns
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer

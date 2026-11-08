@@ -2,7 +2,7 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
-**Scope (Phase 5d):** every page of the layout: grid pages with `value`, `gauge`, `bar`, `switch`, `wind_rose` and `autopilot` tiles, and `chart` pages (PSRAM only). `hello.widgets` lists exactly these (`chart` only with PSRAM), so the plugin refuses to assign a layout that needs anything else.
+**Scope:** every page of the layout: grid pages with every tile type of the catalog, `chart` only with PSRAM. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else.
 
 ## Configuration
 
@@ -157,16 +157,16 @@ Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy
 - **Size:** below `AUTOPILOT_FIT` (260×220 px of content) the tile shows status only, with no buttons. In narrow tiles TGT and HDG stack; in tiny ones HDG is dropped.
 - Disabled buttons use the theme's dark colours (LVGL's grey recolour is turned off; this applies to the footer buttons too).
 
-**Chart pages** (`chart.cpp`, ADR-0012; grid and maths ported from ESPTiles, MIT):
-- **Buffer:** a 1280×1280 RGB565 image (5×5 tiles of 256 px, 3,276,800 bytes) is allocated in PSRAM when the page is built and freed when it goes away. Without PSRAM, or if the allocation fails, the page shows a message instead.
-- **Tiles:** fetched from `GET …/esphelm/tiles/<chart>/<z>/<x>/<y>` on a second HTTP worker (so they never delay hellos and layout fetches), one at a time, nearest to the vessel first, and copied into the buffer on the main loop.
-  - A body must be exactly 131,072 bytes; anything else is dropped.
-  - 404 tiles stay blank; other failures are retried after 30 s.
-  - When the vessel crosses into another tile, the grid moves the tiles it keeps inside the buffer and fetches the rest; a zoom change starts over.
-- **View:** north up, with the vessel's position in the middle. The overlay is drawn: a vessel arrow along the heading, the anchor marker and the alarm radius (metres → pixels at the latitude and zoom), and an ANCHOR ALARM banner when the anchor notification's `state` isn't `normal`/`nominal`.
-- **Controls:** zoom + / − buttons (applied in the next tick), and a bottom label "lat lon z" that adds "position stale" when the position is older than the stale time.
-- **Night:** the chart image is darkened and tinted red.
-- **Offline:** tiles already in the buffer stay; nothing is stored on flash, so a reboot without the server shows placeholders.
+**Chart tiles** (`chart.cpp` and `chart_store.cpp`, ADR-0012 and ADR-0030; Web-Mercator maths ported from ESPTiles, MIT):
+- **One store for every chart** (`ChartTileStore`, owned by the runtime): 256 px RGB565 map tiles (131,072 bytes each) in PSRAM, keyed by chart, zoom and tile. Charts are centred on the vessel, so charts of the same chart and zoom need the same tiles, and each is fetched and kept once.
+  - **Budget:** set when the first tile is needed: 40 % of the free PSRAM, between 16 and 48 tiles (2–6 MB; logged as "Chart tiles: up to N"). Memory is allocated per tile as it arrives and reused.
+  - **Wanting:** every tick, each chart tells the store which tiles cover its view, nearest to the vessel first. A tile wanted in the last second is never evicted; when the budget is full the least recently wanted other tile makes room, and if every tile is on screen, nothing more is fetched (the edges stay blank).
+  - **Fetching:** the store alone uses the second HTTP worker (`GET …/esphelm/tiles/<chart>/<z>/<x>/<y>`, so tiles never delay hellos and layout fetches), one tile at a time, the most wanted first. A body must be exactly 131,072 bytes; anything else is dropped. 404 tiles stay blank; other failures are retried after 30 s. Each loaded tile is logged at debug level ("Chart tile … loaded").
+  - **Lifetime:** kept across page changes while the layout has charts, so a chart page you come back to draws at once; freed when a layout without charts is applied.
+- **Drawing:** each chart draws the store's tiles that cover its cell straight from the store in its draw callback (no image of its own), then the overlay: a vessel arrow along the heading, the anchor marker and the alarm radius (metres → pixels at the latitude and zoom). Without PSRAM it shows a message instead.
+- **Size tiers** (`CHART_FIT` in `esphelm_sizes.h`): zoom + / − buttons (applied in the next tick, each chart keeps its own zoom) from 200 px on the shorter side; the bottom label "lat lon z" (with "position stale" when the position is older than the stale time) from 260 px; an ANCHOR ALARM banner when the anchor notification's `state` isn't `normal`/`nominal`, or below 200 px a red frame.
+- **Night:** the map is darkened and tinted red (a recolour on each drawn tile).
+- **Offline:** tiles already in the store stay; nothing is stored on flash, so a reboot without the server shows placeholders.
 
 The PUT goes through ESPHomeSignalK `put_request`; signalk-server answers it only if a provider handles that path (e.g. a digital-switching plugin). The firmware does not read the PUT response, it trusts the value stream.
 
@@ -209,7 +209,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `wind_rose` tile | ≈6.7–6.9 KB in full (full screen: 6,720 B at 720, 6,864 B at 480); 720 page with a 2x2 rose and five tiles: 23,936 B |
 | `autopilot` tile | ≈11 KB with its 11 buttons (full screen at 480: 10,992 B); a status-only tile builds the same objects and hides the buttons |
 | `position` tile | ≈1.7 KB (four tiles = 6,640 B) |
-| `chart` page | 3,276,800 B tile buffer (PSRAM) + ≈6 KB of LVGL objects; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
+| `chart` tiles (ADR-0030) | the shared store: up to its budget of 131,072 B map tiles in PSRAM (16–48, 2–6 MB), whatever the number of chart tiles, plus ≈80 B per slot; per chart tile ≈5 KB of LVGL objects and a few hundred bytes of state; up to one tile body (131 KB) in flight; an 8 KB second HTTP worker task |
 | Zones from the server (ADR-0020) | 24 B per zone per tile that uses them, a second list of the layout's own zones, and one map entry per path with zones (SI, up to 16 zones); a transient 4 KB body per read. Nothing per value, nothing in flash |
 | Value history (ADR-0018, ADR-0019) | per recorded value (a value tile, or one wind rose value), allocated when a layout is applied: 4,320 B with PSRAM (three windows × 120 points × 12 B, in PSRAM, up to 48 values), 2,880 B without (two windows, up to 6 values, only while 48 KB of internal RAM stay free); angles add 16 B of sums per window |
 | `graph` tile (ADR-0021) | its recorded value (the row below) and, while its page is shown, ≈8.8 KB of LVGL objects with its 1.9 KB point buffer (four graphs with two zones = 35,152 B) |
@@ -252,12 +252,13 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
       - an armed WIND expires after 3 s without sending
       - STANDBY is one tap
       - offline, even STANDBY is refused
-  14. **a chart page**, with the charts stand-in from `startSignalK({ chartSim: true })` (generated PNG tiles):
-      - tiles through the plugin, the anchor and its radius
+  14. **chart tiles**, with the charts stand-in from `startSignalK({ chartSim: true })` (generated PNG tiles):
+      - a chart filling its page: tiles through the plugin, the anchor and its radius
       - recentring after a 350 m move
-      - zoom in through the hook (`esphelm_tap_request chart zoom_in`)
+      - zoom in through the hook (`esphelm_tap_request map zoom_in`)
       - the anchor alarm
       - a page whose chart the server doesn't have
+      - a 2x2 chart beside a rose and a 1x1 chart of the same chart (`fixtures/valid/chart-tiles.json`): each map tile fetched once, the small chart without buttons; zooming the big one fetches only its new zoom; leaving the page and coming back fetches nothing
   15. **the boot guard** (`ESPHELM_TEST_CRASH_ON=<tile id>` makes the host build abort while building that tile):
       - a fetched layout that crashes the display is skipped after one crash, refused when fetched again, and reported in the hello
       - offline, a cached layout that crashes is tried twice, then the last known good layout is shown, also after a normal restart
@@ -304,7 +305,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - +10 moves the pilot's target 10° to starboard. STANDBY disengages on one tap.
     - Check that the buttons are easy to hit and that you can't engage by brushing the screen.
     - If your pilot only implements SignalK's v2 Autopilot API, nothing will respond (no bridge yet); say so and I'll add it.
-11. **Chart** (needs a SignalK charts plugin with a raster PNG/JPEG chart, e.g. MBTiles). Add a chart page in the editor, pick the chart, and Save & send.
+11. **Chart** (needs a SignalK charts plugin with a raster PNG/JPEG chart, e.g. MBTiles). Add a chart page (or a chart tile) in the editor, pick the chart, and Save & send.
     - Tiles appear around the vessel within a few seconds, and the vessel arrow points along the heading.
     - Zoom + / − refetch the map. Moving (or a changing position) recentres it without blank flashes for tiles that stay in view.
     - With the anchor alarm plugin: the anchor and the circle match its radius, and the circle and banner turn red when it alarms.
@@ -388,3 +389,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - Bear away past the beam: the lines jump to the gybe angle, behind the beam.
     - Without a polar plugin they use the fixed angles (45° / 150°, or the ones set in the drawer); with one, they follow `performance.beatAngle` / `gybeAngle`.
     - W points at the active waypoint, as on the heading tape. Unplug the wind sensor: within 15 s the laylines go, and the rose doesn't show stale guidance.
+28. **Chart tiles (ADR-0030).** Put a chart tile beside the rose (2x2) and a small one elsewhere, of the same chart:
+    - Both draw around the vessel; the small one has no zoom buttons, and with anchor watch on it is framed red in an alarm.
+    - Zoom the big one: only it changes, and its new zoom fills in; the small one stays.
+    - Move (or drive the position): both pan smoothly, without blank flashes for tiles that stay in view. Note how a full screen of tiles draws compared with the old chart page.
+    - Info tab: free PSRAM after switching between pages a few times stays put (the store keeps its tiles, it doesn't grow).

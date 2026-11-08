@@ -13,6 +13,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-wind-day.png">
  <img width="200px" src="/docs/images/display-wind-night.png">
  <img width="200px" src="/docs/images/display-wind-laylines.png">
+ <img width="200px" src="/docs/images/display-chart-tiles.png">
  <img width="200px" src="/docs/images/display-engine-day.png">
  <img width="200px" src="/docs/images/display-energy-night.png">
  <img width="200px" src="/docs/images/display-switchboard-day.png">
@@ -90,7 +91,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar (gauges and bars can be centre zero, for a rudder, heel, rate of turn or battery current: filled from zero, red to port and green to starboard, or plus and minus), switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), laylines for both tacks upwind and downwind (from a polar plugin's beat and gybe angles, or angles you set), the bearing to the next waypoint and the polar's target angle, an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY), a graph of a value's last 10 min, 1 h or 6 h (with an optional fixed range and zone bands), and a heading tape: a compass strip that scrolls with the heading, with markers for COG, the bearing to the next waypoint and the autopilot target, and a clock: the time and/or date in your time zone (summer time included) or UTC, set from GPS time through SignalK or from NTP, and kept running offline.
 - **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge, bar or graph tile's own zones, and the display follows them when they change on the server.
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
-- **Pages:** as many as you like, with page buttons in the footer, plus a full-screen **chart page** with anchor watch (SignalK charts, PSRAM boards).
+- **Pages:** as many as you like, with page buttons in the footer.
+- **Charts:** a chart tile with anchor watch (SignalK charts, PSRAM boards), beside a wind rose or depth, or filling its page. Several charts share their map tiles, so a second chart of the same chart and zoom costs no extra memory.
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again.

@@ -37,7 +37,7 @@ import {
   unitsForSignalKUnits,
   type AutopilotMode,
   type AutopilotTile,
-  type ChartPage,
+  type ChartTile,
   type DataItem,
   type GraphTile,
   type GraphWindow,
@@ -1359,22 +1359,30 @@ const CHART_PATHS: { key: keyof Omit<typeof CHART_DEFAULTS, 'zoom' | 'anchor'>; 
     { key: 'anchorAlarmPath', label: 'Anchor alarm notification', anchor: true },
   ];
 
-/** Chart page settings: which chart, zoom, anchor watch, and the paths it follows. */
+/**
+ * Chart tile settings (ADR-0030): which chart, zoom, anchor watch, and the paths it follows.
+ * Charts on one display share their map tiles, so a second chart of the same chart and zoom
+ * costs the display no memory.
+ */
 export function ChartDrawer(
   props: Common & {
-    page: ChartPage;
+    tile: ChartTile;
     charts: ChartInfo[];
     supported: boolean;
+    /** What the display will draw at this size (CHART_FIT). */
+    sizeHint: string;
     onChange(patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Patch }): void;
+    onDelete(): void;
   },
 ) {
-  const { page, charts } = props;
+  const { tile: page, charts } = props;
   const config = page.config ?? {};
   const anchor = page.anchor ?? CHART_DEFAULTS.anchor;
   const known = charts.some((c) => c.identifier === page.chart);
   return (
-    <Drawer title={page.title ?? page.id} label="Chart settings" onClose={props.onClose}>
+    <Drawer title="Chart" label="Tile settings" onClose={props.onClose}>
       {!props.supported && <p className="warn">This display can't show charts (it needs PSRAM).</p>}
+      <p className="size-hint">{props.sizeHint}</p>
       <label className="field">
         <span>Chart</span>
         <select
@@ -1433,13 +1441,17 @@ export function ChartDrawer(
           </div>
         ))}
       </details>
+      <button className="danger" onClick={props.onDelete}>
+        Delete tile
+      </button>
     </Drawer>
   );
 }
 
 export function TileDrawer(
   props: Common & {
-    tile: Tile;
+    /** Any tile but a chart (ChartDrawer). */
+    tile: Exclude<Tile, ChartTile>;
     supported: boolean;
     /** Wind rose only: how the display will draw it at this size. */
     sizeHint?: string;

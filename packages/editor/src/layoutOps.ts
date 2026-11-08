@@ -14,6 +14,7 @@ import {
   type Layout,
   type Page,
   type Settings,
+  type ChartTile,
   type Tile,
   type TileType,
   type WindRoseTile,
@@ -122,6 +123,13 @@ export function headingTapeSettings(tile: HeadingTapeTile): {
   };
 }
 
+/** The paths a chart follows: position and heading, and the anchor's when anchor watch is on. */
+function chartPaths(tile: ChartTile): string[] {
+  const c = { ...CHART_DEFAULTS, ...tile.config };
+  const anchor = tile.anchor ?? CHART_DEFAULTS.anchor;
+  return [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])].map((k) => c[k]);
+}
+
 /** SignalK paths a tile shows (what the live preview subscribes to). */
 export function tilePaths(tile: Tile): string[] {
   if (tile.type === 'autopilot') {
@@ -131,6 +139,7 @@ export function tilePaths(tile: Tile): string[] {
   }
   if (tile.type === 'position') return [tile.path ?? POSITION_DEFAULTS.path];
   if (tile.type === 'clock') return []; // the display's own clock
+  if (tile.type === 'chart') return chartPaths(tile);
   if (tile.type === 'heading_tape') {
     const t = headingTapeSettings(tile);
     return [t.headingPath, ...t.markers.map((m) => t.paths[m])];
@@ -194,6 +203,9 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place };
     case 'clock':
       return { type, ...place, show: 'both' };
+    case 'chart':
+      // The chart starts unset: the validator asks for one until it is picked.
+      return { type, ...place, chart: '' };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -227,10 +239,12 @@ export function addTile(
               ? 'tape'
               : type === 'clock'
                 ? 'clock'
-                : 'tile';
+                : type === 'chart'
+                  ? 'chart'
+                  : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
-  const big = type === 'wind_rose' || type === 'autopilot';
+  const big = type === 'wind_rose' || type === 'autopilot' || type === 'chart';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
@@ -312,7 +326,7 @@ export type NewPageKind = 'grid' | 'wind_rose' | 'autopilot' | 'chart';
 
 /**
  * Insert a new page after `after` (default: at the end). Returns the new page's index.
- * A wind rose or autopilot page is a 1x1 grid with one such tile filling the screen.
+ * A wind rose, autopilot or chart page is a 1x1 grid with one such tile filling the screen.
  */
 export function addPage(
   layout: Layout,
@@ -320,11 +334,6 @@ export function addPage(
   after = layout.pages.length - 1,
 ): { layout: Layout; index: number } {
   const used = usedIds(layout);
-  if (kind === 'chart') {
-    // The chart starts unset: the validator asks for one until it is picked.
-    const page: Page = { kind: 'chart', id: nextId(used, 'chart'), title: 'Chart', chart: '' };
-    return insertPages(layout, [page], after);
-  }
   if (kind === 'grid') {
     const page: Page = {
       kind: 'grid',
@@ -335,22 +344,29 @@ export function addPage(
     };
     return insertPages(layout, [page], after);
   }
-  const rose = kind === 'wind_rose';
-  const id = nextId(used, rose ? 'wind' : 'pilot');
+  const names = {
+    wind_rose: { id: 'wind', suffix: 'rose', title: 'Wind' },
+    autopilot: { id: 'pilot', suffix: 'ap', title: 'Autopilot' },
+    chart: { id: 'chart', suffix: 'map', title: 'Chart' },
+  }[kind];
+  const id = nextId(used, names.id);
   used.add(id);
-  const suffix = rose ? 'rose' : 'ap';
-  const tileId = used.has(`${id}-${suffix}`) ? nextId(used, `${id}-${suffix}`) : `${id}-${suffix}`;
+  const tileId = used.has(`${id}-${names.suffix}`)
+    ? nextId(used, `${id}-${names.suffix}`)
+    : `${id}-${names.suffix}`;
   const place = { id: tileId, x: 0, y: 0, w: 1, h: 1 };
+  const tile: Tile =
+    kind === 'wind_rose'
+      ? { type: 'wind_rose', ...place, config: { showTrueWind: true }, slots: {} }
+      : kind === 'chart'
+        ? { type: 'chart', ...place, chart: '' }
+        : { type: 'autopilot', ...place };
   const page: Page = {
     kind: 'grid',
     id,
-    title: rose ? 'Wind' : 'Autopilot',
+    title: names.title,
     grid: { cols: 1, rows: 1 },
-    tiles: [
-      rose
-        ? { type: 'wind_rose', ...place, config: { showTrueWind: true }, slots: {} }
-        : { type: 'autopilot', ...place },
-    ],
+    tiles: [tile],
   };
   return insertPages(layout, [page], after);
 }
@@ -471,25 +487,29 @@ export function renamePage(layout: Layout, index: number, title: string): Layout
 }
 
 /**
- * Change a chart page: `chart`, `zoom` and `anchor` at the top, path overrides under `config`.
- * Undefined values fall back to the defaults; an empty config is removed.
+ * Change chart tile `id`: `chart`, `zoom` and `anchor` at the top, path overrides under
+ * `config`. Undefined values fall back to the defaults; an empty config is removed.
  */
-export function updateChartPage(
+export function updateChartTile(
   layout: Layout,
   index: number,
+  id: string,
   patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Record<string, unknown> },
 ): Layout {
-  return withPage(layout, index, (p) => {
-    if (p.kind !== 'chart') return p;
-    const { config, ...top } = patch;
-    let next = merge(p, top);
-    if (config) {
-      const c = merge<Record<string, unknown>>(next.config ?? {}, config);
-      next =
-        Object.keys(c).length > 0 ? { ...next, config: c } : merge(next, { config: undefined });
-    }
-    return next;
-  });
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => {
+      if (t.id !== id || t.type !== 'chart') return t;
+      const { config, ...top } = patch;
+      let next = merge(t, top);
+      if (config) {
+        const c = merge<Record<string, unknown>>(next.config ?? {}, config);
+        next =
+          Object.keys(c).length > 0 ? { ...next, config: c } : merge(next, { config: undefined });
+      }
+      return next;
+    }),
+  }));
 }
 
 /** Merge into a slot of wind-rose tile `id`; `null` empties the slot. New slots start without a path. */
@@ -585,18 +605,18 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
   const refs: PathRef[] = [];
   const add = (path: string, ...at: (string | number)[]) => refs.push({ path, at });
   layout.pages.forEach((p, pi) => {
-    if (p.kind === 'chart') {
-      const c = { ...CHART_DEFAULTS, ...p.config };
-      const anchor = p.anchor ?? CHART_DEFAULTS.anchor;
-      for (const k of [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])])
-        add(c[k], 'pages', pi, 'config', k);
-      return;
-    }
     p.tiles.forEach((t, ti) => {
       const at = ['pages', pi, 'tiles', ti];
       switch (t.type) {
         case 'clock':
           return; // the display's own clock (settings.clockPath below)
+        case 'chart': {
+          const c = { ...CHART_DEFAULTS, ...t.config };
+          const anchor = t.anchor ?? CHART_DEFAULTS.anchor;
+          for (const k of [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])])
+            add(c[k], ...at, 'config', k);
+          return;
+        }
         case 'position':
           return add(t.path ?? POSITION_DEFAULTS.path, ...at, 'path');
         case 'autopilot': {
@@ -649,14 +669,20 @@ export function replacePath(layout: Layout, from: string, to: string): Layout {
   return next as unknown as Layout;
 }
 
-/** Chart pages showing chart `from` show `to`. */
+/** Chart tiles showing chart `from` show `to`. */
 export function replaceChart(layout: Layout, from: string, to: string): Layout {
   return {
     ...layout,
-    pages: layout.pages.map((p) =>
-      p.kind === 'chart' && p.chart === from ? { ...p, chart: to } : p,
-    ),
+    pages: layout.pages.map((p) => ({
+      ...p,
+      tiles: p.tiles.map((t) => (t.type === 'chart' && t.chart === from ? { ...t, chart: to } : t)),
+    })),
   };
+}
+
+/** The charts a layout shows, one entry per chart tile. */
+export function layoutCharts(layout: Layout): string[] {
+  return layout.pages.flatMap((p) => p.tiles.flatMap((t) => (t.type === 'chart' ? [t.chart] : [])));
 }
 
 /** What a validation error points at (e.g. "/pages/0/tiles/2/label"). */

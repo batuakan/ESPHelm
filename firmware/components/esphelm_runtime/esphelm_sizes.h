@@ -43,6 +43,10 @@ inline constexpr int WIND_ROSE_GYBE_MIN = 100;
 inline constexpr int WIND_ROSE_GYBE_MAX = 175;
 inline constexpr int WIND_ROSE_GYBE_FIXED = 150;
 
+// Chart tile (ADR-0030): shorter side in pixels from which it shows its zoom buttons and position line.
+inline constexpr int CHART_BUTTONS = 200;
+inline constexpr int CHART_INFO = 260;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

@@ -528,6 +528,35 @@ void check_time_zone(Checker &chk, JsonVariantConst v, const std::string &ptr, S
   }
 }
 
+void check_chart(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
+  auto chart = std::make_shared<ChartConfig>();
+  string_field(chk, obj, ptr, "chart", true, StrKind::CHART_ID, chart->chart);
+  long long zoom;
+  if (has(obj, "zoom") && int_field(chk, obj, ptr, "zoom", false, 1, 20, zoom))
+    chart->zoom = static_cast<int>(zoom);
+  if (has(obj, "anchor")) {
+    if (!obj["anchor"].is<bool>())
+      chk.add(ptr + "/anchor", "INVALID_TYPE");
+    else
+      chart->anchor = obj["anchor"].as<bool>();
+  }
+  if (has(obj, "config")) {
+    JsonVariantConst config = obj["config"];
+    const std::string cp = ptr + "/config";
+    if (!config.is<JsonObjectConst>()) {
+      chk.add(cp, "INVALID_TYPE");
+    } else {
+      JsonObjectConst c = config.as<JsonObjectConst>();
+      string_field(chk, c, cp, "positionPath", false, StrKind::PATH, chart->position_path);
+      string_field(chk, c, cp, "headingPath", false, StrKind::PATH, chart->heading_path);
+      string_field(chk, c, cp, "anchorPositionPath", false, StrKind::PATH, chart->anchor_position_path);
+      string_field(chk, c, cp, "anchorRadiusPath", false, StrKind::PATH, chart->anchor_radius_path);
+      string_field(chk, c, cp, "anchorAlarmPath", false, StrKind::PATH, chart->anchor_alarm_path);
+    }
+  }
+  tile.chart = std::move(chart);
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -551,6 +580,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::HEADING_TAPE;
   } else if (t != nullptr && std::strcmp(t, "clock") == 0) {
     tile.type = TileType::CLOCK;
+  } else if (t != nullptr && std::strcmp(t, "chart") == 0) {
+    tile.type = TileType::CHART;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -592,6 +623,10 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
   if (tile.type == TileType::CLOCK) {
     string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
     check_clock(chk, obj, ptr, tile.clock);
+    return;
+  }
+  if (tile.type == TileType::CHART) {
+    check_chart(chk, obj, ptr, tile);
     return;
   }
   if (tile.type == TileType::WIND_ROSE) {
@@ -691,38 +726,6 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     if (o >= 0)
       tile.orientation = static_cast<Orientation>(o);
   }
-}
-
-void check_chart_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, Page &page) {
-  page.kind = PageKind::CHART;
-  string_field(chk, obj, ptr, "id", true, StrKind::ID, page.id);
-  string_field(chk, obj, ptr, "title", false, StrKind::LABEL, page.title);
-  auto chart = std::make_shared<ChartConfig>();
-  string_field(chk, obj, ptr, "chart", true, StrKind::CHART_ID, chart->chart);
-  long long zoom;
-  if (has(obj, "zoom") && int_field(chk, obj, ptr, "zoom", false, 1, 20, zoom))
-    chart->zoom = static_cast<int>(zoom);
-  if (has(obj, "anchor")) {
-    if (!obj["anchor"].is<bool>())
-      chk.add(ptr + "/anchor", "INVALID_TYPE");
-    else
-      chart->anchor = obj["anchor"].as<bool>();
-  }
-  if (has(obj, "config")) {
-    JsonVariantConst config = obj["config"];
-    const std::string cp = ptr + "/config";
-    if (!config.is<JsonObjectConst>()) {
-      chk.add(cp, "INVALID_TYPE");
-    } else {
-      JsonObjectConst c = config.as<JsonObjectConst>();
-      string_field(chk, c, cp, "positionPath", false, StrKind::PATH, chart->position_path);
-      string_field(chk, c, cp, "headingPath", false, StrKind::PATH, chart->heading_path);
-      string_field(chk, c, cp, "anchorPositionPath", false, StrKind::PATH, chart->anchor_position_path);
-      string_field(chk, c, cp, "anchorRadiusPath", false, StrKind::PATH, chart->anchor_radius_path);
-      string_field(chk, c, cp, "anchorAlarmPath", false, StrKind::PATH, chart->anchor_alarm_path);
-    }
-  }
-  page.chart = std::move(chart);
 }
 
 void check_grid_page(Checker &chk, JsonObjectConst obj, const std::string &ptr, Page &page) {
@@ -866,8 +869,6 @@ void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
     Page page{};
     if (kind.is<const char *>() && std::strcmp(kind.as<const char *>(), "grid") == 0) {
       check_grid_page(chk, po, pp, page);
-    } else if (kind.is<const char *>() && std::strcmp(kind.as<const char *>(), "chart") == 0) {
-      check_chart_page(chk, po, pp, page);
     } else {
       chk.add(pp + "/kind", "UNKNOWN_PAGE_KIND");
       continue;
@@ -892,8 +893,6 @@ void check_semantics(Checker &chk, const Layout &layout) {
     const Page &page = layout.pages[i];
     const std::string pp = "/pages/" + std::to_string(i);
     claim(page.id, pp + "/id");
-    if (page.kind != PageKind::GRID)
-      continue;
     std::vector<size_t> placed;
     for (size_t j = 0; j < page.tiles.size(); j++) {
       const Tile &t = page.tiles[j];

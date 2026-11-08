@@ -240,15 +240,40 @@ const mutations: { name: string; doc: unknown }[] = [
     ]),
   },
   {
-    name: 'chart pages with odd fields',
+    name: 'chart tiles with odd fields',
+    doc: withTileList([
+      {
+        type: 'chart',
+        id: 'a',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        chart: 'ok',
+        zoom: 0,
+        anchor: 'yes',
+        config: [],
+      },
+      {
+        type: 'chart',
+        id: 'b',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        chart: '',
+        zoom: 2.5,
+        config: { headingPath: 7, extra: 1 },
+      },
+      { type: 'chart', id: 'c', x: 0, y: 0, w: 1, h: 1, chart: 5, zoom: '15', label: 'x' },
+      { type: 'chart', id: 'a', x: 0, y: 0, w: 1, h: 1, chart: 'dup' },
+    ]),
+  },
+  {
+    name: 'the old chart page kind',
     doc: {
       ...minimal,
-      pages: [
-        { kind: 'chart', id: 'a', chart: 'ok', zoom: 0, anchor: 'yes', config: [] },
-        { kind: 'chart', id: 'b', chart: '', zoom: 2.5, config: { headingPath: 7, extra: 1 } },
-        { kind: 'chart', id: 'c', chart: 5, zoom: '15', title: 'Karte ü' },
-        { kind: 'chart', id: 'a', chart: 'dup' },
-      ],
+      pages: [{ kind: 'chart', id: 'a', chart: 'ok', zoom: 0, anchor: 'yes', config: [] }],
     },
   },
   {

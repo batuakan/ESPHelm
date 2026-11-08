@@ -1,6 +1,6 @@
 # ADR-0012: Chart page and its tile pipeline
 
-Status: **Accepted** (Phase 5d, 2026-10-25)
+Status: **Accepted** (Phase 5d, 2026-10-25). The page kind and its per-page 1280² buffer are **superseded by ADR-0030** (the chart is a tile; every chart shares one store of map tiles). The tile pipeline through the plugin, north up, night and PSRAM-only still stand.
 
 ## Context
 The legacy chart app showed map tiles around the vessel through your ESPTiles component, with the vessel, the anchor position and the anchor alarm radius. Its tiles came from your separate `SignalKRGB565Proxy` plugin, which turns the PNG tiles of SignalK's charts plugin into raw RGB565, because the display can't decode PNG or JPEG.

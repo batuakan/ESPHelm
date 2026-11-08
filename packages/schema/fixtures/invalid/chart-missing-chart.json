@@ -3,7 +3,7 @@
   "expect": [
     {
       "code": "MISSING_FIELD",
-      "pointer": "/pages/0/chart"
+      "pointer": "/pages/0/tiles/0/chart"
     }
   ],
   "layout": {
@@ -11,7 +11,24 @@
     "id": "minimal",
     "theme": "day",
     "pages": [
-      { "kind": "chart", "id": "c" }
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "chart",
+            "id": "c",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1
+          }
+        ]
+      }
     ]
   }
 }

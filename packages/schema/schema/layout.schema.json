@@ -2025,88 +2025,102 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "chart"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "chart"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "chart": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "SignalK chart identifier: letters, digits, \".\", \"_\" and \"-\"."
+                        },
+                        "zoom": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 20
+                        },
+                        "anchor": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "properties": {
+                            "positionPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "headingPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "anchorPositionPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "anchorRadiusPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "anchorAlarmPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   ]
                 },
                 "minItems": 1,
                 "errorCode": "EMPTY_PAGE"
-              }
-            },
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "required": [
-              "kind",
-              "id",
-              "chart"
-            ],
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "chart"
-              },
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9_-]*$",
-                "errorCode": "INVALID_ID",
-                "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
-              },
-              "title": {
-                "type": "string",
-                "pattern": "^[\\x20-\\x7E\\u00B0]*$",
-                "errorCode": "INVALID_LABEL",
-                "description": "Printable ASCII plus the degree sign (U+00B0)."
-              },
-              "chart": {
-                "type": "string",
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
-                "errorCode": "INVALID_ID",
-                "description": "SignalK chart identifier: letters, digits, \".\", \"_\" and \"-\"."
-              },
-              "zoom": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 20
-              },
-              "anchor": {
-                "type": "boolean"
-              },
-              "config": {
-                "type": "object",
-                "properties": {
-                  "positionPath": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
-                    "errorCode": "INVALID_PATH",
-                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
-                  },
-                  "headingPath": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
-                    "errorCode": "INVALID_PATH",
-                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
-                  },
-                  "anchorPositionPath": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
-                    "errorCode": "INVALID_PATH",
-                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
-                  },
-                  "anchorRadiusPath": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
-                    "errorCode": "INVALID_PATH",
-                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
-                  },
-                  "anchorAlarmPath": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
-                    "errorCode": "INVALID_PATH",
-                    "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
-                  }
-                },
-                "additionalProperties": false
               }
             },
             "additionalProperties": false

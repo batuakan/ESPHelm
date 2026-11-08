@@ -409,7 +409,7 @@ describe('editor', { timeout: 20000 }, () => {
     expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('day');
   });
 
-  it('adds a chart page, picks a chart and previews it at the position', async () => {
+  it('adds a chart page (a chart tile), picks a chart and previews it at the position', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();
     render(<App api={server.api} live={live.factory} />);
@@ -418,8 +418,8 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Chart page' }));
-    await screen.findByText(/Chart: choose a chart/);
-    const drawer = screen.getByRole('complementary', { name: 'Chart settings' });
+    await screen.findByText(/Chart, chart-1-map: choose a chart/);
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
     const select = within(drawer).getByLabelText('Chart') as HTMLSelectElement;
     expect([...select.options].map((o) => [o.value, o.disabled])).toEqual([
       ['', true],
@@ -436,7 +436,7 @@ describe('editor', { timeout: 20000 }, () => {
       'notifications.navigation.anchor',
     ]);
     live.emit('navigation.position', { latitude: 60.15, longitude: 24.95 });
-    const preview = screen.getByTestId('chart-chart-1');
+    const preview = screen.getByTestId('chart-chart-1-map');
     const hrefs = [...preview.querySelectorAll('image')].map((i) => i.getAttribute('href'));
     // z12 at 60.15N 24.95E is tile 2331/1186.
     expect(hrefs).toContain('/tiles/sea/12/2331/1186.png');
@@ -445,11 +445,11 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
     expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[1]).toEqual({
-      kind: 'chart',
+      kind: 'grid',
       id: 'chart-1',
       title: 'Chart',
-      chart: 'sea',
-      zoom: 12,
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ type: 'chart', id: 'chart-1-map', x: 0, y: 0, w: 1, h: 1, chart: 'sea', zoom: 12 }],
     });
   });
 

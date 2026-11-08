@@ -45,6 +45,8 @@ import { useEffect, useState } from 'react';
 import { formatValue } from '../format';
 import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
+import type { ChartInfo } from '../api';
+import { ChartPreview } from './ChartPreview';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
@@ -300,6 +302,8 @@ export function TilePreview(props: {
   tapeWidth?: number;
   /** Clock only: the layout's time zone as a POSIX rule (settings.timeZone.posix); absent: UTC. */
   timeZone?: string;
+  /** Chart only: its chart, the tile's size on the display, and the night theme. */
+  chart?: { info: ChartInfo | undefined; width: number; height: number; night: boolean };
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -321,6 +325,17 @@ export function TilePreview(props: {
   if (tile.type === 'heading_tape')
     return <HeadingTapePreview tile={tile} values={values} width={props.tapeWidth ?? 440} />;
   if (tile.type === 'clock') return <ClockPreview tile={tile} timeZone={props.timeZone} />;
+  if (tile.type === 'chart')
+    return (
+      <ChartPreview
+        tile={tile}
+        chart={props.chart?.info}
+        values={values}
+        width={props.chart?.width ?? 480}
+        height={props.chart?.height ?? 480}
+        night={props.chart?.night ?? false}
+      />
+    );
   const value = tile.path ? values.get(tile.path) : undefined;
   switch (tile.type) {
     case 'gauge':

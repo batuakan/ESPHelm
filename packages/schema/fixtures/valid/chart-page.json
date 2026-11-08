@@ -4,27 +4,74 @@
   "name": "Chart and anchor watch",
   "theme": "night",
   "pages": [
-    { "kind": "chart", "id": "chart", "title": "Chart", "chart": "test-chart" },
     {
-      "kind": "chart",
+      "kind": "grid",
+      "id": "chart",
+      "title": "Chart",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "chart",
+          "id": "map",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "chart": "test-chart"
+        }
+      ]
+    },
+    {
+      "kind": "grid",
       "id": "anchor",
       "title": "Anchor",
-      "chart": "OSM.raster_v2",
-      "zoom": 17,
-      "anchor": true,
-      "config": {
-        "positionPath": "navigation.position",
-        "headingPath": "navigation.headingMagnetic",
-        "anchorPositionPath": "navigation.anchor.position",
-        "anchorRadiusPath": "navigation.anchor.maxRadius",
-        "anchorAlarmPath": "notifications.navigation.anchor"
-      }
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "chart",
+          "id": "anchor-map",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "chart": "OSM.raster_v2",
+          "zoom": 17,
+          "anchor": true,
+          "config": {
+            "positionPath": "navigation.position",
+            "headingPath": "navigation.headingMagnetic",
+            "anchorPositionPath": "navigation.anchor.position",
+            "anchorRadiusPath": "navigation.anchor.maxRadius",
+            "anchorAlarmPath": "notifications.navigation.anchor"
+          }
+        }
+      ]
     },
     {
       "kind": "grid",
       "id": "speeds",
-      "grid": { "cols": 1, "rows": 1 },
-      "tiles": [{ "type": "value", "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn" }]
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "unit": "kn"
+        }
+      ]
     }
   ]
 }

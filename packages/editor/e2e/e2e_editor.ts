@@ -568,11 +568,12 @@ async function main(): Promise<void> {
       JSON.stringify(ap),
     );
 
-    // A chart page (ADR-0012): the test chart from the charts stand-in, previewed with its real
-    // tiles at the sample data's position.
+    // A chart page (a 1x1 grid with a chart tile, ADR-0030): the test chart from the charts
+    // stand-in, previewed with its real tiles at the sample data's position. Then a second
+    // column with a value beside the chart.
     await page.getByRole('button', { name: 'Add page' }).click();
     await page.getByRole('menuitem', { name: 'Chart page', exact: true }).click();
-    const chartDrawer = page.getByRole('complementary', { name: 'Chart settings' });
+    const chartDrawer = page.getByRole('complementary', { name: 'Tile settings' });
     await chartDrawer.getByLabel('Chart').selectOption('test-chart');
     await chartDrawer.getByLabel('Zoom').fill('14');
     let chartTiles = 0;
@@ -587,6 +588,16 @@ async function main(): Promise<void> {
     );
     await page.waitForTimeout(1500); // tile images load
     await shot(page, '07c-desktop-night-chart');
+    await chartDrawer.getByRole('button', { name: 'Close settings' }).click();
+    await page.getByLabel('Columns').fill('2');
+    await page
+      .getByRole('region', { name: 'Tiles' })
+      .getByRole('button', { name: /^Value/ })
+      .click();
+    await page.getByLabel('Search SignalK paths').fill('speedOverGround');
+    await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
+    await page.waitForTimeout(1000);
+    await shot(page, '07d-desktop-night-chart-beside-value');
     await page.getByText('No problems').waitFor();
     await save.click();
     await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
@@ -596,18 +607,26 @@ async function main(): Promise<void> {
       deviceToken,
     );
     const chartPageServed = (withChart.body.pages as Record<string, unknown>[] | undefined)?.find(
-      (p) => p.kind === 'chart',
+      (p) => p.id === 'chart-1',
     );
+    const [chartServed, besideServed] = (chartPageServed?.tiles ?? []) as Record<string, unknown>[];
     check(
-      'the display gets the chart page',
-      JSON.stringify(chartPageServed) ===
-        JSON.stringify({
-          kind: 'chart',
-          id: 'chart-1',
-          title: 'Chart',
-          chart: 'test-chart',
-          zoom: 14,
-        }),
+      'the display gets the chart tile beside a value',
+      JSON.stringify(chartPageServed?.grid) === JSON.stringify({ cols: 2, rows: 1 }) &&
+        JSON.stringify(chartServed) ===
+          JSON.stringify({
+            type: 'chart',
+            id: 'chart-1-map',
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            chart: 'test-chart',
+            zoom: 14,
+          }) &&
+        besideServed?.type === 'value' &&
+        besideServed.x === 1 &&
+        besideServed.path === 'navigation.speedOverGround',
       JSON.stringify(chartPageServed),
     );
     await page.getByRole('tab', { name: 'Helm' }).click();

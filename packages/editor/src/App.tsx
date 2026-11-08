@@ -10,9 +10,9 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import {
-  CHART_DEFAULTS,
   DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
   DEFAULT_FONT_LINE_HEIGHTS,
+  CHART_FIT,
   GRAPH_FIT,
   TEMPLATES,
   TILE_TYPES,
@@ -20,7 +20,6 @@ import {
   validateLayout,
   type Layout,
   type Page,
-  type ChartPage,
   type Tile,
   type TileType,
 } from '@esphelm/schema';
@@ -48,7 +47,7 @@ import {
   targetForPointer,
   tilePaths,
   pageTiles,
-  updateChartPage,
+  updateChartTile,
   updateSettings,
   withBrowserTimeZone,
   updateSlot,
@@ -65,7 +64,6 @@ import { IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, exportFile, missingRefs, parseImpor
 import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
 import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
-import { ChartPreview } from './components/ChartPreview';
 import {
   AUTOPILOT_TIER_TEXT,
   ROSE_TIER_TEXT,
@@ -86,11 +84,6 @@ interface Selection {
 /** SignalK paths a page shows (what the live preview subscribes to). */
 function pagePaths(page: Page | undefined): string[] {
   if (!page) return [];
-  if (page.kind === 'chart') {
-    const c = { ...CHART_DEFAULTS, ...page.config };
-    const anchor = page.anchor ?? CHART_DEFAULTS.anchor;
-    return [c.positionPath, c.headingPath, ...(anchor ? [c.anchorPositionPath, c.anchorRadiusPath, c.anchorAlarmPath] : [])];
-  }
   return page.tiles.flatMap(tilePaths).filter(Boolean);
 }
 
@@ -226,8 +219,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   }, [props.live]);
   const index = layout ? Math.min(pageIndex, layout.pages.length - 1) : 0;
   const page = layout?.pages[index];
-  const grid = page?.kind === 'grid' ? page : undefined;
-  const chartPage: ChartPage | undefined = page?.kind === 'chart' ? page : undefined;
+  const grid = page;
   useEffect(() => {
     live?.setPaths(pagePaths(page));
   }, [live, page]);
@@ -425,8 +417,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   };
 
   const tile = selection ? grid?.tiles.find((t) => t.id === selection.id) : undefined;
-  const chartSelected = !!chartPage && selection?.id === chartPage.id;
-  const drawerOpen = !!tile || chartSelected;
+  const drawerOpen = !!tile;
   // The screen this layout gets: turned by its settings.rotation where the display can (ADR-0028).
   const display = device ? shownSize(device.hello, layout?.settings?.rotation) : { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
@@ -589,7 +580,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 const r = addPage(layout, kind, index);
                 edit(r.layout);
                 const added = r.layout.pages[r.index];
-                const first = added?.kind === 'chart' ? added : pageTiles(added)[0];
+                const first = pageTiles(added)[0];
                 showPage(r.index, first ? { id: first.id } : undefined);
               }}
               onAddTemplate={(id) => {
@@ -670,6 +661,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   graphAxis={(t) => tileBox(t).height >= GRAPH_FIT.axisHeight}
                   tileWidth={(t) => tileBox(t).width}
                   timeZone={layout.settings?.timeZone?.posix}
+                  charts={charts}
+                  tileSize={tileBox}
+                  night={layout.theme === 'night'}
                   textSize={(t) =>
                     t.type === 'value'
                       ? valueTextSize(
@@ -690,17 +684,6 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   onResize={(id, w, h) => edit(resizeTile(layout, index, id, w, h), 'Not enough room to grow there.')}
                   onDropNew={(type, cell) => add(type, cell)}
                   onDragNewEnd={() => setNewTileDrag(null)}
-                />
-              )}
-              {chartPage && (
-                <ChartPreview
-                  page={chartPage}
-                  chart={charts.find((c) => c.identifier === chartPage.chart)}
-                  values={shownValues}
-                  width={display.width}
-                  height={Math.round(display.height * 0.89)}
-                  night={layout.theme === 'night'}
-                  onSelect={() => setSelection({ id: chartPage.id })}
                 />
               )}
               <FooterPreview layout={layout} index={index} />
@@ -746,19 +729,24 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {chartPage && chartSelected && layout && (
+      {tile?.type === 'chart' && layout && (
         <ChartDrawer
-          key={chartPage.id}
-          page={chartPage}
+          key={tile.id}
+          tile={tile}
           charts={charts}
           supported={supported.has('chart')}
+          sizeHint={chartSizeHint(tilePx(tile), !!device)}
           paths={paths}
           values={shownValues}
-          onChange={(patch) => edit(updateChartPage(layout, index, patch))}
+          onChange={(patch) => edit(updateChartTile(layout, index, tile.id, patch))}
+          onDelete={() => {
+            edit(removeTile(layout, index, tile.id));
+            setSelection(undefined);
+          }}
           onClose={() => setSelection(undefined)}
         />
       )}
-      {tile && layout && (
+      {tile && tile.type !== 'chart' && layout && (
         <TileDrawer
           key={tile.id}
           tile={tile}
@@ -795,6 +783,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 function sizeHint(px: number, known: boolean): string {
   const where = known ? 'on this display' : 'on a 480×480 display';
   return `About ${px} px ${where}: ${ROSE_TIER_TEXT[roseTier(px)]}.`;
+}
+
+function chartSizeHint(px: number, known: boolean): string {
+  const where = known ? 'on this display' : 'on a 480×480 display';
+  const what =
+    px >= CHART_FIT.info
+      ? 'the map with zoom buttons and the position line'
+      : px >= CHART_FIT.buttons
+        ? `the map with zoom buttons; ${CHART_FIT.info} px or more adds the position line`
+        : `the map only (an anchor alarm frames it in red); ${CHART_FIT.buttons} px or more adds zoom buttons`;
+  return `About ${px} px ${where}: ${what}.`;
 }
 
 function autopilotHint(box: { width: number; height: number }, known: boolean): string {
@@ -838,8 +837,8 @@ function describeProblem(
   target: ReturnType<typeof targetForPointer>,
 ): string {
   const page = target ? layout.pages[target.page] : undefined;
-  const tile = page?.kind === 'grid' ? page.tiles.find((t) => t.id === target?.tileId) : undefined;
-  const text = /^\/pages\/\d+\/chart$/.test(pointer)
+  const tile = page?.tiles.find((t) => t.id === target?.tileId);
+  const text = /^\/pages\/\d+\/tiles\/\d+\/chart$/.test(pointer)
     ? 'choose a chart'
     : pointer.startsWith('/settings/timeZone')
       ? 'the time zone is not one the display can read: pick it again in Display settings'

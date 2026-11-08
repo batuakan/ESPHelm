@@ -1,7 +1,7 @@
 // Layout files (ADR-0027): export is the layout JSON itself (layout v1, like the starter
 // templates); import checks an untrusted file and keeps the display's own layout id and name.
 import { migrateLayout, validateLayout, type Layout } from '@esphelm/schema';
-import { layoutPathRefs, withValidStartPage } from './layoutOps';
+import { layoutCharts, layoutPathRefs, withValidStartPage } from './layoutOps';
 
 /** Largest file an import reads. Layouts are a few KB; this only stops a wrong file. */
 export const IMPORT_MAX_BYTES = 1024 * 1024;
@@ -64,7 +64,7 @@ export function parseImport(text: string, current: Layout): ImportResult {
 export interface MissingRef {
   kind: 'path' | 'chart';
   value: string;
-  /** Fields (paths) or pages (charts) that use it. */
+  /** Fields (paths) or chart tiles (charts) that use it. */
   uses: number;
 }
 
@@ -82,7 +82,6 @@ export function missingRefs(
     counts.set(key, m);
   };
   for (const r of layoutPathRefs(layout)) if (!knownPaths.has(r.path)) count('path', r.path);
-  for (const p of layout.pages)
-    if (p.kind === 'chart' && !chartIds.has(p.chart)) count('chart', p.chart);
+  for (const chart of layoutCharts(layout)) if (!chartIds.has(chart)) count('chart', chart);
   return [...counts.values()];
 }

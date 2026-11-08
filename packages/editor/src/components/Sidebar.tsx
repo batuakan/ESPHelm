@@ -68,6 +68,12 @@ const ICONS: Record<string, JSX.Element> = {
       <path d="M10 2.5v2M17.5 10h-2M10 17.5v-2M2.5 10h2" />
     </svg>
   ),
+  chart: (
+    <svg viewBox="0 0 20 20">
+      <path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z" />
+      <path d="M7.5 3v12M12.5 5v12" />
+    </svg>
+  ),
 };
 
 const TILE_INFO: Record<string, { title: string }> = {
@@ -81,6 +87,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   clock: { title: 'Clock' },
   wind_rose: { title: 'Wind rose' },
   autopilot: { title: 'Autopilot' },
+  chart: { title: 'Chart' },
 };
 
 export function DeviceList(props: {

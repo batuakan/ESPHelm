@@ -76,7 +76,6 @@ export function roseHistorySeries(tile: WindRoseTile): HistorySeries[] {
 export function historySeries(layout: Pick<Layout, 'pages'>): HistorySeries[] {
   const out: HistorySeries[] = [];
   for (const page of layout.pages) {
-    if (page.kind === 'chart') continue;
     for (const tile of page.tiles) {
       if ((tile.type === 'value' && historyEnabled(tile)) || tile.type === 'graph') {
         out.push({

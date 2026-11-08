@@ -97,4 +97,66 @@ describe('size tiers', () => {
     expect(header).toContain(`HISTORY_NO_PSRAM_WINDOWS = ${HISTORY.noPsramWindows};`);
     expect(header).toContain(`HISTORY_MAX_VALUES_NO_PSRAM = ${HISTORY.maxValuesNoPsram};`);
   });
+
+  it('turns chart pages into 1x1 grid pages with a chart tile (ADR-0030)', () => {
+    const charts = {
+      version: 1,
+      id: 'charts',
+      theme: 'night',
+      pages: [
+        { kind: 'chart', id: 'nav', title: 'Chart', chart: 'osm', zoom: 12, anchor: false },
+        {
+          kind: 'chart',
+          id: 'anchor',
+          chart: 'osm',
+          config: { headingPath: 'navigation.headingMagnetic' },
+        },
+      ],
+    };
+    expect(validateLayout(charts).errors.map((e) => e.code)).toEqual([
+      'UNKNOWN_PAGE_KIND',
+      'UNKNOWN_PAGE_KIND',
+    ]);
+    const { layout, changed } = migrateLayout(charts);
+    expect(changed).toBe(true);
+    expect(validateLayout(layout).errors).toEqual([]);
+    expect((layout as { pages: unknown[] }).pages).toEqual([
+      {
+        kind: 'grid',
+        id: 'nav',
+        title: 'Chart',
+        grid: { cols: 1, rows: 1 },
+        tiles: [
+          {
+            type: 'chart',
+            id: 'nav-chart',
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            chart: 'osm',
+            zoom: 12,
+            anchor: false,
+          },
+        ],
+      },
+      {
+        kind: 'grid',
+        id: 'anchor',
+        grid: { cols: 1, rows: 1 },
+        tiles: [
+          {
+            type: 'chart',
+            id: 'anchor-chart',
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            chart: 'osm',
+            config: { headingPath: 'navigation.headingMagnetic' },
+          },
+        ],
+      },
+    ]);
+  });
 });
