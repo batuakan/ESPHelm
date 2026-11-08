@@ -17,10 +17,11 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
        - Paths and charts this server doesn't have are then listed with a picker each. A replacement applies to every use; *Keep as is* skips them.
      - **Use another display's layout:** pick a display, then **Copy** (its pages become this display's own layout, sent with *Save & send*) or **Link** (both displays show one layout at once, and editing it changes both; the editor says "Shared with …").
      - **Make a separate copy** (on a linked display) gives it its own layout again with the next *Save & send*.
+     - **Displays of different shapes** (landscape, portrait or square, after their rotation): before *Link*, the editor says the other screen's shape and that a linked layout is stretched to both, and suggests *Copy*.
    - Under the tabs, the current page's **title** (shown in the display's footer), **← →** to reorder, **Delete** (asks first; the last page can't be deleted), and a grid page's size.
    - Pages or templates that need widgets this display's firmware lacks are struck through or disabled.
 4. **Edit a grid page:**
-   - **Grid size:** columns × rows, next to the page title. The canvas has the display's aspect ratio.
+   - **Grid size:** columns × rows, next to the page title. The canvas has the display's aspect ratio, turned by the layout's rotation (ADR-0028, *Display settings → Mounted*), and fits the window: a portrait display is tall, a landscape one gets a wider canvas. The editor reloads the displays every 5 s, so a new size (another display, or a new firmware) shows without a reload.
    - **Add a tile:** click a tile type in *Tiles* (first free cell), or drag it onto a free cell. Types the display's firmware can't render are disabled and marked `n/a` (from its hello).
    - **Move:** drag a tile. **Resize:** drag its bottom-right corner. Cells snap; a red outline means it won't fit there.
    - **Settings** (right drawer, a bottom sheet on a phone):
@@ -71,6 +72,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 **Position tile:** shows `navigation.position` (or another position path) as two lines. The drawer lists the four formats, each with an example from the live value: degrees and decimal minutes (`60° 09.000' N`), degrees, minutes and seconds, decimal degrees, and signed decimal. *Decimals* applies to the last part (minutes, seconds or degrees); empty uses the format's default. The preview uses the same formatter as the display.
 
 **Display settings** (the *Display settings* button next to the display theme, ADR-0015) are part of the layout too, sent with *Save & send*:
+- *Mounted* (ADR-0028): as built, or turned 90°, 180° or 270° clockwise for a display mounted sideways or upside down. The canvas turns at once; the pages are laid out for the turned screen. Disabled, with a note, when the display reports it can't turn its picture
 - brightness for the day and the night theme (disabled when the display reports it can't dim its backlight)
 - the start page
 - *Auto day/night*: the night theme while `environment.sun` (derived-data plugin) says dusk or night; the drawer shows its current value
@@ -101,6 +103,7 @@ A display that skipped a layout because it crashed while showing it (boot guard,
     - *Helm (large display)*: the autopilot gets its buttons (size hint), WIND unticked, and the display downloads it without WIND
     - a chart page with the test chart of a charts stand-in: tiles in the preview around the sample-data position, and the display downloads the page
     - sharing: a second display; *Export file* downloads exactly the layout the display gets; a file with a path the server lacks is imported on the second display, the path replaced in the list, and the display gets it under its own id; *Link* gives both displays one layout and *Make a separate copy* separates them again
+    - rotation: the display says hello as a 1280×800 panel that can turn; the editor follows without a reload with a wider preview (`17-desktop-landscape`); *Display settings → Mounted → 90°* previews 800×1280 at once, fitting the window (`18-desktop-portrait`), and *Save & send* puts `settings.rotation: 90` in the layout; linking a square display to it warns
     - phone: tile drawer, and a tap on a rose slot opens that slot in the drawer
 
     Screenshots (desktop light/night, wind rose, gauge with a rose, Sailing 720, phone dark) go to a temp dir printed by the test.

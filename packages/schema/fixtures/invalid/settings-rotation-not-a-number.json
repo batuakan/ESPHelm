@@ -1,0 +1,42 @@
+{
+  "description": "rotation is a number of degrees, not a string",
+  "expect": [
+    {
+      "code": "INVALID_TYPE",
+      "pointer": "/settings/rotation"
+    },
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/settings/rotation"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "rotation": "90"
+    }
+  }
+}

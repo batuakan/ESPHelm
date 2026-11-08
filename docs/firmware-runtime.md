@@ -42,6 +42,8 @@ All the fonts form one ladder, sorted by line height. Tile text picks the larges
 
 `backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
 
+**Rotation** (ADR-0028): the layout's `settings.rotation` turns the display just before the layout's page is built (`rotate_()`, ESPHome's `LvglComponent::set_rotation()`, picture and touch), so a cached layout boots turned and a layout without it turns it back to 0. A change closes the panel and the history popup, the alarm banner cuts its text for the new width, and a `hello` with the turned size follows. A board allows it with `lvgl: rotation: 0`, which sets `USE_ESPHELM_ROTATION` and `capabilities.rotation`; elsewhere the setting is logged once and ignored.
+
 **The clock** (ADR-0024) is set from the layout's `clockPath` (default `navigation.datetime`, GPS time), and runs on `millis()` in between, so it keeps time offline. It's subscribed only when the layout has a clock tile or a clock screen saver. `time_id` is optional: any ESPHome `time:` component, used when SignalK hasn't sent a time for ten minutes: `homeassistant`, or `sntp` with `servers:` on the boat's LAN (its defaults are internet pool servers, and ESPHelm doesn't depend on the internet). No ready-made config sets it. A time before 2020 (a GPS without a fix) is ignored. With the layout's `screenSaver` set, the screen timeout dims the backlight to `screenSaverBrightness` and shows the time and/or date faintly instead of going dark; until the display knows the time it goes dark as before. The digits fonts need `:` for the time; a font without it is skipped for clocks.
 
 Ready-made configs:
@@ -50,6 +52,7 @@ Ready-made configs:
 |---|---|---|
 | `firmware/esphelm_sdl.yaml` | desktop, 480×480 | compile, run, e2e test. Test hooks: `esphelm_shot_request <file>`, `esphelm_page_request <n>`, `esphelm_tap_request <tile> [button]` (autopilot buttons: `-10 -1 +1 +10 auto wind route standby`; a value tile or a wind rose that records opens its history, `@history close\|10m\|1h\|6h\|<rose value name>` works its popup), `esphelm_exit_request`. `ESPHELM_TEST_HISTORY=<key>[,<key>…]` (a tile id, or `<rose id>/<name>`) seeds those values with a fixed curve, across north for angles, and keeps them still (goldens) |
 | `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, 720 renders in the e2e test. It repeats `signalk_host`/`signalk_port` because `-s` on the command line does not override substitutions of the included `esphelm_sdl.yaml`; the e2e test refuses to run a build that isn't compiled for its test port |
+| `firmware/esphelm_sdl_wide.yaml` | desktop, 1280×800 with the P4-86 font sizes | compile, renders in the e2e test: a square layout stretched to a landscape screen, the panel, and a layout with `settings.rotation: 90` turning it to 800×1280 |
 | `firmware/esphelm_sdl_cyd.yaml` | desktop, 320×240 with the CYD font sizes | compile; a preview of layouts on the CYD (not in the e2e test) |
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles, checked on hardware |
 | `firmware/esphelm_guition_4848s040.yaml` | Guition ESP32-S3-4848S040, 4" 480×480, S3 with PSRAM (`hardware/guition-esp32-s3-4848s040.yaml`: ESPHome's `mipi_rgb` model `GUITION-4848S040`, GT911 touch, backlight GPIO38). The 480 font sizes of the SDL build | compiles (flash 1,799,787 B of 8 MB, static RAM 121,647 B); **not yet run on hardware** |
@@ -215,6 +218,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes, now on every layout, with the menu button's three bars |
 | Settings panel (ADR-0025) | about 20 LVGL objects with the *Settings* tab, about 30 with *Info* (four per section), none when closed; the saved choices are one record of under 100 B in NVS |
+| Rotation (ADR-0028) | a second LVGL draw buffer as large as the first while rotation is enabled in the YAML (in PSRAM on the P4 and the Guition); nothing per layout |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
 | P4 runtime firmware, static | RAM 98,742 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 15.5 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
 | C3 compile check, static | RAM 112,768 B of 321,296 B (35.1 %), flash 1.48 MB of 1.8 MB (80.7 %) |
@@ -274,6 +278,7 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 
   21g. **setup** (ADR-0026, offline from an empty flash, `ESPHELM_TEST_SETUP=ap|joining` standing in for Wi-Fi): the *Set up Wi-Fi* screen with its QR code, the status page's menu button opening the panel, the *Network* tab with the setup network, and "Joining Wi-Fi"
   21f. **clocks** (ADR-0024, `fixtures/valid/clock.json`, clock frozen with `ESPHELM_TEST_CLOCK=frozen`): "--" before a time arrives; `navigation.datetime` 09:05 UTC in July shown as 11:05 in Stockholm summer time, 12-hour with seconds, UTC with a dmy date, and a weekday date; night; the screen saver with the time and date after a 10 s timeout, and a touch waking it; a 2015 GPS date is ignored; offline at 720 ("--")
+  21h. **mounting rotation** (ADR-0028, `fixtures/valid/rotation.json`): at 480 online, a layout with `settings.rotation: 90` turns the display and the plugin's device list shows the new `hello` (rotation 90); after a restart the cached layout turns it before its page is built; a layout without it turns it back. The 1280×800 build offline: a square layout stretched to it, the panel, then the rotation layout turns it to 800×1280 (portrait page and panel)
   Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
 ## Hardware check (P4-86)
@@ -370,3 +375,7 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - **Mistyped password:** at the bottom of the panel's *Network* tab, *Factory reset* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
     - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
     - Check that the QR code scans from about 30 cm by day and at night.
+26. **Rotation (ADR-0028).** In the editor, *Display settings → Mounted → Turned 90° clockwise*, then *Save & send*:
+    - The display's picture turns clockwise and touch follows it (the buttons react where you press).
+    - The editor showed the turned screen as soon as you picked it, and its size stays so after the display's next hello.
+    - Power-cycle: the display starts turned, before the page appears. Set *As built (0°)* and *Save & send* to go back.

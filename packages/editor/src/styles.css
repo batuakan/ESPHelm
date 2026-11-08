@@ -285,10 +285,19 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* The display frame keeps the selected display's shape: --ratio is its width over height (after
+     its rotation, ADR-0028), set by App. It fits the window's height, and a landscape screen may
+     grow past 560px. */
+  --ratio: 1;
+  --frame-cap: 560px;
+  --frame-height: calc(100vh - 300px);
+  --frame: min(100%, calc(var(--frame-cap) * max(1, var(--ratio))), calc(var(--frame-height) * var(--ratio)));
+  /* The bars above and below follow the frame, but don't get narrower than 560px. */
+  --column: min(100%, max(560px, var(--frame)));
 }
 /* What applies to the whole layout, above the page tabs. */
 .layout-bar-wrap {
-  width: min(100%, 560px);
+  width: var(--column);
   margin-bottom: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
@@ -383,7 +392,7 @@ select {
   border-color: var(--accent);
 }
 .display-frame {
-  width: min(100%, 560px, calc((100vh - 300px)));
+  width: var(--frame);
   background: var(--canvas-bg);
   border-radius: 18px;
   padding: 8px;
@@ -601,7 +610,7 @@ select {
   background: color-mix(in srgb, var(--danger) 18%, transparent);
 }
 .problems {
-  width: min(100%, 560px);
+  width: var(--column);
   margin-top: 12px;
   font-size: 14px;
 }
@@ -694,7 +703,7 @@ select {
 
 /* Page tabs and tools */
 .page-tabs {
-  width: min(100%, 560px);
+  width: var(--column);
   margin-bottom: 10px;
 }
 /* Holds a bar and its drop-down menus, which open just below it. */
@@ -1259,8 +1268,9 @@ select.zone-emergency {
   .workspace {
     padding: 10px;
   }
-  .display-frame {
-    width: min(100%, calc(100vh - 320px));
+  .workspace {
+    --frame-height: calc(100vh - 320px);
+    --frame-cap: 100%;
   }
   .drawer {
     position: fixed;

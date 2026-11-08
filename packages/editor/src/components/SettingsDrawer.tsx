@@ -8,6 +8,7 @@ import {
   type Settings,
 } from '@esphelm/schema';
 import type { PathInfo } from '../api';
+import { ROTATIONS, type Rotation } from '../rotation';
 import { browserTimeZone, timeZoneSetting } from '../layoutOps';
 import { Drawer, PathPicker } from './TileDrawer';
 
@@ -53,6 +54,8 @@ export function SettingsDrawer(props: {
   layout: Layout;
   /** The display can dim its backlight (hello.capabilities.backlight). */
   backlight: boolean;
+  /** The display can turn its picture (hello.capabilities.rotation). */
+  canRotate: boolean;
   paths: PathInfo[];
   values: Map<string, unknown>;
   onChange(patch: SettingsPatch): void;
@@ -79,6 +82,30 @@ export function SettingsDrawer(props: {
   return (
     <Drawer title="Display settings" label="Display settings" onClose={props.onClose}>
       <p className="hint">Sent to the display with Save & send. They apply offline too.</p>
+
+      <label className="field">
+        <span>Mounted</span>
+        <select
+          value={s.rotation ?? SETTINGS_DEFAULTS.rotation}
+          disabled={!props.canRotate && (s.rotation ?? 0) === 0}
+          onChange={(e) => {
+            const degrees = Number(e.target.value) as Rotation;
+            props.onChange({ rotation: degrees === 0 ? undefined : degrees });
+          }}
+          aria-label="Rotation"
+        >
+          {ROTATIONS.map((r) => (
+            <option key={r} value={r}>
+              {r === 0 ? 'As built (0°)' : `Turned ${r}° clockwise`}
+            </option>
+          ))}
+        </select>
+        <small className={props.canRotate ? 'hint' : 'warn'}>
+          {props.canRotate
+            ? 'How the display is mounted: its picture is turned, and the pages are laid out for the turned screen.'
+            : "This display can't turn its picture."}
+        </small>
+      </label>
 
       <fieldset className="settings-group">
         <legend>Brightness</legend>

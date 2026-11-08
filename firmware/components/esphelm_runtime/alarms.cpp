@@ -216,11 +216,15 @@ void AlarmBanner::build_() {
 }
 
 void AlarmBanner::tick(esphelm::Theme theme, bool online, bool can_ack) {
-  if (theme != this->drawn_theme_ || online != this->drawn_online_ || can_ack != this->drawn_can_ack_)
+  // The screen's width changes when a layout turns the display (ADR-0028): the text is cut anew.
+  const int32_t width = lv_display_get_horizontal_resolution(lv_display_get_default());
+  if (theme != this->drawn_theme_ || online != this->drawn_online_ || can_ack != this->drawn_can_ack_ ||
+      width != this->drawn_width_)
     this->dirty_ = true;
   if (!this->dirty_)
     return;
   this->dirty_ = false;
+  this->drawn_width_ = width;
   this->drawn_theme_ = theme;
   this->drawn_online_ = online;
   this->drawn_can_ack_ = can_ack;

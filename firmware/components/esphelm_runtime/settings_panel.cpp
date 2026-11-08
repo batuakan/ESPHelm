@@ -252,6 +252,11 @@ void SettingsPanel::build_() {
   const int32_t line_big = lv_font_get_line_height(big);
   const int32_t line_small = lv_font_get_line_height(this->fonts_.small);
   const int32_t btn_h = std::max<int32_t>(48, line_big + 16);
+  // Only the shown tab's objects exist: forget those of the tab built before (deleted with root_),
+  // or a brightness change while another tab shows would touch the deleted slider.
+  this->brightness_value_ = this->slider_ = nullptr;
+  for (lv_obj_t *&b : this->choices_)
+    b = nullptr;
 
   // The whole screen below the banner; clickable, so taps beside the controls do nothing.
   this->root_ = lv_obj_create(lv_layer_top());

@@ -67,6 +67,12 @@ export const Settings = Type.Object(
         },
       ),
     ),
+    rotation: Type.Optional(
+      Type.Union([Type.Literal(0), Type.Literal(90), Type.Literal(180), Type.Literal(270)], {
+        description:
+          'How the display is mounted: the picture is turned this many degrees clockwise (ADR-0028). The layout is designed for the turned screen. Displays that cannot turn ignore it. Absent: 0.',
+      }),
+    ),
     screenSaverBrightness: Type.Optional(
       Type.Integer({
         minimum: 1,
@@ -90,6 +96,7 @@ export const SETTINGS_DEFAULTS = {
   clockPath: 'navigation.datetime',
   screenSaver: 'off',
   screenSaverBrightness: 30,
+  rotation: 0,
   /** Shortest timeout a display applies (a smaller value would make it hard to use). */
   minScreenTimeout: 10,
 } as const;
