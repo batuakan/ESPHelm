@@ -253,12 +253,26 @@ class WindRoseWidget : public Widget {
     const int32_t room_w = inner * 3 / 2;
     const int32_t small_h = text_h;
     const int32_t head_h = full_ ? small_h + 4 : 0;
-    const lv_font_t *fonts[] = {fonts_.value, fonts_.label, fonts_.small};
+    // Candidate fonts, largest first: every full font of the ladder (ADR-0017) up to the value
+    // font, so a slightly smaller rose (e.g. under the alarm banner) steps down one size, not
+    // straight to the label font. Digits-only fonts are left out: a slot can show text.
+    const lv_font_t *fonts[Fonts::MAX_LADDER + 3];
+    size_t font_count = 0;
+    const int32_t value_h = lv_font_get_line_height(fonts_.value);
+    for (int i = static_cast<int>(fonts_.count) - 1; i >= 0; i--) {
+      if (!fonts_.digits[i] && lv_font_get_line_height(fonts_.ladder[i]) <= value_h)
+        fonts[font_count++] = fonts_.ladder[i];
+    }
+    if (font_count == 0) {
+      for (const lv_font_t *f : {fonts_.value, fonts_.label, fonts_.small})
+        fonts[font_count++] = f;
+    }
     const lv_font_t *font = fonts_.small;
     size_t fit = 0;
     // Values are digits only, so their lines are tightened by a quarter (negative margins).
     const auto tight = [](int32_t fh) { return fh * 3 / 4; };
-    for (const lv_font_t *f : fonts) {
+    for (size_t k = 0; k < font_count; k++) {
+      const lv_font_t *f = fonts[k];
       const int32_t fh = lv_font_get_line_height(f);
       const size_t n = static_cast<size_t>(std::max<int32_t>(0, room_h - head_h) / (tight(fh) + small_h));
       // "13.6" is about 2.4 line heights wide in these fonts.

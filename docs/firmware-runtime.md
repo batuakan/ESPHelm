@@ -139,7 +139,7 @@ Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `
 | `autopilot` | labels and `lv_button`s | state (AUTO / WIND / TRACK / STANDBY), "TGT x°" and "HDG x°"; course buttons −10/−1/+1/+10, the configured mode buttons and STANDBY (on its own wide row when it wouldn't fit a quarter of the width). Rules below |
 
 **Wind rose size tiers** (`esphelm_sizes.h`, generated from `WIND_ROSE_FIT` in `packages/schema`, ADR-0010). The rose measures the shorter side of its cell after layout:
-- **full** (≥ 260 px): every tick, all 16 compass points, heading, slots. Slot values use the biggest font (value → label → small) at which all of them fit inside the card.
+- **full** (≥ 260 px): every tick, all 16 compass points, heading, slots. Slot values use the biggest font at which all of them fit inside the card: the value font, else the next full font of the ladder (ADR-0017), down to the small font. So a slightly smaller rose, e.g. while the alarm banner pushes the page down, steps down one size instead of straight to the label font.
 - **compact** (≥ 150 px): ticks every 30°, only N/E/S/W on the card, no heading; as many slots as fit.
 - **pointers** (< 150 px): ring, sectors and markers only.
 
