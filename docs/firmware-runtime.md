@@ -286,6 +286,14 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   21i. **wind rose performance** (ADR-0029, `fixtures/valid/rose-performance.json`): at 480 with live values, upwind on starboard tack with the laylines at the fixed beat angle and the waypoint W; SignalK's beat angle moves them and the target bar appears; downwind on port at SignalK's gybe angle; the true wind gone stale: the laylines and the bar go, A and W stay
   Seventy-two screenshots are compared with `firmware/test/golden/*.png` (`UPDATE_GOLDEN=1` re-records them; review them by eye before committing). It needs an X display, the ESPHome CLI (`ESPHOME`), and Python with Pillow (`PYTHON`).
 
+## Releases (ADR-0031)
+`.github/workflows/release.yml` builds the P4-86, Guition 4848S040 and CYD firmware on a pushed tag and creates a **draft** GitHub release with each board's `.factory.bin` (esptool, at 0x0) and `.ota.bin` (the captive portal's upload), plus `SHA256SUMS`.
+
+1. Bump `FIRMWARE_VERSION` in `esphelm_runtime.h` in a PR and merge it.
+2. Tag the merge commit and push the tag: `git tag v0.5.0 && git push origin v0.5.0`. A tag that doesn't match `FIRMWARE_VERSION` fails before building; `v0.5.0-rc.1` makes a draft prerelease.
+3. The run pins ESPHomeSignalK's `main` to one commit for every board (`-s signalk_ref <sha>`; the board files default to `main`) and names it in the notes. The P4 gets esp-hosted-firmware v2.9.3, checked against the sha256 in `hardware/waveshare-esp32-p4-86.yaml`. When that pin changes, change `ESP_HOSTED_VERSION` in the workflow with it.
+4. Flash the draft's files on hardware, then publish the release.
+
 ## Hardware check (P4-86)
 All steps below were checked on the P4-86 (2026-11-05). Keep them for new boards and for changes that touch them.
 

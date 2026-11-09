@@ -1,0 +1,158 @@
+name: Release firmware
+
+# Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N, a prerelease) builds the firmware of every supported board
+# and creates a draft GitHub release with the binaries (ADR-0031). The tag must match the
+# firmware's FIRMWARE_VERSION. Review the draft, check it on hardware, then publish it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  ESPHOME_VERSION: '2026.9.1'
+  # The P4's Wi-Fi co-processor firmware; its sha256 is pinned in hardware/waveshare-esp32-p4-86.yaml.
+  ESP_HOSTED_VERSION: 'v2.9.3'
+  SIGNALK_REPO: 'https://github.com/batuakan/ESPHomeSignalK'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      signalk_sha: ${{ steps.signalk.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag against FIRMWARE_VERSION
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          base="${version%%-*}"
+          fw=$(sed -n 's/.*FIRMWARE_VERSION = "\([^"]*\)".*/\1/p' firmware/components/esphelm_runtime/esphelm_runtime.h)
+          if [ -z "$fw" ]; then
+            echo "::error::FIRMWARE_VERSION not found in esphelm_runtime.h"; exit 1
+          fi
+          if [ "$base" != "$fw" ]; then
+            echo "::error::Tag $TAG does not match FIRMWARE_VERSION $fw. Bump it in esphelm_runtime.h first, or tag v$fw."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$version" != "$base" ]; then echo "prerelease=true"; else echo "prerelease=false"; fi >> "$GITHUB_OUTPUT"
+      - name: Pin ESPHomeSignalK
+        id: signalk
+        run: |
+          sha=$(git ls-remote "$SIGNALK_REPO" refs/heads/main | cut -f1)
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not resolve ESPHomeSignalK main"; exit 1
+          fi
+          echo "ESPHomeSignalK $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: p4
+            yaml: esphelm_p4.yaml
+            node: esphelm-p4
+          - board: guition
+            yaml: esphelm_guition_4848s040.yaml
+            node: esphelm-guition
+          - board: cyd
+            yaml: esphelm_cyd.yaml
+            node: esphelm-cyd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ESPHome
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install "esphome==$ESPHOME_VERSION"
+      # Only the toolchains are cached; the build itself (firmware/.esphome) always starts clean.
+      - name: Cache the toolchains
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/esphome
+          key: toolchains-${{ matrix.board }}-esphome-${{ env.ESPHOME_VERSION }}
+      - name: Fetch the P4's Wi-Fi co-processor firmware
+        if: matrix.board == 'p4'
+        run: |
+          curl -fsSL -o firmware/network_adapter_esp32c6.bin \
+            "https://github.com/esphome/esp-hosted-firmware/releases/download/$ESP_HOSTED_VERSION/network_adapter_esp32c6.bin"
+          pin=$(sed -n 's/^ *sha256: *\([0-9a-f]\{64\}\).*/\1/p' firmware/hardware/waveshare-esp32-p4-86.yaml)
+          echo "$pin  firmware/network_adapter_esp32c6.bin" | sha256sum -c -
+      - name: Build
+        run: |
+          "$RUNNER_TEMP/venv/bin/esphome" -s signalk_ref "${{ needs.prepare.outputs.signalk_sha }}" \
+            compile "firmware/${{ matrix.yaml }}"
+      - name: Collect the binaries
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          out="firmware/.esphome/build/${{ matrix.node }}/build"
+          mkdir -p dist
+          cp "$out/firmware.factory.bin" "dist/esphelm-${{ matrix.board }}-$VERSION.factory.bin"
+          cp "$out/firmware.ota.bin" "dist/esphelm-${{ matrix.board }}-$VERSION.ota.bin"
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: dist
+          merge-multiple: true
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+          SIGNALK_SHA: ${{ needs.prepare.outputs.signalk_sha }}
+        run: |
+          cd dist
+          sha256sum *.bin > SHA256SUMS
+          cat SHA256SUMS
+          cat > ../notes.md <<EOF
+          Firmware for the ESPHelm displays. Pick your board's files:
+
+          | Board | Screen | First install (USB) | Update | Hardware |
+          |---|---|---|---|---|
+          | Waveshare ESP32-P4-86 | 720×720, PSRAM | \`esphelm-p4-$VERSION.factory.bin\` | \`esphelm-p4-$VERSION.ota.bin\` | tested |
+          | Guition ESP32-S3-4848S040 | 480×480, PSRAM | \`esphelm-guition-$VERSION.factory.bin\` | \`esphelm-guition-$VERSION.ota.bin\` | not yet tested |
+          | ESP32-2432S028R (cheap yellow display) | 320×240, no PSRAM, no charts | \`esphelm-cyd-$VERSION.factory.bin\` | \`esphelm-cyd-$VERSION.ota.bin\` | not yet tested |
+
+          **First install:** connect the display over USB and write the factory image at 0x0:
+
+              esptool.py write_flash 0x0 esphelm-<board>-$VERSION.factory.bin
+
+          **Updating:** write the factory image again over USB, or upload the \`.ota.bin\` on the display's setup network page (the captive portal) while that network is open: on a display without a saved Wi-Fi, or after a power-up that finds no Wi-Fi.
+
+          Then set the display up as in the README: [Setting up a display](https://github.com/${{ github.repository }}/blob/$TAG/README.md#-setting-up-a-display). Check the files against \`SHA256SUMS\`.
+
+          Built with ESPHome $ESPHOME_VERSION, ESPHomeSignalK [\`${SIGNALK_SHA:0:7}\`]($SIGNALK_REPO/tree/$SIGNALK_SHA) and, for the P4, esp-hosted-firmware $ESP_HOSTED_VERSION.
+          EOF
+          flags=(--draft --title "ESPHelm $TAG" --notes-file ../notes.md --verify-tag)
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" -R "${{ github.repository }}" "${flags[@]}" *.bin SHA256SUMS

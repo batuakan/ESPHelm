@@ -2,6 +2,8 @@
 #   ~/venv/bin/esphome run firmware/esphelm_p4.yaml
 # Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
 substitutions:
+  # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
+  signalk_ref: main
   screen_width: "720"
   screen_height: "720"
   font_digits_huge_size: "288"
@@ -28,7 +30,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/batuakan/ESPHomeSignalK
-      ref: main
+      ref: ${signalk_ref}
       path: components
     components: [signalk]
   - source:

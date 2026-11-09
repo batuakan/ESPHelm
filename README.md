@@ -138,7 +138,9 @@ npm run build
 
 **Plugin and editor:** symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. (An npm / App Store package comes later.)
 
-**Firmware:** nothing to configure. The [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware](https://github.com/esphome/esp-hosted-firmware) (it is not in this repository). Then:
+**Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040 or the cheap yellow display) and write it over USB with `esptool.py write_flash 0x0 <file>`.
+
+Or build it yourself: the [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware v2.9.3](https://github.com/esphome/esp-hosted-firmware/releases/tag/v2.9.3) (the release matching its pinned checksum; it is not in this repository). Then:
 
 ```bash
 esphome run firmware/esphelm_p4.yaml                # Waveshare ESP32-P4-86
