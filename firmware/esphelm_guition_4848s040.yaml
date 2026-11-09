@@ -2,6 +2,10 @@
 #   ~/venv/bin/esphome run firmware/esphelm_guition_4848s040.yaml
 # Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
 # The 480 font sizes of fonts.yaml, as the SDL build (and its goldens) use.
+substitutions:
+  # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
+  signalk_ref: main
+
 packages:
   hardware: !include hardware/guition-esp32-s3-4848s040.yaml
   wifi: !include wifi.yaml
@@ -17,7 +21,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/batuakan/ESPHomeSignalK
-      ref: main
+      ref: ${signalk_ref}
       path: components
     components: [signalk]
   - source:

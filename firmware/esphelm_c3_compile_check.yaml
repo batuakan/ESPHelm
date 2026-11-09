@@ -3,6 +3,8 @@
 # and how much static RAM it leaves on the smallest target (CLAUDE.md §6).
 #   ~/venv/bin/esphome compile firmware/esphelm_c3_compile_check.yaml
 substitutions:
+  # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
+  signalk_ref: main
   font_digits_huge_size: "112"
   font_digits_large_size: "80"
   font_huge_size: "56"
@@ -32,7 +34,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/batuakan/ESPHomeSignalK
-      ref: main
+      ref: ${signalk_ref}
       path: components
     components: [signalk]
   - source:
