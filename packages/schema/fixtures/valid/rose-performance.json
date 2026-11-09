@@ -43,6 +43,12 @@
               "unit": "kn",
               "decimals": 1,
               "label": "VMG"
+            },
+            "center3": {
+              "path": "environment.depth.belowTransducer",
+              "unit": "m",
+              "decimals": 1,
+              "label": "Depth"
             }
           }
         }

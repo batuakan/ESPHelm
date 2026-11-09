@@ -248,3 +248,8 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Build sizes:** P4 flash 3,447,548 B (20.9 %), static RAM 99,682 B; Guition flash 1,803,835 B; C3 flash 1,610,780 B (87.8 %; no chart).
 - **Not checked on hardware yet** (hardware step 28): drawing up to 16 tiles per refresh instead of one picture is the thing to watch on the P4.
 
+## Wind rose values under the alarm banner (branch `fix/rose-font-under-banner`)
+- **Found on the P4:** with an alarm banner showing, the rose's three centre values shrank from the value font (96 px) to the label font (42 px), and grew back when the alarm cleared. The banner pushes the page down (by design), the rose gets a little smaller, three values no longer fit at 96 px by a few pixels, and the rose's ladder had only value → label → small.
+- **Fix:** the rose picks from every full font of the ladder (ADR-0017) up to the value font, so it steps down one size (64 px on the P4). Digits-only fonts are left out, since a slot can show text.
+- **Tests:** `fixtures/valid/rose-performance.json` gets a third centre value; a new golden (`76-rose-under-banner`) of it under a depth alarm. Goldens 70–73 re-recorded for the third value, and four goldens where a rose used the label font before now use the next size up (`06-multi-wind`, `39-history-rose-page`, `720-02-small-roses`, `wide-01-landscape`), reviewed by eye.
+

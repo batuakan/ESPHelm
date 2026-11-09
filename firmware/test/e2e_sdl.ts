@@ -1428,6 +1428,27 @@ async function main(): Promise<void> {
     await sleep(17000);
     clearInterval(roseTimer);
     await fw.screenshot('73-rose-laylines-stale', shots);
+    // Under the alarm banner the rose is a little smaller: its three values step down one font
+    // size (the ladder, ADR-0017), not straight to the label font.
+    const depthAlarm = /ALARM notifications\.environment\.depth\.belowTransducer/;
+    const depthCleared = /belowTransducer cleared/;
+    const alarmsBefore = fw.count(depthAlarm);
+    const clearsBefore = fw.count(depthCleared);
+    publish({ ...roseWind(20, 65, 38), 'environment.depth.belowTransducer': 4.2 });
+    publish({
+      'notifications.environment.depth.belowTransducer': {
+        state: 'alarm',
+        method: ['visual'],
+        message: 'Shallow water',
+      },
+    });
+    await fw.waitLog(depthAlarm, 15000, alarmsBefore + 1);
+    await sleep(1500);
+    await fw.screenshot('76-rose-under-banner', shots);
+    publish({
+      'notifications.environment.depth.belowTransducer': { state: 'normal', message: 'Depth ok' },
+    });
+    await fw.waitLog(depthCleared, 15000, clearsBefore + 1);
 
     // 9l. Mounting rotation (ADR-0028): a layout designed for a display mounted sideways
     //     (settings.rotation 90) turns it before its page is built, and the display says hello
