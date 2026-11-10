@@ -72,6 +72,12 @@ export const Hello = Type.Object(
               'The firmware can turn the picture (settings.rotation, ADR-0028); width and height are as turned.',
           }),
         ),
+        sound: Type.Optional(
+          Type.Boolean({
+            description:
+              'The display has a speaker: touch clicks and alarm tones (settings.sound, ADR-0033).',
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

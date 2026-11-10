@@ -317,6 +317,8 @@ Display settings travel with the layout (one layout per display), so they're val
 | `screenSaver` | `off` | what the screen shows after `screenTimeout` instead of turning off: `time`, `date` or `both`, faintly, on black (ADR-0024). Written like the layout's first clock tile (else 24-hour, weekday date). Until the display knows the time it goes dark as with `off`. |
 | `screenSaverBrightness` | 30 | backlight in %, 1–100, while the screen saver shows. Some panels (the P4-86) are dark below about 30 %. |
 | `rotation` | 0 | how the display is mounted: 0, 90, 180 or 270 degrees clockwise (ADR-0028). The display turns its picture and touch before it builds the page, and the layout is designed for the turned screen. Displays that can't turn (`capabilities.rotation` false or absent) ignore it. |
+| `sound.volume` | 60 | speaker volume in %, 10–100, for touch clicks and alarm tones (ADR-0033). At least 10 %, so alarms stay audible. |
+| `sound.touch` | true | a click when a button or tile is touched. Alarms sound when their notification's `method` contains `"sound"`, whatever this says. Displays without a speaker (`capabilities.sound` false or absent) ignore `sound`. |
 | `timeZone` | UTC | `{ name, posix }`: the IANA zone (`name`, `^[A-Za-z0-9_+/-]{1,64}$`) and its POSIX TZ rule (`posix`, `POSIX_TZ_PATTERN`, `INVALID_FORMAT` otherwise), see below |
 | `clockPath` | `navigation.datetime` | where the display's clock comes from: an ISO 8601 date-time with a zone (a GPS gives it) |
 
@@ -424,7 +426,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `fontLineHeights?` | line heights (px) of the fonts tile text can use, smallest first; the editor sizes its preview text from them (ADR-0017). Integers ≥ 1 |
 | `digitFontLineHeights?` | the same for the digits-only fonts (glyphs `0123456789.-`), which only a value tile's number uses, while its text is numeric |
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
-| `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight), `rotation?` (the firmware can turn the picture for `settings.rotation`; `display.width`/`height` are then as turned, and `display.rotation` says by how much) |
+| `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight), `rotation?` (the firmware can turn the picture for `settings.rotation`; `display.width`/`height` are then as turned, and `display.rotation` says by how much), `sound?` (the display has a speaker: touch clicks and alarm tones, `settings.sound`) |
 | `layoutEtag?` | ETag of the cached layout |
 | `recovery?` | `skippedLayoutEtag`: a layout that crashed the display; refused until a changed one is sent (ADR-0013) |
 

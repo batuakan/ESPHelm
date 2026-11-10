@@ -218,6 +218,15 @@ const mutations: { name: string; doc: unknown }[] = [
       settings: { clockPath: 'a..b', screenSaver: true, screenSaverBrightness: 0 },
     },
   },
+  { name: 'sound not an object', doc: { ...minimal, settings: { sound: 60 } } },
+  {
+    name: 'sound volume under 10 % and touch not a boolean',
+    doc: { ...minimal, settings: { sound: { volume: 9, touch: 'yes' } } },
+  },
+  {
+    name: 'sound volume fractional',
+    doc: { ...minimal, settings: { sound: { volume: 50.5, touch: true } } },
+  },
   { name: 'fractional integer', doc: withTile({ x: 0.5 }) },
   { name: 'null optional field', doc: withTile({ label: null }) },
   { name: 'number as label', doc: withTile({ label: 42 }) },

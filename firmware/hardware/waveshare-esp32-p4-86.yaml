@@ -30,9 +30,15 @@ esp32:
     # log_level: INFO
     advanced:
       enable_idf_experimental_features: yes
-    # sdkconfig_options:
-    #   CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
-    #   CONFIG_SPIRAM_RODATA: y
+    sdkconfig_options:
+      # esp_hosted starts its Wi-Fi tasks in a static constructor, before the main task exists. On
+      # P4 rev < 3 only ~138 KB of internal heap is free that early, and their ~20 KB of stacks
+      # left the main task's stack a few KB short: it fell into the 8 KB SPM and the first flash
+      # read asserted (esp_task_stack_is_sane_cache_disabled), a boot loop. Their stacks go to
+      # PSRAM instead; they never touch flash. See docs/phase6-notes.md (sound).
+      CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM: y
+      # CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      # CONFIG_SPIRAM_RODATA: y
 
 logger:
   level: DEBUG
@@ -86,6 +92,43 @@ i2c:
   scan: true
   frequency: 400kHz
   id: i2c_bus
+
+# Audio (ADR-0033): ES8311 codec on the I2C bus, an NS4150B amplifier enabled by GPIO53 and an
+# MX1.25 connector for an 8 Ω 2 W speaker. Pins from Waveshare's wiki and the BSP (BSP_POWER_AMP_IO).
+# The microphone (ES7210) is not used.
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_mclk_pin: GPIO13
+    i2s_lrclk_pin: GPIO10
+    i2s_bclk_pin: GPIO12
+
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: i2c_bus
+    address: 0x18
+
+speaker:
+  - platform: i2s_audio
+    id: board_speaker
+    i2s_audio_id: i2s_audio_bus
+    i2s_dout_pin: GPIO9
+    dac_type: external
+    audio_dac: es8311_dac
+    channel: mono
+    bits_per_sample: 16bit
+    sample_rate: 48000
+    buffer_duration: 100ms
+
+switch:
+  - platform: gpio
+    id: speaker_amplifier
+    pin: GPIO53
+    restore_mode: ALWAYS_ON
+
+rtttl:
+  id: board_rtttl
+  speaker: board_speaker
 
 
 touchscreen:

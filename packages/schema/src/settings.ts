@@ -81,6 +81,28 @@ export const Settings = Type.Object(
           'Backlight in % while the screen saver shows. Some panels are dark below about 30 %.',
       }),
     ),
+    sound: Type.Optional(
+      Type.Object(
+        {
+          volume: Type.Optional(
+            Type.Integer({
+              minimum: 10,
+              maximum: 100,
+              description:
+                'Speaker volume in %, for touch clicks and alarm tones. At least 10 %, so alarms stay audible.',
+            }),
+          ),
+          touch: Type.Optional(
+            Type.Boolean({ description: 'A click when a button or tile is touched.' }),
+          ),
+        },
+        {
+          additionalProperties: false,
+          description:
+            'Sound on displays with a speaker (ADR-0033). Alarms sound when their notification asks for it (method "sound").',
+        },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -97,6 +119,8 @@ export const SETTINGS_DEFAULTS = {
   screenSaver: 'off',
   screenSaverBrightness: 30,
   rotation: 0,
+  soundVolume: 60,
+  soundTouch: true,
   /** Shortest timeout a display applies (a smaller value would make it hard to use). */
   minScreenTimeout: 10,
 } as const;

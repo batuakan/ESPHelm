@@ -780,7 +780,7 @@ async function main(): Promise<void> {
     fw.start();
     check(
       'panel: the choices come back after a restart',
-      (await fw.waitLog(/Display choices: v=1;th=1;bd=-1;bn=15;/)) &&
+      (await fw.waitLog(/Display choices: v=2;th=1;bd=-1;bn=15;vo=-1;to=-1;/)) &&
         (await fw.waitLog(/Showing cached layout "settings"/)) &&
         (await fw.waitLog(/Brightness 15 % \(no backlight configured\)/)),
     );

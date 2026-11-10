@@ -869,6 +869,17 @@ void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
     settings.screen_saver = SAVER_SHOWS[saver];
   if (int_field(chk, obj, sp, "screenSaverBrightness", false, 1, 100, n))
     settings.screen_saver_brightness = static_cast<uint8_t>(n);
+  if (has(obj, "sound")) {
+    const std::string sop = sp + "/sound";
+    if (!obj["sound"].is<JsonObjectConst>()) {
+      chk.add(sop, "INVALID_TYPE");
+    } else {
+      JsonObjectConst so = obj["sound"].as<JsonObjectConst>();
+      if (int_field(chk, so, sop, "volume", false, 10, 100, n))
+        settings.sound_volume = static_cast<uint8_t>(n);
+      bool_field(chk, so, sop, "touch", settings.sound_touch);
+    }
+  }
   if (has(obj, "rotation")) {
     // A union of number literals: reported like enum_field (the per-branch type failure, anyOf).
     const std::string rp = sp + "/rotation";

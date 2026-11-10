@@ -726,6 +726,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           layout={layout}
           backlight={device?.hello.capabilities.backlight === true}
           canRotate={device?.hello.capabilities.rotation === true}
+          sound={device?.hello.capabilities.sound === true}
           paths={paths}
           values={shownValues}
           onChange={(patch) => edit(updateSettings(layout, patch))}

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ValueZone } from '../src/index.js';
+import type { AlarmSoundAction, AlarmSoundInput, ValueZone } from '../src/index.js';
 import { PACKAGE_ROOT } from '../scripts/render.js';
 
 export interface ExpectedError {
@@ -174,3 +174,12 @@ export interface ClockCases {
 export const CLOCK_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'clock.cases.json'), 'utf8'),
 ) as ClockCases;
+
+/** Alarm tone cases (ADR-0033), shared by the TS and C++ tests. */
+export interface SoundCases {
+  cases: { name: string; input: AlarmSoundInput; expected: AlarmSoundAction }[];
+}
+
+export const SOUND_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'sound.cases.json'), 'utf8'),
+) as SoundCases;

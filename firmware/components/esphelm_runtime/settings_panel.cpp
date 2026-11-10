@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "esphome/core/log.h"
+#include "display_prefs.h"
 #include "esphelm_wifi_setup.h"
 
 namespace esphome {
@@ -80,6 +81,7 @@ void SettingsPanel::close() {
     return;
   lv_obj_delete(this->root_);
   this->root_ = this->brightness_value_ = this->slider_ = nullptr;
+  this->volume_value_ = this->volume_slider_ = nullptr;
   for (lv_obj_t *&b : this->choices_)
     b = nullptr;
   for (lv_obj_t *&b : this->tabs_)
@@ -132,6 +134,15 @@ void SettingsPanel::tap(const std::string &part) {
   } else if (part == "sleep") {
     if (this->state_.can_sleep)
       this->sleep_wanted_ = true;
+  } else if (part.compare(0, 7, "volume=") == 0) {
+    const int v = std::atoi(part.c_str() + 7);
+    if (this->state_.sound && v >= esphelm::PREFS_MIN_VOLUME && v <= 100) {
+      this->pending_volume_ = v;
+      this->volume_done_ = true;
+    }
+  } else if (part == "touch-sounds") {
+    if (this->state_.sound)
+      this->pending_touch_ = this->state_.touch_sounds ? 0 : 1;
   } else if (part.compare(0, 11, "brightness=") == 0) {
     const int v = std::atoi(part.c_str() + 11);
     if (v >= this->state_.min_brightness && v <= 100) {
@@ -172,6 +183,24 @@ bool SettingsPanel::take_brightness(int &percent, bool &done) {
   return true;
 }
 
+bool SettingsPanel::take_volume(int &percent, bool &done) {
+  if (this->pending_volume_ < 0)
+    return false;
+  percent = this->pending_volume_;
+  done = this->volume_done_;
+  this->pending_volume_ = -1;
+  this->volume_done_ = false;
+  return true;
+}
+
+bool SettingsPanel::take_touch_sounds(bool &on) {
+  if (this->pending_touch_ < 0)
+    return false;
+  on = this->pending_touch_ == 1;
+  this->pending_touch_ = -1;
+  return true;
+}
+
 bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
   if (this->root_ == nullptr)
     return false;
@@ -202,6 +231,7 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
                                                     state.servers != this->state_.servers)));
   rebuild = rebuild || this->network_dirty_ || network_changed || state.theme != this->state_.theme ||
             state.can_sleep != this->state_.can_sleep || state.min_brightness != this->state_.min_brightness ||
+            state.sound != this->state_.sound || state.touch_sounds != this->state_.touch_sounds ||
             top != this->top_;
   this->network_dirty_ = false;
   const State before = this->state_;
@@ -219,6 +249,11 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
     lv_label_set_text_fmt(this->brightness_value_, "%d %%", state.brightness);
     if (!lv_obj_has_state(this->slider_, LV_STATE_PRESSED))
       lv_slider_set_value(this->slider_, state.brightness, LV_ANIM_OFF);
+  }
+  if (this->volume_slider_ != nullptr && state.volume != before.volume) {
+    lv_label_set_text_fmt(this->volume_value_, "%d %%", state.volume);
+    if (!lv_obj_has_state(this->volume_slider_, LV_STATE_PRESSED))
+      lv_slider_set_value(this->volume_slider_, state.volume, LV_ANIM_OFF);
   }
   if (now >= this->next_info_ms_) {
     this->next_info_ms_ = now + INFO_INTERVAL_MS;
@@ -255,6 +290,7 @@ void SettingsPanel::build_() {
   // Only the shown tab's objects exist: forget those of the tab built before (deleted with root_),
   // or a brightness change while another tab shows would touch the deleted slider.
   this->brightness_value_ = this->slider_ = nullptr;
+  this->volume_value_ = this->volume_slider_ = nullptr;
   for (lv_obj_t *&b : this->choices_)
     b = nullptr;
 
@@ -310,29 +346,36 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
   lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(body, 8, LV_PART_MAIN);
 
-  lv_obj_t *row = box(body, w);
-  lv_obj_t *name = label(row, big, c.muted, "Brightness");
+  // A name with its value on the right, and a slider below it.
+  const auto slider_row = [&](const char *title, int min, int value, lv_obj_t *&value_label) {
+    lv_obj_t *row = box(body, w);
+    lv_obj_t *name = label(row, big, c.muted, title);
+    value_label = label(row, big, c.text, "");
+    lv_label_set_text_fmt(value_label, "%d %%", value);
+    lv_obj_align(value_label, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_height(row, line_big);
+    lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_t *track = box(body, w);
+    lv_obj_set_height(track, btn_h);
+    lv_obj_t *slider = lv_slider_create(track);
+    const int32_t knob = btn_h / 2;
+    lv_obj_set_size(slider, w - 2 * knob, btn_h / 4);
+    lv_obj_center(slider);
+    lv_obj_set_ext_click_area(slider, btn_h / 2);
+    lv_slider_set_range(slider, min, 100);
+    lv_slider_set_value(slider, value, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(slider, c.tile, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(slider, c.accent, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(slider, c.text, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(slider, knob / 3, LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(slider, 0, LV_PART_KNOB);
+    return slider;
+  };
+
   // Shown on every board; without a backlight the value is only logged (as ADR-0015's).
-  this->brightness_value_ = label(row, big, c.text, "");
-  lv_label_set_text_fmt(this->brightness_value_, "%d %%", this->state_.brightness);
-  lv_obj_align(this->brightness_value_, LV_ALIGN_RIGHT_MID, 0, 0);
-  lv_obj_set_height(row, line_big);
-  lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
-  lv_obj_t *track = box(body, w);
-  lv_obj_set_height(track, btn_h);
-  this->slider_ = lv_slider_create(track);
-  const int32_t knob = btn_h / 2;
-  lv_obj_set_size(this->slider_, w - 2 * knob, btn_h / 4);
-  lv_obj_center(this->slider_);
-  lv_obj_set_ext_click_area(this->slider_, btn_h / 2);
-  lv_slider_set_range(this->slider_, this->state_.min_brightness, 100);
-  lv_slider_set_value(this->slider_, this->state_.brightness, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(this->slider_, c.tile, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(this->slider_, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(this->slider_, c.accent, LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(this->slider_, c.text, LV_PART_KNOB);
-  lv_obj_set_style_pad_all(this->slider_, knob / 3, LV_PART_KNOB);
-  lv_obj_set_style_shadow_width(this->slider_, 0, LV_PART_KNOB);
+  this->slider_ = slider_row("Brightness", this->state_.min_brightness, this->state_.brightness,
+                             this->brightness_value_);
   // Live while dragged, saved when let go.
   lv_obj_add_event_cb(
       this->slider_,
@@ -361,6 +404,30 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
     on_part(this->choices_[i], this, CHOICE_PARTS[i]);
   }
   this->style_choices_();
+  if (this->state_.sound) {
+    // Sound (ADR-0033): the volume, saved when let go, and touch clicks on or off.
+    lv_obj_t *gap = box(body, w);
+    lv_obj_set_height(gap, 8);
+    this->volume_slider_ = slider_row("Volume", esphelm::PREFS_MIN_VOLUME, this->state_.volume, this->volume_value_);
+    lv_obj_add_event_cb(
+        this->volume_slider_,
+        [](lv_event_t *e) {
+          auto *self = static_cast<SettingsPanel *>(lv_event_get_user_data(e));
+          self->pending_volume_ = lv_slider_get_value(self->volume_slider_);
+        },
+        LV_EVENT_VALUE_CHANGED, this);
+    lv_obj_add_event_cb(
+        this->volume_slider_,
+        [](lv_event_t *e) {
+          auto *self = static_cast<SettingsPanel *>(lv_event_get_user_data(e));
+          self->pending_volume_ = lv_slider_get_value(self->volume_slider_);
+          self->volume_done_ = true;
+        },
+        LV_EVENT_RELEASED, this);
+    lv_obj_t *touch = button(body, c, w, btn_h);
+    lv_obj_center(label(touch, big, c.text, this->state_.touch_sounds ? "Touch sounds: on" : "Touch sounds: off"));
+    on_part(touch, this, "touch-sounds");
+  }
   if (this->state_.can_sleep) {
     lv_obj_t *sleep = button(body, c, w, btn_h);
     lv_obj_set_style_margin_top(sleep, 16, LV_PART_MAIN);

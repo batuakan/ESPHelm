@@ -66,3 +66,7 @@ esphelm_runtime:
   board: waveshare-esp32-p4-86
   backlight: display_backlight
   touch: true
+  # Alarm tones and touch clicks (ADR-0033) on the board's speaker (hardware package).
+  sound:
+    rtttl: board_rtttl
+    speaker: board_speaker

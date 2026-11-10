@@ -28,6 +28,35 @@ CONF_MAX_LAYOUT_BYTES = "max_layout_bytes"
 CONF_STORE_DIR = "store_dir"
 CONF_BACKLIGHT = "backlight"
 CONF_TIME_ID = "time_id"
+CONF_SOUND = "sound"
+CONF_RTTTL = "rtttl"
+CONF_SPEAKER = "speaker"
+CONF_CLICK = "click"
+
+def _rtttl(value):
+    """An RTTTL tune as ESPHome's rtttl plays it: name:d=..,o=..,b=..:notes (d 1-32, o 4-7)."""
+    value = cv.string_strict(value)
+    parts = value.split(":")
+    if len(parts) != 3 or not parts[2].strip():
+        raise cv.Invalid("an RTTTL tune is 'name:d=8,o=6,b=180:notes'")
+    for setting in parts[1].split(","):
+        key, _, num = setting.strip().partition("=")
+        if key == "d" and num not in ("1", "2", "4", "8", "16", "32"):
+            raise cv.Invalid("RTTTL d= must be 1, 2, 4, 8, 16 or 32")
+        if key == "o" and num not in ("4", "5", "6", "7"):
+            raise cv.Invalid("RTTTL o= must be 4 to 7")
+    return value
+
+
+# Default tunes (RTTTL), replaceable in the YAML (ADR-0033). The click is one very short high note;
+# the alarm levels rise in urgency, and the tune of `alarm` and `emergency` repeats until acknowledged.
+SOUND_TUNES = {
+    CONF_CLICK: "click:d=32,o=7,b=250:c",
+    "alert": "alert:d=8,o=6,b=180:e",
+    "warn": "warn:d=8,o=6,b=180:a,p,a",
+    "alarm": "alarm:d=8,o=6,b=200:c7,p,c7,p,c7",
+    "emergency": "emergency:d=16,o=6,b=220:c7,g,c7,g,c7,g,c7,g",
+}
 
 # LVGL features the renderer needs. ESPHome only compiles what the YAML uses ("image": lv_scale
 # links against it for image needles).
@@ -75,6 +104,15 @@ CONFIG_SCHEMA = cv.Schema(
         # A second source for the clock (ADR-0024), e.g. SNTP or HomeAssistant; SignalK's
         # navigation.datetime (GPS time) wins while it arrives.
         cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
+        # Alarm tones and touch clicks (ADR-0033), through ESPHome's rtttl component; with the
+        # speaker it plays on, the layout's volume is the speaker's (else rtttl's gain).
+        cv.Optional(CONF_SOUND): cv.Schema(
+            {
+                cv.Required(CONF_RTTTL): cv.use_id(cg.esphome_ns.namespace("rtttl").class_("Rtttl")),
+                cv.Optional(CONF_SPEAKER): cv.use_id(cg.esphome_ns.namespace("speaker").class_("Speaker")),
+                **{cv.Optional(name, default=tune): _rtttl for name, tune in SOUND_TUNES.items()},
+            }
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -136,6 +174,15 @@ async def to_code(config):
     if CONF_TIME_ID in config:
         cg.add_define("USE_ESPHELM_TIME")
         cg.add(var.set_time(await cg.get_variable(config[CONF_TIME_ID])))
+    if CONF_SOUND in config:
+        sound = config[CONF_SOUND]
+        cg.add_define("USE_ESPHELM_SOUND")
+        cg.add(var.set_sound_rtttl(await cg.get_variable(sound[CONF_RTTTL])))
+        if CONF_SPEAKER in sound:
+            cg.add(var.set_sound_speaker(await cg.get_variable(sound[CONF_SPEAKER])))
+        # In the order of esphelm::sound::Level: the click (NONE), then alert .. emergency.
+        for index, name in enumerate(SOUND_TUNES):
+            cg.add(var.set_sound_tune(index, sound[name]))
     # The layout's settings.rotation (ADR-0028): ESPHome's LVGL turns the picture and touch at
     # runtime once `rotation:` is in its config. Software rotation needs a second draw buffer, so
     # a board without the RAM leaves it out (the C3).

@@ -157,6 +157,10 @@
         "rotation": {
           "type": "boolean",
           "description": "The firmware can turn the picture (settings.rotation, ADR-0028); width and height are as turned."
+        },
+        "sound": {
+          "type": "boolean",
+          "description": "The display has a speaker: touch clicks and alarm tones (settings.sound, ADR-0033)."
         }
       },
       "additionalProperties": false

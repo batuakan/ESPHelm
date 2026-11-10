@@ -79,6 +79,7 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 **Display settings** (the *Display settings* button next to the display theme, ADR-0015) are part of the layout too, sent with *Save & send*:
 - *Mounted* (ADR-0028): as built, or turned 90°, 180° or 270° clockwise for a display mounted sideways or upside down. The canvas turns at once; the pages are laid out for the turned screen. Disabled, with a note, when the display reports it can't turn its picture
 - brightness for the day and the night theme (disabled when the display reports it can't dim its backlight)
+- *Sound* (ADR-0033): the volume (10–100 %, default 60) and *Touch sounds*, a click when a button or tile is touched. Disabled, with a note, when the display reports no speaker. Alarms sound when the server asks for it (their `method` includes `sound`)
 - the start page
 - *Auto day/night*: the night theme while `environment.sun` (derived-data plugin) says dusk or night; the drawer shows its current value
 - *Screen off without a touch*: Never, or 30 s to 1 hour

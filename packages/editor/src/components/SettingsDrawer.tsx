@@ -9,7 +9,7 @@ import {
 } from '@esphelm/schema';
 import type { PathInfo } from '../api';
 import { ROTATIONS, type Rotation } from '../rotation';
-import { browserTimeZone, timeZoneSetting } from '../layoutOps';
+import { browserTimeZone, timeZoneSetting, type SettingsPatch } from '../layoutOps';
 import { Drawer, PathPicker } from './TileDrawer';
 
 /** Screen timeout choices in seconds (0 = never). */
@@ -46,16 +46,14 @@ function utcOffset(east: number): string {
   return `UTC${east < 0 ? '-' : '+'}${hh}:${mm}`;
 }
 
-type SettingsPatch = Omit<Partial<Settings>, 'brightness'> & {
-  brightness?: Partial<NonNullable<Settings['brightness']>>;
-};
-
 export function SettingsDrawer(props: {
   layout: Layout;
   /** The display can dim its backlight (hello.capabilities.backlight). */
   backlight: boolean;
   /** The display can turn its picture (hello.capabilities.rotation). */
   canRotate: boolean;
+  /** The display has a speaker (hello.capabilities.sound). */
+  sound: boolean;
   paths: PathInfo[];
   values: Map<string, unknown>;
   onChange(patch: SettingsPatch): void;
@@ -65,6 +63,8 @@ export function SettingsDrawer(props: {
   const day = s.brightness?.day ?? SETTINGS_DEFAULTS.brightnessDay;
   const night = s.brightness?.night ?? SETTINGS_DEFAULTS.brightnessNight;
   const timeout = s.screenTimeout ?? SETTINGS_DEFAULTS.screenTimeout;
+  const volume = s.sound?.volume ?? SETTINGS_DEFAULTS.soundVolume;
+  const touchSounds = s.sound?.touch ?? SETTINGS_DEFAULTS.soundTouch;
   const auto = (s.autoTheme ?? SETTINGS_DEFAULTS.autoTheme) === 'sun';
   const sunPath = s.autoThemePath ?? SETTINGS_DEFAULTS.autoThemePath;
   const sunNow = props.values.get(sunPath);
@@ -142,6 +142,43 @@ export function SettingsDrawer(props: {
             aria-label="Night brightness"
           />
         </label>
+      </fieldset>
+
+      <fieldset className="settings-group">
+        <legend>Sound</legend>
+        {!props.sound && (
+          <p className="warn">This display has no speaker; sound settings are ignored.</p>
+        )}
+        <label className="field">
+          <span>
+            Volume <output>{volume} %</output>
+          </span>
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={5}
+            value={volume}
+            disabled={!props.sound}
+            onChange={(e) => props.onChange({ sound: { volume: Number(e.target.value) } })}
+            aria-label="Volume"
+          />
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={touchSounds}
+            disabled={!props.sound}
+            onChange={(e) => props.onChange({ sound: { touch: e.target.checked } })}
+            aria-label="Touch sounds"
+          />
+          A click when a button or tile is touched
+        </label>
+        <small className="hint">
+          Alarms sound when the server asks for it (an alarm's method includes sound): an alarm repeats
+          every 5 s and an emergency without a pause until acknowledged. On the display, the Settings
+          menu changes these too, until the layout changes them.
+        </small>
       </fieldset>
 
       <label className="field">

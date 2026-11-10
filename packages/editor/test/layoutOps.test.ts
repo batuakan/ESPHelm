@@ -443,6 +443,15 @@ describe('display settings', () => {
     expect(validateLayout(l).ok).toBe(true);
   });
 
+  it('merges sound like brightness (ADR-0033)', () => {
+    let l = updateSettings(twoPages(), { sound: { volume: 40 } });
+    l = updateSettings(l, { sound: { touch: false }, brightness: { day: 90 } });
+    expect(l.settings).toEqual({ sound: { volume: 40, touch: false }, brightness: { day: 90 } });
+    expect(validateLayout(l).ok).toBe(true);
+    l = updateSettings(l, { sound: { volume: undefined, touch: undefined } });
+    expect(l.settings).toEqual({ brightness: { day: 90 } });
+  });
+
   it('forgets the start page when that page is removed or the pages are replaced', () => {
     const l = updateSettings(twoPages(), { startPage: 'b', autoTheme: 'sun' });
     expect(removePage(l, 1)!.settings).toEqual({ autoTheme: 'sun' });

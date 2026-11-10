@@ -55,7 +55,8 @@
     "touch": true,
     "put": true,
     "backlight": true,
-    "rotation": true
+    "rotation": true,
+    "sound": true
   },
   "layoutEtag": "\"7f3a9c\""
 }

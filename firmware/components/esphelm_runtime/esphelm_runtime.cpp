@@ -164,6 +164,7 @@ void EsphelmRuntime::setup() {
     else
       ESP_LOGW(TAG, "Saved display choices are not valid; ignoring them");
   }
+  this->apply_sound_();  // the defaults and these choices, until a layout says otherwise
 
   // Offline first: show what we had before any network traffic. The boot guard first decides
   // whether the cached layout is the one that keeps crashing the display (ADR-0013).
@@ -279,6 +280,7 @@ void EsphelmRuntime::loop() {
     this->show_saver_(now);
   this->alarms_.tick(this->theme_, connected,
                      authorized && connected && this->server_state_ != ServerState::UNKNOWN);
+  this->tick_sound_(now, connected);
   // The banner pushes the page down instead of covering it, so no control hides under it.
   if (this->renderer_.set_top_inset(this->alarms_.height())) {
     for (auto &w : this->widgets_)
@@ -334,6 +336,9 @@ void EsphelmRuntime::send_hello_() {
 #else
   doc["capabilities"]["rotation"] = false;
 #endif
+  // Only when there is one, so a display without a speaker still says hello to an older plugin.
+  if (this->has_sound_())
+    doc["capabilities"]["sound"] = true;
   if (!this->etag_.empty())
     doc["layoutEtag"] = this->etag_;
   if (!this->bad_etag_.empty())
@@ -541,6 +546,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   if (this->asleep_)
     this->wake_("new layout");
   this->apply_brightness_();
+  this->apply_sound_();
   this->status_key_.clear();
   this->etag_ = etag;
   this->body_ = body;
@@ -936,6 +942,78 @@ void EsphelmRuntime::wake_(const char *why) {
   this->apply_brightness_();
 }
 
+// ---- Sound (ADR-0033) ----
+
+bool EsphelmRuntime::has_sound_() const {
+#ifdef USE_ESPHELM_SOUND
+  return true;
+#else
+  return false;
+#endif
+}
+
+int EsphelmRuntime::sound_volume_() const {
+  return this->prefs_.volume >= 0 ? this->prefs_.volume : this->layout_.settings.sound_volume;
+}
+
+bool EsphelmRuntime::sound_touch_() const {
+  return this->prefs_.touch >= 0 ? this->prefs_.touch == 1 : this->layout_.settings.sound_touch;
+}
+
+void EsphelmRuntime::apply_sound_() {
+#ifdef USE_ESPHELM_SOUND
+  this->sound_.set_volume(this->sound_volume_());
+  this->sound_.set_touch(this->sound_touch_());
+#endif
+}
+
+void EsphelmRuntime::tick_sound_(uint32_t now, bool online) {
+#ifdef USE_ESPHELM_SOUND
+  this->attach_click_();
+  // AlarmBanner::Severity and sound::Level list the same states in the same order.
+  const auto level = static_cast<esphelm::sound::Level>(this->alarms_.sound_level());
+  this->sound_.tick(level, this->alarms_.sound_generation(), online, now);
+#else
+  (void) now;
+  (void) online;
+#endif
+}
+
+void EsphelmRuntime::attach_click_() {
+#ifdef USE_ESPHELM_SOUND
+  if (this->click_attached_)
+    return;
+  // One callback on the touchscreen, which LVGL calls with the object pressed: no code per widget.
+  for (lv_indev_t *in = lv_indev_get_next(nullptr); in != nullptr; in = lv_indev_get_next(in)) {
+    if (lv_indev_get_type(in) != LV_INDEV_TYPE_POINTER)
+      continue;
+    lv_indev_add_event_cb(
+        in,
+        [](lv_event_t *e) {
+          auto *self = static_cast<EsphelmRuntime *>(lv_event_get_user_data(e));
+          auto *obj = static_cast<lv_obj_t *>(lv_event_get_param(e));
+          // A touch that wakes the screen only wakes it.
+          if (self->asleep_ || obj == nullptr || obj == self->sleep_cover_)
+            return;
+          // Clicks for what reacts to a touch: the object, or a parent its events bubble to,
+          // has an event handler (tiles, buttons, sliders, the footer); not a bare background.
+          for (; obj != nullptr; obj = lv_obj_get_parent(obj)) {
+            if (lv_obj_has_state(obj, LV_STATE_DISABLED))
+              return;
+            if (lv_obj_get_event_count(obj) > 0) {
+              self->sound_.click();
+              return;
+            }
+            if (!lv_obj_has_flag(obj, LV_OBJ_FLAG_EVENT_BUBBLE))
+              return;
+          }
+        },
+        LV_EVENT_PRESSED, this);
+    this->click_attached_ = true;
+  }
+#endif
+}
+
 // ---- Settings panel (ADR-0025) ----
 
 SettingsPanel::State EsphelmRuntime::panel_state_() const {
@@ -945,6 +1023,9 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
   s.brightness = this->brightness_percent_();
   s.min_brightness = this->theme_ == esphelm::Theme::NIGHT ? esphelm::PREFS_MIN_NIGHT : esphelm::PREFS_MIN_DAY;
   s.can_sleep = this->layout_.settings.screen_timeout > 0;
+  s.sound = this->has_sound_();
+  s.volume = this->sound_volume_();
+  s.touch_sounds = this->sound_touch_();
 #ifdef USE_ESPHELM_WIFI_SETUP
   s.wifi = true;
 #endif
@@ -1116,6 +1197,28 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
       ESP_LOGI(TAG, "Brightness chosen on the display: %d %% (%s)", percent, night ? "night" : "day");
       this->save_prefs_();
     }
+  }
+  int volume;
+  bool volume_done;
+  if (this->panel_.take_volume(volume, volume_done)) {
+    this->prefs_.volume = static_cast<int16_t>(volume);
+    this->prefs_.set_base(this->layout_.settings, this->base_theme_);
+    this->apply_sound_();
+    if (volume_done) {
+      ESP_LOGI(TAG, "Volume chosen on the display: %d %%", volume);
+      this->save_prefs_();
+#ifdef USE_ESPHELM_SOUND
+      this->sound_.click(true);  // how loud it is now
+#endif
+    }
+  }
+  bool touch_sounds;
+  if (this->panel_.take_touch_sounds(touch_sounds)) {
+    ESP_LOGI(TAG, "Touch sounds %s on the display", touch_sounds ? "on" : "off");
+    this->prefs_.touch = touch_sounds ? 1 : 0;
+    this->prefs_.set_base(this->layout_.settings, this->base_theme_);
+    this->apply_sound_();
+    this->save_prefs_();
   }
   if (this->panel_.take_sleep()) {
     ESP_LOGI(TAG, "Screen off from the settings");
