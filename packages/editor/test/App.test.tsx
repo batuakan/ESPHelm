@@ -409,6 +409,22 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
     expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('day');
+    // The dark theme (ADR-0034).
+    fireEvent.click(within(group).getByRole('button', { name: 'Dark' }));
+    expect(frame().dataset.themePreview).toBe('dark');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await waitFor(() => expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('dark'));
+  });
+
+  it('offers the dark theme only to displays that render it', async () => {
+    const d = device('adopted');
+    d.hello = { ...p4, capabilities: { touch: true, put: true, backlight: true } };
+    render(<App api={fakeServer([d]).api} live={fakeLive().factory} />);
+    const group = await screen.findByRole('group', { name: 'Display theme' });
+    const dark = within(group).getByRole('button', { name: 'Dark' }) as HTMLButtonElement;
+    expect(dark.disabled).toBe(true);
+    expect(dark.title).toMatch(/Update this display's firmware/);
+    expect((within(group).getByRole('button', { name: 'Day' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('adds a chart page (a chart tile), picks a chart and previews it at the position', async () => {

@@ -97,13 +97,13 @@ void Renderer::show_status(const std::string &headline, const std::string &detai
     lv_obj_align(title, LV_ALIGN_CENTER, 0, -30);
   } else {
     // The setup network: its QR code at the top (phone cameras join from it), the text below.
-    // Dark modules on light ones by day; at night the light ones are the dim red text colour.
     const int32_t size = std::min(sw, sh) * 4 / 10;
     lv_obj_t *code = lv_qrcode_create(this->container_);
     lv_qrcode_set_size(code, size);
-    const bool night = theme == esphelm::Theme::NIGHT;
-    lv_qrcode_set_dark_color(code, night ? c.background : c.text);
-    lv_qrcode_set_light_color(code, night ? c.text : c.background);
+    lv_color_t dark, light;
+    qr_colors(theme, c, dark, light);
+    lv_qrcode_set_dark_color(code, dark);
+    lv_qrcode_set_light_color(code, light);
     lv_qrcode_set_quiet_zone(code, true);
     lv_qrcode_update(code, qr.data(), qr.size());
     lv_obj_align(code, LV_ALIGN_TOP_MID, 0, sh / 20);

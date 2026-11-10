@@ -143,6 +143,18 @@ describe('GET layout', () => {
     expect(lastVersion(h.deltas, ID)).toBe(newEtag);
   });
 
+  it('stores and serves a layout in the dark theme (ADR-0034)', async () => {
+    await adoptWithLayout();
+    const put = await h.call('PUT', '/plugins/esphelm/api/layouts/minimal', {
+      as: ADMIN,
+      body: { ...minimal, theme: 'dark' },
+    });
+    expect(put.status).toBeLessThan(300);
+    const served = await getLayout(device(ID));
+    expect(served.status).toBe(200);
+    expect(((await served.json()) as { theme: string }).theme).toBe('dark');
+  });
+
   it('answers 503 before the plugin is started', async () => {
     h.service.stop();
     expect((await getLayout(device(ID))).status).toBe(503);

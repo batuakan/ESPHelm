@@ -138,11 +138,17 @@ class EsphelmRuntime : public Component {
   void save_boot_record_();
   // Display settings (ADR-0015)
   esphelm::Theme effective_theme_() const;
-  /// The layout's theme, or night by environment.sun (autoTheme): what "auto" shows.
-  esphelm::Theme automatic_theme_() const;
+  /// What "auto" shows: the layout's theme; with autoTheme, night by environment.sun and the
+  /// day-side theme otherwise (ADR-0034). `day_side` as DisplayPrefs::day_side.
+  esphelm::Theme automatic_theme_(int8_t day_side) const;
+  esphelm::Theme automatic_theme_() const { return this->automatic_theme_(this->prefs_.day_side); }
+  /// The theme shown when it isn't night: day or dark as last picked here, else the layout's.
+  esphelm::Theme day_side_theme_(int8_t day_side) const;
+  /// The footer's theme button: night, or back to the day-side theme.
   void toggle_theme_();
-  /// -1: the layout's theme (autoTheme), else a Theme chosen on the display (saved).
-  void set_theme_choice_(int8_t choice);
+  /// -1: the layout's theme (autoTheme), else a Theme chosen on the display (saved). Day or dark
+  /// also becomes the day-side theme. `prefer_auto`: back to -1 when auto shows that theme anyway.
+  void set_theme_choice_(int8_t choice, bool prefer_auto = false);
   void show_theme_();
   int brightness_percent_() const;
   void watch_sun_();

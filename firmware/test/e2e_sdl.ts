@@ -780,7 +780,7 @@ async function main(): Promise<void> {
     fw.start();
     check(
       'panel: the choices come back after a restart',
-      (await fw.waitLog(/Display choices: v=2;th=1;bd=-1;bn=15;vo=-1;to=-1;/)) &&
+      (await fw.waitLog(/Display choices: v=3;th=1;ds=0;bd=-1;bn=15;vo=-1;to=-1;/)) &&
         (await fw.waitLog(/Showing cached layout "settings"/)) &&
         (await fw.waitLog(/Brightness 15 % \(no backlight configured\)/)),
     );
@@ -815,6 +815,50 @@ async function main(): Promise<void> {
     );
     writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@screen');
     check('panel: a touch switches it on again', await waitNext(/Screen on \(touch\)/));
+    // The dark theme (ADR-0034): picked on the display, it becomes the day side of Auto: night
+    // at dusk, dark again at sunrise; the footer toggles night and dark. Day brightness.
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@menu');
+    await waitNext(/Settings opened/);
+    const brightnessLogs = fw.count(/Brightness \d+ % \(no backlight configured\)/);
+    settingsTap('dark');
+    check(
+      'dark: Dark in the panel switches the theme',
+      await waitNext(/Theme switched on the display: dark/),
+    );
+    await sleep(1000);
+    check(
+      'dark: it keeps the day brightness (90 %, no change)',
+      fw.count(/Brightness \d+ % \(no backlight configured\)/) === brightnessLogs,
+    );
+    await fw.screenshot('86-settings-panel-dark', shots);
+    settingsTap('close');
+    await waitNext(/Settings closed/);
+    publish({ 'navigation.speedThroughWater': 2.4 });
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    await sleep(1500);
+    await fw.screenshot('85-settings-dark-alarm', shots);
+    notify(DEPTH, 'normal', '', []);
+    publish({ 'environment.sun': 'dusk' });
+    check(
+      'dark: dusk switches to night',
+      await waitNext(/Sun: dusk, switching to the night theme/),
+    );
+    await sleep(1500); // SignalK drops an update sooner than the subscription's minPeriod
+    publish({ 'environment.sun': 'day' });
+    check(
+      'dark: sunrise comes back to the dark theme picked before',
+      await waitNext(/Sun: day, switching to the dark theme/),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@theme');
+    check(
+      'dark: the footer toggle switches dark to night',
+      await waitNext(/Theme switched on the display: night/),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@theme');
+    check(
+      'dark: and back to dark, the automatic theme by day',
+      await waitNext(/Theme on the display: automatic \(dark\)/),
+    );
     await fw.stop();
     writeFileSync(join(fw.workDir, 'esphelm_prefs.bin'), cacheRecord('v=1;th=5', 'prefs'));
     fw.start();
@@ -874,6 +918,17 @@ async function main(): Promise<void> {
     publish(colourValues);
     await sleep(1500);
     await fw.screenshot('31-value-colors-night', shots);
+    await json('PUT', '/plugins/esphelm/api/layouts/value-colors', admin, {
+      ...colors,
+      theme: 'dark',
+    });
+    check(
+      'colours: the same layout in the dark theme',
+      await fw.waitLog(/Showing fetched layout "value-colors" \(1 pages/, 15000, 3),
+    );
+    publish(colourValues);
+    await sleep(1500);
+    await fw.screenshot('82-value-colors-dark', shots);
 
     // 9e2. Zones from the server's metadata (ADR-0020): they replace a tile's own and follow the
     //      server without a new layout. A value tile and a gauge with their own zones, a bar with
@@ -1449,6 +1504,17 @@ async function main(): Promise<void> {
       'notifications.environment.depth.belowTransducer': { state: 'normal', message: 'Depth ok' },
     });
     await fw.waitLog(depthCleared, 15000, clearsBefore + 1);
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(perf.id)}`, admin, {
+      ...perf,
+      theme: 'dark',
+    });
+    check(
+      'rose performance: the dark theme',
+      await fw.waitLog(/Showing fetched layout "rose-performance" \(1 pages/, 15000, 2),
+    );
+    publish(roseWind(20, 65, 38));
+    await sleep(1500);
+    await fw.screenshot('83-rose-dark', shots);
 
     // 9n. Engine tile (ADR-0032): the RPM arc with oil, fuel and coolant gauges and their
     //     needles, and engine hours, alternator, exhaust and fuel rate in the corners; in the
@@ -1505,6 +1571,16 @@ async function main(): Promise<void> {
     });
     await sleep(1500);
     await fw.screenshot('81-engine-small', shots);
+    await json('PUT', '/plugins/esphelm/api/layouts/engine', admin, { ...engine, theme: 'dark' });
+    check(
+      'engine: the dark theme',
+      await fw.waitLog(/Showing fetched layout "engine" \(2 pages/, 15000, 2),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '0');
+    await sleep(800);
+    publish({ ...engineValues(4200, 0.6, 104), 'tanks.fuel.0.currentLevel': 0.1 });
+    await sleep(1500);
+    await fw.screenshot('84-engine-dark', shots);
 
     // 9l. Mounting rotation (ADR-0028): a layout designed for a display mounted sideways
     //     (settings.rotation 90) turns it before its page is built, and the display says hello
@@ -1662,6 +1738,18 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-07-graph', shots);
+    await fw720.stop();
+    writeFileSync(
+      join(work720, 'esphelm_cur.bin'),
+      cacheRecord(JSON.stringify({ ...JSON.parse(graph720), theme: 'dark' }), '"seed-graph-dark"'),
+    );
+    fw720.start({ ESPHELM_TEST_HISTORY: 'depth,sog,hdg,baro' });
+    check(
+      '720 build shows the graph layout in the dark theme',
+      await fw720.waitLog(/Showing cached layout "graph" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-18-graph-dark', shots);
     await fw720.stop();
 
     // 12e. Heading tapes at 720, offline: stale, so muted, "--" and no markers.

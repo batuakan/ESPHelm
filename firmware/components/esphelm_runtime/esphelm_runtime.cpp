@@ -330,6 +330,7 @@ void EsphelmRuntime::send_hello_() {
 #endif
   doc["capabilities"]["touch"] = this->touch_;
   doc["capabilities"]["put"] = true;
+  doc["capabilities"]["darkTheme"] = true;  // ADR-0034
   doc["capabilities"]["backlight"] = this->has_backlight_();
 #ifdef USE_ESPHELM_ROTATION
   doc["capabilities"]["rotation"] = this->lvgl_ != nullptr;
@@ -577,10 +578,19 @@ esphelm::Theme EsphelmRuntime::effective_theme_() const {
   return this->automatic_theme_();
 }
 
-esphelm::Theme EsphelmRuntime::automatic_theme_() const {
-  if (this->layout_.settings.auto_theme == esphelm::AutoTheme::SUN && this->sun_night_ == 1)
-    return esphelm::Theme::NIGHT;
-  return this->base_theme_;
+esphelm::Theme EsphelmRuntime::day_side_theme_(int8_t day_side) const {
+  if (day_side >= 0)
+    return static_cast<esphelm::Theme>(day_side);
+  return esphelm::red_only(this->base_theme_) ? esphelm::Theme::DAY : this->base_theme_;
+}
+
+esphelm::Theme EsphelmRuntime::automatic_theme_(int8_t day_side) const {
+  if (this->layout_.settings.auto_theme != esphelm::AutoTheme::SUN)
+    return this->base_theme_;
+  // Until the sun is known the layout's theme, as before the first value.
+  if (this->sun_night_ < 0)
+    return day_side >= 0 ? static_cast<esphelm::Theme>(day_side) : this->base_theme_;
+  return this->sun_night_ == 1 ? esphelm::Theme::NIGHT : this->day_side_theme_(day_side);
 }
 
 void EsphelmRuntime::watch_sun_() {
@@ -618,7 +628,7 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
   const esphelm::Theme theme = this->effective_theme_();
   if (theme == this->layout_.theme)
     return;
-  ESP_LOGI(TAG, "Sun: %s, switching to the %s theme", sun, theme == esphelm::Theme::NIGHT ? "night" : "day");
+  ESP_LOGI(TAG, "Sun: %s, switching to the %s theme", sun, esphelm::theme_name(theme));
   this->layout_.theme = theme;
   this->theme_ = theme;
   this->build_page_(this->page_);  // a theme change rebuilds the page (twice a day)
@@ -626,23 +636,29 @@ void EsphelmRuntime::on_sun_(ArduinoJson::JsonVariantConst value) {
 }
 
 void EsphelmRuntime::toggle_theme_() {
-  // The other theme; back to automatic when that is what the layout would show anyway.
-  const esphelm::Theme theme =
-      this->layout_.theme == esphelm::Theme::NIGHT ? esphelm::Theme::DAY : esphelm::Theme::NIGHT;
-  this->set_theme_choice_(theme == this->automatic_theme_() ? -1 : static_cast<int8_t>(theme));
+  // Night, or back to the day-side theme; automatic again when that is what auto shows anyway.
+  const esphelm::Theme theme = esphelm::red_only(this->layout_.theme) ? this->day_side_theme_(this->prefs_.day_side)
+                                                                      : esphelm::Theme::NIGHT;
+  this->set_theme_choice_(static_cast<int8_t>(theme), true);
 }
 
-void EsphelmRuntime::set_theme_choice_(int8_t choice) {
-  if (choice == this->prefs_.theme)
+void EsphelmRuntime::set_theme_choice_(int8_t choice, bool prefer_auto) {
+  int8_t day_side = this->prefs_.day_side;
+  if (choice >= 0 && !esphelm::red_only(static_cast<esphelm::Theme>(choice)))
+    day_side = choice;
+  if (prefer_auto && choice >= 0 && static_cast<esphelm::Theme>(choice) == this->automatic_theme_(day_side))
+    choice = -1;
+  if (choice == this->prefs_.theme && day_side == this->prefs_.day_side)
     return;
   this->prefs_.theme = choice;
+  this->prefs_.day_side = day_side;
   this->prefs_.set_base(this->layout_.settings, this->base_theme_);
   this->save_prefs_();
   const esphelm::Theme theme = this->effective_theme_();
   if (choice < 0)
-    ESP_LOGI(TAG, "Theme on the display: automatic (%s)", theme == esphelm::Theme::NIGHT ? "night" : "day");
+    ESP_LOGI(TAG, "Theme on the display: automatic (%s)", esphelm::theme_name(theme));
   else
-    ESP_LOGI(TAG, "Theme switched on the display: %s", theme == esphelm::Theme::NIGHT ? "night" : "day");
+    ESP_LOGI(TAG, "Theme switched on the display: %s", esphelm::theme_name(theme));
   this->show_theme_();
 }
 
@@ -1429,7 +1445,8 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.put = [this](const std::string &path, const PutValue &value) { this->signalk_->put_request(path, value); };
   env.can_put = [this]() { return this->signalk_->is_connected(); };
   env.psram = this->psram_;
-  env.night = this->layout_.theme == esphelm::Theme::NIGHT;
+  env.night = esphelm::red_only(this->layout_.theme);
+  env.dark = esphelm::dark_page(this->layout_.theme);
   env.has_history = [this](const std::string &key) { return this->history_.find(key) >= 0; };
   env.history = &this->history_;
   env.utc_now = [this](int64_t &utc) { return this->utc_now_(utc); };

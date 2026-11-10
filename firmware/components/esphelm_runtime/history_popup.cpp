@@ -159,7 +159,7 @@ lv_color_t HistoryPopup::number_color_(bool has, float v) const {
     return c.muted;
   esphelm::ZoneState state;
   if (esphelm::value_zone_state(v, this->cur_().zones, state)) {
-    if (this->theme_ == esphelm::Theme::NIGHT && state == esphelm::ZoneState::NORMAL)
+    if (esphelm::red_only(this->theme_) && state == esphelm::ZoneState::NORMAL)
       return c.text;
     return c.zone[static_cast<int>(state)];
   }
@@ -174,7 +174,7 @@ void HistoryPopup::build_() {
     this->bands_.clear();
   }
   const Colors c = colors_for(this->theme_);
-  const bool night = this->theme_ == esphelm::Theme::NIGHT;
+  const bool dark = esphelm::dark_page(this->theme_);
   const int32_t sw = lv_display_get_horizontal_resolution(nullptr);
   const int32_t sh = lv_display_get_vertical_resolution(nullptr);
   const int32_t pad = sw >= 600 ? 16 : 12;
@@ -302,7 +302,7 @@ void HistoryPopup::build_() {
     lv_obj_remove_style_all(band);
     lv_obj_remove_flag(band, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_color(band, c.zone[static_cast<int>(this->cur_().zones[z].state)], LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(band, night ? LV_OPA_30 : LV_OPA_20, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(band, dark ? LV_OPA_30 : LV_OPA_20, LV_PART_MAIN);
     lv_obj_add_flag(band, LV_OBJ_FLAG_HIDDEN);
     this->bands_.push_back(band);
   }

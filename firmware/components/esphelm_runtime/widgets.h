@@ -79,6 +79,21 @@ struct Colors {
 
 Colors colors_for(esphelm::Theme theme);
 
+/// QR code colours: dark modules on light ones by day; at night the light ones are the dim red text
+/// colour. The dark theme uses black on white: cameras read inverted codes badly.
+inline void qr_colors(esphelm::Theme theme, const Colors &c, lv_color_t &dark, lv_color_t &light) {
+  if (theme == esphelm::Theme::NIGHT) {
+    dark = c.background;
+    light = c.text;
+  } else if (theme == esphelm::Theme::DARK) {
+    dark = lv_color_hex(0x000000);
+    light = lv_color_hex(0xFFFFFF);
+  } else {
+    dark = c.text;
+    light = c.background;
+  }
+}
+
 /// A PUT value (same alternatives as ESPHomeSignalK put_request).
 using PutValue = std::variant<double, std::string, bool>;
 
@@ -95,8 +110,10 @@ struct WidgetEnv {
   ChartTileStore *charts{nullptr};
   /// Whether the display has PSRAM (chart tiles keep their map tiles there).
   bool psram{false};
-  /// The layout's theme is night (charts are darkened and tinted red).
+  /// The theme is night, red only (charts are darkened and tinted red; zones by brightness).
   bool night{false};
+  /// The page is dark (night or dark theme): zone bands are drawn a little stronger.
+  bool dark{false};
   /// Whether a value records its history (ADR-0018, ADR-0019): a value tile by its id, a wind
   /// rose value by "<tile id>/<name>"; and opening a tile's popup. A tap only asks for it; the
   /// runtime opens it in loop(). Unset or false: the tile isn't tappable.

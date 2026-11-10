@@ -25,13 +25,27 @@ int main() {
   p.brightness_night = 12;
   p.set_base(s, esphelm::Theme::DAY);
   const std::string text = esphelm::encode_prefs(p);
-  CHECK(text == "v=2;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
+  CHECK(text == "v=3;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
 
   DisplayPrefs q;
   CHECK(esphelm::decode_prefs(text, q));
   CHECK(q.theme == 1 && q.brightness_day == -1 && q.brightness_night == 12);
   CHECK(q.base_theme == esphelm::Theme::DAY && q.base_day == 100 && q.base_night == 30);
   CHECK(q.volume == -1 && q.touch == -1 && q.base_volume == 60 && q.base_touch);
+  CHECK(q.day_side == -1);
+
+  // The dark theme (ADR-0034): chosen, as the day side, and as the layout's theme, round-trips.
+  DisplayPrefs dp;
+  dp.theme = static_cast<int8_t>(esphelm::Theme::DARK);
+  dp.day_side = static_cast<int8_t>(esphelm::Theme::DARK);
+  dp.set_base(s, esphelm::Theme::DARK);
+  DisplayPrefs dq;
+  CHECK(esphelm::encode_prefs(dp) == "v=3;th=2;ds=2;bd=-1;bn=-1;vo=-1;to=-1;Bt=2;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
+  CHECK(esphelm::decode_prefs(esphelm::encode_prefs(dp), dq));
+  CHECK(dq.theme == 2 && dq.day_side == 2 && dq.base_theme == esphelm::Theme::DARK && !dq.empty());
+  DisplayPrefs only_side;
+  only_side.day_side = static_cast<int8_t>(esphelm::Theme::DAY);
+  CHECK(!only_side.empty());
 
   // Sound overrides round-trip.
   DisplayPrefs sp = p;
@@ -42,6 +56,11 @@ int main() {
   CHECK(sq.volume == 25 && sq.touch == 0 && sq.theme == 1 && sq.brightness_night == 12);
   CHECK(!sq.empty());
 
+  // A record saved before the dark theme (version 2) still reads, with no day side.
+  DisplayPrefs v2;
+  CHECK(esphelm::decode_prefs("v=2;th=1;bd=-1;bn=12;vo=25;to=0;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1", v2));
+  CHECK(v2.theme == 1 && v2.day_side == -1 && v2.volume == 25 && v2.touch == 0);
+
   // A record saved before sound (version 1) still reads, with no sound overrides.
   DisplayPrefs old;
   CHECK(esphelm::decode_prefs("v=1;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30", old));
@@ -50,7 +69,13 @@ int main() {
   // Refused, and `out` left as it was.
   const char *bad[] = {
       "",
-      "v=3;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // unknown version
+      "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // unknown version
+      "v=3;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",        // version 3 without ds
+      "v=3;th=1;ds=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",   // night as the day side
+      "v=3;th=3;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // no such theme
+      "v=3;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=3;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // no such base theme
+      "v=2;th=2;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",        // dark before version 3
+      "v=2;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=2;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",        // dark base before version 3
       "v=2;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // version 2 without the sound fields
       "v=1;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // version 1 with them
       "v=2;th=1;bd=-1;bn=12;vo=9;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",   // volume below 10 %
@@ -89,10 +114,17 @@ int main() {
   CHECK(esphelm::reconcile_prefs(k, s2, esphelm::Theme::DAY));
   CHECK(k.theme == 1 && k.brightness_night == -1 && k.base_night == 20);
 
-  // Another layout theme, or autoTheme switched on: the theme choice goes.
+  // Another layout theme, or autoTheme switched on: the theme choice and the day side go.
   k = q;
+  k.day_side = static_cast<int8_t>(esphelm::Theme::DARK);
   CHECK(esphelm::reconcile_prefs(k, s, esphelm::Theme::NIGHT));
-  CHECK(k.theme == -1 && k.brightness_night == 12);
+  CHECK(k.theme == -1 && k.day_side == -1 && k.brightness_night == 12);
+  // A day side alone goes too.
+  k = DisplayPrefs();
+  k.day_side = static_cast<int8_t>(esphelm::Theme::DARK);
+  k.set_base(s, esphelm::Theme::DAY);
+  CHECK(esphelm::reconcile_prefs(k, s, esphelm::Theme::DARK));
+  CHECK(k.day_side == -1 && k.empty());
   esphelm::Settings s3 = s;
   s3.auto_theme = esphelm::AutoTheme::SUN;
   k = q;

@@ -258,9 +258,12 @@ void AlarmBanner::tick(esphelm::Theme theme, bool online, bool can_ack) {
   lv_obj_move_foreground(this->banner_);
 
   const Colors colors = colors_for(theme);
-  const bool night = theme == esphelm::Theme::NIGHT;
-  // Red-on-black at night keeps night vision: dark band, coloured text.
-  const lv_color_t ink = night ? lv_color_hex(0x000000) : lv_color_hex(0xFFFFFF);
+  const bool night = esphelm::red_only(theme);
+  // Red-on-black at night keeps night vision: dark band, coloured text. By day white text on the
+  // band; the dark theme's bands are light shades, so its text is the dark page colour.
+  const lv_color_t ink = night                             ? lv_color_hex(0x000000)
+                         : theme == esphelm::Theme::DARK ? colors.background
+                                                         : lv_color_hex(0xFFFFFF);
   const std::vector<size_t> open = this->unacked_();
   const char *offline = online ? "" : "  (offline)";
   char buf[MAX_MESSAGE + MAX_PATH + 48];

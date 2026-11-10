@@ -32,9 +32,14 @@
         },
         {
           "type": "string",
+          "const": "dark"
+        },
+        {
+          "type": "string",
           "const": "night"
         }
-      ]
+      ],
+      "description": "day: light, for sunlight; dark: dark page, full colours; night: red on black for night vision (ADR-0034)."
     },
     "pages": {
       "type": "array",
@@ -3155,7 +3160,7 @@
               "const": "sun"
             }
           ],
-          "description": "\"sun\": night theme while autoThemePath says dusk or night, else the layout theme."
+          "description": "\"sun\": night theme while autoThemePath says dusk or night, else the day-side theme: day or dark as last picked on the display, or the layout theme (day when that is night)."
         },
         "autoThemePath": {
           "type": "string",

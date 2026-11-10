@@ -12,7 +12,10 @@ export const Layout = Type.Object(
     version: Type.Literal(LAYOUT_VERSION, { errorCode: 'UNSUPPORTED_VERSION' }),
     id: Id,
     name: Type.Optional(Label),
-    theme: Type.Union([Type.Literal('day'), Type.Literal('night')]),
+    theme: Type.Union([Type.Literal('day'), Type.Literal('dark'), Type.Literal('night')], {
+      description:
+        'day: light, for sunlight; dark: dark page, full colours; night: red on black for night vision (ADR-0034).',
+    }),
     pages: Type.Array(Page, { minItems: 1, errorCode: 'NO_PAGES' }),
     settings: Type.Optional(Settings),
   },

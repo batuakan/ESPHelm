@@ -233,6 +233,11 @@ const mutations: { name: string; doc: unknown }[] = [
   { name: 'unit not a string', doc: withTile({ unit: 3 }) },
   { name: 'staleAfter zero', doc: withTile({ staleAfter: 0 }) },
   { name: 'theme not a string', doc: { ...minimal, theme: 5 } },
+  { name: 'theme Dark capitalised', doc: { ...minimal, theme: 'Dark' } },
+  {
+    name: 'theme dark with auto',
+    doc: { ...minimal, theme: 'dark', settings: { autoTheme: 'sun' } },
+  },
   { name: 'version as string', doc: { ...minimal, version: '1' } },
   { name: 'version missing', doc: { ...minimal, version: undefined } },
   { name: 'pages not an array', doc: { ...minimal, pages: {} } },
