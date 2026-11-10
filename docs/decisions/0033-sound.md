@@ -46,6 +46,7 @@ Status: **Accepted** (2026-11-10)
 - **Any board with a speaker** (or a PWM buzzer through `rtttl: output:`) gets sound by adding `sound:`. The other boards' builds don't change.
 - **Touch clicks need no widget code,** so new widgets click for free. A widget with a handler on a purely decorative object would click too.
 - **The P4 needs `CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM`:** without it the audio's few KB of IRAM left the main task no early internal heap and the board boot-looped (`docs/phase6-notes.md`).
+- **Codecs that pop when their clock starts** (the ES8311 does) need the speaker kept running: `rtttl` → `mixer` → an I2S speaker with `timeout: never`, plus a silent tune at boot with the amplifier off. This is per board, in its hardware YAML; see the P4's.
 - **The microphone** (ES7210) is not used.
 - **Not done:**
   - per-alarm tunes;

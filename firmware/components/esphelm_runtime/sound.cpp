@@ -69,6 +69,9 @@ void SoundPlayer::tick(Level level, uint32_t generation, bool online, uint32_t n
       this->played_generation_ = generation;
       this->last_start_ms_ = now;
       this->alarm_ = play;
+      // rtttl ignores play() while a tune (a click, or a milder alarm's) is playing.
+      if (this->rtttl_->is_playing())
+        this->rtttl_->stop();
       this->rtttl_->play(this->tunes_[static_cast<int>(play)]);
       break;
     case Action::NONE:

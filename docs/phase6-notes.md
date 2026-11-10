@@ -288,6 +288,13 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **Main was within those 3.5 KB too:** any growth of IRAM or static RAM would have hit the same loop.
   - **Fix:** `CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM: y` in `hardware/waveshare-esp32-p4-86.yaml` moves the hosted tasks' stacks to PSRAM (Espressif's P4 examples do the same). Those tasks move Wi-Fi packets and never touch flash.
   - **Checked on the P4:** without the audio the build booted (confirming the cause); with the audio and the option it boots, starts the codec, speaker and sound, and connects to Wi-Fi and SignalK.
+- **Pop before a sound, fixed:** the ES8311 popped whenever its I2S clock started, at the first sound and again after a few idle seconds, because `rtttl` stops its speaker after every tune.
+  - `rtttl` now plays into a `mixer` source (`board_speaker`; a mixer needs a second, unused source).
+  - The I2S speaker behind the mixer (`board_i2s_speaker`) has `timeout: never` and runs at `rtttl`'s 16 kHz, so it never stops once started.
+  - `esphome: on_boot` plays a silent tune with the amplifier off, then turns the amplifier on (`restore_mode: ALWAYS_OFF`).
+  - Cost: +760 B static RAM, +11 KB flash, and I2S writing silence all the time.
+  - Checked on the P4: no pop; the I2S speaker starts once at boot and never stops.
+- **Alarm over a playing tune, fixed:** `rtttl.play()` ignores a call while a tune plays, so an alarm that came during a click (or an escalation during a milder alarm's tune) was dropped, and `alert`/`warn` never retry. `SoundPlayer` now stops the playing tune first.
 - **The desktop builds have no speaker:** the SDL e2e runs without `sound:`, so it checks that the feature compiles out without changing a screen.
 - **Not checked on hardware yet** (hardware step 30): the pins, the loudness, hiss with the amplifier always on, and that the clicks feel right.
 - **Editor test timing:** `App.test.tsx`'s "edits the display settings" can miss its 1 s wait for the layout on a loaded machine (on `main` too); with a longer wait it passes, and it passes in the full run.

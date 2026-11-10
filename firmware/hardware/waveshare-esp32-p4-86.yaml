@@ -13,7 +13,15 @@ esphome:
   min_version: 2026.1.1
   project:
     name: "Waveshare.ESP32-P4-86"
-    version: "1.0"    
+    version: "1.0"
+  on_boot:
+    # The ES8311 powers its DAC up in setup, before the I2S clock runs; the first sound then pops
+    # as the DAC settles. A silent tune runs I2S once while the amplifier is still off.
+    - priority: -100
+      then:
+        - rtttl.play: "warmup:d=4,o=5,b=120:p"
+        - delay: 1s
+        - switch.turn_on: speaker_amplifier
   # on_boot:
   #   - priority: 0
   #     then:
@@ -108,23 +116,36 @@ audio_dac:
     i2c_id: i2c_bus
     address: 0x18
 
+# The ES8311 pops when its I2S clock starts after a few idle seconds, and rtttl stops its speaker
+# after every tune. So rtttl plays into a mixer source, and the I2S speaker behind the mixer never
+# times out: once the boot warm-up (esphome: on_boot) has started it, the clock never stops. It
+# runs at rtttl's 16 kHz, so the mixer never restarts it for a new sample rate.
 speaker:
   - platform: i2s_audio
-    id: board_speaker
+    id: board_i2s_speaker
     i2s_audio_id: i2s_audio_bus
     i2s_dout_pin: GPIO9
     dac_type: external
     audio_dac: es8311_dac
     channel: mono
     bits_per_sample: 16bit
-    sample_rate: 48000
+    sample_rate: 16000
     buffer_duration: 100ms
+    timeout: never
+  - platform: mixer
+    output_speaker: board_i2s_speaker
+    source_speakers:
+      - id: board_speaker
+        timeout: never
+      # Unused; ESPHome's mixer needs at least two sources.
+      - id: board_speaker_spare
 
 switch:
   - platform: gpio
     id: speaker_amplifier
     pin: GPIO53
-    restore_mode: ALWAYS_ON
+    # Turned on by on_boot once the codec has settled (no pop on the first sound).
+    restore_mode: ALWAYS_OFF
 
 rtttl:
   id: board_rtttl
