@@ -5,6 +5,8 @@ export * from './headingTape.js';
 export * from './windRose.js';
 export * from './centerZero.js';
 export * from './clock.js';
+export * from './engine.js';
+export * from './svgPath.js';
 export * from './valueZones.js';
 export * from './serverZones.js';
 export * from './textFit.js';

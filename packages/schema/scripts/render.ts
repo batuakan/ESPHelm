@@ -203,6 +203,7 @@ function renderSizesHeader(
   tape: { minorTickPx: number; label10Px: number },
   tack: Record<'beat' | 'gybe', { min: number; max: number; fixed: number }>,
   chart: { buttons: number; info: number },
+  engine: { slots: number; labels: number; minorTickPx: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -254,6 +255,12 @@ function renderSizesHeader(
     `inline constexpr int CHART_BUTTONS = ${chart.buttons};`,
     `inline constexpr int CHART_INFO = ${chart.info};`,
     '',
+    '// Engine tile (ADR-0032): shorter side in pixels from which it shows its slots and its labels;',
+    '// minor ticks from this spacing.',
+    `inline constexpr int ENGINE_SLOTS = ${engine.slots};`,
+    `inline constexpr int ENGINE_LABELS = ${engine.labels};`,
+    `inline constexpr int ENGINE_MINOR_TICK_PX = ${engine.minorTickPx};`,
+    '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
     '',
@@ -261,6 +268,99 @@ function renderSizesHeader(
     '}  // namespace esphelm',
     '',
   ].join('\n');
+}
+
+/** A float for C++: always with a decimal point and the f suffix. */
+function cf(v: number): string {
+  const s = String(v);
+  return `${/[.e]/.test(s) ? s : `${s}.0`}f`;
+}
+
+function renderEngineShapesHeader(
+  arcs: Record<string, { start: number; sweep: number }>,
+  geometry: Record<string, unknown>,
+  iconNames: readonly string[],
+  icons: Record<string, number[][]>,
+): string {
+  const camelToUpper = (k: string): string =>
+    k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+  const lines: string[] = [
+    `// ${GENERATED_NOTE}`,
+    "// Engine tile shapes (ADR-0032) from src/engine.ts: arcs in degrees clockwise from 3 o'clock,",
+    '// lengths as fractions of R (half the shorter side of the drawing square), icons in a 0..1 box.',
+    '#pragma once',
+    '',
+    '#include <cstdint>',
+    '',
+    'namespace esphelm {',
+    'namespace engine_shapes {',
+    '',
+    'struct Arc {',
+    '  float start;',
+    '  float sweep;',
+    '};',
+  ];
+  for (const [name, a] of Object.entries(arcs))
+    lines.push(`inline constexpr Arc ${name.toUpperCase()}_ARC{${cf(a.start)}, ${cf(a.sweep)}};`);
+  lines.push('');
+  for (const [group, value] of Object.entries(geometry)) {
+    if (typeof value === 'number') {
+      lines.push(
+        Number.isInteger(value)
+          ? `inline constexpr int ${camelToUpper(group)} = ${value};`
+          : `inline constexpr float ${camelToUpper(group)} = ${cf(value)};`,
+        '',
+      );
+      continue;
+    }
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof v === 'number') {
+        lines.push(
+          `inline constexpr float ${camelToUpper(group)}_${camelToUpper(key)} = ${cf(v)};`,
+        );
+      } else {
+        const box = v as { x: number; y: number; size: number };
+        lines.push(
+          `inline constexpr float ${camelToUpper(group)}_${camelToUpper(key)}_X = ${cf(box.x)};`,
+          `inline constexpr float ${camelToUpper(group)}_${camelToUpper(key)}_Y = ${cf(box.y)};`,
+          `inline constexpr float ${camelToUpper(group)}_${camelToUpper(key)}_SIZE = ${cf(box.size)};`,
+        );
+      }
+    }
+    lines.push('');
+  }
+  lines.push(
+    '/// A closed contour: count x, y pairs in a 0..1 box (y down). An icon is filled with the',
+    '/// nonzero rule (esphelm_icon_raster.h); holes wind against their outline.',
+    'struct Contour {',
+    '  const float *pts;',
+    '  uint16_t count;  // points',
+    '};',
+    'struct Icon {',
+    '  const Contour *contours;',
+    '  uint8_t count;',
+    '};',
+    '',
+  );
+  for (const name of iconNames) {
+    const contours = icons[name] ?? [];
+    const id = name.toUpperCase();
+    contours.forEach((c, i) => {
+      lines.push(`inline constexpr float ${id}_${i}[] = {${c.map(cf).join(', ')}};`);
+    });
+    const entries = contours.map((c, i) => `{${id}_${i}, ${c.length / 2}}`);
+    lines.push(`inline constexpr Contour ${id}[] = {${entries.join(', ')}};`, '');
+  }
+  lines.push(
+    `/// In the order of ENGINE_ICON_NAMES: ${iconNames.join(', ')}.`,
+    `inline constexpr Icon ICONS[] = {${iconNames.map((n) => `{${n.toUpperCase()}, ${icons[n]?.length ?? 0}}`).join(', ')}};`,
+    `inline constexpr int ICON_COUNT = ${iconNames.length};`,
+    '',
+    '}  // namespace engine_shapes',
+    '}  // namespace esphelm',
+    '',
+  );
+  return lines.join('\n');
 }
 
 function renderCasesHeader(cases: CasesFile['cases']): string {
@@ -356,7 +456,16 @@ export async function renderAll(): Promise<Record<string, string>> {
     HEADING_TAPE_FIT,
     WIND_ROSE_TACK,
     CHART_FIT,
+    ENGINE_FIT,
+    ENGINE_ICON_NAMES,
   } = await import('../src/tiles.js');
+  const { ENGINE_ARCS, ENGINE_GEOMETRY, ENGINE_ICONS } = await import('../src/engine.js');
+  const engineShapes = renderEngineShapesHeader(
+    ENGINE_ARCS,
+    ENGINE_GEOMETRY,
+    ENGINE_ICON_NAMES,
+    ENGINE_ICONS,
+  );
   return {
     [UNITS_TS]: renderUnitsTs(units, quantities),
     'src/generated/templates.ts': renderTemplatesTs(),
@@ -374,6 +483,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       HEADING_TAPE_FIT,
       WIND_ROSE_TACK,
       CHART_FIT,
+      ENGINE_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -385,7 +495,10 @@ export async function renderAll(): Promise<Record<string, string>> {
       HEADING_TAPE_FIT,
       WIND_ROSE_TACK,
       CHART_FIT,
+      ENGINE_FIT,
     ),
+    'generated/esphelm_engine_shapes.h': engineShapes,
+    '../../firmware/components/esphelm_runtime/esphelm_engine_shapes.h': engineShapes,
     'schema/layout.schema.json': renderJsonSchema(Layout),
     'schema/hello.schema.json': renderJsonSchema(Hello),
   };

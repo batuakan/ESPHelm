@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "id": "engine",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "engine",
+      "title": "Engine",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "engine",
+          "id": "main-engine",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p0.revolutions",
+          "unit": "rpm",
+          "decimals": 0,
+          "label": "RPM",
+          "min": 0,
+          "max": 5000,
+          "zones": [
+            {
+              "from": 0,
+              "to": 1500,
+              "state": "warn"
+            },
+            {
+              "from": 1500,
+              "to": 3500,
+              "state": "normal"
+            },
+            {
+              "from": 3500,
+              "to": 5000,
+              "state": "alarm"
+            }
+          ],
+          "slots": {
+            "left": {
+              "path": "propulsion.p0.oilPressure",
+              "unit": "bar",
+              "decimals": 1,
+              "label": "Oil",
+              "min": 0,
+              "max": 6,
+              "zones": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "state": "alarm"
+                },
+                {
+                  "from": 2,
+                  "to": 5,
+                  "state": "normal"
+                }
+              ],
+              "icon": "oil"
+            },
+            "right": {
+              "path": "tanks.fuel.0.currentLevel",
+              "unit": "pct",
+              "decimals": 0,
+              "label": "Fuel",
+              "min": 0,
+              "max": 100,
+              "zones": [
+                {
+                  "from": 0,
+                  "to": 15,
+                  "state": "alarm"
+                }
+              ],
+              "icon": "fuel"
+            },
+            "bottom": {
+              "path": "propulsion.p0.temperature",
+              "unit": "degC",
+              "decimals": 0,
+              "label": "Coolant",
+              "min": 40,
+              "max": 120,
+              "zones": [
+                {
+                  "from": 95,
+                  "to": 120,
+                  "state": "alarm"
+                }
+              ],
+              "icon": "temperature"
+            },
+            "topLeft": {
+              "path": "propulsion.p0.runTime",
+              "unit": "h",
+              "decimals": 0,
+              "label": "Hours"
+            },
+            "topRight": {
+              "path": "electrical.alternators.0.voltage",
+              "unit": "V",
+              "decimals": 1,
+              "label": "Alt"
+            },
+            "bottomLeft": {
+              "path": "propulsion.p0.exhaustTemperature",
+              "unit": "degC",
+              "decimals": 0,
+              "label": "Exhaust"
+            },
+            "bottomRight": {
+              "path": "propulsion.p0.fuel.rate",
+              "unit": "Lph",
+              "decimals": 1,
+              "label": "Fuel rate"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "engines",
+      "title": "Engines",
+      "grid": {
+        "cols": 2,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "engine",
+          "id": "rpm-only",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p1.revolutions",
+          "unit": "rpm",
+          "min": 0,
+          "max": 3000,
+          "slots": {}
+        },
+        {
+          "type": "engine",
+          "id": "battery",
+          "x": 1,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "propulsion.p1.revolutions",
+          "unit": "rpm",
+          "label": "Port",
+          "min": 0,
+          "max": 4000,
+          "slots": {
+            "left": {
+              "path": "electrical.batteries.0.voltage",
+              "unit": "V",
+              "label": "Batt",
+              "min": 10,
+              "max": 16,
+              "icon": "battery"
+            },
+            "right": {
+              "path": "propulsion.p1.oilPressure",
+              "unit": "bar",
+              "label": "Oil",
+              "min": 0,
+              "max": 6
+            },
+            "bottom": {
+              "path": "propulsion.p1.temperature",
+              "unit": "degC",
+              "label": "Temp",
+              "min": 40,
+              "max": 120,
+              "icon": "none"
+            }
+          }
+        },
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 1,
+          "w": 2,
+          "h": 1,
+          "path": "navigation.speedOverGround",
+          "unit": "kn",
+          "label": "SOG"
+        }
+      ]
+    }
+  ]
+}

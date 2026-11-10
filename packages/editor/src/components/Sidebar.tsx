@@ -68,6 +68,13 @@ const ICONS: Record<string, JSX.Element> = {
       <path d="M10 2.5v2M17.5 10h-2M10 17.5v-2M2.5 10h2" />
     </svg>
   ),
+  engine: (
+    <svg viewBox="0 0 20 20">
+      <path d="M3.5 15.5a7.5 7.5 0 1 1 13 0" />
+      <path d="M10 11.5l3.5-4" />
+      <path d="M7 12.5a3 3 0 0 1 0-1M13 12.5a3 3 0 0 0 0-1" />
+    </svg>
+  ),
   chart: (
     <svg viewBox="0 0 20 20">
       <path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z" />
@@ -88,6 +95,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   wind_rose: { title: 'Wind rose' },
   autopilot: { title: 'Autopilot' },
   chart: { title: 'Chart' },
+  engine: { title: 'Engine' },
 };
 
 export function DeviceList(props: {
@@ -136,7 +144,11 @@ export function TileLibrary(props: {
   onDragStart(type: TileType, e: ReactPointerEvent): void;
 }) {
   const [query, setQuery] = useState('');
-  const shown = props.types.filter((t) => (TILE_INFO[t]?.title ?? t).toLowerCase().includes(query.toLowerCase()));
+  const title = (t: string) => TILE_INFO[t]?.title ?? t;
+  // Alphabetical by the name shown, whatever order the display's catalog lists them in.
+  const shown = props.types
+    .filter((t) => title(t).toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => title(a).localeCompare(title(b)));
   return (
     <section className="panel library" aria-label="Tiles">
       <h2>Tiles</h2>
@@ -162,7 +174,7 @@ export function TileLibrary(props: {
                 <span className="icon" aria-hidden>
                   {ICONS[t] ?? ICONS.value}
                 </span>
-                {TILE_INFO[t]?.title ?? t}
+                {title(t)}
                 {!ok && <span className="na">n/a</span>}
               </button>
             </li>

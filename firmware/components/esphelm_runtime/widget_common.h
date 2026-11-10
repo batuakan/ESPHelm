@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "widgets.h"
 
@@ -94,6 +95,39 @@ struct Binding {
   }
 };
 
+/// Values in a tile's corners, outside its round drawing (the wind rose's and the engine tile's
+/// corner slots; corner_values.cpp). Each is a value over its caption (label and unit).
+class CornerValues {
+ public:
+  /// A value in `corner` (0 top left, 1 top right, 2 bottom left, 3 bottom right) of `cell`.
+  void add(lv_obj_t *cell, int corner, const esphelm::DataItem &item, const WidgetEnv &env);
+  bool empty() const { return corners_.empty(); }
+  void paths(std::vector<std::string> &out) const;
+  void on_value(const std::string &path, ArduinoJson::JsonVariantConst v, uint32_t now);
+  /// Shows new values (throttled) and "--" once a value goes stale.
+  void tick(uint32_t now);
+  /// Shows each value (in the label font, else the small one) whose box clears the circle of
+  /// radius `r` around the middle of the w x h cell; hides it when it doesn't or when !allowed.
+  /// A drawing open at the bottom (the engine tile) passes `open_below` >= 0: a bottom corner's box
+  /// whose top is at least that far under the centre need only clear radius `open_r`.
+  void layout(int32_t w, int32_t h, double r, bool allowed, double open_below = -1, double open_r = 0);
+  /// Whether the value in `corner` is shown.
+  bool shown(int corner) const;
+
+ private:
+  struct Corner {
+    Binding b;
+    int corner{0};
+    lv_obj_t *box{nullptr};  // the value over its caption
+    lv_obj_t *value{nullptr};
+    lv_obj_t *caption{nullptr};
+    std::string shown{"--"};
+  };
+  std::vector<Corner> corners_;
+  Colors colors_;
+  Fonts fonts_;
+};
+
 // One factory per tile type (widget_<type>.cpp).
 std::unique_ptr<Widget> make_value_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_gauge_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
@@ -106,6 +140,7 @@ std::unique_ptr<Widget> make_graph_widget(lv_obj_t *cell, const esphelm::Tile &t
 std::unique_ptr<Widget> make_heading_tape_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_clock_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_chart_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_engine_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
 }  // namespace esphelm_runtime
 }  // namespace esphome

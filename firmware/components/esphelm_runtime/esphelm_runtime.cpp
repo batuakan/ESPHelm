@@ -309,7 +309,7 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["rotation"] = this->rotation_();  // width and height are as rotated
   // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
   // need PSRAM for their tile buffer.
-  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock"})
+  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock", "engine"})
     doc["widgets"].add(w);
   if (this->psram_)
     doc["widgets"].add("chart");
@@ -1456,7 +1456,8 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
 
 static bool has_zones(const esphelm::Tile &tile) {
   return tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GAUGE ||
-         tile.type == esphelm::TileType::BAR || tile.type == esphelm::TileType::GRAPH;
+         tile.type == esphelm::TileType::BAR || tile.type == esphelm::TileType::GRAPH ||
+         tile.type == esphelm::TileType::ENGINE;  // its RPM (ADR-0032); its slots keep their own
 }
 
 bool EsphelmRuntime::on_visible_page_(const std::string &path) const {
@@ -1557,7 +1558,8 @@ bool EsphelmRuntime::apply_server_zones_() {
       auto it = this->server_zones_.find(t.data.path);
       if (it != this->server_zones_.end()) {
         // A graph takes them as a value tile does: open ends; its bands are cut to the axis it draws.
-        const bool scale = t.type == esphelm::TileType::GAUGE || t.type == esphelm::TileType::BAR;
+        const bool scale = t.type == esphelm::TileType::GAUGE || t.type == esphelm::TileType::BAR ||
+                           t.type == esphelm::TileType::ENGINE;
         esphelm::server_zones_to_display(it->second, t.data.unit, scale ? &t.min : nullptr, scale ? &t.max : nullptr,
                                          zones);
       }

@@ -1,0 +1,45 @@
+{
+  "description": "A slot needs its own min and max",
+  "expect": [
+    {
+      "code": "MISSING_FIELD",
+      "pointer": "/pages/0/tiles/0/slots/right/max"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "engine",
+            "id": "engine",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "propulsion.p0.revolutions",
+            "unit": "rpm",
+            "min": 0,
+            "max": 5000,
+            "slots": {
+              "right": {
+                "path": "tanks.fuel.0.currentLevel",
+                "unit": "pct",
+                "min": 0
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

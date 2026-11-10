@@ -250,6 +250,10 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return make_heading_tape_widget(cell, tile, env);
     case esphelm::TileType::CLOCK:
       return make_clock_widget(cell, tile, env);
+    case esphelm::TileType::ENGINE:
+      // Like the rose, it sits on the page background, as on the legacy engine page.
+      lv_obj_set_style_bg_color(cell, env.colors.background, LV_PART_MAIN);
+      return make_engine_widget(cell, tile, env);
     case esphelm::TileType::CHART:
       return make_chart_widget(cell, tile, env);
     case esphelm::TileType::VALUE:

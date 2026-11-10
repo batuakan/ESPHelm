@@ -557,6 +557,84 @@ void check_chart(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile
   tile.chart = std::move(chart);
 }
 
+/// A `zones` array (optional). `open`: value and graph zones may leave an end open (infinite).
+void zones_field(Checker &chk, JsonObjectConst obj, const std::string &ptr, bool open, std::vector<Zone> &out) {
+  if (!has(obj, "zones"))
+    return;
+  JsonVariantConst zones = obj["zones"];
+  if (!zones.is<JsonArrayConst>()) {
+    chk.add(ptr + "/zones", "INVALID_TYPE");
+    return;
+  }
+  size_t k = 0;
+  for (JsonVariantConst z : zones.as<JsonArrayConst>()) {
+    const std::string zp = ptr + "/zones/" + std::to_string(k++);
+    if (!z.is<JsonObjectConst>()) {
+      chk.add(zp, "INVALID_TYPE");
+      continue;
+    }
+    JsonObjectConst zo = z.as<JsonObjectConst>();
+    Zone zone{-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(), ZoneState::NORMAL};
+    number_field(chk, zo, zp, "from", !open, zone.from);
+    number_field(chk, zo, zp, "to", !open, zone.to);
+    int state = enum_field(chk, zo, zp, "state", true, ZONE_STATES, 4);
+    if (state >= 0)
+      zone.state = static_cast<ZoneState>(state);
+    out.push_back(zone);
+  }
+}
+
+const char *const ENGINE_ICONS[] = {"oil", "fuel", "temperature", "battery", "none"};
+
+/// An engine tile's slots (ADR-0032); its RPM is parsed like a gauge's.
+void check_engine(Checker &chk, JsonObjectConst obj, const std::string &ptr, EngineConfig &engine) {
+  const std::string sp = ptr + "/slots";
+  if (!has(obj, "slots")) {
+    chk.add(sp, "MISSING_FIELD");
+    return;
+  }
+  if (!obj["slots"].is<JsonObjectConst>()) {
+    chk.add(sp, "INVALID_TYPE");
+    return;
+  }
+  for (JsonPairConst kv : obj["slots"].as<JsonObjectConst>()) {
+    int slot = -1, corner = -1;
+    for (int i = 0; i < EngineConfig::SLOTS; i++) {
+      if (std::strcmp(kv.key().c_str(), ENGINE_SLOT_NAMES[i]) == 0)
+        slot = i;
+    }
+    for (int i = 0; i < EngineConfig::CORNERS; i++) {
+      if (std::strcmp(kv.key().c_str(), ENGINE_CORNER_NAMES[i]) == 0)
+        corner = i;
+    }
+    const std::string kp = sp + "/" + kv.key().c_str();
+    if (slot < 0 && corner < 0) {
+      chk.add(kp, "UNKNOWN_SLOT");
+      continue;
+    }
+    if (!kv.value().is<JsonObjectConst>()) {
+      chk.add(kp, "INVALID_TYPE");
+      continue;
+    }
+    JsonObjectConst so = kv.value().as<JsonObjectConst>();
+    if (corner >= 0) {
+      // A corner value: a plain DataItem, as a wind rose's corners.
+      data_item_fields(chk, so, kp, engine.corners[corner]);
+      engine.has_corner[corner] = true;
+      continue;
+    }
+    EngineSlot &s = engine.slots[slot];
+    data_item_fields(chk, so, kp, s.data);
+    number_field(chk, so, kp, "min", true, s.min);
+    number_field(chk, so, kp, "max", true, s.max);
+    zones_field(chk, so, kp, false, s.zones);
+    int icon = enum_field(chk, so, kp, "icon", false, ENGINE_ICONS, 5);
+    if (icon >= 0 && icon < 4)
+      s.icon = static_cast<EngineIcon>(icon);
+    engine.has_slot[slot] = true;
+  }
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -582,6 +660,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::CLOCK;
   } else if (t != nullptr && std::strcmp(t, "chart") == 0) {
     tile.type = TileType::CHART;
+  } else if (t != nullptr && std::strcmp(t, "engine") == 0) {
+    tile.type = TileType::ENGINE;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -685,31 +765,7 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     number_field(chk, obj, ptr, "min", true, tile.min);
     number_field(chk, obj, ptr, "max", true, tile.max);
   }
-  if (has(obj, "zones")) {
-    JsonVariantConst zones = obj["zones"];
-    if (!zones.is<JsonArrayConst>()) {
-      chk.add(ptr + "/zones", "INVALID_TYPE");
-    } else {
-      size_t k = 0;
-      for (JsonVariantConst z : zones.as<JsonArrayConst>()) {
-        const std::string zp = ptr + "/zones/" + std::to_string(k++);
-        if (!z.is<JsonObjectConst>()) {
-          chk.add(zp, "INVALID_TYPE");
-          continue;
-        }
-        JsonObjectConst zo = z.as<JsonObjectConst>();
-        // Value tiles have no min/max, so either end may be open.
-        Zone zone{-std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
-                  ZoneState::NORMAL};
-        number_field(chk, zo, zp, "from", !value, zone.from);
-        number_field(chk, zo, zp, "to", !value, zone.to);
-        int state = enum_field(chk, zo, zp, "state", true, ZONE_STATES, 4);
-        if (state >= 0)
-          zone.state = static_cast<ZoneState>(state);
-        tile.zones.push_back(zone);
-      }
-    }
-  }
+  zones_field(chk, obj, ptr, value, tile.zones);
   if (tile.type == TileType::GAUGE || tile.type == TileType::BAR) {
     if (has(obj, "centerZero")) {
       if (!obj["centerZero"].is<bool>())
@@ -725,6 +781,11 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     int o = enum_field(chk, obj, ptr, "orientation", false, ORIENTATIONS, 2);
     if (o >= 0)
       tile.orientation = static_cast<Orientation>(o);
+  }
+  if (tile.type == TileType::ENGINE) {
+    auto engine = std::make_shared<EngineConfig>();
+    check_engine(chk, obj, ptr, *engine);
+    tile.engine = std::move(engine);
   }
 }
 
@@ -877,6 +938,23 @@ void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
   }
 }
 
+/// A scale's range and its zones (as checkScale() in validate.ts).
+void check_scale(Checker &chk, const std::string &base, double min, double max, const std::vector<Zone> &zones) {
+  if (!(min < max)) {
+    chk.add(base + "/max", "INVALID_RANGE");
+    return;
+  }
+  for (size_t k = 0; k < zones.size(); k++) {
+    const Zone &z = zones[k];
+    const std::string zp = base + "/zones/" + std::to_string(k);
+    if (!(z.from < z.to)) {
+      chk.add(zp, "INVALID_ZONE");
+    } else if (z.from < min || z.to > max) {
+      chk.add(zp, "ZONE_OUT_OF_RANGE");
+    }
+  }
+}
+
 void check_semantics(Checker &chk, const Layout &layout) {
   std::vector<std::string> ids;
   auto claim = [&](const std::string &id, const std::string &pointer) {
@@ -922,19 +1000,13 @@ void check_semantics(Checker &chk, const Layout &layout) {
       }
       if ((t.type == TileType::GAUGE || t.type == TileType::BAR) && t.center_zero && !(t.min < 0 && t.max > 0))
         chk.add(tp + "/min", "INVALID_RANGE");
-      if (t.type == TileType::GAUGE || t.type == TileType::BAR) {
-        if (!(t.min < t.max)) {
-          chk.add(tp + "/max", "INVALID_RANGE");
-          continue;
-        }
-        for (size_t k = 0; k < t.zones.size(); k++) {
-          const Zone &z = t.zones[k];
-          const std::string zp = tp + "/zones/" + std::to_string(k);
-          if (!(z.from < z.to)) {
-            chk.add(zp, "INVALID_ZONE");
-          } else if (z.from < t.min || z.to > t.max) {
-            chk.add(zp, "ZONE_OUT_OF_RANGE");
-          }
+      if (t.type == TileType::GAUGE || t.type == TileType::BAR || t.type == TileType::ENGINE)
+        check_scale(chk, tp, t.min, t.max, t.zones);
+      if (t.type == TileType::ENGINE && t.engine) {
+        for (int k = 0; k < EngineConfig::SLOTS; k++) {
+          const EngineSlot &slot = t.engine->slots[k];
+          if (t.engine->has_slot[k])
+            check_scale(chk, tp + "/slots/" + ENGINE_SLOT_NAMES[k], slot.min, slot.max, slot.zones);
         }
       }
     }

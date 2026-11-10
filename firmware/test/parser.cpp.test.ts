@@ -78,6 +78,51 @@ const withTile = (patch: Record<string, unknown>) => ({
 /** Extra mutations beyond the fixtures, compared the same way (differential test). */
 const mutations: { name: string; doc: unknown }[] = [
   { name: 'integer written as 2.0', doc: withTile({ w: 1.0, decimals: 2.0 }) },
+  {
+    name: 'engine slots not an object',
+    doc: withTile({ type: 'engine', min: 0, max: 5000, slots: [] }),
+  },
+  {
+    name: 'engine slot: not an object, no path, an unknown unit and zone state, a numeric icon',
+    doc: withTile({
+      type: 'engine',
+      min: 0,
+      max: 5000,
+      slots: {
+        left: 'oil',
+        right: { min: 0, max: 6, unit: 'furlongs', zones: [{ from: 0, to: 1, state: 'red' }] },
+        bottom: { path: 'propulsion.p0.temperature', min: 40, max: 120, icon: 2 },
+      },
+    }),
+  },
+  {
+    name: 'engine slot zones not an array, and a zone without ends',
+    doc: withTile({
+      type: 'engine',
+      min: 0,
+      max: 5000,
+      zones: [{ state: 'alarm' }],
+      slots: { left: { path: 'propulsion.p0.oilPressure', min: 0, max: 6, zones: 'low' } },
+    }),
+  },
+  {
+    name: 'engine corners: not an object, no path, an unknown unit, a label out of the charset',
+    doc: withTile({
+      type: 'engine',
+      min: 0,
+      max: 5000,
+      slots: {
+        topLeft: 12,
+        topRight: { unit: 'furlongs' },
+        bottomLeft: { path: 'propulsion.p0.runTime', label: 'Stunden ü' },
+        bottomRight: { path: 'propulsion.p0.fuel.rate', unit: 'Lph', decimals: 1 },
+      },
+    }),
+  },
+  {
+    name: 'engine without min and max',
+    doc: withTile({ type: 'engine', slots: {} }),
+  },
   { name: 'settings not an object', doc: { ...minimal, settings: 'bright' } },
   { name: 'position format of the wrong type', doc: withTile({ type: 'position', format: 3 }) },
   { name: 'value colour of the wrong type', doc: withTile({ color: 1 }) },

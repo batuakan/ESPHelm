@@ -6,6 +6,13 @@ import {
   posixTz,
   AUTOPILOT_DEFAULTS,
   CHART_DEFAULTS,
+  ENGINE_DEFAULTS,
+  type EngineSlot,
+  type EngineSlotName,
+  type EngineCornerName,
+  ENGINE_CORNER_SLOTS,
+  ENGINE_GAUGE_SLOTS,
+  type EngineTile,
   SETTINGS_DEFAULTS,
   POSITION_DEFAULTS,
   WIND_ROSE_DEFAULTS,
@@ -49,6 +56,10 @@ export const CORNER_SLOTS: readonly SlotName[] = [
   'bottomRight',
 ];
 export const WIND_ROSE_SLOTS: readonly SlotName[] = [...CENTER_SLOTS, ...CORNER_SLOTS];
+/** An engine tile's slot gauges (ADR-0032): inside the RPM arc on the left and right, and in its open bottom. */
+export const ENGINE_SLOTS: readonly EngineSlotName[] = ENGINE_GAUGE_SLOTS;
+/** An engine tile's corner values, outside the RPM arc. */
+export const ENGINE_CORNERS: readonly EngineCornerName[] = ENGINE_CORNER_SLOTS;
 
 /** Layout id for a display's own layout (one layout per display). */
 export function layoutIdFor(deviceId: string): string {
@@ -144,6 +155,7 @@ export function tilePaths(tile: Tile): string[] {
     const t = headingTapeSettings(tile);
     return [t.headingPath, ...t.markers.map((m) => t.paths[m])];
   }
+  if (tile.type === 'engine') return [tile.path, ...Object.values(tile.slots).map((s) => s.path)];
   if (tile.type !== 'wind_rose') return [tile.path];
   const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   return [
@@ -206,6 +218,13 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
     case 'chart':
       // The chart starts unset: the validator asks for one until it is picked.
       return { type, ...place, chart: '' };
+    case 'engine':
+      // The legacy engine screen's values (propulsion.p0), so it shows something at once.
+      return {
+        type,
+        ...place,
+        ...(structuredClone(ENGINE_DEFAULTS) as Omit<EngineTile, 'type' | keyof Rect | 'id'>),
+      };
     default:
       return { type: 'value', ...place, path: '' };
   }
@@ -213,7 +232,7 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
 
 /**
  * Add a tile to page `index` at `at` (or the first free cell). Tiles are 1x1, except wind
- * roses and autopilots, which take 2x2, and positions, graphs and heading tapes, which take 2x1,
+ * roses, autopilots, charts and engines, which take 2x2, and positions, graphs and heading tapes, which take 2x1,
  * when that fits there.
  */
 export function addTile(
@@ -241,10 +260,12 @@ export function addTile(
                 ? 'clock'
                 : type === 'chart'
                   ? 'chart'
-                  : 'tile';
+                  : type === 'engine'
+                    ? 'engine'
+                    : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
-  const big = type === 'wind_rose' || type === 'autopilot' || type === 'chart';
+  const big = type === 'wind_rose' || type === 'autopilot' || type === 'chart' || type === 'engine';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
@@ -529,6 +550,40 @@ export function updateSlot(
   });
 }
 
+/**
+ * Merge into a slot of engine tile `id`; `null` empties the slot. A new gauge starts as the
+ * default for that place (ENGINE_DEFAULTS), so it has a sensible range and icon; a new corner
+ * value starts without a path, as a wind rose's.
+ */
+export function updateEngineSlot(
+  layout: Layout,
+  index: number,
+  id: string,
+  slot: EngineSlotName | EngineCornerName,
+  patch: Record<string, unknown> | null,
+): Layout {
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => {
+      if (t.id !== id || t.type !== 'engine') return t;
+      const slots = { ...t.slots };
+      if (patch === null) delete slots[slot];
+      else if (isEngineCorner(slot))
+        slots[slot] = merge<DataItem>(slots[slot] ?? { path: '' }, patch);
+      else
+        slots[slot] = merge<EngineSlot>(
+          slots[slot] ?? (structuredClone(ENGINE_DEFAULTS.slots[slot]) as EngineSlot),
+          patch,
+        );
+      return { ...t, slots };
+    }),
+  }));
+}
+
+export function isEngineCorner(slot: string): slot is EngineCornerName {
+  return (ENGINE_CORNERS as readonly string[]).includes(slot);
+}
+
 /** `tile` with `name` in its history list or not, in ROSE_HISTORY_KEYS order; [] removes it. */
 function withHistory(tile: WindRoseTile, name: RoseHistoryKey, on: boolean): WindRoseTile {
   const names = new Set(tile.history ?? []);
@@ -640,6 +695,11 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
             if (slot) add(slot.path, ...at, 'slots', name, 'path');
           return;
         }
+        case 'engine':
+          add(t.path, ...at, 'path');
+          for (const [name, slot] of Object.entries(t.slots))
+            if (slot) add(slot.path, ...at, 'slots', name, 'path');
+          return;
         default:
           return add(t.path, ...at, 'path');
       }
@@ -689,7 +749,7 @@ export function layoutCharts(layout: Layout): string[] {
 export interface ProblemTarget {
   page: number;
   tileId?: string;
-  slot?: SlotName;
+  slot?: SlotName | EngineSlotName;
 }
 
 export function targetForPointer(layout: Layout, pointer: string): ProblemTarget | undefined {
@@ -700,8 +760,8 @@ export function targetForPointer(layout: Layout, pointer: string): ProblemTarget
   if (!page) return undefined;
   if (m[2] === undefined) return { page: index };
   const tileId = pageTiles(page)[Number(m[2])]?.id;
-  const slot = (WIND_ROSE_SLOTS as readonly string[]).includes(m[3] ?? '')
-    ? (m[3] as SlotName)
+  const slot = ([...WIND_ROSE_SLOTS, ...ENGINE_SLOTS] as readonly string[]).includes(m[3] ?? '')
+    ? (m[3] as SlotName | EngineSlotName)
     : undefined;
   return { page: index, tileId, ...(slot ? { slot } : {}) };
 }

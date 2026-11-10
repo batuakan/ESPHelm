@@ -1377,6 +1377,89 @@ fieldset.modes {
   gap: 8px 16px;
 }
 
+/* Engine tile preview (ADR-0032): drawn in display pixels on the page background, as on the display */
+.tile-type-engine {
+  grid-template-rows: 0 1fr; /* no caption line: the arcs use the whole tile */
+  padding: 6px;
+  background: var(--canvas-bg) !important;
+}
+.tile-graphic.engine-tile {
+  height: 100%;
+  min-height: 0;
+}
+.tile-graphic.engine-tile svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.engine .band,
+.engine .track {
+  fill: none;
+}
+.engine .track,
+.engine .tick {
+  stroke: var(--tile-text);
+  stroke-linecap: round;
+}
+.engine .tick {
+  stroke-linecap: butt; /* flat ends: a round cap would poke past the track */
+}
+.engine .tick.alarm {
+  stroke: var(--zone-alarm);
+}
+.engine .band.zone-normal {
+  stroke: var(--zone-normal);
+}
+.engine .band.zone-warn {
+  stroke: var(--zone-warn);
+}
+.engine .band.zone-alarm {
+  stroke: var(--zone-alarm);
+}
+.engine .band.zone-emergency {
+  stroke: var(--zone-emergency);
+}
+.engine .needle {
+  fill: var(--zone-alarm);
+}
+.engine .tick-label,
+.engine .engine-title,
+.engine .slot-label {
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.engine .tick-label,
+.engine .slot-label {
+  fill: var(--tile-text);
+}
+.engine .engine-title,
+.engine .stale {
+  fill: var(--tile-muted);
+}
+.engine .corner-value {
+  cursor: pointer;
+}
+.engine .corner-value text {
+  fill: var(--tile-text);
+  dominant-baseline: central;
+  text-anchor: start;
+}
+.engine .corner-value.right text {
+  text-anchor: end;
+}
+.engine .corner-value .value {
+  font-variant-numeric: tabular-nums;
+}
+.engine .corner-value .value.stale {
+  fill: var(--tile-muted);
+}
+.engine .icon {
+  fill: var(--tile-text);
+}
+.engine .icon.stale {
+  fill: var(--tile-muted);
+}
+
 /* Chart tile preview (ADR-0030): the map fills the tile, as on the display */
 .tile-type-chart {
   grid-template-rows: 0 1fr; /* no caption line */

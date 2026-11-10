@@ -36,7 +36,7 @@ function fakeServer(devices: Device[]) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock', 'engine'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -329,7 +329,9 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Replace' }));
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Engine']);
     await screen.findByText('No problems');
-    expect(within(screen.getByTestId('grid')).getAllByText(/RPM|Coolant|Oil/)).toHaveLength(3);
+    // One engine tile (ADR-0032) with the RPM arc and its oil, fuel and coolant gauges.
+    expect(screen.getByTestId('engine-engine-p0')).toBeTruthy();
+    expect(within(screen.getByTestId('grid')).getAllByText('RPM')).toHaveLength(1);
   });
 
   it('adds an autopilot next to other tiles; modes and size hint', async () => {
@@ -524,6 +526,74 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('adds an engine tile: live needles, a slot icon and range, and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Engine/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect([...live.paths()].sort()).toEqual([
+      'propulsion.p0.oilPressure',
+      'propulsion.p0.revolutions',
+      'propulsion.p0.temperature',
+      'tanks.fuel.0.currentLevel',
+    ]);
+    const preview = screen.getByTestId('engine-engine-1');
+    expect(preview.querySelectorAll('.needle')).toHaveLength(0); // no values yet
+    within(preview).getByText('x100');
+    live.emit('propulsion.p0.revolutions', 30); // 1800 rpm
+    live.emit('propulsion.p0.oilPressure', 350000);
+    expect(preview.querySelectorAll('.needle')).toHaveLength(2);
+    expect(preview.querySelectorAll('.icon')).toHaveLength(3);
+
+    fireEvent.click(within(drawer).getByText('Left gauge'));
+    const left = within(drawer).getByTestId('slot-section-left');
+    fireEvent.change(within(left).getByLabelText('Icon of the left gauge'), { target: { value: 'none' } });
+    fireEvent.change(within(left).getByLabelText('Maximum'), { target: { value: '8' } });
+    // No icon: the label instead, where one of the display's fonts fits the slot (not at this size).
+    expect(preview.querySelectorAll('.icon')).toHaveLength(2);
+    fireEvent.click(within(within(drawer).getByTestId('slot-section-right')).getByText('Empty this slot'));
+
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    const saved = pageTiles(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]!)[0] as {
+      slots: Record<string, Record<string, unknown>>;
+    };
+    expect(saved).toMatchObject({ type: 'engine', id: 'engine-1', w: 2, h: 2, max: 5000 });
+    expect(Object.keys(saved.slots)).toEqual(['left', 'bottom']);
+    expect(saved.slots.left).toMatchObject({ max: 8 });
+    expect(saved.slots.left).not.toHaveProperty('icon');
+  });
+
+  it('puts a value in an engine tile corner, shown where it fits outside the arc', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Engine/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    const section = within(drawer).getByTestId('slot-section-topLeft');
+    expect(section.textContent).toMatch(/Top left corner/);
+    fireEvent.change(within(section).getByLabelText('Search SignalK paths'), { target: { value: 'depth' } });
+    fireEvent.click(within(section).getByRole('option', { name: /belowTransducer/ }));
+    live.emit('environment.depth.belowTransducer', 7.44);
+    const corner = screen.getByTestId('slot-engine-1-topLeft');
+    within(corner).getByText('7.4');
+    within(corner).getByText('m');
+    // A tap on it opens its section.
+    fireEvent.click(within(drawer).getByText('Revolutions (the large arc)'));
+    fireEvent.click(corner);
+    expect((within(drawer).getByTestId('slot-section-topLeft') as HTMLDetailsElement).open).toBe(true);
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(pageTiles(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]!)[0]).toMatchObject({
+      slots: { topLeft: { path: 'environment.depth.belowTransducer', unit: 'm' } },
+    });
+  });
+
   it('adds a heading tape: live heading, markers, the true/magnetic hint, and saves it', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();
@@ -698,6 +768,17 @@ describe('editor', { timeout: 20000 }, () => {
       expect((within(library).getByRole('button', { name: /Gauge/ }) as HTMLButtonElement).disabled).toBe(true),
     );
     expect((within(library).getByRole('button', { name: /Value/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('lists the tile types alphabetically', async () => {
+    render(<App api={fakeServer([device('adopted')]).api} live={fakeLive().factory} />);
+    const library = await screen.findByRole('region', { name: 'Tiles' });
+    await waitFor(() => expect(within(library).getAllByRole('button').length).toBeGreaterThan(5));
+    const names = within(library)
+      .getAllByRole('button')
+      .map((b) => b.textContent ?? '');
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(names[0]).toMatch(/^Autopilot/);
   });
 
   it('shows a login hint when SignalK refuses the editor API', async () => {

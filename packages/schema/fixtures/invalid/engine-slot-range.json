@@ -1,0 +1,46 @@
+{
+  "description": "A slot scale needs max above min",
+  "expect": [
+    {
+      "code": "INVALID_RANGE",
+      "pointer": "/pages/0/tiles/0/slots/left/max"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "engine",
+            "id": "engine",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "propulsion.p0.revolutions",
+            "unit": "rpm",
+            "min": 0,
+            "max": 5000,
+            "slots": {
+              "left": {
+                "path": "propulsion.p0.oilPressure",
+                "unit": "bar",
+                "min": 6,
+                "max": 6
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

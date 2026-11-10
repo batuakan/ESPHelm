@@ -8,25 +8,34 @@
       "kind": "grid",
       "id": "engine",
       "title": "Engine",
-      "grid": { "cols": 2, "rows": 3 },
+      "grid": { "cols": 1, "rows": 1 },
       "tiles": [
         {
-          "type": "gauge", "id": "rpm", "x": 0, "y": 0, "w": 2, "h": 2,
+          "type": "engine", "id": "engine-p0", "x": 0, "y": 0, "w": 1, "h": 1,
           "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM",
           "min": 0, "max": 5000,
-          "zones": [{ "from": 3500, "to": 5000, "state": "alarm" }]
-        },
-        {
-          "type": "gauge", "id": "coolant", "x": 0, "y": 2, "w": 1, "h": 1,
-          "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
-          "min": 40, "max": 120,
-          "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
-        },
-        {
-          "type": "bar", "id": "oil", "x": 1, "y": 2, "w": 1, "h": 1,
-          "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil",
-          "min": 0, "max": 6, "orientation": "vertical",
-          "zones": [{ "from": 0, "to": 1, "state": "alarm" }]
+          "zones": [
+            { "from": 0, "to": 1500, "state": "warn" },
+            { "from": 1500, "to": 3500, "state": "normal" },
+            { "from": 3500, "to": 5000, "state": "alarm" }
+          ],
+          "slots": {
+            "left": {
+              "path": "propulsion.p0.oilPressure", "unit": "bar", "decimals": 1, "label": "Oil",
+              "min": 0, "max": 6, "icon": "oil",
+              "zones": [{ "from": 0, "to": 1, "state": "alarm" }, { "from": 2, "to": 5, "state": "normal" }]
+            },
+            "right": {
+              "path": "tanks.fuel.0.currentLevel", "unit": "pct", "decimals": 0, "label": "Fuel",
+              "min": 0, "max": 100, "icon": "fuel",
+              "zones": [{ "from": 0, "to": 15, "state": "alarm" }]
+            },
+            "bottom": {
+              "path": "propulsion.p0.temperature", "unit": "degC", "decimals": 0, "label": "Coolant",
+              "min": 40, "max": 120, "icon": "temperature",
+              "zones": [{ "from": 95, "to": 120, "state": "alarm" }]
+            }
+          }
         }
       ]
     }
