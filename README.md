@@ -13,8 +13,10 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-wind-day.png">
  <img width="200px" src="/docs/images/display-wind-night.png">
  <img width="200px" src="/docs/images/display-wind-laylines.png">
+ <img width="200px" src="/docs/images/display-wind-dark.png">
  <img width="200px" src="/docs/images/display-chart-tiles.png">
  <img width="200px" src="/docs/images/display-engine-day.png">
+ <img width="200px" src="/docs/images/display-engine-dark.png">
  <img width="200px" src="/docs/images/display-energy-night.png">
  <img width="200px" src="/docs/images/display-switchboard-day.png">
  <img width="200px" src="/docs/images/display-autopilot-night.png">
@@ -31,7 +33,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-setup-wifi.png">
 </p>
 
-<p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day and night themes.</em></p>
+<p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day, dark and night themes.</em></p>
 
 ---
 
@@ -97,8 +99,9 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
 - **Touch sounds:** a short click when you press a button or tile, with the volume and an on/off switch in the editor's display settings and on the display.
+- **Three display themes:** *Day* (light, for sunlight), *Dark* (a dark page with full colours, like the editor's dark theme) and *Night* (red on black, for night vision). Automatic day/night switches between Night and your Day or Dark.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
-- **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Night / Auto, the volume and touch sounds (on a display with a speaker) and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
+- **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Dark / Night / Auto, the volume and touch sounds (on a display with a speaker) and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Safe with bad layouts:** every layout is validated on the device, and one that crashes the display is skipped at the next boot in favour of the last one that worked.
@@ -114,8 +117,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 - **Change page:** the **<** and **>** buttons in the footer.
 - **Settings:** the button with three bars in the footer (every layout has one) opens the settings panel, on its *Settings* tab.
-  - **Brightness:** a slider for the theme shown (day and night are kept separately).
-  - **Theme:** *Day*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, a choice of Day or Night holds until the next sunrise or sunset.
+  - **Brightness:** a slider for the theme shown (night is kept separately; Day and Dark share one).
+  - **Theme:** *Day*, *Dark*, *Night*, or *Auto* (the layout's theme, or the sun's with automatic day/night). With automatic day/night on, Day or Dark is what comes back at sunrise; a choice of Night holds until the next sunrise or sunset.
   - **Screen off,** when the layout has a screen timeout.
   - **Saved on the display:** what you choose survives a restart. When you change the same setting in the editor and send the layout, the editor's value wins.
   - **Network tab:** the Wi-Fi network, signal and IP, and the SignalK server. *Change server* lists the servers on the network; *Forget server* drops the server and its approval. At the bottom, *Factory reset* is ESPHome's factory reset: the display forgets Wi-Fi, its server and approval, its cached layout and its settings, and restarts into its setup network. *Forget server* and *Factory reset* ask *Yes* first.
@@ -166,7 +169,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 96 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 102 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

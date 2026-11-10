@@ -22,6 +22,18 @@ Colors colors_for(esphelm::Theme theme) {
                   {lv_color_hex(0xE0302A), lv_color_hex(0xE0302A), lv_color_hex(0xE0302A), lv_color_hex(0xE0302A),
                    lv_color_hex(0xE0302A), lv_color_hex(0xE0302A)}};
   }
+  if (theme == esphelm::Theme::DARK) {
+    // Dark (ADR-0034): the editor's own dark theme (packages/editor/src/styles.css), full colours.
+    return Colors{lv_color_hex(0x0E141A), lv_color_hex(0x17202A), lv_color_hex(0xE5EBF1), lv_color_hex(0x93A1AE),
+                  lv_color_hex(0x4A9EFF), lv_color_hex(0xF2C14E),
+                  {lv_color_hex(0x4CC38A), lv_color_hex(0xF0B04A), lv_color_hex(0xFF6B6B), lv_color_hex(0xD34DD9)},
+                  // red port, green starboard, orange A, purple T, lightened for the dark page
+                  lv_color_hex(0xFF5A52), lv_color_hex(0x3DDC84), lv_color_hex(0xFF9F43), lv_color_hex(0xC77DFF),
+                  lv_color_hex(0x2A3744), lv_color_hex(0x17202A), lv_color_hex(0xE5EBF1),
+                  // value tile colours: light shades that read on the dark tile
+                  {lv_color_hex(0x4A9EFF), lv_color_hex(0x4CC38A), lv_color_hex(0xF2C14E), lv_color_hex(0xFF9F43),
+                   lv_color_hex(0xFF6B6B), lv_color_hex(0xC77DFF)}};
+  }
   // Day: light, for sunlight. White page, light grey tiles, dark text.
   return Colors{lv_color_hex(0xFFFFFF), lv_color_hex(0xE6EAEE), lv_color_hex(0x111820), lv_color_hex(0x5D6B78),
                 lv_color_hex(0x0A6CD6), lv_color_hex(0xB07800),

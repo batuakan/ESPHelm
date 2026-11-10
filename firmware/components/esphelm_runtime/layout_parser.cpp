@@ -267,7 +267,8 @@ void data_item_fields(Checker &chk, JsonObjectConst obj, const std::string &ptr,
 const char *const ZONE_STATES[] = {"normal", "warn", "alarm", "emergency"};
 const char *const ORIENTATIONS[] = {"horizontal", "vertical"};
 const char *const CENTER_ZERO_SIDES[] = {"portStarboard", "plusMinus"};
-const char *const THEMES[] = {"day", "night"};
+// Same order as Theme.
+const char *const THEMES[] = {"day", "night", "dark"};
 // Same order as position::Format.
 const char *const POSITION_FORMATS[] = {"ddm", "dms", "dd", "decimal"};
 const char *const VALUE_COLORS[] = {"blue", "green", "yellow", "orange", "red", "purple"};
@@ -912,7 +913,7 @@ void check_structure(Checker &chk, JsonVariantConst root, Layout &layout) {
     chk.add("/version", "MISSING_FIELD");
   string_field(chk, obj, "", "id", true, StrKind::ID, layout.id);
   string_field(chk, obj, "", "name", false, StrKind::LABEL, layout.name);
-  int theme = enum_field(chk, obj, "", "theme", true, THEMES, 2);
+  int theme = enum_field(chk, obj, "", "theme", true, THEMES, 3);
   if (theme >= 0)
     layout.theme = static_cast<Theme>(theme);
   if (has(obj, "settings"))

@@ -299,3 +299,18 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Not checked on hardware yet** (hardware step 30): the pins, the loudness, hiss with the amplifier always on, and that the clicks feel right.
 - **Editor test timing:** `App.test.tsx`'s "edits the display settings" can miss its 1 s wait for the layout on a loaded machine (on `main` too); with a longer wait it passes, and it passes in the full run.
 
+
+## Dark theme (ADR-0034, branch `feat/dark-theme`)
+- **What:** a third display theme, `dark`, that looks like the editor's dark theme: a `#0E141A` page, `#17202A` tiles, light text, and the zone, value and wind rose colours in lighter shades. Day and Night are unchanged.
+- **Night vs dark:** "night" had meant both "red only" and "dark page". `red_only()` (night: zones by brightness, red charts) and `dark_page()` (night or dark: stronger zone bands) in `layout_model.h` now say which. In Dark the alarm banner's text is the page colour (its bands are light), QR codes are black on white, and charts are drawn as by day.
+- **Auto:** swaps between Night and the day-side theme: the last Day or Dark picked on the display, else the layout's (Day when that is Night). The footer toggle goes Night and back to the day side. The panel's Theme row is Day / Dark / Night / Auto; it falls back to two rows where four don't fit, which none of the current screens need (checked at 480, 720, the turned 1280×800 and the CYD's 320×240).
+- **Saved:** the day side is `ds=` in the `v=3` prefs record; `v=1` and `v=2` records still read.
+- **Brightness:** unchanged; Dark uses the day value and floor.
+- **Older firmware:** it refuses a `dark` layout and keeps its last good one. `hello` now reports `capabilities.darkTheme`, and the editor greys out *Dark* for displays without it.
+- **Behaviour change:** a layout whose theme is Night with automatic day/night now shows Day by day (it used to stay Night all day).
+- **Found by the e2e:** two `environment.sun` updates sent back to back reach the display as one; SignalK drops an update sooner than the subscription's `minPeriod`. The test now waits between dusk and sunrise.
+- **Tests:**
+  - **Unit:** a schema fixture; parser mutations; the prefs test for v3, the day side and its reconcile; editor tests for the button, its gating and the preview; a plugin test storing and serving a dark layout.
+  - **SDL e2e:** the dark flow (panel pick, day brightness kept, dusk to night, sunrise back to dark, the footer toggle) and new goldens 82–86 and 720-18, reviewed by eye. The five settings-panel goldens changed for the fourth button and were reviewed; the other 91 are unchanged.
+- **Build sizes:** P4 flash 3,541,886 B (+1.3 KB), static RAM 104,106 B (unchanged); Guition flash 1,828,451 B, RAM 122,031 B; CYD flash 1,520,035 B (82.8 %), RAM 55,908 B; C3 flash 1,639,488 B (89.3 %), RAM 113,854 B.
+- **Checked on the P4** (2026-11-10).

@@ -78,6 +78,12 @@ export const Hello = Type.Object(
               'The display has a speaker: touch clicks and alarm tones (settings.sound, ADR-0033).',
           }),
         ),
+        darkTheme: Type.Optional(
+          Type.Boolean({
+            description:
+              'The firmware renders theme "dark" (ADR-0034); older firmware refuses such a layout and keeps its last good one.',
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

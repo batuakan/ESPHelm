@@ -26,7 +26,7 @@ export const Settings = Type.Object(
     autoTheme: Type.Optional(
       Type.Union([Type.Literal('off'), Type.Literal('sun')], {
         description:
-          '"sun": night theme while autoThemePath says dusk or night, else the layout theme.',
+          '"sun": night theme while autoThemePath says dusk or night, else the day-side theme: day or dark as last picked on the display, or the layout theme (day when that is night).',
       }),
     ),
     autoThemePath: Type.Optional(SkPath),

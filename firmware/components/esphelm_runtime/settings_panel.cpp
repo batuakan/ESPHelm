@@ -13,11 +13,22 @@ namespace esphelm_runtime {
 
 static const char *const TAG = "esphelm.settings";
 static const uint32_t INFO_INTERVAL_MS = 1000;
-static const char *const CHOICE_PARTS[3] = {"day", "night", "auto"};
-static const char *const CHOICE_TEXT[3] = {"Day", "Night", "Auto"};
+static const int CHOICES = 4;
+static const char *const CHOICE_PARTS[CHOICES] = {"day", "dark", "night", "auto"};
+static const char *const CHOICE_TEXT[CHOICES] = {"Day", "Dark", "Night", "Auto"};
+/// What each button chooses: -1 auto, else Theme.
+static const int8_t CHOICE_VALUE[CHOICES] = {static_cast<int8_t>(esphelm::Theme::DAY),
+                                             static_cast<int8_t>(esphelm::Theme::DARK),
+                                             static_cast<int8_t>(esphelm::Theme::NIGHT), -1};
 
 /// Choice button index of a choice (-1 auto, else Theme).
-static int choice_index(int8_t choice) { return choice < 0 ? 2 : choice; }
+static int choice_index(int8_t choice) {
+  for (int i = 0; i < CHOICES; i++) {
+    if (CHOICE_VALUE[i] == choice)
+      return i;
+  }
+  return CHOICES - 1;
+}
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, const char *text) {
   lv_obj_t *l = lv_label_create(parent);
@@ -150,9 +161,9 @@ void SettingsPanel::tap(const std::string &part) {
       this->brightness_done_ = true;
     }
   } else {
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < CHOICES; i++) {
       if (part == CHOICE_PARTS[i])
-        this->pending_choice_ = static_cast<int8_t>(i == 2 ? -1 : i);
+        this->pending_choice_ = CHOICE_VALUE[i];
     }
   }
 }
@@ -265,7 +276,7 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
 void SettingsPanel::style_choices_() {
   const Colors c = colors_for(this->state_.theme);
   const int selected = choice_index(this->state_.choice);
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < CHOICES; i++) {
     if (this->choices_[i] == nullptr)
       continue;
     const bool on = i == selected;
@@ -395,11 +406,19 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
 
   label(body, big, c.muted, "Theme");
   lv_obj_t *choices = box(body, w);
-  lv_obj_set_height(choices, btn_h);
-  const int32_t choice_w = (w - 2 * 8) / 3;
-  for (int i = 0; i < 3; i++) {
+  // Four in a row, or two rows of two where the widest name would not fit (small screens).
+  int32_t widest = 0;
+  for (const char *text : CHOICE_TEXT) {
+    lv_point_t size;
+    lv_text_get_size(&size, text, big, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    widest = std::max<int32_t>(widest, size.x);
+  }
+  const int per_row = (w - 3 * 8) / CHOICES >= widest + 16 ? CHOICES : CHOICES / 2;
+  const int32_t choice_w = (w - (per_row - 1) * 8) / per_row;
+  lv_obj_set_height(choices, (CHOICES / per_row) * (btn_h + 8) - 8);
+  for (int i = 0; i < CHOICES; i++) {
     this->choices_[i] = button(choices, c, choice_w, btn_h);
-    lv_obj_set_pos(this->choices_[i], i * (choice_w + 8), 0);
+    lv_obj_set_pos(this->choices_[i], (i % per_row) * (choice_w + 8), (i / per_row) * (btn_h + 8));
     lv_obj_center(label(this->choices_[i], big, c.text, CHOICE_TEXT[i]));
     on_part(this->choices_[i], this, CHOICE_PARTS[i]);
   }
@@ -512,15 +531,15 @@ void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int
 void SettingsPanel::build_setup_network_(lv_obj_t *body, int32_t w) {
   const Colors c = colors_for(this->state_.theme);
   const lv_font_t *big = this->fonts_.label;
-  // The QR code beside the name and password; phone cameras join the network from it. Dark modules
-  // on light ones by day; at night the light ones are the dim red text colour.
+  // The QR code beside the name and password; phone cameras join the network from it (qr_colors).
   const int32_t size = std::min<int32_t>(w / 3, 240);
   lv_obj_t *row = box(body, w);
   lv_obj_t *qr = lv_qrcode_create(row);
   lv_qrcode_set_size(qr, size);
-  const bool night = this->state_.theme == esphelm::Theme::NIGHT;
-  lv_qrcode_set_dark_color(qr, night ? c.background : c.text);
-  lv_qrcode_set_light_color(qr, night ? c.text : c.background);
+  lv_color_t dark, light;
+  qr_colors(this->state_.theme, c, dark, light);
+  lv_qrcode_set_dark_color(qr, dark);
+  lv_qrcode_set_light_color(qr, light);
   lv_qrcode_set_quiet_zone(qr, true);
   const std::string text = esphelm::wifi_qr_text(this->state_.ap_ssid, this->state_.ap_password);
   lv_qrcode_update(qr, text.data(), text.size());

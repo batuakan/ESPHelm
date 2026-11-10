@@ -16,7 +16,16 @@
 
 namespace esphelm {
 
-enum class Theme : uint8_t { DAY, NIGHT };
+/// Display themes (ADR-0034). DARK comes last: saved display choices keep their numbers.
+enum class Theme : uint8_t { DAY, NIGHT, DARK };
+/// Night: red on black, hue would cost night vision (zones by brightness, red-tinted charts).
+inline bool red_only(Theme t) { return t == Theme::NIGHT; }
+/// A dark page (Night or Dark): light marks on black or near black.
+inline bool dark_page(Theme t) { return t != Theme::DAY; }
+/// The theme's name in logs and the layout ("day", "night", "dark").
+inline const char *theme_name(Theme t) {
+  return t == Theme::NIGHT ? "night" : t == Theme::DARK ? "dark" : "day";
+}
 enum class TileType : uint8_t {
   VALUE,
   GAUGE,

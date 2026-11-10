@@ -34,7 +34,7 @@ static std::string age_text(int seconds) {
 class GraphWidget : public Widget {
  public:
   GraphWidget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env)
-      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), night_(env.night), zones_(tile.zones),
+      : id_(tile.id), colors_(env.colors), fonts_(env.fonts), cell_(cell), night_(env.night), dark_(env.dark), zones_(tile.zones),
         has_range_(tile.has_range), min_(tile.min), max_(tile.max), history_(env.history) {
     b_.item = tile.data;
     b_.stale_ms = stale_ms(tile.data, env);
@@ -67,7 +67,7 @@ class GraphWidget : public Widget {
       lv_obj_remove_style_all(band);
       lv_obj_remove_flag(band, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_set_style_bg_color(band, env.colors.zone[static_cast<int>(zone.state)], LV_PART_MAIN);
-      lv_obj_set_style_bg_opa(band, night_ ? LV_OPA_30 : LV_OPA_20, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(band, dark_ ? LV_OPA_30 : LV_OPA_20, LV_PART_MAIN);
       lv_obj_add_flag(band, LV_OBJ_FLAG_HIDDEN);
       bands_.push_back(band);
     }
@@ -297,6 +297,7 @@ class GraphWidget : public Widget {
   Fonts fonts_;
   lv_obj_t *cell_;
   bool night_;
+  bool dark_;
   std::vector<esphelm::Zone> zones_;
   bool has_range_;
   double min_, max_;

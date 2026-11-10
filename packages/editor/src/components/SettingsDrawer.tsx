@@ -207,7 +207,7 @@ export function SettingsDrawer(props: {
           }
           aria-label="Auto day/night"
         />
-        Auto day/night: the night theme at dusk and night
+        Auto day/night: the night theme at dusk and night, otherwise Day or Dark as chosen
       </label>
       {auto && (
         <div className="settings-sub">

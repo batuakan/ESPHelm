@@ -546,16 +546,24 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 title="The display's colours; sent to the display with Save & send"
               >
                 <span>Display theme</span>
-                {(['day', 'night'] as const).map((t) => (
-                  <button
-                    key={t}
-                    className={`small ${layout.theme === t ? 'on' : ''}`}
-                    aria-pressed={layout.theme === t}
-                    onClick={() => edit({ ...layout, theme: t })}
-                  >
-                    {t === 'day' ? 'Day' : 'Night'}
-                  </button>
-                ))}
+                {(['day', 'dark', 'night'] as const).map((t) => {
+                  // Firmware without the dark theme refuses such a layout and keeps its last
+                  // good one (ADR-0034), so it isn't offered for that display.
+                  const unsupported =
+                    t === 'dark' && device !== undefined && device.hello.capabilities.darkTheme !== true;
+                  return (
+                    <button
+                      key={t}
+                      className={`small ${layout.theme === t ? 'on' : ''}`}
+                      aria-pressed={layout.theme === t}
+                      disabled={unsupported && layout.theme !== t}
+                      title={unsupported ? "Update this display's firmware for the Dark theme" : undefined}
+                      onClick={() => edit({ ...layout, theme: t })}
+                    >
+                      {t === 'day' ? 'Day' : t === 'dark' ? 'Dark' : 'Night'}
+                    </button>
+                  );
+                })}
               </div>
               <button
                 className={`small ${settingsOpen ? 'on' : ''}`}

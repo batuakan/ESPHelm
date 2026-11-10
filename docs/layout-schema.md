@@ -29,7 +29,7 @@ Layout
 ├─ version: 1
 ├─ id: Id
 ├─ name?: Label
-├─ theme: "day" | "night"
+├─ theme: "day" | "dark" | "night"
 ├─ pages: Page[]            (at least 1)
 └─ settings?: Settings      display settings (Phase 6, see below)
 
@@ -109,7 +109,7 @@ For values either side of zero: rudder angle, heel, rate of turn, battery curren
 ### Value tile colours (ADR-0016)
 - `color` (optional): `blue`, `green`, `yellow`, `orange`, `red` or `purple`. By day, each is its own colour; at night all are the night text red (night vision).
 - `zones` (optional): `{ from?, to?, state }`, in display units. A value tile has no `min`/`max`, so a missing end is open: `{ "to": 2, "state": "alarm" }` means "2 or less". At least one end is required, and `from` must be below `to` when both are given (`INVALID_ZONE`). Both ends are included, and the last matching zone wins (`valueZoneState`).
-- The number is coloured, in this order: muted when stale; a matching zone's colour (at night a `normal` zone uses the text colour); the fixed `color`; the theme's text colour. Older firmware ignores both fields and shows the value uncoloured.
+- The number is coloured, in this order: muted when stale; a matching zone's colour (at night a `normal` zone uses the text colour; the dark theme keeps its green); the fixed `color`; the theme's text colour. Older firmware ignores both fields and shows the value uncoloured.
 - `history` (optional boolean, ADR-0018, ADR-0019): `true` makes the display record the value from boot, and a tap on the tile opens a graph of it (10 min, 1 h and, on displays with PSRAM, 6 h). Absent or `false`: nothing records. Older firmware ignores it. Angles (units with a wrap range) average on the circle.
 
 ```json
@@ -308,10 +308,10 @@ Display settings travel with the layout (one layout per display), so they're val
 
 | Field | Default | Notes |
 |---|---|---|
-| `brightness.day` | 100 | backlight in %, 5–100, while the day theme is shown |
+| `brightness.day` | 100 | backlight in %, 5–100, while the day or dark theme is shown |
 | `brightness.night` | 30 | backlight in %, 1–100, while the night theme is shown |
 | `startPage` | first page | page id shown at boot; must be a page of this layout (`UNKNOWN_PAGE`) |
-| `autoTheme` | `off` | `sun`: the night theme while `autoThemePath` is `dusk` or `night` (`NIGHT_SUN_STATES`), else the layout's `theme`. Without a value the layout's `theme` stays. |
+| `autoTheme` | `off` | `sun`: the night theme while `autoThemePath` is `dusk` or `night` (`NIGHT_SUN_STATES`), else the day-side theme: day or dark as last picked on the display, or the layout's `theme` (day when that is `night`; ADR-0034). Without a value the layout's `theme` stays. |
 | `autoThemePath` | `environment.sun` | set by the derived-data plugin (`dawn`, `sunrise`, `day`, `sunset`, `dusk`, `night`) |
 | `screenTimeout` | 0 | seconds without a touch before the screen turns off, 0–3600; 0 = never. Displays apply at least 10 s. |
 | `screenSaver` | `off` | what the screen shows after `screenTimeout` instead of turning off: `time`, `date` or `both`, faintly, on black (ADR-0024). Written like the layout's first clock tile (else 24-hour, weekday date). Until the display knows the time it goes dark as with `off`. |

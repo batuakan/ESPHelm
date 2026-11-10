@@ -379,6 +379,33 @@ select {
   --rose-card: #1c0606;
   --rose-card-text: #9a2a22;
 }
+.display-frame[data-theme-preview='dark'] {
+  /* the editor's own dark theme, full colours (ADR-0034) */
+  --tile-bg: #17202a;
+  --tile-text: #e5ebf1;
+  --tile-muted: #93a1ae;
+  --canvas-bg: #0e141a;
+  --zone-normal: #4cc38a;
+  --zone-warn: #f0b04a;
+  --zone-alarm: #ff6b6b;
+  --zone-emergency: #d34dd9;
+  --tile-accent: #4a9eff;
+  --tile-second: #f2c14e;
+  --value-blue: #4a9eff;
+  --value-green: #4cc38a;
+  --value-yellow: #f2c14e;
+  --value-orange: #ff9f43;
+  --value-red: #ff6b6b;
+  --value-purple: #c77dff;
+  --value-zone-normal: var(--zone-normal);
+  --rose-port: #ff5a52;
+  --rose-stbd: #3ddc84;
+  --rose-apparent: #ff9f43;
+  --rose-true: #c77dff;
+  --rose-ring: #2a3744;
+  --rose-card: #17202a;
+  --rose-card-text: #e5ebf1;
+}
 .display-theme {
   display: flex;
   align-items: center;

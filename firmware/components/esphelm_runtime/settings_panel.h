@@ -143,7 +143,7 @@ class SettingsPanel {
   lv_obj_t *slider_{nullptr};
   lv_obj_t *volume_value_{nullptr};
   lv_obj_t *volume_slider_{nullptr};
-  lv_obj_t *choices_[3]{};  // day, night, auto
+  lv_obj_t *choices_[4]{};  // day, dark, night, auto
   lv_obj_t *tabs_[3]{};     // settings, network, info
   struct Section {
     lv_obj_t *values;
