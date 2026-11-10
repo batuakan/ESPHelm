@@ -445,17 +445,19 @@ export function removePage(layout: Layout, index: number): Layout | null {
  * Change display settings (ADR-0015). `undefined` removes a field (the display's default
  * applies); a settings block with nothing left is removed, so the layout stays as it was.
  */
-export function updateSettings(
-  layout: Layout,
-  patch: Omit<Partial<Settings>, 'brightness'> & {
-    brightness?: Partial<NonNullable<Settings['brightness']>>;
-  },
-): Layout {
+/** A settings patch: the nested groups (brightness, sound) merge field by field. */
+export type SettingsPatch = Omit<Partial<Settings>, 'brightness' | 'sound'> & {
+  brightness?: Partial<NonNullable<Settings['brightness']>>;
+  sound?: Partial<NonNullable<Settings['sound']>>;
+};
+
+export function updateSettings(layout: Layout, patch: SettingsPatch): Layout {
   const merged: Record<string, unknown> = { ...layout.settings, ...patch };
-  if (patch.brightness) {
-    const b: Record<string, unknown> = { ...layout.settings?.brightness, ...patch.brightness };
-    for (const k of Object.keys(b)) if (b[k] === undefined) delete b[k];
-    merged.brightness = Object.keys(b).length > 0 ? b : undefined;
+  for (const group of ['brightness', 'sound'] as const) {
+    if (!patch[group]) continue;
+    const g: Record<string, unknown> = { ...layout.settings?.[group], ...patch[group] };
+    for (const k of Object.keys(g)) if (g[k] === undefined) delete g[k];
+    merged[group] = Object.keys(g).length > 0 ? g : undefined;
   }
   for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
   const { settings: _old, ...rest } = layout;

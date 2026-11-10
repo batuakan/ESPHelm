@@ -36,6 +36,10 @@ esphelm_runtime:
   # store_dir: "."                # host build only: where the cache files go
   # backlight: display_backlight  # a dimmable light: layout brightness and screen timeout
   # time_id: sntp_time            # an ESPHome time source for the clock when SignalK has none
+  # sound:                        # alarm tones and touch clicks (ADR-0033)
+  #   rtttl: board_rtttl          # ESPHome's rtttl component (required)
+  #   speaker: board_speaker      # its speaker, for the volume (else rtttl's gain)
+  #   click: "click:d=32,o=7,b=250:c"   # optional: replace a tune (click, alert, warn, alarm, emergency)
 ```
 
 All the fonts form one ladder, sorted by line height. Tile text picks the largest size that fits the tile (ADR-0017). `firmware/fonts.yaml` sets the sizes by substitution: P4 and the 720 SDL build use 28 / 42 / 64 / 96 / 144 px, the default 480 build 22 / 32 / 48 / 64 / 96, and the C3 14 / 20 / 28 / 40 / 56. The `digits` fonts (192 / 288, 128 / 192 and 80 / 112) have only the glyphs a number needs, so they're cheap even that large. Only a value tile's number uses them, while its text is numeric. The hello reports the ladder as `fontLineHeights` and `digitFontLineHeights`.
@@ -43,6 +47,8 @@ All the fonts form one ladder, sorted by line height. Tile text picks the larges
 `backlight` is optional (ADR-0015). Without it, brightness is only logged, and the screen timeout covers the screen with black instead of switching the light off. The P4 config sets it and removes the hardware package's fixed `lvgl.on_idle`, so the layout's `screenTimeout` decides.
 
 **Rotation** (ADR-0028): the layout's `settings.rotation` turns the display just before the layout's page is built (`rotate_()`, ESPHome's `LvglComponent::set_rotation()`, picture and touch), so a cached layout boots turned and a layout without it turns it back to 0. A change closes the panel and the history popup, the alarm banner cuts its text for the new width, and a `hello` with the turned size follows. A board allows it with `lvgl: rotation: 0`, which sets `USE_ESPHELM_ROTATION` and `capabilities.rotation`; elsewhere the setting is logged once and ignored.
+
+**Sound** (ADR-0033): with `sound:`, the runtime plays alarm tones and touch clicks through ESPHome's `rtttl` (`sound.cpp`, `SoundPlayer`). An alarm sounds when its notification's `method` contains `"sound"` and it isn't acknowledged: `alert` and `warn` once, `alarm` every 5 s, `emergency` back to back (`esphelm_sound.h`, shared with `packages/schema/src/sound.ts`), stopped by an acknowledgement, the alarm clearing or the server going offline. A click plays when a touch lands on something with an event handler (one LVGL input-device callback), never over an alarm tune or on a wake touch. Volume and touch clicks come from the layout's `settings.sound` and the *Settings* tab. The P4's hardware package wires the ES8311, the I2S speaker, the amplifier (GPIO53) and `rtttl`. `rtttl` plays through a `mixer` into an I2S speaker that never stops, warmed up by a silent tune at boot with the amplifier still off, so the codec doesn't pop when its clock starts. The other boards have no speaker, compile no sound code and leave `capabilities.sound` out of `hello`.
 
 **The clock** (ADR-0024) is set from the layout's `clockPath` (default `navigation.datetime`, GPS time), and runs on `millis()` in between, so it keeps time offline. It's subscribed only when the layout has a clock tile or a clock screen saver. `time_id` is optional: any ESPHome `time:` component, used when SignalK hasn't sent a time for ten minutes: `homeassistant`, or `sntp` with `servers:` on the boat's LAN (its defaults are internet pool servers, and ESPHelm doesn't depend on the internet). No ready-made config sets it. A time before 2020 (a GPS without a fix) is ignored. With the layout's `screenSaver` set, the screen timeout dims the backlight to `screenSaverBrightness` and shows the time and/or date faintly instead of going dark; until the display knows the time it goes dark as before. The digits fonts need `:` for the time; a font without it is skipped for clocks.
 
@@ -102,11 +108,12 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
 - **Opening and closing:** the footer's menu button (or the status page's, before there is a layout) opens `SettingsPanel` on LVGL's top layer, below the alarm banner, on its *Settings* tab; *Network* and *Info* are the others. Only the tab shown is built. Only its close button closes it; the screen timeout and losing the layout (e.g. the device is unassigned) close it too.
 - **Brightness** is a slider for the theme shown: day 5–100 %, night 1–100 %. It dims live and is saved when let go. On a board without a backlight it is only logged.
 - **Theme:** *Day* and *Night* override the layout's theme and the sun; *Auto* hands it back.
+- **Sound** (ADR-0033, only with `sound:`): a *Volume* slider (10–100 %, saved when let go, with a click at the new volume) and a *Touch sounds* button (tap parts `volume=<10-100>`, `touch-sounds`).
 - **Screen off,** shown when the layout has a screen timeout, switches off (or to the screen saver) at once.
 - **Saved choices** are kept in `Slot::PREFS` (NVS key `prefs`; `esphelm_prefs.bin` on the host) by `display_prefs.cpp`.
-  - **Format:** a self-checking record, `v=1;th=…;bd=…;bn=…` plus the layout values they were chosen against.
+  - **Format:** a self-checking record, `v=2;th=…;bd=…;bn=…;vo=…;to=…` plus the layout values they were chosen against. A `v=1` record (before sound) still reads, with no sound overrides.
   - **Read:** before the first layout, so they survive a reboot. A record that doesn't parse or has a value out of range is ignored.
-  - **Dropped:** when a layout brings a different `theme`/`autoTheme` (theme choice) or `brightness.day`/`.night` (that override), and a day/night choice when the sun changes. The first sun value after a boot is not a change.
+  - **Dropped:** when a layout brings a different `theme`/`autoTheme` (theme choice), `brightness.day`/`.night` or `sound.volume`/`.touch` (that override), and a day/night choice when the sun changes. The first sun value after a boot is not a change.
 - **Information** (the *Info* tab, one column of sections that scrolls) is refreshed once a second while it shows.
   - **Display:** id, board, firmware, screen, uptime, free memory (internal, and PSRAM). Free memory is not on the host.
   - **SignalK:** server, stream, deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
@@ -223,6 +230,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
 | Footer | not counted above (built before the measurement starts); a few hundred bytes, now on every layout, with the menu button's three bars |
 | Settings panel (ADR-0025) | about 20 LVGL objects with the *Settings* tab, about 30 with *Info* (four per section), none when closed; the saved choices are one record of under 100 B in NVS |
+| Sound (ADR-0033) | the five tune strings (under 200 B) and a few words of state in the runtime, one LVGL input-device callback; the I2S speaker's buffer (100 ms at 16 kHz, 16 bit: 3.2 KB), the mixer's buffers and ESPHome's speaker and mixer tasks, only with `sound:` (the P4); I2S writes silence all the time |
 | Rotation (ADR-0028) | a second LVGL draw buffer as large as the first while rotation is enabled in the YAML (in PSRAM on the P4 and the Guition); nothing per layout |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
 | P4 runtime firmware, static | RAM 98,742 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 15.5 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |
@@ -410,3 +418,8 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - The needles follow the values smoothly; the RPM needle crosses the labels without leaving marks.
     - The icons are clear at full size; at night everything is red.
     - Unplug a sensor (or stop its value): after its stale time its needle and icon turn dim, the others carry on.
+30. **Sound (ADR-0033).** Connect an 8 Ω speaker to the speaker connector (MX1.25):
+    - **Touch:** a tile that opens its history, the footer's buttons and the settings panel's controls click; an empty page background doesn't, and neither does the touch that wakes a dark screen. *Settings → Touch sounds: off* silences them (and survives a reboot).
+    - **Alarms:** publish `notifications.test` with `{"state":"alarm","method":["visual","sound"],"message":"Test"}`: a tone at once, then every 5 s; *ACK* stops it. `emergency` repeats without a pause; `warn` beeps twice, once. With `method: ["visual"]` it stays silent.
+    - **Volume:** the *Volume* slider changes the loudness and clicks at the new volume when let go; the editor's *Display settings → Sound → Volume* applies after *Save & send* (and drops the display's own choice).
+    - **Noise:** no hiss or hum from the speaker while nothing plays (the amplifier is always on). If nothing sounds at all, the pins are the first suspect (logged: `esphelm.sound` and `i2s_audio`).

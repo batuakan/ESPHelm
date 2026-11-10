@@ -45,6 +45,12 @@ class AlarmBanner {
     return w;
   }
   size_t active() const { return this->entries_.size(); }
+  /// The worst state among notifications asking for sound (method "sound") that are not yet
+  /// acknowledged; NONE when there is none (ADR-0033).
+  Severity sound_level() const;
+  /// Counts up whenever a notification starts asking for sound: new, in a new state, or sound
+  /// added again. A new count plays its tune again.
+  uint32_t sound_generation() const { return this->sound_generation_; }
   /// Bring the banner in front of whatever else is on the top layer (the history popup).
   void raise() {
     if (this->banner_ != nullptr)
@@ -80,6 +86,7 @@ class AlarmBanner {
   std::string pending_;      // path of the acknowledge in flight
   bool dirty_{true};
   bool wake_{false};
+  uint32_t sound_generation_{0};
   bool dropped_logged_{false};
   int32_t height_{0};
   // What was drawn last, to redraw only on change.

@@ -8,6 +8,7 @@ export * from './clock.js';
 export * from './engine.js';
 export * from './svgPath.js';
 export * from './valueZones.js';
+export * from './sound.js';
 export * from './serverZones.js';
 export * from './textFit.js';
 export * from './history.js';

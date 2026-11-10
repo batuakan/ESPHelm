@@ -3243,6 +3243,23 @@
           "minimum": 1,
           "maximum": 100,
           "description": "Backlight in % while the screen saver shows. Some panels are dark below about 30 %."
+        },
+        "sound": {
+          "type": "object",
+          "properties": {
+            "volume": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "description": "Speaker volume in %, for touch clicks and alarm tones. At least 10 %, so alarms stay audible."
+            },
+            "touch": {
+              "type": "boolean",
+              "description": "A click when a button or tile is touched."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Sound on displays with a speaker (ADR-0033). Alarms sound when their notification asks for it (method \"sound\")."
         }
       },
       "additionalProperties": false

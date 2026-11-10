@@ -15,14 +15,21 @@ struct DisplayPrefs {
   int8_t theme{-1};             // -1: the layout's (with autoTheme), else Theme
   int16_t brightness_day{-1};   // %; -1: the layout's
   int16_t brightness_night{-1};
+  int16_t volume{-1};  // %; -1: the layout's (ADR-0033)
+  int8_t touch{-1};    // touch clicks 0/1; -1: the layout's
   // The layout values the overrides were chosen against (kept equal to the current layout's
   // while an override stays; see reconcile_prefs()).
   Theme base_theme{Theme::DAY};
   AutoTheme base_auto{AutoTheme::OFF};
   uint8_t base_day{100};
   uint8_t base_night{30};
+  uint8_t base_volume{60};
+  bool base_touch{true};
 
-  bool empty() const { return this->theme < 0 && this->brightness_day < 0 && this->brightness_night < 0; }
+  bool empty() const {
+    return this->theme < 0 && this->brightness_day < 0 && this->brightness_night < 0 && this->volume < 0 &&
+           this->touch < 0;
+  }
   /// Record the layout the overrides are made against.
   void set_base(const Settings &s, Theme layout_theme);
 };
@@ -30,10 +37,13 @@ struct DisplayPrefs {
 /// Allowed brightness overrides (as settings.brightness in the schema).
 static const int PREFS_MIN_DAY = 5;
 static const int PREFS_MIN_NIGHT = 1;
+/// Allowed volume overrides (as settings.sound.volume).
+static const int PREFS_MIN_VOLUME = 10;
 
-/// "v=1;th=-1;bd=-1;bn=20;Bt=0;Ba=0;Bd=100;Bn=30"
+/// "v=2;th=-1;bd=-1;bn=20;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1"
 std::string encode_prefs(const DisplayPrefs &p);
-/// Strict: every field, in range, nothing else; false leaves `out` unchanged.
+/// Strict: every field, in range, nothing else; false leaves `out` unchanged. Also reads the
+/// version 1 record written before sound (no vo, to, Bv, Bo), with no sound overrides.
 bool decode_prefs(const std::string &text, DisplayPrefs &out);
 /// Drop the overrides made against other values than this layout's; true if any was dropped.
 bool reconcile_prefs(DisplayPrefs &p, const Settings &s, Theme layout_theme);

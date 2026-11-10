@@ -264,3 +264,38 @@ Each value is switched on in the editor, so only chosen values take memory; the 
 - **Tests:** schema fixtures (valid and 9 invalid), shared cases in TS and C++, parser mutations; editor unit tests and an App test (add, live needles, slot icon and range, empty a slot, save); SDL e2e goldens 77–81 (live, alarm zones, night, a stale slot, small tiles) and 720-16/17 offline, reviewed by eye; the 89 existing goldens unchanged.
 - **Build sizes** (with the SVG icons and corner values): P4 flash 3,471,772 B (21.0 %), static RAM 99,682 B; Guition flash 1,824,299 B, RAM 121,847 B; CYD flash 1,515,875 B (82.6 %), RAM 55,724 B; C3 flash 1,635,038 B (89.1 %), RAM 113,654 B. The icons cost about 7.5 KB of flash over the drawn ones, the corner values about 2 KB; no static RAM.
 - **Checked on the P4** (2026-11-10, hardware step 29), with the SVG icons and corner values.
+
+## Sound: alarm tones and touch clicks (ADR-0033, branch `feat/sound`)
+- **Hardware:** the P4-86's ES8311 codec, I2S speaker and amplifier (GPIO53) through ESPHome's `i2s_audio`, `es8311`, `speaker` and `rtttl` in `hardware/waveshare-esp32-p4-86.yaml`. The pins come from Waveshare's wiki and a community config, not yet checked on the board.
+- **Runtime:**
+  - `esphelm_runtime: sound:` names the `rtttl` (and its speaker, for the volume); `SoundPlayer` (`sound.cpp`) plays the tunes.
+  - **Alarm tones:** when to play is `esphelm_sound.h`, shared with `packages/schema/src/sound.ts` and checked against `fixtures/sound.cases.json` in TS and g++. Alarms sound when their `method` contains `"sound"` and they aren't acknowledged; `AlarmBanner` gained `sound_level()` and `sound_generation()`.
+  - **Clicks:** one LVGL input-device callback on `LV_EVENT_PRESSED`, for objects with an event handler, not on a wake touch, never over an alarm tone.
+  - Without `sound:` nothing is compiled.
+- **Settings:**
+  - `settings.sound { volume 10–100, touch }` in the schema, the editor's *Display settings → Sound*, and the display's *Settings* tab (*Volume*, *Touch sounds*).
+  - The display's choices record moved to `v=2` (volume and touch overrides); `v=1` still reads.
+  - `hello.capabilities.sound`.
+- **Tests:**
+  - schema fixtures (valid `settings-sound`, two invalid), the shared sound cases;
+  - parser mutations (three), the prefs host test (v2 round trip, v1 still read, volume/touch reconcile);
+  - editor unit and App tests (sending volume and touch; the no-speaker note).
+- **Build sizes** (against `main` with the engine tile):
+  - P4 flash 3,527,230 B (21.4 %, +55 KB: ESPHome's I2S speaker, ES8311 and rtttl), static RAM 103,210 B (+3.5 KB).
+  - Guition 1,826,067 B, CYD 1,517,607 B (82.7 %), C3 1,636,822 B (89.2 %): +1.8 KB each and +48 B RAM, for the settings, the saved choices and the panel code, which every board compiles.
+- **Boot loop on the P4, fixed:** the first sound build boot-looped before ESPHome started: `assert failed: spi_flash_disable_interrupts_caches_and_other_cpu (esp_task_stack_is_sane_cache_disabled())` from `nvs_flash_init` in `setup_preferences`.
+  - **Cause:** on a P4 rev < 3 only about 138 KB of internal heap is free before the main task starts; the larger block is the startup stack, freed later. `esp_hosted_init()` runs as a static constructor and takes most of it (its Wi-Fi tasks' stacks, about 20 KB, among it). The audio build's 3.5 KB more static RAM (`CONFIG_I2S_ISR_IRAM_SAFE` puts I2S and GDMA code in IRAM) left too little for the main task's 3.5 KB stack, so it went to the 8 KB SPM, which the flash driver refuses with the cache off.
+  - **Main was within those 3.5 KB too:** any growth of IRAM or static RAM would have hit the same loop.
+  - **Fix:** `CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM: y` in `hardware/waveshare-esp32-p4-86.yaml` moves the hosted tasks' stacks to PSRAM (Espressif's P4 examples do the same). Those tasks move Wi-Fi packets and never touch flash.
+  - **Checked on the P4:** without the audio the build booted (confirming the cause); with the audio and the option it boots, starts the codec, speaker and sound, and connects to Wi-Fi and SignalK.
+- **Pop before a sound, fixed:** the ES8311 popped whenever its I2S clock started, at the first sound and again after a few idle seconds, because `rtttl` stops its speaker after every tune.
+  - `rtttl` now plays into a `mixer` source (`board_speaker`; a mixer needs a second, unused source).
+  - The I2S speaker behind the mixer (`board_i2s_speaker`) has `timeout: never` and runs at `rtttl`'s 16 kHz, so it never stops once started.
+  - `esphome: on_boot` plays a silent tune with the amplifier off, then turns the amplifier on (`restore_mode: ALWAYS_OFF`).
+  - Cost: +760 B static RAM, +11 KB flash, and I2S writing silence all the time.
+  - Checked on the P4: no pop; the I2S speaker starts once at boot and never stops.
+- **Alarm over a playing tune, fixed:** `rtttl.play()` ignores a call while a tune plays, so an alarm that came during a click (or an escalation during a milder alarm's tune) was dropped, and `alert`/`warn` never retry. `SoundPlayer` now stops the playing tune first.
+- **The desktop builds have no speaker:** the SDL e2e runs without `sound:`, so it checks that the feature compiles out without changing a screen.
+- **Not checked on hardware yet** (hardware step 30): the pins, the loudness, hiss with the amplifier always on, and that the clicks feel right.
+- **Editor test timing:** `App.test.tsx`'s "edits the display settings" can miss its 1 s wait for the layout on a loaded machine (on `main` too); with a longer wait it passes, and it passes in the full run.
+

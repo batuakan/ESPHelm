@@ -1,0 +1,252 @@
+{
+  "description": "When an alarm tone plays (ADR-0033): alarmSound() in src/sound.ts and esphelm::sound::alarm_sound() in esphelm_sound.h must both return expected.",
+  "cases": [
+    {
+      "name": "nothing asks for sound",
+      "input": {
+        "level": null,
+        "generation": 0,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 0,
+        "lastStartMs": 0,
+        "nowMs": 1000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "a new alarm plays at once",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 0,
+        "lastStartMs": 0,
+        "nowMs": 1000
+      },
+      "expected": "alarm"
+    },
+    {
+      "name": "an alarm waits while its tune plays",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": "alarm",
+        "playedGeneration": 1,
+        "lastStartMs": 1000,
+        "nowMs": 2000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "an alarm waits 5 s from the last start",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 1,
+        "lastStartMs": 1000,
+        "nowMs": 5999
+      },
+      "expected": "none"
+    },
+    {
+      "name": "an alarm repeats after 5 s",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 1,
+        "lastStartMs": 1000,
+        "nowMs": 6000
+      },
+      "expected": "alarm"
+    },
+    {
+      "name": "an alarm repeats across a millis() wrap",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 1,
+        "lastStartMs": 4294966296,
+        "nowMs": 4704
+      },
+      "expected": "alarm"
+    },
+    {
+      "name": "an emergency repeats when its tune ends",
+      "input": {
+        "level": "emergency",
+        "generation": 3,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 3,
+        "lastStartMs": 1000,
+        "nowMs": 1001
+      },
+      "expected": "emergency"
+    },
+    {
+      "name": "an alert plays once",
+      "input": {
+        "level": "alert",
+        "generation": 2,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 1,
+        "lastStartMs": 0,
+        "nowMs": 10
+      },
+      "expected": "alert"
+    },
+    {
+      "name": "an alert does not repeat",
+      "input": {
+        "level": "alert",
+        "generation": 2,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 2,
+        "lastStartMs": 0,
+        "nowMs": 60000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "a warn does not repeat",
+      "input": {
+        "level": "warn",
+        "generation": 2,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 2,
+        "lastStartMs": 0,
+        "nowMs": 60000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "a new notification interrupts the tune playing",
+      "input": {
+        "level": "emergency",
+        "generation": 4,
+        "online": true,
+        "playing": "alarm",
+        "playedGeneration": 3,
+        "lastStartMs": 1000,
+        "nowMs": 1200
+      },
+      "expected": "emergency"
+    },
+    {
+      "name": "a second alarm plays again",
+      "input": {
+        "level": "alarm",
+        "generation": 5,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 1500
+      },
+      "expected": "alarm"
+    },
+    {
+      "name": "acknowledged: the tune stops",
+      "input": {
+        "level": null,
+        "generation": 4,
+        "online": true,
+        "playing": "alarm",
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 1200
+      },
+      "expected": "stop"
+    },
+    {
+      "name": "acknowledged with nothing playing",
+      "input": {
+        "level": null,
+        "generation": 4,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 1200
+      },
+      "expected": "none"
+    },
+    {
+      "name": "the worse alarm acknowledged, a warn left: the alarm tune stops",
+      "input": {
+        "level": "warn",
+        "generation": 4,
+        "online": true,
+        "playing": "alarm",
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 1200
+      },
+      "expected": "stop"
+    },
+    {
+      "name": "the warn left does not play again",
+      "input": {
+        "level": "warn",
+        "generation": 4,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 9000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "offline: the tune stops",
+      "input": {
+        "level": "emergency",
+        "generation": 4,
+        "online": false,
+        "playing": "emergency",
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 1200
+      },
+      "expected": "stop"
+    },
+    {
+      "name": "offline: no repeat",
+      "input": {
+        "level": "alarm",
+        "generation": 4,
+        "online": false,
+        "playing": null,
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 60000
+      },
+      "expected": "none"
+    },
+    {
+      "name": "offline: nothing new plays",
+      "input": {
+        "level": "alarm",
+        "generation": 5,
+        "online": false,
+        "playing": null,
+        "playedGeneration": 4,
+        "lastStartMs": 1000,
+        "nowMs": 60000
+      },
+      "expected": "none"
+    }
+  ]
+}

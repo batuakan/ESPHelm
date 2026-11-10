@@ -25,17 +25,37 @@ int main() {
   p.brightness_night = 12;
   p.set_base(s, esphelm::Theme::DAY);
   const std::string text = esphelm::encode_prefs(p);
-  CHECK(text == "v=1;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30");
+  CHECK(text == "v=2;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
 
   DisplayPrefs q;
   CHECK(esphelm::decode_prefs(text, q));
   CHECK(q.theme == 1 && q.brightness_day == -1 && q.brightness_night == 12);
   CHECK(q.base_theme == esphelm::Theme::DAY && q.base_day == 100 && q.base_night == 30);
+  CHECK(q.volume == -1 && q.touch == -1 && q.base_volume == 60 && q.base_touch);
+
+  // Sound overrides round-trip.
+  DisplayPrefs sp = p;
+  sp.volume = 25;
+  sp.touch = 0;
+  DisplayPrefs sq;
+  CHECK(esphelm::decode_prefs(esphelm::encode_prefs(sp), sq));
+  CHECK(sq.volume == 25 && sq.touch == 0 && sq.theme == 1 && sq.brightness_night == 12);
+  CHECK(!sq.empty());
+
+  // A record saved before sound (version 1) still reads, with no sound overrides.
+  DisplayPrefs old;
+  CHECK(esphelm::decode_prefs("v=1;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30", old));
+  CHECK(old.theme == 1 && old.brightness_night == 12 && old.volume == -1 && old.touch == -1);
 
   // Refused, and `out` left as it was.
   const char *bad[] = {
       "",
-      "v=2;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // unknown version
+      "v=3;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // unknown version
+      "v=2;th=1;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // version 2 without the sound fields
+      "v=1;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // version 1 with them
+      "v=2;th=1;bd=-1;bn=12;vo=9;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",   // volume below 10 %
+      "v=2;th=1;bd=-1;bn=12;vo=-1;to=2;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",   // touch not 0/1
+      "v=2;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=5;Bo=1",   // base volume below 10 %
       "v=1;th=2;bd=-1;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",   // no such theme
       "v=1;th=1;bd=4;bn=12;Bt=0;Ba=0;Bd=100;Bn=30",    // day below 5 %
       "v=1;th=1;bd=-1;bn=0;Bt=0;Ba=0;Bd=100;Bn=30",    // night 0 %
@@ -78,6 +98,16 @@ int main() {
   k = q;
   CHECK(esphelm::reconcile_prefs(k, s3, esphelm::Theme::DAY));
   CHECK(k.theme == -1);
+
+  // Another volume from the editor: the volume override goes, touch stays; then touch changes.
+  DisplayPrefs so = sq;
+  esphelm::Settings s4 = s;
+  s4.sound_volume = 80;
+  CHECK(esphelm::reconcile_prefs(so, s4, esphelm::Theme::DAY));
+  CHECK(so.volume == -1 && so.touch == 0 && so.base_volume == 80);
+  s4.sound_touch = false;
+  CHECK(esphelm::reconcile_prefs(so, s4, esphelm::Theme::DAY));
+  CHECK(so.touch == -1 && !so.base_touch);
 
   // Nothing overridden: nothing to drop, whatever the layout says.
   DisplayPrefs e;

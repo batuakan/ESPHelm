@@ -1,6 +1,6 @@
 #pragma once
 // Settings and information panel (ADR-0025), opened by the footer's menu button, in three tabs:
-// Settings (brightness, day/night/auto and "screen off"), Network (Wi-Fi and the SignalK server:
+// Settings (brightness, day/night/auto, sound on displays with a speaker, and "screen off"), Network (Wi-Fi and the SignalK server:
 // forget them, choose another server; ADR-0026) and Info (what the display knows about itself,
 // SignalK, its layout and its clock). Only the shown tab is built. Over the page and below the
 // alarm banner, on LVGL's top layer, like the history popup; closed only by its close button. Not a
@@ -38,6 +38,10 @@ class SettingsPanel {
     int brightness{100};                        // % of the shown theme
     int min_brightness{1};
     bool can_sleep{false};  // the layout has a screen timeout
+    // Sound (ADR-0033): shown only on displays with a speaker.
+    bool sound{false};
+    int volume{60};  // %
+    bool touch_sounds{true};
     // Network tab (ADR-0026)
     bool wifi{false};          // the board has Wi-Fi (not the host build)
     bool ap_active{false};     // the setup network is up
@@ -58,7 +62,8 @@ class SettingsPanel {
   bool is_open() const { return this->root_ != nullptr; }
 
   /// Test hook and the buttons: "close", "tab-settings", "tab-network", "tab-info", "day",
-  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "factory-reset",
+  /// "night", "auto", "sleep", "brightness=<1-100>" (the slider let go there), "volume=<10-100>",
+  /// "touch-sounds" (switch them over), "factory-reset",
   /// "forget-server", "change-server", "server=<n>" (in the list), "confirm" and "cancel".
   /// Applied in tick().
   void tap(const std::string &part);
@@ -71,6 +76,10 @@ class SettingsPanel {
   bool take_choice(int8_t &choice);
   /// The slider moved (live) or was let go there (`done`: save it).
   bool take_brightness(int &percent, bool &done);
+  /// The volume slider moved (live) or was let go there (`done`: save it, play a click).
+  bool take_volume(int &percent, bool &done);
+  /// Touch sounds switched on or off.
+  bool take_touch_sounds(bool &on);
   bool take_sleep() { return take(this->sleep_wanted_); }
   /// Confirmed: a factory reset (ESPHome's, then a restart), or forget the SignalK server.
   bool take_factory_reset() { return take(this->factory_reset_); }
@@ -116,6 +125,9 @@ class SettingsPanel {
   int8_t pending_choice_{-2};  // -2: none
   int pending_brightness_{-1};
   bool brightness_done_{false};
+  int pending_volume_{-1};
+  bool volume_done_{false};
+  int8_t pending_touch_{-1};
   bool sleep_wanted_{false};
   // Network tab: what it shows (changed in tap(), rebuilt in tick()) and what was confirmed.
   Confirm confirm_{Confirm::NONE};
@@ -129,6 +141,8 @@ class SettingsPanel {
   lv_obj_t *root_{nullptr};
   lv_obj_t *brightness_value_{nullptr};
   lv_obj_t *slider_{nullptr};
+  lv_obj_t *volume_value_{nullptr};
+  lv_obj_t *volume_slider_{nullptr};
   lv_obj_t *choices_[3]{};  // day, night, auto
   lv_obj_t *tabs_[3]{};     // settings, network, info
   struct Section {

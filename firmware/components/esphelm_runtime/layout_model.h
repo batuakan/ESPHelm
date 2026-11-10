@@ -210,6 +210,9 @@ struct Settings {
   ClockShow screen_saver{ClockShow::OFF};
   uint8_t screen_saver_brightness{30};  // %
   uint16_t rotation{0};                 // degrees clockwise: how the display is mounted (ADR-0028)
+  // Sound on displays with a speaker (ADR-0033).
+  uint8_t sound_volume{60};  // %, 10..100
+  bool sound_touch{true};    // a click when a button or tile is touched
 };
 
 struct Layout {

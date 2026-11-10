@@ -738,6 +738,10 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.change(within(drawer).getByLabelText('Start page'), { target: { value: 'second' } });
     fireEvent.click(within(drawer).getByLabelText('Auto day/night'));
     fireEvent.change(within(drawer).getByLabelText('Screen timeout'), { target: { value: '120' } });
+    // The P4 has a speaker (ADR-0033).
+    expect(within(drawer).queryByText(/has no speaker/)).toBeNull();
+    fireEvent.change(within(drawer).getByRole('slider', { name: 'Volume' }), { target: { value: '35' } });
+    fireEvent.click(within(drawer).getByLabelText('Touch sounds'));
     await screen.findByText('No problems');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
@@ -746,6 +750,7 @@ describe('editor', { timeout: 20000 }, () => {
       startPage: 'second',
       autoTheme: 'sun',
       screenTimeout: 120,
+      sound: { volume: 35, touch: false },
     });
   });
 
@@ -757,6 +762,17 @@ describe('editor', { timeout: 20000 }, () => {
     const drawer = screen.getByRole('complementary', { name: 'Display settings' });
     within(drawer).getByText(/can't dim its backlight/);
     expect((within(drawer).getByLabelText('Day brightness') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('says when a display has no speaker', async () => {
+    const d = device('adopted');
+    d.hello = { ...p4, capabilities: { touch: true, put: true, backlight: true } };
+    render(<App api={fakeServer([d]).api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Display settings' }));
+    const drawer = screen.getByRole('complementary', { name: 'Display settings' });
+    within(drawer).getByText(/has no speaker/);
+    expect((within(drawer).getByRole('slider', { name: 'Volume' }) as HTMLInputElement).disabled).toBe(true);
+    expect((within(drawer).getByLabelText('Touch sounds') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('greys out tile types the display cannot render', async () => {

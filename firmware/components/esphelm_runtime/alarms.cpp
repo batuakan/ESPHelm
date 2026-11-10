@@ -100,6 +100,8 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     ESP_LOGW(TAG, "%s %s: %s", state_name(sev), e.path.c_str(), e.message.c_str());
     if (sev >= Severity::ALARM)
       this->wake_ = true;
+    if (sound)
+      this->sound_generation_++;
     this->entries_.push_back(std::move(e));
     this->dirty_ = true;
     return;
@@ -113,7 +115,13 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     e.severity = sev;
     e.acked = false;
     e.had_sound = sound;
+    if (sound)
+      this->sound_generation_++;
     this->dirty_ = true;
+  } else if (sound && !e.had_sound && !e.acked) {
+    // Same state, sound added: it asks to be heard now.
+    e.had_sound = true;
+    this->sound_generation_++;
   } else if (e.had_sound && !sound && !e.acked) {
     // Same state, sound removed: acknowledged by this or another display, or another app.
     ESP_LOGI(TAG, "%s acknowledged", e.path.c_str());
@@ -125,6 +133,15 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     e.message = std::move(text);
     this->dirty_ = true;
   }
+}
+
+AlarmBanner::Severity AlarmBanner::sound_level() const {
+  Severity worst = Severity::NONE;
+  for (const Entry &e : this->entries_) {
+    if (e.sound && !e.acked)
+      worst = std::max(worst, e.severity);
+  }
+  return worst;
 }
 
 void AlarmBanner::ack_result(int status) {

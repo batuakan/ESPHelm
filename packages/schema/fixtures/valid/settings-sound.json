@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "settings-sound",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "main",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "value",
+          "id": "sog",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "path": "navigation.speedOverGround"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "sound": {
+      "volume": 35,
+      "touch": false
+    }
+  }
+}

@@ -43,6 +43,7 @@
 #include "layout_store.h"
 #include "renderer.h"
 #include "settings_panel.h"
+#include "sound.h"
 #include "value_history.h"
 
 namespace esphome {
@@ -75,6 +76,17 @@ class EsphelmRuntime : public Component {
 #endif
 #ifdef USE_ESPHELM_TIME
   void set_time(time::RealTimeClock *time) { this->time_ = time; }
+#endif
+#ifdef USE_ESPHELM_SOUND
+  /// Alarm tones and touch clicks (ADR-0033).
+  void set_sound_rtttl(rtttl::Rtttl *rtttl) { this->sound_.set_rtttl(rtttl); }
+#ifdef USE_SPEAKER
+  void set_sound_speaker(speaker::Speaker *speaker) { this->sound_.set_speaker(speaker); }
+#endif
+  /// 0: the touch click, 1..4: alert, warn, alarm, emergency.
+  void set_sound_tune(int index, const std::string &tune) {
+    this->sound_.set_tune(static_cast<esphelm::sound::Level>(index), tune);
+  }
 #endif
 #ifdef USE_ESPHELM_ROTATION
   /// ESPHome's LVGL, which turns the picture (and touch) at runtime (`lvgl: rotation:` set).
@@ -152,6 +164,13 @@ class EsphelmRuntime : public Component {
   // Settings panel and the display's own choices (ADR-0025)
   SettingsPanel::State panel_state_() const;
   void tick_panel_(uint32_t now);
+  // Sound (ADR-0033): what the layout and the display's choices make of it, and the clicks.
+  bool has_sound_() const;
+  int sound_volume_() const;
+  bool sound_touch_() const;
+  void apply_sound_();
+  void tick_sound_(uint32_t now, bool online);
+  void attach_click_();
   void fill_info_(std::vector<InfoRow> &rows, bool network) const;
   void save_prefs_();
   // Setup without configuration (ADR-0026): the setup network, Wi-Fi and the SignalK server.
@@ -249,6 +268,10 @@ class EsphelmRuntime : public Component {
   bool asleep_{false};
   bool wake_wanted_{false};  // set by a touch on the sleep cover (inside an LVGL event)
   lv_obj_t *sleep_cover_{nullptr};
+#ifdef USE_ESPHELM_SOUND
+  SoundPlayer sound_;
+  bool click_attached_{false};
+#endif
   uint32_t next_sleep_check_ms_{0};
 #ifdef USE_ESPHELM_BACKLIGHT
   light::LightState *backlight_{nullptr};
