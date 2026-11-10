@@ -130,6 +130,11 @@ class WindRoseWidget : public Widget {
       if (!cfg.has_slot[i])
         continue;
       const esphelm::DataItem &item = cfg.slots[i];
+      if (i >= esphelm::RoseConfig::CENTER_SLOTS) {
+        // Corner: a value over its caption, pushed into the tile's corner.
+        corners_.add(cell, i - esphelm::RoseConfig::CENTER_SLOTS, item, env);
+        continue;
+      }
       Slot s;
       s.b.item = item;
       s.b.stale_ms = stale_ms(item, env);
@@ -137,25 +142,9 @@ class WindRoseWidget : public Widget {
       std::string caption = item.label;
       if (item.unit != nullptr && item.unit->label[0] != '\0')
         caption += caption.empty() ? item.unit->label : std::string(" ") + item.unit->label;
-      if (i < esphelm::RoseConfig::CENTER_SLOTS) {
-        s.value = make_label(center_, env.fonts.value, colors_.muted, "--");
-        s.caption = make_label(center_, env.fonts.small, colors_.text, caption);
-        slots_.push_back(std::move(s));
-        continue;
-      }
-      // Corner: a value over its caption, pushed into the tile's corner.
-      s.corner = i - esphelm::RoseConfig::CENTER_SLOTS;  // 0 TL, 1 TR, 2 BL, 3 BR
-      s.box = lv_obj_create(cell);
-      lv_obj_remove_style_all(s.box);
-      lv_obj_remove_flag(s.box, LV_OBJ_FLAG_CLICKABLE);
-      lv_obj_set_size(s.box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-      lv_obj_set_flex_flow(s.box, LV_FLEX_FLOW_COLUMN);
-      const bool right = s.corner % 2 == 1;
-      lv_obj_set_flex_align(s.box, LV_FLEX_ALIGN_START, right ? LV_FLEX_ALIGN_END : LV_FLEX_ALIGN_START,
-                            LV_FLEX_ALIGN_START);
-      s.value = make_label(s.box, env.fonts.label, colors_.muted, "--");
-      s.caption = make_label(s.box, env.fonts.small, colors_.text, caption);
-      corners_.push_back(std::move(s));
+      s.value = make_label(center_, env.fonts.value, colors_.muted, "--");
+      s.caption = make_label(center_, env.fonts.small, colors_.text, caption);
+      slots_.push_back(std::move(s));
     }
 
     // Tap for the history popup (ADR-0019) when any of its values records; the mark goes in a
@@ -198,8 +187,7 @@ class WindRoseWidget : public Widget {
       out.push_back(bearing_.item.path);
     for (const auto &s : slots_)
       out.push_back(s.b.item.path);
-    for (const auto &s : corners_)
-      out.push_back(s.b.item.path);
+    corners_.paths(out);
   }
 
   void layout_done() override {
@@ -309,12 +297,11 @@ class WindRoseWidget : public Widget {
       if (path == b->item.path)
         b->set(v, now);
     }
-    for (auto *list : {&slots_, &corners_}) {
-      for (auto &s : *list) {
-        if (path == s.b.item.path)
-          s.b.set(v, now);
-      }
+    for (auto &s : slots_) {
+      if (path == s.b.item.path)
+        s.b.set(v, now);
     }
+    corners_.on_value(path, v, now);
   }
 
   void tick(uint32_t now) override {
@@ -349,14 +336,13 @@ class WindRoseWidget : public Widget {
     }
     if (markers)
       lv_obj_invalidate(markers_);
-    for (auto *list : {&slots_, &corners_}) {
-      for (auto &s : *list) {
-        if (!s.b.due(now, stale))
-          continue;
-        set_text(s.value, s.shown, stale ? "--" : s.b.text);
-        lv_obj_set_style_text_color(s.value, stale ? colors_.muted : colors_.text, LV_PART_MAIN);
-      }
+    for (auto &s : slots_) {
+      if (!s.b.due(now, stale))
+        continue;
+      set_text(s.value, s.shown, stale ? "--" : s.b.text);
+      lv_obj_set_style_text_color(s.value, stale ? colors_.muted : colors_.text, LV_PART_MAIN);
     }
+    corners_.tick(now);
   }
 
  protected:
@@ -365,19 +351,13 @@ class WindRoseWidget : public Widget {
     lv_obj_t *value{nullptr};
     lv_obj_t *caption{nullptr};
     std::string shown{"--"};
-    int corner{-1};          // corner slots: 0 top left, 1 top right, 2 bottom left, 3 bottom right
-    lv_obj_t *box{nullptr};  // corner slots: the value and caption container
   };
 
   /// The history mark in the bottom left corner, else the bottom right, else none.
   void place_mark_() {
     if (mark_ == nullptr)
       return;
-    bool taken[2] = {false, false};  // bottom left, bottom right
-    for (const auto &s : corners_) {
-      if (s.corner >= 2 && !lv_obj_has_flag(s.box, LV_OBJ_FLAG_HIDDEN))
-        taken[s.corner - 2] = true;
-    }
+    const bool taken[2] = {corners_.shown(2), corners_.shown(3)};  // bottom left, bottom right
     if (taken[0] && taken[1]) {
       lv_obj_add_flag(mark_, LV_OBJ_FLAG_HIDDEN);
       return;
@@ -386,43 +366,11 @@ class WindRoseWidget : public Widget {
     lv_obj_align(mark_, taken[0] ? LV_ALIGN_BOTTOM_RIGHT : LV_ALIGN_BOTTOM_LEFT, 0, -4);
   }
 
-  /// Corner values sit outside the ring, in the tile's corners. Each shows only in the full tier
-  /// and when its box (value in the label or small font, over its caption) clears the ring.
+  /// Corner values sit outside the ring, in the tile's corners: each only in the full tier and
+  /// when its box clears the ring.
   void layout_corners_(int32_t d) {
-    if (corners_.empty())
-      return;
-    const int32_t w = lv_obj_get_content_width(area_), h = lv_obj_get_content_height(area_);
-    const double r = d / 2.0 + 2;
-    const bool full = d >= esphelm::sizes::WIND_ROSE_FULL;
-    const int32_t small_h = lv_font_get_line_height(fonts_.small);
-    for (auto &s : corners_) {
-      lv_obj_update_layout(s.caption);
-      const int32_t caption_w = lv_obj_get_width(s.caption);
-      bool shown = false;
-      for (const lv_font_t *f : {fonts_.label, fonts_.small}) {
-        const int32_t fh = lv_font_get_line_height(f);
-        const int32_t bw = std::max<int32_t>(fh * 12 / 5, caption_w);  // "12.5" or the caption
-        const int32_t bh = fh + small_h;
-        // The box's inner corner, relative to the rose's centre, must be outside the ring.
-        const double x = w / 2.0 - bw, y = h / 2.0 - bh;
-        if (full && x >= 0 && y >= 0 && std::hypot(x, y) >= r) {
-          lv_obj_set_style_text_font(s.value, f, LV_PART_MAIN);
-          shown = true;
-          break;
-        }
-      }
-      if (!shown) {
-        lv_obj_add_flag(s.box, LV_OBJ_FLAG_HIDDEN);
-        continue;
-      }
-      lv_obj_remove_flag(s.box, LV_OBJ_FLAG_HIDDEN);
-      static const lv_align_t ALIGN[] = {LV_ALIGN_TOP_LEFT, LV_ALIGN_TOP_RIGHT, LV_ALIGN_BOTTOM_LEFT,
-                                         LV_ALIGN_BOTTOM_RIGHT};
-      lv_obj_align(s.box, ALIGN[s.corner], 0, 0);
-      const lv_text_align_t ta = s.corner % 2 == 1 ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_LEFT;
-      lv_obj_set_style_text_align(s.value, ta, LV_PART_MAIN);
-      lv_obj_set_style_text_align(s.caption, ta, LV_PART_MAIN);
-    }
+    corners_.layout(lv_obj_get_content_width(area_), lv_obj_get_content_height(area_), d / 2.0 + 2,
+                    d >= esphelm::sizes::WIND_ROSE_FULL);
   }
 
   /// A triangle on the ring pointing at the centre, at `deg` clockwise from the bow, with a letter.
@@ -527,7 +475,7 @@ class WindRoseWidget : public Widget {
   bool full_{false};
   int32_t marker_{12}, ring_r_{0}, ring_w_{6}, line_w_{2}, line_in_{0};
   std::vector<Slot> slots_;    // the centre stack
-  std::vector<Slot> corners_;  // corner values
+  CornerValues corners_;
 };
 
 std::unique_ptr<Widget> make_wind_rose_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env) {

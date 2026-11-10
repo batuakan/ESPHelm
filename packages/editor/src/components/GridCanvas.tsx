@@ -8,7 +8,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { GridPage, Tile, TileType } from '@esphelm/schema';
+import type { EngineSlotName, GridPage, Tile, TileType } from '@esphelm/schema';
 import { fits, type Rect, type SlotName } from '../layoutOps';
 import type { AutopilotTier, RoseTier, ValueTextSize } from '../sizing';
 import type { ChartInfo } from '../api';
@@ -27,7 +27,7 @@ interface Props {
   /** meta.zones by path (ADR-0020). */
   serverZones?: Map<string, unknown>;
   selectedId: string | undefined;
-  selectedSlot?: SlotName;
+  selectedSlot?: SlotName | EngineSlotName;
   /** Size tier the display will draw a wind rose tile with. */
   roseTier(tile: Tile): RoseTier;
   /** Whether the display will show an autopilot tile's buttons. */
@@ -42,6 +42,8 @@ interface Props {
   charts?: ChartInfo[];
   tileSize?(tile: Tile): { width: number; height: number };
   night?: boolean;
+  /** The display's full fonts' line heights (engine tiles show text only where one fits). */
+  fontLines?: readonly number[];
   /** Font sizes the display gives a value tile (other tiles keep the preview's own). */
   textSize?(tile: Tile): ValueTextSize | undefined;
   problemTileIds: Set<string>;
@@ -194,7 +196,7 @@ export function GridCanvas(props: Props) {
               data-testid={`tile-${tile.id}`}
             >
               <span className="tile-label">
-                {tile.type === 'wind_rose' || tile.type === 'chart'
+                {tile.type === 'wind_rose' || tile.type === 'chart' || tile.type === 'engine'
                   ? ''
                   : tile.type === 'clock'
                     ? [tile.label, tile.utc ? 'UTC' : ''].filter(Boolean).join(' ')
@@ -220,7 +222,13 @@ export function GridCanvas(props: Props) {
                       }
                     : undefined
                 }
-                selectedSlot={tile.id === selectedId ? props.selectedSlot : undefined}
+                engineBox={tile.type === 'engine' ? (props.tileSize?.(tile) ?? { width: 480, height: 480 }) : undefined}
+                fontLines={tile.type === 'engine' ? props.fontLines : undefined}
+                selectedSlot={
+                  tile.id === selectedId && tile.type === 'wind_rose'
+                    ? (props.selectedSlot as SlotName | undefined)
+                    : undefined
+                }
                 onSelectSlot={(slot) => props.onSelectSlot(tile.id, slot)}
               />
               <span

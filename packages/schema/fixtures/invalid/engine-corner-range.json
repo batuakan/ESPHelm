@@ -1,0 +1,45 @@
+{
+  "description": "A corner value is a plain value: no range or icon (an unknown field)",
+  "expect": [
+    {
+      "code": "UNKNOWN_FIELD",
+      "pointer": "/pages/0/tiles/0/slots/topLeft/min"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "p",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "engine",
+            "id": "engine",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "propulsion.p0.revolutions",
+            "unit": "rpm",
+            "min": 0,
+            "max": 5000,
+            "slots": {
+              "topLeft": {
+                "path": "propulsion.p0.runTime",
+                "unit": "h",
+                "min": 0
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -47,6 +47,7 @@ import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
 import type { ChartInfo } from '../api';
 import { ChartPreview } from './ChartPreview';
+import { EnginePreview } from './EnginePreview';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
 function displayNumber(value: unknown, item: DataItem): number | undefined {
@@ -79,7 +80,8 @@ export function withServerZones<T extends Tile>(tile: T, serverZones: Map<string
     const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit);
     return zones.length > 0 ? { ...tile, zones } : tile;
   }
-  if (t.type === 'gauge' || t.type === 'bar') {
+  if (t.type === 'gauge' || t.type === 'bar' || t.type === 'engine') {
+    // An engine's RPM (ADR-0032); its slots keep their own zones.
     const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit, { min: t.min, max: t.max });
     return zones.length > 0 ? { ...tile, zones } : tile;
   }
@@ -304,6 +306,9 @@ export function TilePreview(props: {
   timeZone?: string;
   /** Chart only: its chart, the tile's size on the display, and the night theme. */
   chart?: { info: ChartInfo | undefined; width: number; height: number; night: boolean };
+  /** Engine only: the tile's size on the display, in pixels, and the display's font ladder. */
+  engineBox?: { width: number; height: number };
+  fontLines?: readonly number[];
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -325,6 +330,16 @@ export function TilePreview(props: {
   if (tile.type === 'heading_tape')
     return <HeadingTapePreview tile={tile} values={values} width={props.tapeWidth ?? 440} />;
   if (tile.type === 'clock') return <ClockPreview tile={tile} timeZone={props.timeZone} />;
+  if (tile.type === 'engine')
+    return (
+      <EnginePreview
+        tile={tile}
+        values={values}
+        box={props.engineBox ?? { width: 480, height: 480 }}
+        fontLines={props.fontLines}
+        onSelectSlot={props.onSelectSlot}
+      />
+    );
   if (tile.type === 'chart')
     return (
       <ChartPreview

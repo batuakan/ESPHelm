@@ -1450,6 +1450,62 @@ async function main(): Promise<void> {
     });
     await fw.waitLog(depthCleared, 15000, clearsBefore + 1);
 
+    // 9n. Engine tile (ADR-0032): the RPM arc with oil, fuel and coolant gauges and their
+    //     needles, and engine hours, alternator, exhaust and fuel rate in the corners; in the
+    //     alarm zones; night; the fuel gone stale (muted icon and needle, the others live); then
+    //     smaller engine tiles without their gauges or corners (page 2).
+    const engine = fixture('valid/engine.json');
+    const enginePages = engine.pages as {
+      tiles: { slots: Record<string, Record<string, unknown>> }[];
+    }[];
+    enginePages[0]!.tiles[0]!.slots.right!.staleAfter = 3;
+    await json('PUT', '/plugins/esphelm/api/layouts/engine', admin, engine);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'engine' });
+    check(
+      'engine: the layout renders',
+      await fw.waitLog(/Showing fetched layout "engine" \(2 pages/),
+    );
+    const engineValues = (rpm: number, bar: number, degC: number) => ({
+      'propulsion.p0.revolutions': rpm / 60,
+      'propulsion.p0.oilPressure': bar * 1e5,
+      'propulsion.p0.temperature': degC + 273.15,
+      // The corners
+      'propulsion.p0.runTime': 1234 * 3600,
+      'electrical.alternators.0.voltage': 14.2,
+      'propulsion.p0.exhaustTemperature': 310 + 273.15,
+      'propulsion.p0.fuel.rate': 6.5 / 1000 / 3600,
+    });
+    publish({ ...engineValues(1800, 3.5, 85), 'tanks.fuel.0.currentLevel': 0.4 });
+    await sleep(1500);
+    await fw.screenshot('77-engine', shots);
+    publish({ ...engineValues(4200, 0.6, 104), 'tanks.fuel.0.currentLevel': 0.1 });
+    await sleep(1500);
+    await fw.screenshot('78-engine-alarm', shots);
+    tapTile('@theme');
+    await sleep(800);
+    // The theme rebuilds the page: the values come again with the next deltas.
+    publish({ ...engineValues(4200, 0.6, 104), 'tanks.fuel.0.currentLevel': 0.1 });
+    await sleep(1500);
+    await fw.screenshot('79-engine-night', shots);
+    tapTile('@theme');
+    // The fuel level stops (stale after 3 s); the others keep coming.
+    for (let i = 0; i < 3; i++) {
+      publish(engineValues(2000 + i * 100, 3.2, 86));
+      await sleep(1500);
+    }
+    await fw.screenshot('80-engine-stale', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
+    check('engine: page 2 with the smaller tiles', await fw.waitLog(/Page 2\/2 "Engines"/));
+    publish({
+      'propulsion.p1.revolutions': 2400 / 60,
+      'propulsion.p1.oilPressure': 4e5,
+      'propulsion.p1.temperature': 80 + 273.15,
+      'electrical.batteries.0.voltage': 12.6,
+      'navigation.speedOverGround': 3.2,
+    });
+    await sleep(1500);
+    await fw.screenshot('81-engine-small', shots);
+
     // 9l. Mounting rotation (ADR-0028): a layout designed for a display mounted sideways
     //     (settings.rotation 90) turns it before its page is built, and the display says hello
     //     again with its rotation, so the editor knows. Kept with the cached layout over a
@@ -1630,6 +1686,35 @@ async function main(): Promise<void> {
     );
     await sleep(1500);
     await fw720.screenshot('720-09-center-zero', shots);
+    await fw720.stop();
+
+    // 12f2. Engine tiles at 720, offline (stale: muted icons, no needles): the full tile, then
+    //      the second page's 2x2 tiles, big enough here for their gauges, one with labels and
+    //      a battery icon.
+    const engine720 = JSON.parse(
+      readFileSync(join(FIXTURES, 'valid/engine.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    writeFileSync(
+      join(work720, 'esphelm_cur.bin'),
+      cacheRecord(JSON.stringify(engine720), '"seed-engine"'),
+    );
+    fw720.start();
+    check(
+      '720 build shows the engine layout',
+      await fw720.waitLog(/Showing cached layout "engine" \(2 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-16-engine', shots);
+    await fw720.stop();
+    engine720.settings = { startPage: 'engines' };
+    writeFileSync(
+      join(work720, 'esphelm_cur.bin'),
+      cacheRecord(JSON.stringify(engine720), '"seed-engines"'),
+    );
+    fw720.start();
+    check('720 build shows the second engine page', await fw720.waitLog(/Page 2\/2 "Engines"/));
+    await sleep(1500);
+    await fw720.screenshot('720-17-engines', shots);
     await fw720.stop();
 
     // 12g. Clocks at 720, offline before any time arrived: "--", muted.

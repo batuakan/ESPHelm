@@ -28,7 +28,8 @@ enum class TileType : uint8_t {
   GRAPH,
   HEADING_TAPE,
   CLOCK,
-  CHART
+  CHART,
+  ENGINE
 };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
@@ -125,6 +126,32 @@ struct ChartConfig {
   std::string anchor_alarm_path{"notifications.navigation.anchor"};
 };
 
+/// Engine slot icons, in the order of ENGINE_ICON_NAMES (esphelm_engine_shapes.h ICONS).
+enum class EngineIcon : int8_t { NONE = -1, OIL, FUEL, TEMPERATURE, BATTERY };
+inline constexpr const char *ENGINE_ICON_NAMES[] = {"oil", "fuel", "temperature", "battery"};
+
+/// One of an engine tile's small gauges (ADR-0032).
+struct EngineSlot {
+  DataItem data;
+  double min{0}, max{0};
+  std::vector<Zone> zones;
+  EngineIcon icon{EngineIcon::NONE};
+};
+
+/// Engine settings: its three slot gauges and four corner values (the RPM is the tile's own data,
+/// min, max and zones).
+struct EngineConfig {
+  static constexpr int SLOTS = 3;    // left, right, bottom
+  static constexpr int CORNERS = 4;  // topLeft, topRight, bottomLeft, bottomRight
+  bool has_slot[SLOTS]{};
+  EngineSlot slots[SLOTS];
+  bool has_corner[CORNERS]{};
+  DataItem corners[CORNERS];
+};
+inline constexpr const char *ENGINE_SLOT_NAMES[EngineConfig::SLOTS] = {"left", "right", "bottom"};
+inline constexpr const char *ENGINE_CORNER_NAMES[EngineConfig::CORNERS] = {"topLeft", "topRight", "bottomLeft",
+                                                                           "bottomRight"};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -154,6 +181,8 @@ struct Tile {
   ClockConfig clock;
   // chart
   std::shared_ptr<const ChartConfig> chart;
+  // engine: the RPM in data, min, max and zones like a gauge; the slots here
+  std::shared_ptr<const EngineConfig> engine;
 };
 
 /// A grid page, the only page kind (the wind rose and the chart were page kinds; ADR-0010, ADR-0030).

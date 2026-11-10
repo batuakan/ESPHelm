@@ -2,7 +2,7 @@ import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
 import { Hello } from './hello.js';
 import { Layout } from './layout.js';
 import { GridPage } from './pages.js';
-import { TILE_TYPES } from './tiles.js';
+import { ENGINE_GAUGE_SLOTS, TILE_TYPES } from './tiles.js';
 
 /**
  * Stable error codes. Structural codes come from the JSON Schema; semantic codes from the
@@ -277,31 +277,14 @@ function validateSemantics(layout: Layout): ValidationError[] {
           message: 'a centre-zero scale needs min below 0 and max above 0',
         });
       }
-      if (tile.type === 'gauge' || tile.type === 'bar') {
-        if (!(tile.min < tile.max)) {
-          errors.push({
-            pointer: `${tbase}/max`,
-            code: 'INVALID_RANGE',
-            message: `max (${tile.max}) must be greater than min (${tile.min})`,
-          });
-          return;
+      if (tile.type === 'gauge' || tile.type === 'bar' || tile.type === 'engine') {
+        checkScale(tbase, tile.min, tile.max, tile.zones, errors);
+      }
+      if (tile.type === 'engine') {
+        for (const name of ENGINE_GAUGE_SLOTS) {
+          const slot = tile.slots[name];
+          if (slot) checkScale(`${tbase}/slots/${name}`, slot.min, slot.max, slot.zones, errors);
         }
-        (tile.zones ?? []).forEach((zone, k) => {
-          const zp = `${tbase}/zones/${k}`;
-          if (!(zone.from < zone.to)) {
-            errors.push({
-              pointer: zp,
-              code: 'INVALID_ZONE',
-              message: 'zone "to" must be greater than "from"',
-            });
-          } else if (zone.from < tile.min || zone.to > tile.max) {
-            errors.push({
-              pointer: zp,
-              code: 'ZONE_OUT_OF_RANGE',
-              message: `zone ${zone.from}..${zone.to} is outside ${tile.min}..${tile.max}`,
-            });
-          }
-        });
       }
     });
   });
@@ -335,4 +318,38 @@ export function validateHello(input: unknown): ValidationResult<Hello> {
     return { ok: false, errors: mapAjvErrors(validators.hello.errors, '') };
   }
   return { ok: true, value: input as Hello, errors: [] };
+}
+
+/** A scale's range and its zones: min below max, each zone from below to and inside the range. */
+function checkScale(
+  base: string,
+  min: number,
+  max: number,
+  zones: readonly { from: number; to: number }[] | undefined,
+  errors: ValidationError[],
+): void {
+  if (!(min < max)) {
+    errors.push({
+      pointer: `${base}/max`,
+      code: 'INVALID_RANGE',
+      message: `max (${max}) must be greater than min (${min})`,
+    });
+    return;
+  }
+  (zones ?? []).forEach((zone, k) => {
+    const zp = `${base}/zones/${k}`;
+    if (!(zone.from < zone.to)) {
+      errors.push({
+        pointer: zp,
+        code: 'INVALID_ZONE',
+        message: 'zone "to" must be greater than "from"',
+      });
+    } else if (zone.from < min || zone.to > max) {
+      errors.push({
+        pointer: zp,
+        code: 'ZONE_OUT_OF_RANGE',
+        message: `zone ${zone.from}..${zone.to} is outside ${min}..${max}`,
+      });
+    }
+  });
 }

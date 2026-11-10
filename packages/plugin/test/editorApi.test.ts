@@ -256,6 +256,7 @@ describe('widget catalog', () => {
       'heading_tape',
       'clock',
       'chart',
+      'engine',
     ]);
     expect(body.tileSlots).toEqual({
       wind_rose: [
@@ -267,6 +268,7 @@ describe('widget catalog', () => {
         'bottomLeft',
         'bottomRight',
       ],
+      engine: ['left', 'right', 'bottom', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'],
     });
     expect(body).not.toHaveProperty('pageWidgets');
     expect(body.units).toHaveProperty('kn.label', 'kn');

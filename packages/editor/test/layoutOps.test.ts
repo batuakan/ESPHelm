@@ -22,6 +22,8 @@ import {
   tilePaths,
   targetForPointer,
   updateSlot,
+  updateEngineSlot,
+  layoutPathRefs,
   gridPage,
   layoutIdFor,
   moveTile,
@@ -526,5 +528,79 @@ describe('clock tiles', () => {
     const l = updateSettings(newLayoutFor(device), { timeZone: zone });
     expect(validateLayout(addTile(l, 0, 'clock')!.layout).ok).toBe(true);
     expect(withBrowserTimeZone(l).settings?.timeZone).toEqual(zone);
+  });
+});
+
+describe('engine tiles', () => {
+  it('start 2x2 with the legacy engine values and subscribe to all four paths', () => {
+    const r = addTile(newLayoutFor(device), 0, 'engine')!;
+    const tile = page(r.layout).tiles[0]!;
+    expect(tile).toMatchObject({
+      type: 'engine',
+      id: 'engine-1',
+      w: 2,
+      h: 2,
+      path: 'propulsion.p0.revolutions',
+      unit: 'rpm',
+    });
+    expect(tilePaths(tile)).toEqual([
+      'propulsion.p0.revolutions',
+      'propulsion.p0.oilPressure',
+      'tanks.fuel.0.currentLevel',
+      'propulsion.p0.temperature',
+    ]);
+    expect(validateLayout(r.layout).ok).toBe(true);
+  });
+
+  it('empty a slot, add it back as its default, and change it', () => {
+    let l = addTile(newLayoutFor(device), 0, 'engine')!.layout;
+    l = updateEngineSlot(l, 0, 'engine-1', 'right', null);
+    expect(Object.keys((page(l).tiles[0] as { slots: object }).slots)).toEqual(['left', 'bottom']);
+    l = updateEngineSlot(l, 0, 'engine-1', 'right', {});
+    l = updateEngineSlot(l, 0, 'engine-1', 'right', {
+      icon: 'battery',
+      path: 'electrical.batteries.0.voltage',
+      unit: 'V',
+      min: 10,
+      max: 16,
+      zones: undefined,
+    });
+    const right = (page(l).tiles[0] as { slots: Record<string, unknown> }).slots.right;
+    expect(right).toMatchObject({ icon: 'battery', min: 10, max: 16, label: 'Fuel' });
+    expect(right).not.toHaveProperty('zones');
+    expect(validateLayout(l).ok).toBe(true);
+  });
+
+  it('add a corner value without a path, change it and empty it', () => {
+    let l = addTile(newLayoutFor(device), 0, 'engine')!.layout;
+    l = updateEngineSlot(l, 0, 'engine-1', 'bottomRight', {});
+    const slots = () => (page(l).tiles[0] as { slots: Record<string, unknown> }).slots;
+    expect(slots().bottomRight).toEqual({ path: '' });
+    l = updateEngineSlot(l, 0, 'engine-1', 'bottomRight', {
+      path: 'propulsion.p0.runTime',
+      unit: 'h',
+    });
+    expect(slots().bottomRight).toEqual({ path: 'propulsion.p0.runTime', unit: 'h' });
+    expect(validateLayout(l).ok).toBe(true);
+    expect(targetForPointer(l, '/pages/0/tiles/0/slots/bottomRight/unit')).toMatchObject({
+      slot: 'bottomRight',
+    });
+    l = updateEngineSlot(l, 0, 'engine-1', 'bottomRight', null);
+    expect(Object.keys(slots())).toEqual(['left', 'right', 'bottom']);
+  });
+
+  it('name its slot paths for replacing and point problems at its slots', () => {
+    const l = addTile(newLayoutFor(device), 0, 'engine')!.layout;
+    expect(layoutPathRefs(l).map((r) => r.at.join('/'))).toEqual([
+      'pages/0/tiles/0/path',
+      'pages/0/tiles/0/slots/left/path',
+      'pages/0/tiles/0/slots/right/path',
+      'pages/0/tiles/0/slots/bottom/path',
+    ]);
+    expect(targetForPointer(l, '/pages/0/tiles/0/slots/bottom/max')).toEqual({
+      page: 0,
+      tileId: 'engine-1',
+      slot: 'bottom',
+    });
   });
 });

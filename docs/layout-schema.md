@@ -83,10 +83,11 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `graph` | DataItem + `window?`, `min?`, `max?`, `zones?` (value zones) | line graph of the value's recent history, see below |
 | `heading_tape` | `label?`, `span?`, `markers?`, `config?`, `staleAfter?` | compass strip that scrolls with the heading, see below |
 | `clock` | `label?`, `show?`, `hour12?`, `seconds?`, `dateFormat?`, `utc?` | the display's time and/or date, see below |
+| `engine` | DataItem + `min`, `max`, `zones?`, `slots` | a large RPM arc with three small gauges inside it, see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
-**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
+**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, and of an `engine` tile's RPM (not its slots), on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
 
 ### Centre-zero gauges and bars (ADR-0023)
 For values either side of zero: rudder angle, heel, rate of turn, battery current, trim.
@@ -239,6 +240,36 @@ A compass strip that scrolls with the heading under a fixed centre line, with th
   "config": { "headingPath": "navigation.headingMagnetic" } }
 ```
 
+### Engine tiles
+A large RPM arc, like the legacy engine screen, with three small gauges inside it and up to four values in the tile's corners (ADR-0032). The RPM is the tile's own DataItem, `min`, `max` and `zones`, as on a gauge, so the server's zones apply to it; there's no `centerZero` (`UNKNOWN_FIELD`).
+
+| Field | Notes |
+|---|---|
+| DataItem | the RPM: `path`, `unit` (usually `rpm`), `decimals`, `label` (shown in the centre, else the unit's label), `staleAfter` |
+| `min`, `max`, `zones` | the RPM scale, `min` below `max` (`INVALID_RANGE`), zones inside it (`ZONE_OUT_OF_RANGE`) |
+| `slots` | required, may be `{}`: the gauges `left`, `right` and `bottom`, each an `EngineSlot`, and the corner values `topLeft`, `topRight`, `bottomLeft` and `bottomRight`, each a plain DataItem as a wind rose's corners (`UNKNOWN_SLOT` for other names; a range or icon on a corner is `UNKNOWN_FIELD`) |
+
+An `EngineSlot` is a DataItem plus `min`, `max` (required, `MISSING_FIELD`), `zones?` and `icon?`: `oil`, `fuel`, `temperature`, `battery` or `none` (`INVALID_VALUE`). Without an icon the slot shows its `label` in small text. Each slot's range and zones are checked like the RPM's, with pointers such as `/pages/0/tiles/0/slots/left/max`.
+
+- **Icons:** the oil, fuel, temperature and battery icons are SVG path data in `engine.ts` (Material Design Icons, Apache-2.0), flattened to polygons by `svgPath.ts` and filled with the nonzero rule by the firmware and the editor alike.
+- **Geometry** (`engine.ts`; the arcs, radii and icon polygons are generated into the firmware's `esphelm_engine_shapes.h`, `engineScale()` and `engineAngle()` mirrored by `esphelm_engine.h`, shared cases in `fixtures/engine.cases.json`): the RPM arc sweeps 240° from lower left over the top to lower right, open at the bottom. `left` and `right` are 90° arcs inside it, both rising upward; `bottom` is an 80° arc in the opening, rising left to right.
+- **RPM ticks:** the smallest step of 1, 2 or 5 times a power of ten with at most 8 intervals, labelled; medium ticks halfway, minor ticks every tenth where they're at least `ENGINE_FIT.minorTickPx` apart. A scale reaching 1000 or more is labelled in hundreds, with "x100" under the title. Zones colour a band outside the ticks; ticks in an alarm or emergency zone are red. Slots have 5 ticks.
+- **Size tiers** (`ENGINE_FIT`, by the shorter side in display pixels): the slots from `slots` (260), the labels and title from `labels` (160), below that the RPM arc alone.
+- **Corner values** show with the slots, each a value over its caption (label and unit) in the label font, else the small one, as on a wind rose, and only where its box clears the RPM arc: outside the circle of radius R, or for a bottom corner, below the arc's ends (`ENGINE_GEOMETRY.corners.openBelow`, 0.52 R under the centre) and outside the bottom gauge (`bottomRadius`, 0.9 R). A wider or taller tile than square has the most room.
+- A value that goes stale mutes its needle and icon. Defaults for a new tile are exported as `ENGINE_DEFAULTS`, slot names as `TILE_SLOTS.engine`, icon names as `ENGINE_ICON_NAMES`.
+
+```json
+{ "type": "engine", "id": "port", "x": 0, "y": 0, "w": 2, "h": 2,
+  "path": "propulsion.port.revolutions", "unit": "rpm", "label": "RPM", "min": 0, "max": 4000,
+  "zones": [{ "from": 3200, "to": 4000, "state": "alarm" }],
+  "slots": {
+    "left": { "path": "propulsion.port.oilPressure", "unit": "bar", "min": 0, "max": 6, "icon": "oil" },
+    "bottom": { "path": "propulsion.port.temperature", "unit": "degC", "min": 40, "max": 120,
+                "zones": [{ "from": 95, "to": 120, "state": "alarm" }], "icon": "temperature" },
+    "topLeft": { "path": "propulsion.port.runTime", "unit": "h", "decimals": 0, "label": "Hours" }
+  } }
+```
+
 ### Clock tiles
 The display's own time and/or date, in the layout's time zone (`settings.timeZone`) or in UTC (ADR-0024). A clock has no `path` (`UNKNOWN_FIELD`): the display sets its clock from `settings.clockPath` (GPS time) or from its board's time source, and keeps it running offline. It shows `--`, muted, until it has a time.
 
@@ -330,7 +361,7 @@ Names are numeric in `<...>` (as the tz database writes them) or three or more l
 | `DUPLICATE_ID` | semantic | page ids unique; tile ids unique **across the whole layout** (pointer = the second use) |
 | `TILE_OUT_OF_GRID` | semantic | `x + w > cols` or `y + h > rows` |
 | `TILE_OVERLAP` | semantic | tile shares a cell with an earlier tile (pointer = the later tile) |
-| `INVALID_RANGE` | semantic | gauge/bar `min` is not below `max`; a centre-zero gauge/bar whose range doesn't cross zero; a graph with only one of `min`/`max`, or `min` not below `max` |
+| `INVALID_RANGE` | semantic | gauge/bar/engine (or an engine slot's) `min` is not below `max`; a centre-zero gauge/bar whose range doesn't cross zero; a graph with only one of `min`/`max`, or `min` not below `max` |
 | `INVALID_ZONE` | semantic | zone `from` is not below `to`; a value or graph zone with neither `from` nor `to` |
 | `ZONE_OUT_OF_RANGE` | semantic | zone outside `[min, max]` |
 | `UNKNOWN_PAGE` | semantic | `settings.startPage` isn't a page of the layout |

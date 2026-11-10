@@ -584,6 +584,130 @@ export const CHART_DEFAULTS = {
  */
 export const CHART_FIT = { buttons: 200, info: 260 } as const;
 
+/** Icons an engine slot can show (ADR-0032), drawn by the firmware and the editor from ENGINE_ICONS. */
+export const ENGINE_ICON_NAMES = ['oil', 'fuel', 'temperature', 'battery'] as const;
+export type EngineIconName = (typeof ENGINE_ICON_NAMES)[number];
+export const EngineIcon = Type.Union(
+  [
+    Type.Literal('oil'),
+    Type.Literal('fuel'),
+    Type.Literal('temperature'),
+    Type.Literal('battery'),
+    Type.Literal('none'),
+  ],
+  { description: 'The icon beside the slot. Absent or none: the label in small text instead.' },
+);
+
+/** One of an engine tile's small gauges: a value on its own scale, with zones and an icon. */
+export const EngineSlot = Type.Object(
+  {
+    ...DataItem.properties,
+    min: Type.Number({ description: 'Scale start, in display units.' }),
+    max: Type.Number({ description: 'Scale end, in display units; must be greater than min.' }),
+    zones: Type.Optional(Type.Array(Zone)),
+    icon: Type.Optional(EngineIcon),
+  },
+  { additionalProperties: false },
+);
+export type EngineSlot = Type.Static<typeof EngineSlot>;
+
+const EngineSlots = Type.Object(
+  {
+    // inside the RPM arc on the left and the right, rising upward
+    left: Type.Optional(EngineSlot),
+    right: Type.Optional(EngineSlot),
+    // in the RPM arc's open bottom, rising left to right
+    bottom: Type.Optional(EngineSlot),
+    // values in the tile's corners, outside the RPM arc (shown when there is room), as on a wind rose
+    topLeft: Type.Optional(DataItem),
+    topRight: Type.Optional(DataItem),
+    bottomLeft: Type.Optional(DataItem),
+    bottomRight: Type.Optional(DataItem),
+  },
+  { additionalProperties: false, errorCode: 'UNKNOWN_SLOT' },
+);
+/** An engine tile's small gauges (ADR-0032). */
+export const ENGINE_GAUGE_SLOTS = ['left', 'right', 'bottom'] as const;
+export type EngineSlotName = (typeof ENGINE_GAUGE_SLOTS)[number];
+/** An engine tile's corner values, in the tile's corners outside the RPM arc. */
+export const ENGINE_CORNER_SLOTS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const;
+export type EngineCornerName = (typeof ENGINE_CORNER_SLOTS)[number];
+
+/**
+ * Engine (ADR-0032): a large RPM arc (the tile's own path, unit, range and zones, as a gauge's,
+ * so the server's zones apply to it) with three small gauges inside it, each a free slot, and up to
+ * four values in the tile's corners.
+ */
+export const EngineTile = Type.Object(
+  {
+    type: Type.Literal('engine'),
+    ...Placement,
+    ...DataItem.properties,
+    min: Scale.min,
+    max: Scale.max,
+    zones: Scale.zones,
+    slots: EngineSlots,
+  },
+  { additionalProperties: false },
+);
+
+/** A new engine tile in the editor: the legacy engine screen's values (propulsion.p0). */
+export const ENGINE_DEFAULTS = {
+  path: 'propulsion.p0.revolutions',
+  unit: 'rpm',
+  decimals: 0,
+  label: 'RPM',
+  min: 0,
+  max: 5000,
+  zones: [
+    { from: 0, to: 1500, state: 'warn' },
+    { from: 1500, to: 3500, state: 'normal' },
+    { from: 3500, to: 5000, state: 'alarm' },
+  ],
+  slots: {
+    left: {
+      path: 'propulsion.p0.oilPressure',
+      unit: 'bar',
+      decimals: 1,
+      label: 'Oil',
+      min: 0,
+      max: 6,
+      zones: [
+        { from: 0, to: 1, state: 'alarm' },
+        { from: 2, to: 5, state: 'normal' },
+      ],
+      icon: 'oil',
+    },
+    right: {
+      path: 'tanks.fuel.0.currentLevel',
+      unit: 'pct',
+      decimals: 0,
+      label: 'Fuel',
+      min: 0,
+      max: 100,
+      zones: [{ from: 0, to: 15, state: 'alarm' }],
+      icon: 'fuel',
+    },
+    bottom: {
+      path: 'propulsion.p0.temperature',
+      unit: 'degC',
+      decimals: 0,
+      label: 'Coolant',
+      min: 40,
+      max: 120,
+      zones: [{ from: 95, to: 120, state: 'alarm' }],
+      icon: 'temperature',
+    },
+  },
+} as const satisfies Omit<Type.Static<typeof EngineTile>, 'type' | 'id' | 'x' | 'y' | 'w' | 'h'>;
+
+/**
+ * What an engine tile draws for the shorter side of its cell, in device pixels (ADR-0032): the
+ * slots from `slots`, the tick labels and unit from `labels`, below that the RPM arc alone. Minor
+ * ticks only where they are `minorTickPx` apart. Generated into esphelm_sizes.h.
+ */
+export const ENGINE_FIT = { slots: 260, labels: 160, minorTickPx: 5 } as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,
@@ -597,12 +721,14 @@ export const TILE_TYPES = {
   heading_tape: HeadingTapeTile,
   clock: ClockTile,
   chart: ChartTile,
+  engine: EngineTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
 /** Named slots of the tile types that have them. */
 export const TILE_SLOTS = {
   wind_rose: Object.keys(WindRoseSlots.properties) as (keyof Type.Static<typeof WindRoseSlots>)[],
+  engine: Object.keys(EngineSlots.properties) as (EngineSlotName | EngineCornerName)[],
 } as const;
 
 export const Tile = Type.Union([
@@ -617,6 +743,7 @@ export const Tile = Type.Union([
   HeadingTapeTile,
   ClockTile,
   ChartTile,
+  EngineTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -629,4 +756,5 @@ export type GraphTile = Type.Static<typeof GraphTile>;
 export type HeadingTapeTile = Type.Static<typeof HeadingTapeTile>;
 export type ClockTile = Type.Static<typeof ClockTile>;
 export type ChartTile = Type.Static<typeof ChartTile>;
+export type EngineTile = Type.Static<typeof EngineTile>;
 export type Tile = Type.Static<typeof Tile>;

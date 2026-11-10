@@ -23,7 +23,8 @@
     "graph",
     "heading_tape",
     "clock",
-    "chart"
+    "chart",
+    "engine"
   ],
   "fonts": [
     "tiny",

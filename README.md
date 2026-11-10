@@ -88,8 +88,8 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🌊 Features
 
-- **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar (gauges and bars can be centre zero, for a rudder, heel, rate of turn or battery current: filled from zero, red to port and green to starboard, or plus and minus), switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), laylines for both tacks upwind and downwind (from a polar plugin's beat and gybe angles, or angles you set), the bearing to the next waypoint and the polar's target angle, an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY), a graph of a value's last 10 min, 1 h or 6 h (with an optional fixed range and zone bands), and a heading tape: a compass strip that scrolls with the heading, with markers for COG, the bearing to the next waypoint and the autopilot target, and a clock: the time and/or date in your time zone (summer time included) or UTC, set from GPS time through SignalK or from NTP, and kept running offline.
-- **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge, bar or graph tile's own zones, and the display follows them when they change on the server.
+- **Tiles:** value (coloured by a fixed colour or by thresholds; the text grows and shrinks with the tile), gauge (with coloured zones), bar (gauges and bars can be centre zero, for a rudder, heel, rate of turn or battery current: filled from zero, red to port and green to starboard, or plus and minus), switch (sends a SignalK PUT), position (GPS in four formats), wind rose with up to seven values of your choice (and its angles), laylines for both tacks upwind and downwind (from a polar plugin's beat and gybe angles, or angles you set), the bearing to the next waypoint and the polar's target angle, an autopilot with safe controls (tap to arm, confirm to engage, one-tap STANDBY), a graph of a value's last 10 min, 1 h or 6 h (with an optional fixed range and zone bands), and a heading tape: a compass strip that scrolls with the heading, with markers for COG, the bearing to the next waypoint and the autopilot target, a clock: the time and/or date in your time zone (summer time included) or UTC, set from GPS time through SignalK or from NTP, and kept running offline, and an engine tile like a classic tachometer: a large RPM arc with three small gauges of your choice inside it (oil pressure, fuel and coolant to start), each with its own range, zones and an icon, and up to four values of your choice in its corners (engine hours, alternator voltage, ...).
+- **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge, bar or graph tile's own zones (and an engine tile's RPM zones), and the display follows them when they change on the server.
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
 - **Pages:** as many as you like, with page buttons in the footer.
 - **Charts:** a chart tile with anchor watch (SignalK charts, PSRAM boards), beside a wind rose or depth, or filling its page. Several charts share their map tiles, so a second chart of the same chart and zoom costs no extra memory.
@@ -165,7 +165,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 78 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 96 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```
@@ -173,6 +173,10 @@ npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 CI (`.github/workflows/ci.yml`) runs all of these on GitHub. Images are in Git LFS, so clone with `git-lfs` installed. The firmware's desktop build needs SDL2, OpenSSL, zlib and [IXWebSocket](https://github.com/machinezone/IXWebSocket) in `/usr/local`.
 
 The first `npm test` downloads ArduinoJson 7.4.3 into `firmware/test/.cache/` (set `ESPHELM_ARDUINOJSON` to a copy to work offline). The schema in `packages/schema` is the contract between plugin, editor and firmware; decisions are recorded in [`docs/decisions/`](docs/decisions/) and the layout format in [`docs/layout-schema.md`](docs/layout-schema.md).
+
+## Credits
+
+The engine tile's oil, fuel, coolant and battery icons are from [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers, used under the [Apache License 2.0](https://pictogrammers.com/docs/general/license/).
 
 ## 🧭 Project Goals
 

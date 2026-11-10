@@ -39,6 +39,13 @@ import {
   type AutopilotTile,
   type ChartTile,
   type DataItem,
+  type BarTile,
+  type EngineSlotName,
+  type EngineCornerName,
+  type EngineTile,
+  type GaugeTile,
+  ENGINE_FIT,
+  ENGINE_ICON_NAMES,
   type GraphTile,
   type GraphWindow,
   type HeadingTapeMarker,
@@ -58,7 +65,7 @@ import {
 } from '@esphelm/schema';
 import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
-import { headingTapeSettings, WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import { ENGINE_CORNERS, ENGINE_SLOTS, headingTapeSettings, WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
 import { HistoryPreview, type PreviewSeries } from './HistoryPreview';
 import { withServerZones } from './Previews';
 
@@ -698,15 +705,16 @@ function GraphFields(props: {
   );
 }
 
-/** Min/max, zones and (bars) orientation, in display units. */
-function RangeFields(props: {
-  tile: Tile & { min: number; max: number };
-  serverZones: unknown;
+/**
+ * A scale's min/max and zones, in display units: gauges, bars, an engine's RPM and its slots.
+ * `serverZones` (the path's zones from SignalK metadata, ADR-0020) are shown when given.
+ */
+function ScaleFields(props: {
+  scale: { min: number; max: number; zones?: Zone[]; unit?: UnitId };
+  serverZones?: unknown;
   onChange(p: Patch): void;
 }) {
-  const { tile, onChange } = props;
-  const zones: Zone[] = tile.type === 'gauge' || tile.type === 'bar' ? (tile.zones ?? []) : [];
-  const unit = tile.type === 'gauge' || tile.type === 'bar' ? tile.unit : undefined;
+  const { scale, onChange } = props;
   const setZones = (next: Zone[]) => onChange({ zones: next.length > 0 ? next : undefined });
   return (
     <>
@@ -715,7 +723,7 @@ function RangeFields(props: {
           <span>Min</span>
           <input
             type="number"
-            value={String(tile.min)}
+            value={String(scale.min)}
             onChange={(e) => onChange({ min: Number(e.target.value) })}
             aria-label="Minimum"
           />
@@ -724,53 +732,77 @@ function RangeFields(props: {
           <span>Max</span>
           <input
             type="number"
-            value={String(tile.max)}
+            value={String(scale.max)}
             onChange={(e) => onChange({ max: Number(e.target.value) })}
             aria-label="Maximum"
           />
         </label>
       </div>
-      {(tile.type === 'gauge' || tile.type === 'bar') && (
-        <>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={tile.centerZero === true}
-              onChange={(e) =>
-                onChange(
-                  e.target.checked
-                    ? {
-                        centerZero: true,
-                        // A centre-zero scale crosses zero; an angle needs -180..180 to go negative.
-                        ...(tile.min >= 0 ? { min: -Math.abs(tile.max) } : {}),
-                        ...(tile.unit === 'deg' ? { unit: 'deg180' } : {}),
-                      }
-                    : { centerZero: undefined, sides: undefined },
-                )
-              }
-              aria-label="Centre zero"
-            />
-            Centre zero: fill from zero, for values either side of it (rudder, heel, current)
-          </label>
-          {tile.centerZero && (
-            <label className="field">
-              <span>Sides</span>
-              <select
-                value={tile.sides ?? 'portStarboard'}
-                onChange={(e) =>
-                  onChange({ sides: e.target.value === 'portStarboard' ? undefined : e.target.value })
-                }
-                aria-label="Sides"
-              >
-                <option value="portStarboard">Port / starboard (P and S, red and green)</option>
-                <option value="plusMinus">Plus / minus (signed)</option>
-              </select>
-              <small className="hint">
-                The scale is drawn symmetric around zero, out to the larger of min and max.
-              </small>
-            </label>
-          )}
-        </>
+      <fieldset className="zones">
+        <legend>Zones</legend>
+        {props.serverZones !== undefined && (
+          <ServerZones
+            zones={serverZonesToDisplay(props.serverZones, scale.unit, { min: scale.min, max: scale.max })}
+            unit={scale.unit}
+          />
+        )}
+        <ZoneList
+          zones={scale.zones ?? []}
+          onChange={(next) => setZones(next as Zone[])}
+          newZone={() => ({ from: scale.max - (scale.max - scale.min) / 5, to: scale.max, state: 'alarm' })}
+        />
+      </fieldset>
+    </>
+  );
+}
+
+/** Min/max, zones and (bars) orientation, in display units. */
+function RangeFields(props: {
+  tile: GaugeTile | BarTile;
+  serverZones: unknown;
+  onChange(p: Patch): void;
+}) {
+  const { tile, onChange } = props;
+  return (
+    <>
+      <ScaleFields scale={tile} serverZones={props.serverZones} onChange={onChange} />
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={tile.centerZero === true}
+          onChange={(e) =>
+            onChange(
+              e.target.checked
+                ? {
+                    centerZero: true,
+                    // A centre-zero scale crosses zero; an angle needs -180..180 to go negative.
+                    ...(tile.min >= 0 ? { min: -Math.abs(tile.max) } : {}),
+                    ...(tile.unit === 'deg' ? { unit: 'deg180' } : {}),
+                  }
+                : { centerZero: undefined, sides: undefined },
+            )
+          }
+          aria-label="Centre zero"
+        />
+        Centre zero: fill from zero, for values either side of it (rudder, heel, current)
+      </label>
+      {tile.centerZero && (
+        <label className="field">
+          <span>Sides</span>
+          <select
+            value={tile.sides ?? 'portStarboard'}
+            onChange={(e) =>
+              onChange({ sides: e.target.value === 'portStarboard' ? undefined : e.target.value })
+            }
+            aria-label="Sides"
+          >
+            <option value="portStarboard">Port / starboard (P and S, red and green)</option>
+            <option value="plusMinus">Plus / minus (signed)</option>
+          </select>
+          <small className="hint">
+            The scale is drawn symmetric around zero, out to the larger of min and max.
+          </small>
+        </label>
       )}
       {tile.type === 'bar' && (
         <label className="field">
@@ -785,18 +817,6 @@ function RangeFields(props: {
           </select>
         </label>
       )}
-      <fieldset className="zones">
-        <legend>Zones</legend>
-        <ServerZones
-          zones={serverZonesToDisplay(props.serverZones, unit, { min: tile.min, max: tile.max })}
-          unit={unit}
-        />
-        <ZoneList
-          zones={zones}
-          onChange={(next) => setZones(next as Zone[])}
-          newZone={() => ({ from: tile.max - (tile.max - tile.min) / 5, to: tile.max, state: 'alarm' })}
-        />
-      </fieldset>
     </>
   );
 }
@@ -821,7 +841,10 @@ interface Common {
   onClose(): void;
 }
 
-export const SLOT_TITLES: Record<SlotName, string> = {
+export const SLOT_TITLES: Record<SlotName | EngineSlotName, string> = {
+  left: 'Left gauge',
+  right: 'Right gauge',
+  bottom: 'Bottom gauge',
   center1: 'Centre, top',
   center2: 'Centre, middle',
   center3: 'Centre, bottom',
@@ -1448,6 +1471,133 @@ export function ChartDrawer(
   );
 }
 
+/** The engine tile's slot places, in drawer order (ADR-0032). */
+const ENGINE_SLOT_TITLES: Record<EngineSlotName, string> = {
+  left: 'Left gauge',
+  right: 'Right gauge',
+  bottom: 'Bottom gauge',
+};
+
+const ENGINE_ICON_TITLES: Record<string, string> = {
+  oil: 'Oil can',
+  fuel: 'Fuel pump',
+  temperature: 'Thermometer',
+  battery: 'Battery',
+  none: 'None: show the label',
+};
+
+/** Engine tile (ADR-0032): the RPM (path, unit, range, zones), its three slot gauges, then its corner values. */
+function EngineFields(
+  props: Common & {
+    tile: EngineTile;
+    openSlot: EngineSlotName | EngineCornerName | undefined;
+    serverZones: unknown;
+    onChange(patch: Patch): void;
+    onSlot(slot: EngineSlotName | EngineCornerName, patch: Patch | null): void;
+  },
+) {
+  const { tile } = props;
+  return (
+    <>
+      <details className="slot-section" open={props.openSlot === undefined} data-testid="engine-rpm">
+        <summary>
+          Revolutions (the large arc)
+          <span className="now">{tile.label || tile.path || 'no path yet'}</span>
+        </summary>
+        <DataItemFields item={tile} paths={props.paths} values={props.values} showFormat onChange={props.onChange} />
+        <ScaleFields scale={tile} serverZones={props.serverZones} onChange={props.onChange} />
+        <small className="hint">
+          Scales from 1000 up are labelled in hundreds ("x100"). Zones colour the band outside the
+          ticks; ticks in an alarm zone turn red.
+        </small>
+      </details>
+      {ENGINE_SLOTS.map((slot) => {
+        const item = tile.slots[slot];
+        return (
+          <details
+            key={slot}
+            className="slot-section"
+            open={slot === props.openSlot}
+            data-testid={`slot-section-${slot}`}
+          >
+            <summary>
+              {ENGINE_SLOT_TITLES[slot]}
+              <span className="now">{item ? item.label || item.path || 'no path yet' : 'empty'}</span>
+            </summary>
+            {item ? (
+              <>
+                <DataItemFields
+                  item={item}
+                  paths={props.paths}
+                  values={props.values}
+                  showFormat
+                  onChange={(patch) => props.onSlot(slot, patch)}
+                />
+                <ScaleFields scale={item} onChange={(patch) => props.onSlot(slot, patch)} />
+                <label className="field">
+                  <span>Icon</span>
+                  <select
+                    value={item.icon ?? 'none'}
+                    onChange={(e) => props.onSlot(slot, { icon: e.target.value === 'none' ? undefined : e.target.value })}
+                    aria-label={`Icon of the ${ENGINE_SLOT_TITLES[slot].toLowerCase()}`}
+                  >
+                    {[...ENGINE_ICON_NAMES, 'none'].map((n) => (
+                      <option key={n} value={n}>
+                        {ENGINE_ICON_TITLES[n]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="small" onClick={() => props.onSlot(slot, null)}>
+                  Empty this slot
+                </button>
+              </>
+            ) : (
+              <button className="small" onClick={() => props.onSlot(slot, {})}>
+                Add a gauge here
+              </button>
+            )}
+          </details>
+        );
+      })}
+      {ENGINE_CORNERS.map((slot) => {
+        const item = tile.slots[slot];
+        return (
+          <details
+            key={slot}
+            className="slot-section"
+            open={slot === props.openSlot}
+            data-testid={`slot-section-${slot}`}
+          >
+            <summary>
+              {SLOT_TITLES[slot]}
+              <span className="now">{item ? item.label || item.path || 'no path yet' : 'empty'}</span>
+            </summary>
+            <DataItemFields
+              item={item ?? { path: '' }}
+              paths={props.paths}
+              values={props.values}
+              showFormat
+              onChange={(patch) => props.onSlot(slot, patch)}
+            />
+            {item && (
+              <button className="small" onClick={() => props.onSlot(slot, null)}>
+                Empty this slot
+              </button>
+            )}
+          </details>
+        );
+      })}
+      <small className="hint">
+        The small gauges show from {ENGINE_FIT.slots} px, the labels from {ENGINE_FIT.labels} px on
+        the display. A corner value shows with the small gauges, where it fits outside the large
+        arc (a tile wider or taller than square has room). Zones from the SignalK server apply to
+        the revolutions only.
+      </small>
+    </>
+  );
+}
+
 export function TileDrawer(
   props: Common & {
     /** Any tile but a chart (ChartDrawer). */
@@ -1455,7 +1605,7 @@ export function TileDrawer(
     supported: boolean;
     /** Wind rose only: how the display will draw it at this size. */
     sizeHint?: string;
-    openSlot?: SlotName;
+    openSlot?: SlotName | EngineSlotName;
     /** The layout's display theme (the history mock follows it). */
     theme?: Layout['theme'];
     /** What the whole layout records (the history memory counter). */
@@ -1464,6 +1614,7 @@ export function TileDrawer(
     onChange(patch: Patch): void;
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
+    onEngineSlot(slot: EngineSlotName | EngineCornerName, patch: Patch | null): void;
     onDelete(): void;
   },
 ) {
@@ -1471,7 +1622,9 @@ export function TileDrawer(
   const title =
     tile.type === 'wind_rose'
       ? 'Wind rose'
-      : tile.type === 'autopilot'
+      : tile.type === 'engine'
+        ? 'Engine'
+        : tile.type === 'autopilot'
         ? 'Autopilot'
         : tile.label ||
           (tile.type === 'position' ? 'Position' : tile.type === 'clock' ? 'Clock' : tile.id);
@@ -1517,6 +1670,21 @@ export function TileDrawer(
           onConfig={props.onConfig}
           onClose={props.onClose}
         />
+      ) : tile.type === 'engine' ? (
+        <EngineFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          openSlot={
+            ([...ENGINE_SLOTS, ...ENGINE_CORNERS] as readonly string[]).includes(props.openSlot ?? '')
+              ? (props.openSlot as EngineSlotName | EngineCornerName)
+              : undefined
+          }
+          serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
+          onChange={onChange}
+          onSlot={props.onEngineSlot}
+          onClose={props.onClose}
+        />
       ) : tile.type === 'wind_rose' ? (
         <>
           {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
@@ -1524,7 +1692,7 @@ export function TileDrawer(
             tile={tile}
             paths={props.paths}
             values={props.values}
-            openSlot={props.openSlot}
+            openSlot={(WIND_ROSE_SLOTS as readonly string[]).includes(props.openSlot ?? '') ? (props.openSlot as SlotName) : undefined}
             theme={props.theme ?? 'day'}
             count={props.historyCount}
             onConfig={props.onConfig}

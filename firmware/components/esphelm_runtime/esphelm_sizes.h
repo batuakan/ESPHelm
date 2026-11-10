@@ -47,6 +47,12 @@ inline constexpr int WIND_ROSE_GYBE_FIXED = 150;
 inline constexpr int CHART_BUTTONS = 200;
 inline constexpr int CHART_INFO = 260;
 
+// Engine tile (ADR-0032): shorter side in pixels from which it shows its slots and its labels;
+// minor ticks from this spacing.
+inline constexpr int ENGINE_SLOTS = 260;
+inline constexpr int ENGINE_LABELS = 160;
+inline constexpr int ENGINE_MINOR_TICK_PX = 5;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

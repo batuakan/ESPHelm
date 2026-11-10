@@ -19,6 +19,7 @@ import {
   historyCount,
   validateLayout,
   type Layout,
+  type EngineSlotName,
   type Page,
   type Tile,
   type TileType,
@@ -51,6 +52,7 @@ import {
   updateSettings,
   withBrowserTimeZone,
   updateSlot,
+  updateEngineSlot,
   updateTile,
   type SlotName,
 } from './layoutOps';
@@ -78,7 +80,7 @@ export type Theme = 'light' | 'dark' | 'night';
 /** The selected tile, and for a wind rose optionally one of its slots. */
 interface Selection {
   id: string;
-  slot?: SlotName;
+  slot?: SlotName | EngineSlotName;
 }
 
 /** SignalK paths a page shows (what the live preview subscribes to). */
@@ -664,6 +666,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   charts={charts}
                   tileSize={tileBox}
                   night={layout.theme === 'night'}
+                  fontLines={fontLines}
                   textSize={(t) =>
                     t.type === 'value'
                       ? valueTextSize(
@@ -769,6 +772,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}
           onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
           onSlot={(slot, patch) => edit(updateSlot(layout, index, tile.id, slot, patch))}
+          onEngineSlot={(slot, patch) => edit(updateEngineSlot(layout, index, tile.id, slot, patch))}
           onDelete={() => {
             edit(removeTile(layout, index, tile.id));
             setSelection(undefined);

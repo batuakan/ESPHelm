@@ -96,6 +96,32 @@ export const TAPE_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'heading-tape.cases.json'), 'utf8'),
 ) as TapeCases;
 
+/** Engine tile geometry cases (ADR-0032), shared by the TS and C++ tests. */
+export interface EngineCases {
+  scales: {
+    note: string;
+    min: number;
+    max: number;
+    radius: number;
+    expected: {
+      step: number;
+      divisor: number;
+      ticks: { value: number; kind: 'minor' | 'medium' | 'major'; label?: string }[];
+    };
+  }[];
+  angles: {
+    gauge: 'rpm' | 'left' | 'right' | 'bottom';
+    value: number;
+    min: number;
+    max: number;
+    expected: number;
+  }[];
+}
+
+export const ENGINE_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'engine.cases.json'), 'utf8'),
+) as EngineCases;
+
 /** Wind rose performance cases (ADR-0029), shared by the TS and C++ tests. */
 export interface RoseCases {
   laylines: {
