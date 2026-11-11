@@ -31,6 +31,8 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-settings-info.png">
  <img width="200px" src="/docs/images/display-settings-network.png">
  <img width="200px" src="/docs/images/display-setup-wifi.png">
+ <img width="200px" src="/docs/images/display-mono-zones.png">
+ <img width="200px" src="/docs/images/display-mono-inverted.png">
 </p>
 
 <p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day, dark and night themes.</em></p>
@@ -41,7 +43,7 @@ I have always wanted to have a multi function display (MFD) on the electric pane
 
 This project started as a collection of ESPHome recipes that together function as an MFD (they live on in the [`ESPHelmv1` tag](https://github.com/batuakan/ESPHelm/tree/ESPHelmv1/legacy), see [the original apps](#the-original-static-apps) below). It has since grown into a display whose screens you can change at any time from a browser, on the boat, from your phone.
 
-For this project I have chosen the [ESP32-P4 Smart 86 display from Waveshare](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) for its "classic" square look and its high resolution, high-performance, dual-core RISC-V architecture. ESP32-S3 boards with PSRAM and the smaller ESP32-C3 and C6 boards are targets too (the C3 build compiles; chart pages need PSRAM). Ready-made configs also exist for two cheap boards: the [Guition ESP32-S3-4848S040](https://community.home-assistant.io/t/guition-4-480x480-esp32-s3-4848s040-smart-display-with-lvgl/729271) (4", 480×480) and the ESP32-2432S028R "cheap yellow display" (2.8", 320×240).
+For this project I have chosen the [ESP32-P4 Smart 86 display from Waveshare](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) for its "classic" square look and its high resolution, high-performance, dual-core RISC-V architecture. ESP32-S3 boards with PSRAM and the smaller ESP32-C3 and C6 boards are targets too (the C3 build compiles; chart pages need PSRAM). Ready-made configs also exist for two cheap boards: the [Guition ESP32-S3-4848S040](https://community.home-assistant.io/t/guition-4-480x480-esp32-s3-4848s040-smart-display-with-lvgl/729271) (4", 480×480) and the ESP32-2432S028R "cheap yellow display" (2.8", 320×240). For a screen that reads in full sunlight without a backlight there is the [Waveshare ESP32-S3-RLCD-4.2](https://docs.waveshare.com/ESP32-S3-RLCD-4.2) (4.2" 400×300 reflective LCD, black and white, two buttons instead of touch).
 
 ## 🧭 How it works
 
@@ -100,6 +102,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
 - **Touch sounds:** a short click when you press a button or tile, with the volume and an on/off switch in the editor's display settings and on the display.
 - **Three display themes:** *Day* (light, for sunlight), *Dark* (a dark page with full colours, like the editor's dark theme) and *Night* (red on black, for night vision). Automatic day/night switches between Night and your Day or Dark.
+- **Black-and-white displays:** reflective LCDs, readable in full sun without a backlight, get tiles of their own: value, bar, position and clock as outlined frames, a heavy frame for a warning and an inverted tile for an alarm, every pixel pure black or white. The editor previews such a display in black and white, with *Plain* and *Inverted* themes. Its firmware carries only these tiles, and colour firmware only the colour ones. A display without touch uses its buttons: the next page, Plain or Inverted, and acknowledge an alarm.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
 - **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Dark / Night / Auto, the volume and touch sounds (on a display with a speaker) and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
@@ -129,7 +132,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🚀 Getting started
 
-> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards, the Guition 4848S040 and the cheap yellow display aren't tested on hardware yet (their builds compile). Expect rough edges, and please report them.
+> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards, the Guition 4848S040, the cheap yellow display and the RLCD-4.2 aren't tested on hardware yet (their builds compile). Expect rough edges, and please report them.
 
 You need a SignalK server, Node 22, and [ESPHome](https://esphome.io/) for the firmware.
 
@@ -142,7 +145,7 @@ npm run build
 
 **Plugin and editor:** symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. (An npm / App Store package comes later.)
 
-**Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040 or the cheap yellow display) and write it over USB with `esptool.py write_flash 0x0 <file>`.
+**Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040, the cheap yellow display or the RLCD-4.2) and write it over USB with `esptool.py write_flash 0x0 <file>`.
 
 Or build it yourself: the [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware v2.9.3](https://github.com/esphome/esp-hosted-firmware/releases/tag/v2.9.3) (the release matching its pinned checksum; it is not in this repository). Then:
 
@@ -150,6 +153,7 @@ Or build it yourself: the [EspHomeSignalK](https://github.com/batuakan/ESPHomeSi
 esphome run firmware/esphelm_p4.yaml                # Waveshare ESP32-P4-86
 esphome run firmware/esphelm_guition_4848s040.yaml  # Guition ESP32-S3-4848S040
 esphome run firmware/esphelm_cyd.yaml               # ESP32-2432S028R (cheap yellow display)
+esphome run firmware/esphelm_rlcd.yaml              # Waveshare ESP32-S3-RLCD-4.2 (black and white)
 ```
 
 ### 📶 Setting up a display
@@ -179,6 +183,8 @@ CI (`.github/workflows/ci.yml`) runs all of these on GitHub. Images are in Git L
 The first `npm test` downloads ArduinoJson 7.4.3 into `firmware/test/.cache/` (set `ESPHELM_ARDUINOJSON` to a copy to work offline). The schema in `packages/schema` is the contract between plugin, editor and firmware; decisions are recorded in [`docs/decisions/`](docs/decisions/) and the layout format in [`docs/layout-schema.md`](docs/layout-schema.md).
 
 ## Credits
+
+The RLCD-4.2's panel driver is [ESPHome-ST7305-RLCD](https://github.com/kylehase/ESPHome-ST7305-RLCD) by Kyle Hase (Apache License 2.0), fetched at build time.
 
 The engine tile's oil, fuel, coolant and battery icons are from [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers, used under the [Apache License 2.0](https://pictogrammers.com/docs/general/license/).
 

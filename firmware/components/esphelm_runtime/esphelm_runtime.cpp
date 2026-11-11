@@ -264,6 +264,11 @@ void EsphelmRuntime::loop() {
       if (target >= 0)
         this->show_page(static_cast<size_t>(target));
     }
+    if (this->next_page_wanted_) {
+      this->next_page_wanted_ = false;
+      if (!this->layout_.pages.empty())
+        this->show_page((this->page_ + 1) % this->layout_.pages.size());
+    }
     for (auto &w : this->widgets_)
       w->tick(now);
 #ifdef USE_ESPHELM_CHARTS
@@ -1098,10 +1103,16 @@ void EsphelmRuntime::mono_flush_cb_(lv_event_t *e) {
   if (area == nullptr || buf == nullptr || lv_display_get_color_format(disp) != LV_COLOR_FORMAT_RGB565)
     return;
   // Partial rendering: the buffer holds just this area, row after row; otherwise the whole screen.
+#ifdef USE_ESPHELM_MONO_INK_ON
+  const bool ink_on = true;  // an ESPHome binary display: "on" pixels are ink (esphelm_tiles_mono ink_on)
+#else
+  const bool ink_on = false;
+#endif
   if (lv_display_get_render_mode(disp) == LV_DISPLAY_RENDER_MODE_PARTIAL)
-    esphelm::mono::threshold_block(buf->data, lv_area_get_width(area), lv_area_get_height(area), buf->header.stride);
+    esphelm::mono::threshold_block(buf->data, lv_area_get_width(area), lv_area_get_height(area), buf->header.stride,
+                                   ink_on);
   else
-    esphelm::mono::threshold_block(buf->data, buf->header.w, buf->header.h, buf->header.stride);
+    esphelm::mono::threshold_block(buf->data, buf->header.w, buf->header.h, buf->header.stride, ink_on);
 }
 #endif
 
@@ -1525,6 +1536,14 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
   }
   if (tile_id == "@theme") {  // day/night, as the panel's buttons would
     this->theme_toggle_wanted_ = true;
+    return;
+  }
+  if (tile_id == "@next") {  // a hardware button (displays without touch): the next page, round
+    if (this->asleep_)
+      this->wake_wanted_ = true;  // the first press only wakes the screen
+    else
+      this->next_page_wanted_ = true;
+    lv_display_trigger_activity(nullptr);
     return;
   }
   if (tile_id == "@menu") {  // the footer's menu button

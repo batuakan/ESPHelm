@@ -2098,10 +2098,21 @@ async function main(): Promise<void> {
       'mono: the cached layout with a wind rose loads',
       await fwMono.waitLog(/Showing cached layout "mono-400" \(2 pages/),
     );
-    writeFileSync(join(workMono, 'esphelm_page_request'), '1');
-    check('mono: the wind page', await fwMono.waitLog(/Page 2\/2 "Wind"/));
+    // A button for the next page (displays without touch): page 2, then round to page 1.
+    tapMono('@next');
+    check(
+      'mono: the next-page button shows the wind page',
+      await fwMono.waitLog(/Page 2\/2 "Wind"/),
+    );
     await sleep(1500);
     await monoShot('mono-06-unsupported');
+    const firstPage = /Page 1\/2 "Boat"/;
+    const shownBefore = fwMono.count(firstPage);
+    tapMono('@next');
+    check(
+      'mono: and goes round to the first page',
+      await fwMono.waitLog(firstPage, 15000, shownBefore + 1),
+    );
   } finally {
     await fw.stop();
     await fw720.stop();

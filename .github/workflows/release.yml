@@ -70,6 +70,9 @@ jobs:
           - board: cyd
             yaml: esphelm_cyd.yaml
             node: esphelm-cyd
+          - board: rlcd
+            yaml: esphelm_rlcd.yaml
+            node: esphelm-rlcd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -142,6 +145,7 @@ jobs:
           | Waveshare ESP32-P4-86 | 720×720, PSRAM | \`esphelm-p4-$VERSION.factory.bin\` | \`esphelm-p4-$VERSION.ota.bin\` | tested |
           | Guition ESP32-S3-4848S040 | 480×480, PSRAM | \`esphelm-guition-$VERSION.factory.bin\` | \`esphelm-guition-$VERSION.ota.bin\` | not yet tested |
           | ESP32-2432S028R (cheap yellow display) | 320×240, no PSRAM, no charts | \`esphelm-cyd-$VERSION.factory.bin\` | \`esphelm-cyd-$VERSION.ota.bin\` | not yet tested |
+          | Waveshare ESP32-S3-RLCD-4.2 | 400×300 black and white, buttons, no touch | \`esphelm-rlcd-$VERSION.factory.bin\` | \`esphelm-rlcd-$VERSION.ota.bin\` | not yet tested |
 
           **First install:** connect the display over USB and write the factory image at 0x0:
 

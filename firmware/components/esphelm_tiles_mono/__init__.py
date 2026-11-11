@@ -15,7 +15,15 @@ DEPENDENCIES = ["esphelm_runtime"]
 # LVGL features the mono tiles need on top of the core's (esphelm_runtime LVGL_FEATURES).
 LVGL_FEATURES = ("bar", "label")
 
-CONFIG_SCHEMA = cv.Schema({})
+CONF_INK_ON = "ink_on"
+
+CONFIG_SCHEMA = cv.Schema(
+    {
+        # The panel's driver is an ESPHome binary display (DISPLAY_TYPE_BINARY), which draws any
+        # colour but black in ink: the pixels sent are flipped so black text stays black.
+        cv.Optional(CONF_INK_ON, default=False): cv.boolean,
+    }
+)
 
 
 def _enable_lvgl_features(config):
@@ -36,5 +44,7 @@ async def to_code(config):
     except ImportError:  # pragma: no cover
         for feature in LVGL_FEATURES:
             cg.add_build_flag(f"-DLV_USE_{feature.upper()}=1")
-    # The core draws without anti-aliasing, so every pixel is the ink or the page.
+    # The core turns every flushed pixel black or white (esphelm_mono.h).
     cg.add_define("USE_ESPHELM_MONO")
+    if config[CONF_INK_ON]:
+        cg.add_define("USE_ESPHELM_MONO_INK_ON")

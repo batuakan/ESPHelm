@@ -34,6 +34,12 @@ Status: **Accepted** (2026-11-11)
   - **The palette:** two colours, black on white by day; dark and night are both white on black.
   - **The settings panel** offers *Plain*, *Inverted* and *Auto*.
 - **Pure black and white:** LVGL 9.5's software renderer anti-aliases rounded corners and lines whatever the display's antialiasing flag says. So a mono build (`USE_ESPHELM_MONO`, defined by the mono set) thresholds every area by brightness just before LVGL flushes it (`esphelm_mono.h`, an `LV_EVENT_FLUSH_START` handler). The panel driver then only ever gets pure black and pure white. Fonts are built with `bpp: 1` (`font_bpp` in `fonts.yaml`), so text is crisp rather than thresholded.
+- **ESPHome binary displays** draw any colour but black in ink, so a black-on-white picture would come out inverted. `esphelm_tiles_mono: ink_on: true` flips the thresholded pixels for such a driver. That's one line per board, with no fork of the driver.
+- **The first board** is the Waveshare ESP32-S3-RLCD-4.2 (`firmware/esphelm_rlcd.yaml`):
+  - its panel driver is kylehase/ESPHome-ST7305-RLCD (Apache-2.0), pinned to a commit;
+  - ESPHome's LVGL sends each finished frame to it (`update_when_display_idle`).
+  - **No touch:** its two buttons call the runtime's `tap()`. KEY is the next page (`@next`, wrapping round), and a long press switches between Plain and Inverted. BOOT acknowledges the alarm shown.
+  - **Not reachable from the buttons:** the settings panel. Wi-Fi comes from the captive portal and the server from mDNS, so nothing there is needed to get going.
 - **The core keeps what any tile set shares:**
   - **Helpers** in `widget_base.h/.cpp`: labels, font fitting, value formatting, `Binding`, scale steps.
   - **Header-only geometry:** the wind rose, engine, heading tape and centre zero. A header nobody includes costs nothing, and the generators and g++ tests keep their paths.

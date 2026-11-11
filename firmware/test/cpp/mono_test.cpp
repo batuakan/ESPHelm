@@ -41,6 +41,16 @@ int main() {
   CHECK(threshold_rgb565(rgb565(0x00, 0xFF, 0x00)) == 0xFFFF);  // green: 59 %
   CHECK(threshold_rgb565(rgb565(0xFF, 0xFF, 0x00)) == 0xFFFF);  // yellow
 
+  // ink_on (ESPHome binary displays): the same split, the other way round.
+  CHECK(threshold_rgb565(0x0000, true) == 0xFFFF);
+  CHECK(threshold_rgb565(0xFFFF, true) == 0x0000);
+  CHECK(threshold_rgb565(rgb565(0x30, 0x30, 0x30), true) == 0xFFFF);
+  CHECK(threshold_rgb565(rgb565(0xC8, 0xC8, 0xC8), true) == 0x0000);
+  std::vector<uint16_t> flip(2, 0x0000);
+  flip[1] = 0xFFFF;
+  threshold_block(reinterpret_cast<uint8_t *>(flip.data()), 2, 1, 4, true);
+  CHECK(flip[0] == 0xFFFF && flip[1] == 0x0000);
+
   // A block with a stride wider than its rows: only w pixels of each row change.
   const int32_t w = 3, h = 2;
   const size_t stride = 5 * 2;

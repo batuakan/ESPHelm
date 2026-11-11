@@ -1,0 +1,121 @@
+# Waveshare ESP32-S3-RLCD-4.2: a 4.2" 400x300 reflective LCD (ST7305, 1 bit per pixel, no
+# backlight, no touch) on an ESP32-S3-WROOM-1-N16R8 (16 MB flash, 8 MB PSRAM). Two buttons (KEY,
+# BOOT), an ES8311 codec with a speaker header, a PCF85063 clock with a coin cell, an SHTC3
+# sensor and an 18650 holder. Pins from Waveshare's ESPHome example
+# (github.com/waveshareteam/ESP32-S3-RLCD-4.2, examples/esphome).
+#
+# The panel driver is kylehase/ESPHome-ST7305-RLCD (Apache-2.0), an ESPHome binary display: LVGL
+# draws into its buffer and `update_when_display_idle` sends each finished frame to the panel.
+
+esphome:
+  min_version: 2026.1.1
+  project:
+    name: "Waveshare.ESP32-S3-RLCD-42"
+    version: "1.0"
+  on_boot:
+    - priority: -100
+      then:
+        # The I2S clock starts with this silent tune while the amplifier is still off, so the
+        # codec doesn't pop when the first alarm plays (as on the P4, ADR-0033).
+        - rtttl.play: "warmup:d=4,o=5,b=120:p"
+        - delay: 1s
+        - switch.turn_on: speaker_amplifier
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+json:
+
+preferences:
+  flash_write_interval: 5min
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/kylehase/ESPHome-ST7305-RLCD
+      ref: 5a3e9456c94e2eb85280c24e6c2e18b1f7e03406
+    components: [st7305_rlcd]
+
+spi:
+  clk_pin: GPIO11
+  mosi_pin: GPIO12
+
+display:
+  - platform: st7305_rlcd
+    id: board_display
+    model: WAVESHARE_400X300
+    cs_pin: GPIO40
+    dc_pin: GPIO5
+    reset_pin: GPIO41
+    # LVGL draws the picture; the driver sends it to the panel when LVGL asks (lvgl below).
+    update_interval: never
+    auto_clear_enabled: false
+
+i2c:
+  sda: GPIO13
+  scl: GPIO14
+  id: i2c_bus
+
+# The board's clock (PCF85063, coin cell): the time for clock tiles before SignalK has sent one,
+# and offline (ADR-0024).
+time:
+  - platform: pcf85063
+    id: board_time
+    i2c_id: i2c_bus
+
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_mclk_pin: GPIO16
+    i2s_lrclk_pin: GPIO45
+    i2s_bclk_pin: GPIO9
+
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: i2c_bus
+    address: 0x18
+
+speaker:
+  - platform: i2s_audio
+    id: board_i2s_speaker
+    i2s_audio_id: i2s_audio_bus
+    i2s_dout_pin: GPIO8
+    dac_type: external
+    audio_dac: es8311_dac
+    channel: mono
+    bits_per_sample: 16bit
+    sample_rate: 16000
+    buffer_duration: 100ms
+    timeout: never
+  - platform: mixer
+    output_speaker: board_i2s_speaker
+    source_speakers:
+      - id: board_speaker
+        timeout: never
+      - id: board_speaker_spare
+
+switch:
+  - platform: gpio
+    id: speaker_amplifier
+    pin: GPIO46
+    restore_mode: ALWAYS_OFF
+
+rtttl:
+  id: board_rtttl
+  speaker: board_speaker
+
+lvgl:
+  displays: [board_display]
+  # Draw a frame, then let the driver send it to the panel; no new frame while it is busy.
+  update_when_display_idle: true
+  buffer_size: 100%

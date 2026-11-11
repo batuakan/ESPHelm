@@ -68,6 +68,7 @@ Ready-made configs:
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles, checked on hardware |
 | `firmware/esphelm_guition_4848s040.yaml` | Guition ESP32-S3-4848S040, 4" 480×480, S3 with PSRAM (`hardware/guition-esp32-s3-4848s040.yaml`: ESPHome's `mipi_rgb` model `GUITION-4848S040`, GT911 touch, backlight GPIO38). The 480 font sizes of the SDL build | compiles (flash 1,799,787 B of 8 MB, static RAM 121,647 B); **not yet run on hardware** |
 | `firmware/esphelm_cyd.yaml` | ESP32-2432S028R "cheap yellow display", 2.8" 320×240, ESP32 without PSRAM (`hardware/esp32-2432s028r.yaml`: ESPHome's `mipi_spi` model `ESP32-2432S028`, the micro-USB ILI9341 revision, turned to landscape by the panel; XPT2046 resistive touch, backlight GPIO21). No chart pages, 6 recorded values; dense layouts need bigger tiles at this size | compiles (flash 1,491,819 B, 81 % of its 1.75 MB app partition; static RAM 55,524 B); **not yet run on hardware**, touch calibration and orientation unchecked |
+| `firmware/esphelm_rlcd.yaml` | Waveshare ESP32-S3-RLCD-4.2, 4.2" 400×300 reflective LCD, black and white, no touch, no backlight, S3 with PSRAM (`hardware/waveshare-esp32-s3-rlcd-42.yaml`: kylehase's `st7305_rlcd` driver, pinned to a commit, an ESPHome binary display, so `esphelm_tiles_mono: ink_on: true`; LVGL's `update_when_display_idle` sends each frame; PCF85063 clock as `time_id`; ES8311 speaker like the P4). Buttons: KEY is the next page (`@next`, a long press `@theme`), BOOT acknowledges (`@alarm ack`) | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
 The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
@@ -152,7 +153,9 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 - **The mono tile set** (`esphelm_tiles_mono/`): `value`, `bar`, `clock` and `position`, each an outlined frame (`mono_common.h`, `Frame`). Warn shows as a heavy frame, alarm and emergency as an inverted tile. Two colours: black on white by day, white on black for dark and night.
   - **Pure black and white:** the core thresholds each flushed area to black or white (`esphelm_mono.h`, `USE_ESPHELM_MONO`), since LVGL anti-aliases rounded corners regardless. The fonts use `font_bpp: 1`.
   - **The settings panel** offers *Plain*, *Inverted* and *Auto*.
+  - **`ink_on: true`** flips the pixels for an ESPHome binary display driver, which draws any colour but black in ink.
   - **The desktop build:** `firmware/esphelm_sdl_mono.yaml`, 400×300.
+  - **Displays without touch** call `tap()` from their buttons: `@next` (the next page, round; the first press wakes a switched-off screen), `@theme` and `@alarm ack`.
 
 | Widget | Drawn with | Notes |
 |---|---|---|

@@ -1,0 +1,111 @@
+# Runtime firmware for the Waveshare ESP32-S3-RLCD-4.2 (4.2" 400x300 reflective LCD, black and
+# white, no touch, no backlight).
+#   ~/venv/bin/esphome run firmware/esphelm_rlcd.yaml
+# Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
+# The black-and-white tile set (ADR-0035) with 1-bit fonts. No touch: the KEY button shows the next
+# page (a long press switches between Plain and Inverted), BOOT acknowledges the alarm shown.
+substitutions:
+  # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
+  signalk_ref: main
+  font_bpp: 1
+  font_digits_huge_size: "112"
+  font_digits_large_size: "80"
+  font_huge_size: "56"
+  font_value_size: "40"
+  font_medium_size: "28"
+  font_label_size: "20"
+  font_small_size: "16"
+
+packages:
+  hardware: !include hardware/waveshare-esp32-s3-rlcd-42.yaml
+  wifi: !include wifi.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-rlcd
+  name_add_mac_suffix: true
+  friendly_name: "ESPHelm display"
+
+external_components:
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: ${signalk_ref}
+      path: components
+    components: [signalk]
+  - source:
+      type: local
+      path: components
+    components: [esphelm_runtime, esphelm_tiles_mono]
+
+signalk:
+
+lvgl:
+  # Lets the runtime turn the picture to the layout's rotation, set in the editor for how the
+  # display is mounted (ADR-0028).
+  rotation: 0
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+# The tiles this display renders (ADR-0035): the black-and-white tile set. The ST7305 driver is an
+# ESPHome binary display, which draws "on" pixels in ink.
+esphelm_tiles_mono:
+  ink_on: true
+
+esphelm_runtime:
+  id: esphelm_rt
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: waveshare-esp32-s3-rlcd-4.2
+  touch: false
+  time_id: board_time
+  # Alarm tones (ADR-0033) on the board's speaker (hardware package).
+  sound:
+    rtttl: board_rtttl
+    speaker: board_speaker
+
+# No touch: the two buttons.
+binary_sensor:
+  - platform: gpio
+    id: key_button
+    pin:
+      number: GPIO18
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      - min_length: 20ms
+        max_length: 600ms
+        then:
+          - lambda: id(esphelm_rt)->tap("@next");
+      - min_length: 600ms
+        max_length: 5s
+        then:
+          - lambda: id(esphelm_rt)->tap("@theme");
+  - platform: gpio
+    id: boot_button
+    pin:
+      number: GPIO0
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on_off: 20ms
+    on_click:
+      - then:
+          - lambda: id(esphelm_rt)->tap("@alarm", "ack");

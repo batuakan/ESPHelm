@@ -100,7 +100,9 @@ class EsphelmRuntime : public Component {
 
   /// Show page `index` of the current layout (also the footer buttons' target and a test hook).
   void show_page(size_t index);
-  /// Act as if the tile with this id (and its button `part`, if any) was tapped (test hook).
+  /// Act as if the tile with this id (and its button `part`, if any) was tapped (test hook). Also
+  /// for hardware buttons on displays without touch: "@next" (the next page, round), "@theme"
+  /// (day/night), "@alarm" "ack" (acknowledge the alarm shown).
   void tap(const std::string &tile_id, const std::string &part = "");
   /// Host build: the process is exiting normally, so a pending boot attempt was no crash.
   void clean_exit();
@@ -239,6 +241,7 @@ class EsphelmRuntime : public Component {
   bool has_layout_{false};
   esphelm::Layout layout_;
   size_t page_{0};
+  bool next_page_wanted_{false};  // "@next": a hardware button, applied in loop()
   int pending_step_{0};  // footer button presses, applied in loop() (never inside LVGL events)
   bool theme_toggle_wanted_{false};  // test hook @theme: switch day/night in loop()
   bool menu_wanted_{false};          // the footer's menu button: open the settings in loop()
