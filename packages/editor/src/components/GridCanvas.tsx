@@ -225,7 +225,7 @@ export function GridCanvas(props: Props) {
                 engineBox={tile.type === 'engine' ? (props.tileSize?.(tile) ?? { width: 480, height: 480 }) : undefined}
                 fontLines={tile.type === 'engine' ? props.fontLines : undefined}
                 selectedSlot={
-                  tile.id === selectedId && tile.type === 'wind_rose'
+                  tile.id === selectedId && (tile.type === 'wind_rose' || tile.type === 'engine')
                     ? (props.selectedSlot as SlotName | undefined)
                     : undefined
                 }

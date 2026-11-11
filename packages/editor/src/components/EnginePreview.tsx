@@ -114,6 +114,8 @@ export function EnginePreview(props: {
   box: { width: number; height: number };
   /** The display's full fonts' line heights (hello.fontLineHeights); text only where one fits. */
   fontLines?: readonly number[];
+  /** The slot open in the drawer (an empty corner then shows its outline). */
+  selectedSlot?: SlotName;
   onSelectSlot?(slot: SlotName): void;
 }) {
   const { tile } = props;
@@ -244,6 +246,26 @@ export function EnginePreview(props: {
       })
     : [];
 
+  // Empty corners are hinted with a faint "+", as on a wind rose, so they can be picked here; only
+  // where corner values can show (with the slots).
+  const emptyCorners = slotsOn
+    ? ENGINE_CORNERS.filter((name: EngineCornerName) => !tile.slots[name]).map((name: EngineCornerName) => (
+        <button
+          key={name}
+          className={`rose-slot corner corner-${name} empty ${props.selectedSlot === name ? 'selected' : ''}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onSelectSlot?.(name);
+          }}
+          aria-label={`Slot ${name}`}
+          data-testid={`slot-${tile.id}-${name}`}
+        >
+          <span className="slot-label">+</span>
+        </button>
+      ))
+    : [];
+
   return (
     <span className="tile-graphic engine-tile" data-testid={`engine-${tile.id}`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="engine">
@@ -252,6 +274,7 @@ export function EnginePreview(props: {
         </g>
         {corners}
       </svg>
+      {emptyCorners}
     </span>
   );
 }

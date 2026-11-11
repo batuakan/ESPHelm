@@ -622,6 +622,22 @@ describe('editor', { timeout: 20000 }, () => {
     expect(saved.slots.left).not.toHaveProperty('icon');
   });
 
+  it("hints an engine tile's empty corners with a +, which opens that corner", async () => {
+    render(<App api={fakeServer([device('adopted')]).api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Engine/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    for (const name of ['topLeft', 'topRight', 'bottomLeft', 'bottomRight']) {
+      const plus = screen.getByTestId(`slot-engine-1-${name}`);
+      expect(plus.tagName).toBe('BUTTON');
+      expect(plus.textContent).toBe('+');
+    }
+    const corner = screen.getByTestId('slot-engine-1-bottomRight');
+    fireEvent.click(corner);
+    expect((within(drawer).getByTestId('slot-section-bottomRight') as HTMLDetailsElement).open).toBe(true);
+    expect(screen.getByTestId('slot-engine-1-bottomRight').className).toMatch(/\bselected\b/);
+  });
+
   it('puts a value in an engine tile corner, shown where it fits outside the arc', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();

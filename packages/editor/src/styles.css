@@ -1244,6 +1244,14 @@ select.zone-emergency {
 .rose-slot.corner.empty {
   opacity: 0.35;
 }
+.rose-slot.corner.empty.selected {
+  opacity: 1;
+}
+/* Clear of the tile's resize handle (22 px in its corner, over the tile's padding), so the empty
+   bottom-right corner can be clicked. */
+.rose-slot.corner.empty.corner-bottomRight {
+  right: 16px;
+}
 .rose-slot.selected {
   border: 2px solid var(--accent);
 }
@@ -1470,8 +1478,10 @@ fieldset.modes {
   background: var(--canvas-bg) !important;
 }
 .tile-graphic.engine-tile {
+  position: relative; /* the empty corners' "+" buttons */
   height: 100%;
   min-height: 0;
+  container-type: size;
 }
 .tile-graphic.engine-tile svg {
   display: block;
