@@ -6,8 +6,8 @@
 #include <utility>
 
 #include "esphome/core/hal.h"
-#include "esphelm_sizes.h"
-#include "esphelm_wind_rose.h"
+#include "esphome/components/esphelm_runtime/esphelm_sizes.h"
+#include "esphome/components/esphelm_runtime/esphelm_wind_rose.h"
 
 namespace esphome {
 namespace esphelm_runtime {

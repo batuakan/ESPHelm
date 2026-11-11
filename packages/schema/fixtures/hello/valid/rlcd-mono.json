@@ -1,0 +1,38 @@
+{
+  "deviceId": "5a6b7c8d-9e0f-1a2b-3c4d-5a6b7c8d9e0f",
+  "fw": {
+    "version": "0.3.0"
+  },
+  "schema": {
+    "major": 1
+  },
+  "board": "waveshare-esp32-s3-rlcd-4.2",
+  "display": {
+    "width": 400,
+    "height": 300,
+    "rotation": 0,
+    "kind": "mono"
+  },
+  "widgets": [
+    "value",
+    "bar",
+    "clock",
+    "position"
+  ],
+  "capacity": {
+    "psram": true,
+    "maxLayoutBytes": 131072,
+    "freeHeapBytes": 7500000
+  },
+  "capabilities": {
+    "touch": false,
+    "put": true,
+    "darkTheme": true
+  },
+  "fontLineHeights": [
+    16,
+    24,
+    32,
+    48
+  ]
+}

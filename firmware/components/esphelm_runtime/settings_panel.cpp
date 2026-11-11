@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "esphome/core/defines.h"  // USE_ESPHELM_MONO
 #include "esphome/core/log.h"
 #include "display_prefs.h"
 #include "esphelm_wifi_setup.h"
@@ -13,6 +14,14 @@ namespace esphelm_runtime {
 
 static const char *const TAG = "esphelm.settings";
 static const uint32_t INFO_INTERVAL_MS = 1000;
+#ifdef USE_ESPHELM_MONO
+// A black-and-white panel (ADR-0035): black on white, or inverted (dark and night look the same).
+static const int CHOICES = 3;
+static const char *const CHOICE_PARTS[CHOICES] = {"day", "dark", "auto"};
+static const char *const CHOICE_TEXT[CHOICES] = {"Plain", "Inverted", "Auto"};
+static const int8_t CHOICE_VALUE[CHOICES] = {static_cast<int8_t>(esphelm::Theme::DAY),
+                                             static_cast<int8_t>(esphelm::Theme::DARK), -1};
+#else
 static const int CHOICES = 4;
 static const char *const CHOICE_PARTS[CHOICES] = {"day", "dark", "night", "auto"};
 static const char *const CHOICE_TEXT[CHOICES] = {"Day", "Dark", "Night", "Auto"};
@@ -20,6 +29,7 @@ static const char *const CHOICE_TEXT[CHOICES] = {"Day", "Dark", "Night", "Auto"}
 static const int8_t CHOICE_VALUE[CHOICES] = {static_cast<int8_t>(esphelm::Theme::DAY),
                                              static_cast<int8_t>(esphelm::Theme::DARK),
                                              static_cast<int8_t>(esphelm::Theme::NIGHT), -1};
+#endif
 
 /// Choice button index of a choice (-1 auto, else Theme).
 static int choice_index(int8_t choice) {
@@ -27,6 +37,11 @@ static int choice_index(int8_t choice) {
     if (CHOICE_VALUE[i] == choice)
       return i;
   }
+#ifdef USE_ESPHELM_MONO
+  // Night (the footer's theme button) looks like Inverted here.
+  if (choice == static_cast<int8_t>(esphelm::Theme::NIGHT))
+    return 1;
+#endif
   return CHOICES - 1;
 }
 
@@ -406,16 +421,16 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
 
   label(body, big, c.muted, "Theme");
   lv_obj_t *choices = box(body, w);
-  // Four in a row, or two rows of two where the widest name would not fit (small screens).
+  // All in a row, or two per row where the widest name would not fit (small screens).
   int32_t widest = 0;
   for (const char *text : CHOICE_TEXT) {
     lv_point_t size;
     lv_text_get_size(&size, text, big, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
     widest = std::max<int32_t>(widest, size.x);
   }
-  const int per_row = (w - 3 * 8) / CHOICES >= widest + 16 ? CHOICES : CHOICES / 2;
+  const int per_row = (w - (CHOICES - 1) * 8) / CHOICES >= widest + 16 ? CHOICES : 2;
   const int32_t choice_w = (w - (per_row - 1) * 8) / per_row;
-  lv_obj_set_height(choices, (CHOICES / per_row) * (btn_h + 8) - 8);
+  lv_obj_set_height(choices, ((CHOICES + per_row - 1) / per_row) * (btn_h + 8) - 8);
   for (int i = 0; i < CHOICES; i++) {
     this->choices_[i] = button(choices, c, choice_w, btn_h);
     lv_obj_set_pos(this->choices_[i], (i % per_row) * (choice_w + 8), (i / per_row) * (btn_h + 8));

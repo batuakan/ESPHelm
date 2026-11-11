@@ -12,6 +12,11 @@
 #include <string>
 #include <vector>
 
+#include "esphome/core/defines.h"
+
+// Only a tile set with chart tiles defines it (esphelm_tiles_color, ADR-0035).
+#ifdef USE_ESPHELM_CHARTS
+
 #include "lvgl.h"
 #include "layout_client.h"
 
@@ -95,3 +100,5 @@ class ChartTileStore {
 
 }  // namespace esphelm_runtime
 }  // namespace esphome
+
+#endif  // USE_ESPHELM_CHARTS

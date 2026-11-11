@@ -427,6 +427,45 @@ describe('editor', { timeout: 20000 }, () => {
     expect((within(group).getByRole('button', { name: 'Day' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('shows a mono display in black and white, without colour choices (ADR-0035)', async () => {
+    const d = device('adopted');
+    d.hello = {
+      ...p4,
+      display: { width: 400, height: 300, rotation: 0, kind: 'mono' },
+      widgets: ['value', 'bar', 'clock', 'position'],
+      capabilities: { touch: false, put: true, darkTheme: true },
+    };
+    const server = fakeServer([d]);
+    const { container } = render(<App api={server.api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect(within(drawer).queryByLabelText('Colour')).toBeNull();
+    within(drawer).getByText('Zones by value');
+    expect(container.querySelector('.display-frame')?.getAttribute('data-display-kind')).toBe('mono');
+    const group = screen.getByRole('group', { name: 'Display theme' });
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Plain', 'Inverted']);
+    fireEvent.click(within(group).getByRole('button', { name: 'Inverted' }));
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('dark');
+  });
+
+  it('keeps colour choices for a colour display', async () => {
+    const { container } = render(<App api={fakeServer([device('adopted')]).api} live={fakeLive().factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Value/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    within(drawer).getByLabelText('Colour');
+    within(drawer).getByText('Colour by value');
+    expect(container.querySelector('.display-frame')?.hasAttribute('data-display-kind')).toBe(false);
+    const group = screen.getByRole('group', { name: 'Display theme' });
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Day', 'Dark', 'Night']);
+  });
+
   it('adds a chart page (a chart tile), picks a chart and previews it at the position', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();

@@ -3,6 +3,10 @@
 // its LVGL objects inside a parent, says which SignalK paths it needs, takes values, and redraws
 // itself at most every DRAW_INTERVAL_MS. No widget knows about any other (CLAUDE.md §6).
 // Main loop only.
+//
+// This header is the contract between the core (esphelm_runtime) and a tile set (ADR-0035): the
+// functions marked "tile set" are defined by the one tile set the firmware is built with
+// (esphelm_tiles_color today), never by the core.
 
 #include <cstdint>
 #include <functional>
@@ -14,13 +18,14 @@
 #include <ArduinoJson.h>
 
 #include "lvgl.h"
-#include "chart_store.h"
 #include "layout_client.h"
 #include "layout_model.h"
 #include "value_history.h"
 
 namespace esphome {
 namespace esphelm_runtime {
+
+class ChartTileStore;  // chart_store.h, with USE_ESPHELM_CHARTS
 
 struct Fonts {
   const lv_font_t *value{nullptr};
@@ -77,6 +82,7 @@ struct Colors {
   lv_color_t palette[6];
 };
 
+/// Tile set: the theme's colours, for the tiles and the core's banner, footer, panel and popup.
 Colors colors_for(esphelm::Theme theme);
 
 /// QR code colours: dark modules on light ones by day; at night the light ones are the dim red text
@@ -144,10 +150,16 @@ class Widget {
   virtual void tap(const std::string &part) {}
 };
 
-/// Build the widget for a grid tile inside `cell` (an empty LVGL object placed in the grid).
+/// Tile set: build the widget for a grid tile inside `cell` (an empty LVGL object placed in the
+/// grid).
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
-/// Build a chart page filling `area` (chart.cpp).
+/// Tile set: the tile types it renders (schema names, for hello.widgets); `psram` says whether the
+/// display has PSRAM.
+void tile_types(std::vector<const char *> &out, bool psram);
+
+/// Tile set: the kind of panel it draws for, as hello.display.kind: "color" or "mono".
+const char *display_kind();
 
 /// Format a SignalK value like the editor preview: converted, fixed decimals (default 1),
 /// on/off for booleans, printable text for strings, "--" otherwise.

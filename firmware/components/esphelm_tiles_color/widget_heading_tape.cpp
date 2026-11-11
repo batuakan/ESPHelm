@@ -7,7 +7,7 @@
 #include <cstdio>
 
 #include "esphome/core/hal.h"
-#include "esphelm_heading_tape.h"
+#include "esphome/components/esphelm_runtime/esphelm_heading_tape.h"
 
 namespace esphome {
 namespace esphelm_runtime {

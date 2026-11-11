@@ -2,6 +2,8 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
+The tiles come from a **tile set**, a component of its own (ADR-0035). A firmware is built with exactly one: `esphelm_tiles_color` (`firmware/components/esphelm_tiles_color/`) for the colour displays, or `esphelm_tiles_mono` (`firmware/components/esphelm_tiles_mono/`) for black-and-white panels. The core is everything else: the client, cache, parser, prefs, alarm banner, footer, settings panel and history popup.
+
 **Scope:** every page of the layout: grid pages with every tile type of the catalog, `chart` only with PSRAM. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else.
 
 ## Configuration
@@ -11,7 +13,7 @@ external_components:
   - source: { type: git, url: https://github.com/batuakan/ESPHomeSignalK, ref: main, path: components }
     components: [signalk]
   - source: { type: local, path: components }
-    components: [esphelm_runtime]
+    components: [esphelm_runtime, esphelm_tiles_color]
 
 signalk:                          # no host: found with mDNS (ADR-0026); update_interval defaults to 1s
 
@@ -20,6 +22,8 @@ lvgl:
     - id: esphelm_page
       widgets:
         - obj: { id: esphelm_container, width: 100%, height: 100% }
+
+esphelm_tiles_color:              # the tile set (ADR-0035): exactly one per firmware
 
 esphelm_runtime:
   container: esphelm_container    # LVGL obj the runtime owns (required)
@@ -60,9 +64,11 @@ Ready-made configs:
 | `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, 720 renders in the e2e test. It repeats `signalk_host`/`signalk_port` because `-s` on the command line does not override substitutions of the included `esphelm_sdl.yaml`; the e2e test refuses to run a build that isn't compiled for its test port |
 | `firmware/esphelm_sdl_wide.yaml` | desktop, 1280×800 with the P4-86 font sizes | compile, renders in the e2e test: a square layout stretched to a landscape screen, the panel, and a layout with `settings.rotation: 90` turning it to 800×1280 |
 | `firmware/esphelm_sdl_cyd.yaml` | desktop, 320×240 with the CYD font sizes | compile; a preview of layouts on the CYD (not in the e2e test) |
+| `firmware/esphelm_sdl_mono.yaml` | desktop, 400×300 in black and white: the mono tile set (ADR-0035), 1-bit fonts | compile, e2e test against its own server: the `display.kind` in hello, a refused layout, zones, the panel, the inverted theme, an alarm, a tile it doesn't have; every screenshot checked to hold only black and white |
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles, checked on hardware |
 | `firmware/esphelm_guition_4848s040.yaml` | Guition ESP32-S3-4848S040, 4" 480×480, S3 with PSRAM (`hardware/guition-esp32-s3-4848s040.yaml`: ESPHome's `mipi_rgb` model `GUITION-4848S040`, GT911 touch, backlight GPIO38). The 480 font sizes of the SDL build | compiles (flash 1,799,787 B of 8 MB, static RAM 121,647 B); **not yet run on hardware** |
 | `firmware/esphelm_cyd.yaml` | ESP32-2432S028R "cheap yellow display", 2.8" 320×240, ESP32 without PSRAM (`hardware/esp32-2432s028r.yaml`: ESPHome's `mipi_spi` model `ESP32-2432S028`, the micro-USB ILI9341 revision, turned to landscape by the panel; XPT2046 resistive touch, backlight GPIO21). No chart pages, 6 recorded values; dense layouts need bigger tiles at this size | compiles (flash 1,491,819 B, 81 % of its 1.75 MB app partition; static RAM 55,524 B); **not yet run on hardware**, touch calibration and orientation unchecked |
+| `firmware/esphelm_rlcd.yaml` | Waveshare ESP32-S3-RLCD-4.2, 4.2" 400×300 reflective LCD, black and white, no touch, no backlight, S3 with PSRAM (`hardware/waveshare-esp32-s3-rlcd-42.yaml`: kylehase's `st7305_rlcd` driver, pinned to a commit, an ESPHome binary display, so `esphelm_tiles_mono: ink_on: true`; LVGL's `update_when_display_idle` sends each frame; PCF85063 clock as `time_id`; ES8311 speaker like the P4). Buttons: KEY is the next page (`@next`, a long press `@theme`), BOOT acknowledges (`@alarm ack`) | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
 The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
@@ -134,7 +140,22 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue, and **dark** (ADR-0034) is the editor's dark theme: a `#0E141A` page, `#17202A` tiles, light text and full colours. `red_only()` (night) and `dark_page()` (night or dark) in `layout_model.h` say which a widget means.
 
-Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `switch`, `autopilot`, `wind_rose`, `position`), with its class and factory. `widgets.cpp` holds the theme colours, value formatting, the font fitting and `make_tile_widget()`, which picks the factory. Helpers shared by the widgets are declared in `widget_common.h`. A new tile type adds a file and a case there.
+**Where the code is** (ADR-0035):
+- **The contract**, in the core: `widgets.h`. A tile set defines `colors_for()`, `make_tile_widget()`, `tile_types()` (the list `hello.widgets` sends) and `display_kind()` (`hello.display.kind`, sent only for `mono`).
+- **Helpers every tile set uses**, also in the core: `widget_base.h/.cpp`, covering labels, font fitting (ADR-0017), value formatting, `Binding` (throttling and staleness) and scale steps.
+- **The colour tile set** (`esphelm_tiles_color/`):
+  - one file per tile type, `widget_<type>.cpp`, with its class and factory;
+  - `tiles_color.cpp`: the theme colours, the tile list and `make_tile_widget()`, which picks the factory;
+  - `widget_common.h`: the colour-only helpers (zone styles, the cell style, the history mark, `CornerValues`).
+
+  A new tile type adds a file there, a case in the factory and a name in `tile_types()`.
+- **Header-only geometry** (`esphelm_wind_rose.h`, `esphelm_engine.h` and the like) stays in the core, so a mono tile set can use it too.
+- **The mono tile set** (`esphelm_tiles_mono/`): `value`, `bar`, `clock` and `position`, each an outlined frame (`mono_common.h`, `Frame`). Warn shows as a heavy frame, alarm and emergency as an inverted tile. Two colours: black on white by day, white on black for dark and night.
+  - **Pure black and white:** the core thresholds each flushed area to black or white (`esphelm_mono.h`, `USE_ESPHELM_MONO`), since LVGL anti-aliases rounded corners regardless. The fonts use `font_bpp: 1`.
+  - **The settings panel** offers *Plain*, *Inverted* and *Auto*.
+  - **`ink_on: true`** flips the pixels for an ESPHome binary display driver, which draws any colour but black in ink.
+  - **The desktop build:** `firmware/esphelm_sdl_mono.yaml`, 400×300.
+  - **Displays without touch** call `tap()` from their buttons: `@next` (the next page, round; the first press wakes a switched-off screen), `@theme` and `@alarm ack`.
 
 | Widget | Drawn with | Notes |
 |---|---|---|
@@ -166,7 +187,7 @@ Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy
 - **Size:** below `AUTOPILOT_FIT` (260×220 px of content) the tile shows status only, with no buttons. In narrow tiles TGT and HDG stack; in tiny ones HDG is dropped.
 - Disabled buttons use the theme's dark colours (LVGL's grey recolour is turned off; this applies to the footer buttons too).
 
-**Chart tiles** (`chart.cpp` and `chart_store.cpp`, ADR-0012 and ADR-0030; Web-Mercator maths ported from ESPTiles, MIT):
+**Chart tiles** (`chart.cpp` in the colour tile set, and the core's `chart_store.cpp`, compiled with the colour set's `USE_ESPHELM_CHARTS`; ADR-0012 and ADR-0030; Web-Mercator maths ported from ESPTiles, MIT):
 - **One store for every chart** (`ChartTileStore`, owned by the runtime): 256 px RGB565 map tiles (131,072 bytes each) in PSRAM, keyed by chart, zoom and tile. Charts are centred on the vessel, so charts of the same chart and zoom need the same tiles, and each is fetched and kept once.
   - **Budget:** set when the first tile is needed: 40 % of the free PSRAM, between 16 and 48 tiles (2–6 MB; logged as "Chart tiles: up to N"). Memory is allocated per tile as it arrives and reused.
   - **Wanting:** every tick, each chart tells the store which tiles cover its view, nearest to the vessel first. A tile wanted in the last second is never evicted; when the budget is full the least recently wanted other tile makes room, and if every tile is on screen, nothing more is fetched (the edges stay blank).

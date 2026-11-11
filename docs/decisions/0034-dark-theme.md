@@ -12,7 +12,7 @@ Status: **Accepted** (2026-11-10)
 ## Decision
 **A third layout theme, `dark`, that looks like the editor's dark theme.**
 - `theme` is `day | dark | night`. It's an added value, so `LAYOUT_VERSION` stays 1.
-- **The palette** (`colors_for()` in `widgets.cpp`, mirrored by `.display-frame[data-theme-preview='dark']` in the editor):
+- **The palette** (`colors_for()` in `widgets.cpp`, now `esphelm_tiles_color/tiles_color.cpp` (ADR-0035), mirrored by `.display-frame[data-theme-preview='dark']` in the editor):
   - the editor's dark page `#0E141A`, panel `#17202A` as the tiles, text `#E5EBF1`, muted `#93A1AE`;
   - accent `#4A9EFF`;
   - zones in the editor's green, amber and red;

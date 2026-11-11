@@ -82,6 +82,19 @@
               "const": 270
             }
           ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "color"
+            },
+            {
+              "type": "string",
+              "const": "mono"
+            }
+          ],
+          "description": "color: a colour panel; mono: black and white only, e.g. a reflective LCD (the firmware's tile set, ADR-0035). Missing: color."
         }
       },
       "additionalProperties": false

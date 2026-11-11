@@ -5,7 +5,7 @@
 #include <cstdlib>
 
 #include "esphome/core/hal.h"
-#include "esphelm_sizes.h"
+#include "esphome/components/esphelm_runtime/esphelm_sizes.h"
 #include "esphome/core/log.h"
 
 namespace esphome {

@@ -1,5 +1,7 @@
 #include "chart_store.h"
 
+#ifdef USE_ESPHELM_CHARTS
+
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -260,3 +262,5 @@ size_t ChartTileStore::loaded() const {
 
 }  // namespace esphelm_runtime
 }  // namespace esphome
+
+#endif  // USE_ESPHELM_CHARTS

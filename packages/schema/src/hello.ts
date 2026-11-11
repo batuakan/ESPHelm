@@ -26,6 +26,12 @@ export const Hello = Type.Object(
           Type.Literal(180),
           Type.Literal(270),
         ]),
+        kind: Type.Optional(
+          Type.Union([Type.Literal('color'), Type.Literal('mono')], {
+            description:
+              "color: a colour panel; mono: black and white only, e.g. a reflective LCD (the firmware's tile set, ADR-0035). Missing: color.",
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

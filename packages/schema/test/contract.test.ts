@@ -67,6 +67,7 @@ describe('starter layouts (templates)', () => {
       'switchboard',
       'autopilot',
       'chart',
+      'passage',
       'sailing-720',
       'wind-engine-720',
       'helm-720',
