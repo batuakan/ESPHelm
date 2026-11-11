@@ -60,10 +60,11 @@ SOUND_TUNES = {
 
 # LVGL features the core needs: the page grid, footer, alarm banner, settings panel and history
 # popup. ESPHome only compiles what the YAML uses; a tile set adds what its tiles need.
-LVGL_FEATURES = ("label", "grid", "flex", "font", "line", "button", "chart", "slider", "qrcode")
+# "canvas" and "image": the QR code draws on a canvas.
+LVGL_FEATURES = ("label", "grid", "flex", "font", "line", "button", "chart", "slider", "qrcode", "canvas", "image")
 
 # The tile sets (ADR-0035); a firmware is built with exactly one.
-TILE_SETS = ("esphelm_tiles_color",)
+TILE_SETS = ("esphelm_tiles_color", "esphelm_tiles_mono")
 
 esphelm_ns = cg.esphome_ns.namespace("esphelm_runtime")
 EsphelmRuntime = esphelm_ns.class_("EsphelmRuntime", cg.Component)
@@ -121,11 +122,13 @@ def _final_validate(config):
     # The tiles come from a tile set component (ADR-0035): exactly one, so no other's code is built in.
     full = fv.full_config.get()
     sets = [name for name in TILE_SETS if name in full]
-    if len(sets) != 1:
+    if not sets:
         raise cv.Invalid(
-            "esphelm_runtime needs exactly one tile set: add `esphelm_tiles_color:` to the YAML (and to "
-            f"external_components); found {', '.join(sets) if sets else 'none'}"
+            "esphelm_runtime needs a tile set: add `esphelm_tiles_color:` (or `esphelm_tiles_mono:`) to the "
+            "YAML and to external_components"
         )
+    if len(sets) > 1:
+        raise cv.Invalid(f"esphelm_runtime takes exactly one tile set; remove all but one of: {', '.join(sets)}")
     # The setup network (ADR-0026) gets a password per display, made on the display and shown on
     # its screen: one written in the YAML would be the same on every display built from it.
     wifi_conf = fv.full_config.get().get("wifi")

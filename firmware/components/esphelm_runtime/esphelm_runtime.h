@@ -36,6 +36,7 @@
 #include "alarms.h"
 #include "chart_store.h"
 #include "display_prefs.h"
+#include "esphelm_mono.h"
 #include "esphelm_server_zones.h"
 #include "history_popup.h"
 #include "layout_client.h"
@@ -219,6 +220,11 @@ class EsphelmRuntime : public Component {
   ChartTileStore charts_;  // the map tiles every chart tile shares (ADR-0030)
 #endif
 
+#ifdef USE_ESPHELM_MONO
+  /// Black and white before every flush (ADR-0035).
+  static void mono_flush_cb_(lv_event_t *e);
+  bool mono_hooked_{false};
+#endif
   std::string board_;
   bool touch_{true};
   uint32_t stale_after_ms_{15000};

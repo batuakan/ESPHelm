@@ -201,6 +201,18 @@ void EsphelmRuntime::dump_config() {
 
 void EsphelmRuntime::loop() {
   const uint32_t now = millis();
+#ifdef USE_ESPHELM_MONO
+  // A 1-bit panel (ADR-0035): every pixel LVGL flushes becomes black or white (esphelm_mono.h), as
+  // its software renderer anti-aliases rounded corners and lines regardless. Here, not in setup():
+  // LVGL's display may not exist yet then.
+  if (!this->mono_hooked_) {
+    if (lv_display_t *disp = lv_display_get_default()) {
+      lv_display_add_event_cb(disp, &EsphelmRuntime::mono_flush_cb_, LV_EVENT_FLUSH_START, nullptr);
+      lv_obj_invalidate(lv_screen_active());
+      this->mono_hooked_ = true;
+    }
+  }
+#endif
 
   HttpResult result;
   while (this->client_.poll(result))
@@ -1077,6 +1089,21 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
 }
 
 // ---- Setup without configuration (ADR-0026) ----
+
+#ifdef USE_ESPHELM_MONO
+void EsphelmRuntime::mono_flush_cb_(lv_event_t *e) {
+  lv_display_t *disp = static_cast<lv_display_t *>(lv_event_get_target(e));
+  const auto *area = static_cast<const lv_area_t *>(lv_event_get_param(e));
+  lv_draw_buf_t *buf = lv_display_get_buf_active(disp);
+  if (area == nullptr || buf == nullptr || lv_display_get_color_format(disp) != LV_COLOR_FORMAT_RGB565)
+    return;
+  // Partial rendering: the buffer holds just this area, row after row; otherwise the whole screen.
+  if (lv_display_get_render_mode(disp) == LV_DISPLAY_RENDER_MODE_PARTIAL)
+    esphelm::mono::threshold_block(buf->data, lv_area_get_width(area), lv_area_get_height(area), buf->header.stride);
+  else
+    esphelm::mono::threshold_block(buf->data, buf->header.w, buf->header.h, buf->header.stride);
+}
+#endif
 
 void EsphelmRuntime::setup_ap_() {
   if (std::getenv("ESPHELM_TEST_SETUP") != nullptr) {

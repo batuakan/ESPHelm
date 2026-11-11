@@ -1,0 +1,32 @@
+# Runtime firmware on the desktop (SDL host build), 400x300 in black and white: the mono tile set
+# (ADR-0035) with 1-bit fonts, as on a reflective LCD such as the Waveshare ESP32-S3-RLCD-4.2.
+# Same as esphelm_sdl.yaml otherwise (test hooks included).
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3000 compile firmware/esphelm_sdl_mono.yaml
+substitutions:
+  # Repeated here on purpose: `-s` on the command line only overrides this file's own
+  # substitutions, not those of the included esphelm_sdl.yaml.
+  signalk_host: "127.0.0.1"
+  signalk_port: "3000"
+  screen_width: "400"
+  screen_height: "300"
+  font_bpp: 1
+  font_digits_huge_size: "112"
+  font_digits_large_size: "80"
+  font_huge_size: "56"
+  font_value_size: "40"
+  font_medium_size: "28"
+  font_label_size: "20"
+  font_small_size: "16"
+
+packages:
+  base: !include esphelm_sdl.yaml
+
+esphome:
+  name: esphelm-sdl-mono
+
+esphelm_tiles_color: !remove
+
+esphelm_tiles_mono:
+
+esphelm_runtime:
+  board: sdl-mono

@@ -129,6 +129,7 @@ async function main(): Promise<void> {
     'firmware/esphelm_sdl.yaml',
     'firmware/esphelm_sdl_720.yaml',
     'firmware/esphelm_sdl_wide.yaml',
+    'firmware/esphelm_sdl_mono.yaml',
   ]) {
     console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
     execFileSync(
@@ -139,7 +140,7 @@ async function main(): Promise<void> {
   }
   // Never let a test build talk to a real SignalK server (e.g. the default :3000): check that
   // the compiled code really uses the test port before starting any firmware.
-  for (const name of ['esphelm-sdl', 'esphelm-sdl-720', 'esphelm-sdl-wide']) {
+  for (const name of ['esphelm-sdl', 'esphelm-sdl-720', 'esphelm-sdl-wide', 'esphelm-sdl-mono']) {
     const main = readFileSync(join(FIRMWARE, `.esphome/build/${name}/src/main.cpp`), 'utf8');
     if (!main.includes(`set_port(${PORT});`) || !main.includes('set_host("127.0.0.1");'))
       throw new Error(`${name} was not built for 127.0.0.1:${PORT}; refusing to run it`);
@@ -162,6 +163,9 @@ async function main(): Promise<void> {
   const workSetup = join(work, 'setup');
   mkdirSync(workSetup);
   const fwSetup = new Firmware(workSetup);
+  const workMono = join(work, 'mono');
+  mkdirSync(workMono);
+  const fwMono = new Firmware(workMono, binary('esphelm-sdl-mono'));
   try {
     sk = await startSignalK({
       port: PORT,
@@ -1947,12 +1951,164 @@ async function main(): Promise<void> {
     await fwSetup.stop();
     fwSetup.start({ ESPHELM_TEST_SETUP: 'joining' });
     check('setup: joining the saved network', await fwSetup.waitLog(/Status: Joining Wi-Fi/));
+    await fwSetup.stop();
+    // Every other build stops first: they share the device id and would answer the new server.
+    await fwBoot.stop();
+
+    // 15. The black-and-white build (ADR-0035): the mono tile set at 400x300 with 1-bit fonts,
+    //     against a fresh server. It says it is mono, gets only layouts it can draw, shows zones
+    //     as a heavy frame (warn) or an inverted tile (alarm), and every pixel is black or white.
+    sk = await startSignalK({ port: PORT });
+    const mono = sk;
+    const twoColours = (name: string) => {
+      const out = execFileSync(
+        PYTHON,
+        [
+          '-I',
+          '-c',
+          'import sys; from PIL import Image; im = Image.open(sys.argv[1]).convert("RGB"); ' +
+            'print(sorted(set(c for _, c in im.getcolors(1 << 20))))',
+          join(shots, `${name}.bmp`),
+        ],
+        { encoding: 'utf8' },
+      ).trim();
+      check(`${name}: only black and white`, out === '[(0, 0, 0), (255, 255, 255)]', out);
+    };
+    const monoShot = async (name: string) => {
+      await fwMono.screenshot(name, shots);
+      twoColours(name);
+    };
+    const tapMono = (target: string) =>
+      writeFileSync(join(workMono, 'esphelm_tap_request'), target);
+    const monoNext = (re: RegExp, ms = 15000) => fwMono.waitLog(re, ms, fwMono.count(re) + 1);
+    fwMono.start({ ESPHELM_TEST_CLOCK: 'frozen' });
+    check(
+      'mono: asks for access',
+      await waitFor(() => fwMono.count(/Access request is pending approval/) > 0, 20000),
+    );
+    await mono.approve(DEVICE_ID, 'readwrite');
+    check('mono: registers as pending', await fwMono.waitLog(/pending adoption/, 20000));
+    const monoDevices = (await mono.json('GET', '/plugins/esphelm/api/devices', mono.admin))
+      .body as unknown as {
+      id: string;
+      hello: { display: { kind?: string }; widgets: string[] };
+    }[];
+    const monoHello = monoDevices.find((d) => d.id === DEVICE_ID)?.hello;
+    check(
+      'mono: hello says mono and lists its four tile types',
+      monoHello?.display.kind === 'mono' &&
+        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position"]',
+      JSON.stringify(monoHello),
+    );
+    const monoLayout = fixture('valid/mono-400.json');
+    await mono.json('PUT', '/plugins/esphelm/api/layouts/mono-400', mono.admin, monoLayout);
+    const refused = await mono.json(
+      'PUT',
+      `/plugins/esphelm/api/devices/${DEVICE_ID}`,
+      mono.admin,
+      {
+        state: 'adopted',
+        layoutId: 'mono-400',
+      },
+    );
+    check(
+      'mono: the plugin refuses a layout with a wind rose',
+      refused.status === 409 && JSON.stringify(refused.body).includes('wind_rose'),
+      JSON.stringify(refused.body),
+    );
+    const monoOnly = { ...monoLayout, id: 'mono-boat', pages: monoLayout.pages.slice(0, 1) };
+    await mono.json('PUT', '/plugins/esphelm/api/layouts/mono-boat', mono.admin, monoOnly);
+    await mono.json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, mono.admin, {
+      state: 'adopted',
+      layoutId: 'mono-boat',
+    });
+    check(
+      'mono: shows the layout it can draw',
+      await fwMono.waitLog(/Showing fetched layout "mono-boat" \(1 pages/),
+    );
+    const { ws: monoWs } = await mono.stream(mono.admin);
+    const publishMono = (values: Record<string, number | string | object>) =>
+      monoWs.send(
+        JSON.stringify({
+          context: 'vessels.self',
+          updates: [{ values: Object.entries(values).map(([path, value]) => ({ path, value })) }],
+        }),
+      );
+    await sleep(1000);
+    publishMono({
+      'navigation.datetime': '2026-07-14T09:05:00.000Z',
+      'navigation.speedOverGround': 3.2, // 6.2 kn
+      'environment.depth.belowTransducer': 2.4, // alarm: inverted
+      'environment.water.temperature': 300.15, // 27.0 °C, warn: heavy frame
+      'navigation.position': { latitude: 60.1508, longitude: 24.9497 },
+      'electrical.batteries.house.voltage': 11.5, // alarm: inverted
+      'electrical.batteries.house.current': -12.4,
+    });
+    await sleep(2000);
+    await monoShot('mono-01-zones');
+    publishMono({
+      'environment.depth.belowTransducer': 4.2, // warn
+      'environment.water.temperature': 293.15, // 20 °C, no zone
+      'electrical.batteries.house.voltage': 12.8,
+    });
+    await sleep(2000);
+    await monoShot('mono-02-warn');
+    tapMono('@menu');
+    check('mono: the settings panel opens', await monoNext(/Settings opened/));
+    await sleep(1000);
+    await monoShot('mono-03-settings');
+    tapMono('@settings dark');
+    check(
+      'mono: Inverted is the dark theme',
+      await monoNext(/Theme switched on the display: dark/),
+    );
+    tapMono('@settings close');
+    await monoNext(/Settings closed/);
+    // Fresh values (the earlier ones went stale while the panel was open).
+    const monoLive = {
+      'navigation.speedOverGround': 3.2,
+      'environment.depth.belowTransducer': 2.4,
+      'environment.water.temperature': 300.15,
+      'navigation.position': { latitude: 60.1508, longitude: 24.9497 },
+      'electrical.batteries.house.voltage': 11.5,
+      'electrical.batteries.house.current': -12.4,
+    };
+    publishMono(monoLive);
+    await sleep(2000);
+    await monoShot('mono-04-inverted');
+    publishMono({
+      ...monoLive,
+      'notifications.electrical.batteries.house': { state: 'alarm', message: 'House battery low' },
+    });
+    await sleep(2000);
+    await monoShot('mono-05-alarm');
+    await fwMono.stop();
+    await mono.stop();
+    sk = undefined;
+
+    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a wind rose): a
+    //      placeholder in its place, the rest of the page as usual.
+    writeFileSync(
+      join(workMono, 'esphelm_cur.bin'),
+      cacheRecord(JSON.stringify({ ...monoLayout, theme: 'day' }), '"seed-mono"'),
+    );
+    rmSync(join(workMono, 'esphelm_prefs.bin'), { force: true });
+    fwMono.start();
+    check(
+      'mono: the cached layout with a wind rose loads',
+      await fwMono.waitLog(/Showing cached layout "mono-400" \(2 pages/),
+    );
+    writeFileSync(join(workMono, 'esphelm_page_request'), '1');
+    check('mono: the wind page', await fwMono.waitLog(/Page 2\/2 "Wind"/));
+    await sleep(1500);
+    await monoShot('mono-06-unsupported');
   } finally {
     await fw.stop();
     await fw720.stop();
     await fwWide.stop();
     await fwBoot.stop();
     await fwSetup.stop();
+    await fwMono.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
@@ -1960,6 +2116,7 @@ async function main(): Promise<void> {
       fwWide.saveLog();
       fwBoot.saveLog();
       fwSetup.saveLog();
+      fwMono.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
     } else {
       rmSync(work, { recursive: true, force: true });

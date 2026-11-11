@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "id": "mono-400",
+  "name": "Black and white, 400x300",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "boat",
+      "title": "Boat",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        { "type": "value", "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+        { "type": "value", "id": "depth", "x": 1, "y": 0, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth", "zones": [{ "to": 3, "state": "alarm" }, { "from": 3, "to": 5, "state": "warn" }] },
+        { "type": "value", "id": "water", "x": 2, "y": 0, "w": 1, "h": 1, "path": "environment.water.temperature", "unit": "degC", "decimals": 1, "label": "Water", "color": "blue", "zones": [{ "from": 25, "state": "warn" }] },
+        { "type": "position", "id": "position", "x": 0, "y": 1, "w": 2, "h": 1, "label": "Position" },
+        { "type": "clock", "id": "clock", "x": 2, "y": 1, "w": 1, "h": 1, "utc": true, "show": "both", "dateFormat": "ymd" },
+        { "type": "bar", "id": "volts", "x": 0, "y": 2, "w": 2, "h": 1, "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "House", "min": 11, "max": 14.5, "orientation": "horizontal", "zones": [{ "from": 11, "to": 11.8, "state": "alarm" }] },
+        { "type": "bar", "id": "amps", "x": 2, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.house.current", "unit": "A", "decimals": 1, "label": "Amps", "min": -50, "max": 50, "centerZero": true, "sides": "plusMinus" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "wind",
+      "title": "Wind",
+      "grid": { "cols": 2, "rows": 1 },
+      "tiles": [
+        { "type": "value", "id": "aws", "x": 0, "y": 0, "w": 1, "h": 1, "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" },
+        { "type": "wind_rose", "id": "rose", "x": 1, "y": 0, "w": 1, "h": 1, "slots": {} }
+      ]
+    }
+  ]
+}

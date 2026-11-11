@@ -4,6 +4,8 @@
 # under the runtime's fonts.extra. The two digit fonts have only "0123456789.-:" (a dozen glyphs,
 # so very large sizes are cheap) and go under fonts.digits: only value numbers and clock times use them.
 substitutions:
+  # Bits per pixel of the glyphs: 4 for smooth edges; 1 for black-and-white panels (ADR-0035).
+  font_bpp: 4
   font_digits_huge_size: "192"
   font_digits_large_size: "128"
   font_huge_size: "96"
@@ -16,30 +18,30 @@ font:
   - file: fonts/Roboto.ttf
     id: esphelm_font_digits_huge
     size: ${font_digits_huge_size}
-    bpp: 4
+    bpp: ${font_bpp}
     glyphs: ["0123456789.-:"]
   - file: fonts/Roboto.ttf
     id: esphelm_font_digits_large
     size: ${font_digits_large_size}
-    bpp: 4
+    bpp: ${font_bpp}
     glyphs: ["0123456789.-:"]
   - file: fonts/Roboto.ttf
     id: esphelm_font_huge
     size: ${font_huge_size}
-    bpp: 4
+    bpp: ${font_bpp}
   - file: fonts/Roboto.ttf
     id: esphelm_font_value
     size: ${font_value_size}
-    bpp: 4
+    bpp: ${font_bpp}
   - file: fonts/Roboto.ttf
     id: esphelm_font_medium
     size: ${font_medium_size}
-    bpp: 4
+    bpp: ${font_bpp}
   - file: fonts/Roboto.ttf
     id: esphelm_font_label
     size: ${font_label_size}
-    bpp: 4
+    bpp: ${font_bpp}
   - file: fonts/Roboto.ttf
     id: esphelm_font_small
     size: ${font_small_size}
-    bpp: 4
+    bpp: ${font_bpp}

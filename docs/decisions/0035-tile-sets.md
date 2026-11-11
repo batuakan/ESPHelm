@@ -26,7 +26,14 @@ Status: **Accepted** (2026-11-11)
 - **`esphelm_tiles_color`** holds today's tiles:
   - `widget_*.cpp`, `corner_values.cpp` and `chart.cpp`;
   - `tiles_color.cpp`: the palettes, the factory, and helpers only these tiles use (`zone_style`, `style_cell`, `make_history_mark`).
-- **`esphelm_tiles_mono`**, to come, renders the 1-bit tiles against the same contract.
+- **`esphelm_tiles_mono`** renders black-and-white tiles against the same contract (`mono_*.cpp`, `tiles_mono.cpp`):
+  - **Tiles:** `value`, `bar`, `clock` and `position`. `switch` and `autopilot` need touch, and the round tiles need more work; a type the set lacks shows *Not on this display*, though the plugin doesn't send one.
+  - **The look:** each tile is an outlined frame on the page, its labels taking their colour from the cell.
+  - **Zones** show as a style: a heavy frame for warn, an inverted tile for alarm and emergency. A value tile's colour is ignored.
+  - **Stale:** "--", as the colour tiles show a missing value.
+  - **The palette:** two colours, black on white by day; dark and night are both white on black.
+  - **The settings panel** offers *Plain*, *Inverted* and *Auto*.
+- **Pure black and white:** LVGL 9.5's software renderer anti-aliases rounded corners and lines whatever the display's antialiasing flag says. So a mono build (`USE_ESPHELM_MONO`, defined by the mono set) thresholds every area by brightness just before LVGL flushes it (`esphelm_mono.h`, an `LV_EVENT_FLUSH_START` handler). The panel driver then only ever gets pure black and pure white. Fonts are built with `bpp: 1` (`font_bpp` in `fonts.yaml`), so text is crisp rather than thresholded.
 - **The core keeps what any tile set shares:**
   - **Helpers** in `widget_base.h/.cpp`: labels, font fitting, value formatting, `Binding`, scale steps.
   - **Header-only geometry:** the wind rose, engine, heading tape and centre zero. A header nobody includes costs nothing, and the generators and g++ tests keep their paths.

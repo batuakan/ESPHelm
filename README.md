@@ -169,7 +169,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 102 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 108 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

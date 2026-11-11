@@ -2,7 +2,7 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
-The tiles come from a **tile set**, a component of its own (ADR-0035). A firmware is built with exactly one: `esphelm_tiles_color` (`firmware/components/esphelm_tiles_color/`) for the colour displays. The core is everything else: the client, cache, parser, prefs, alarm banner, footer, settings panel and history popup.
+The tiles come from a **tile set**, a component of its own (ADR-0035). A firmware is built with exactly one: `esphelm_tiles_color` (`firmware/components/esphelm_tiles_color/`) for the colour displays, or `esphelm_tiles_mono` (`firmware/components/esphelm_tiles_mono/`) for black-and-white panels. The core is everything else: the client, cache, parser, prefs, alarm banner, footer, settings panel and history popup.
 
 **Scope:** every page of the layout: grid pages with every tile type of the catalog, `chart` only with PSRAM. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else.
 
@@ -64,6 +64,7 @@ Ready-made configs:
 | `firmware/esphelm_sdl_720.yaml` | desktop, 720×720 with the P4-86 font sizes | compile, 720 renders in the e2e test. It repeats `signalk_host`/`signalk_port` because `-s` on the command line does not override substitutions of the included `esphelm_sdl.yaml`; the e2e test refuses to run a build that isn't compiled for its test port |
 | `firmware/esphelm_sdl_wide.yaml` | desktop, 1280×800 with the P4-86 font sizes | compile, renders in the e2e test: a square layout stretched to a landscape screen, the panel, and a layout with `settings.rotation: 90` turning it to 800×1280 |
 | `firmware/esphelm_sdl_cyd.yaml` | desktop, 320×240 with the CYD font sizes | compile; a preview of layouts on the CYD (not in the e2e test) |
+| `firmware/esphelm_sdl_mono.yaml` | desktop, 400×300 in black and white: the mono tile set (ADR-0035), 1-bit fonts | compile, e2e test against its own server: the `display.kind` in hello, a refused layout, zones, the panel, the inverted theme, an alarm, a tile it doesn't have; every screenshot checked to hold only black and white |
 | `firmware/esphelm_p4.yaml` | Waveshare ESP32-P4-86, 720×720 | compiles, checked on hardware |
 | `firmware/esphelm_guition_4848s040.yaml` | Guition ESP32-S3-4848S040, 4" 480×480, S3 with PSRAM (`hardware/guition-esp32-s3-4848s040.yaml`: ESPHome's `mipi_rgb` model `GUITION-4848S040`, GT911 touch, backlight GPIO38). The 480 font sizes of the SDL build | compiles (flash 1,799,787 B of 8 MB, static RAM 121,647 B); **not yet run on hardware** |
 | `firmware/esphelm_cyd.yaml` | ESP32-2432S028R "cheap yellow display", 2.8" 320×240, ESP32 without PSRAM (`hardware/esp32-2432s028r.yaml`: ESPHome's `mipi_spi` model `ESP32-2432S028`, the micro-USB ILI9341 revision, turned to landscape by the panel; XPT2046 resistive touch, backlight GPIO21). No chart pages, 6 recorded values; dense layouts need bigger tiles at this size | compiles (flash 1,491,819 B, 81 % of its 1.75 MB app partition; static RAM 55,524 B); **not yet run on hardware**, touch calibration and orientation unchecked |
@@ -148,6 +149,10 @@ All widgets are pure functions of (config, latest value, theme), redraw at most 
 
   A new tile type adds a file there, a case in the factory and a name in `tile_types()`.
 - **Header-only geometry** (`esphelm_wind_rose.h`, `esphelm_engine.h` and the like) stays in the core, so a mono tile set can use it too.
+- **The mono tile set** (`esphelm_tiles_mono/`): `value`, `bar`, `clock` and `position`, each an outlined frame (`mono_common.h`, `Frame`). Warn shows as a heavy frame, alarm and emergency as an inverted tile. Two colours: black on white by day, white on black for dark and night.
+  - **Pure black and white:** the core thresholds each flushed area to black or white (`esphelm_mono.h`, `USE_ESPHELM_MONO`), since LVGL anti-aliases rounded corners regardless. The fonts use `font_bpp: 1`.
+  - **The settings panel** offers *Plain*, *Inverted* and *Auto*.
+  - **The desktop build:** `firmware/esphelm_sdl_mono.yaml`, 400×300.
 
 | Widget | Drawn with | Notes |
 |---|---|---|
