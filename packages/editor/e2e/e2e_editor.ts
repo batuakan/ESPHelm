@@ -598,6 +598,33 @@ async function main(): Promise<void> {
     await page.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
     await page.waitForTimeout(1000);
     await shot(page, '07d-desktop-night-chart-beside-value');
+
+    // An engine tile on a new page: its empty corners are hinted with a "+", as on a wind rose,
+    // and one opens that corner in the drawer.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page', exact: true }).click();
+    await page
+      .getByRole('region', { name: 'Tiles' })
+      .getByRole('button', { name: /^Engine/ })
+      .click();
+    const engineCorners = page.locator('[data-testid^="engine-"] button.rose-slot.corner');
+    await engineCorners.first().waitFor();
+    check(
+      'an engine tile hints its four empty corners with a +',
+      (await engineCorners.count()) === 4 &&
+        (await engineCorners.allTextContents()).every((t) => t === '+'),
+      String(await engineCorners.allTextContents()),
+    );
+    // The bottom-right one too, clear of the tile's resize handle.
+    await page.getByTestId('slot-engine-1-bottomRight').click({ timeout: 5000 });
+    const engineDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    check(
+      "a corner's + opens that corner in the drawer",
+      (await engineDrawer
+        .locator('[data-testid="slot-section-bottomRight"]')
+        .getAttribute('open')) !== null,
+    );
+    await shot(page, '07e-desktop-night-engine-corners');
     await page.getByText('No problems').waitFor();
     await save.click();
     await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();

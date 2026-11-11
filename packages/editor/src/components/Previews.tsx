@@ -337,6 +337,7 @@ export function TilePreview(props: {
         values={values}
         box={props.engineBox ?? { width: 480, height: 480 }}
         fontLines={props.fontLines}
+        selectedSlot={props.selectedSlot}
         onSelectSlot={props.onSelectSlot}
       />
     );
