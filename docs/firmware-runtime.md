@@ -2,6 +2,8 @@
 
 ESPHome external component in `firmware/components/esphelm_runtime/`. It shows layouts from the signalk-esphelm plugin on an LVGL display. Architecture: ADR-0007.
 
+The tiles come from a **tile set**, a component of its own (ADR-0035). A firmware is built with exactly one: `esphelm_tiles_color` (`firmware/components/esphelm_tiles_color/`) for the colour displays. The core is everything else: the client, cache, parser, prefs, alarm banner, footer, settings panel and history popup.
+
 **Scope:** every page of the layout: grid pages with every tile type of the catalog, `chart` only with PSRAM. `hello.widgets` lists exactly these, so the plugin refuses to assign a layout that needs anything else.
 
 ## Configuration
@@ -11,7 +13,7 @@ external_components:
   - source: { type: git, url: https://github.com/batuakan/ESPHomeSignalK, ref: main, path: components }
     components: [signalk]
   - source: { type: local, path: components }
-    components: [esphelm_runtime]
+    components: [esphelm_runtime, esphelm_tiles_color]
 
 signalk:                          # no host: found with mDNS (ADR-0026); update_interval defaults to 1s
 
@@ -20,6 +22,8 @@ lvgl:
     - id: esphelm_page
       widgets:
         - obj: { id: esphelm_container, width: 100%, height: 100% }
+
+esphelm_tiles_color:              # the tile set (ADR-0035): exactly one per firmware
 
 esphelm_runtime:
   container: esphelm_container    # LVGL obj the runtime owns (required)
@@ -134,7 +138,16 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
 ## Widgets
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue, and **dark** (ADR-0034) is the editor's dark theme: a `#0E141A` page, `#17202A` tiles, light text and full colours. `red_only()` (night) and `dark_page()` (night or dark) in `layout_model.h` say which a widget means.
 
-Each tile type has its own file, `widget_<type>.cpp` (`value`, `gauge`, `bar`, `switch`, `autopilot`, `wind_rose`, `position`), with its class and factory. `widgets.cpp` holds the theme colours, value formatting, the font fitting and `make_tile_widget()`, which picks the factory. Helpers shared by the widgets are declared in `widget_common.h`. A new tile type adds a file and a case there.
+**Where the code is** (ADR-0035):
+- **The contract**, in the core: `widgets.h`. A tile set defines `colors_for()`, `make_tile_widget()` and `tile_types()`, the last being the list `hello.widgets` sends.
+- **Helpers every tile set uses**, also in the core: `widget_base.h/.cpp`, covering labels, font fitting (ADR-0017), value formatting, `Binding` (throttling and staleness) and scale steps.
+- **The colour tile set** (`esphelm_tiles_color/`):
+  - one file per tile type, `widget_<type>.cpp`, with its class and factory;
+  - `tiles_color.cpp`: the theme colours, the tile list and `make_tile_widget()`, which picks the factory;
+  - `widget_common.h`: the colour-only helpers (zone styles, the cell style, the history mark, `CornerValues`).
+
+  A new tile type adds a file there, a case in the factory and a name in `tile_types()`.
+- **Header-only geometry** (`esphelm_wind_rose.h`, `esphelm_engine.h` and the like) stays in the core, so a mono tile set can use it too.
 
 | Widget | Drawn with | Notes |
 |---|---|---|
@@ -166,7 +179,7 @@ Ring, band and marker sizes scale with the rose (ring ≈ d/15, as on the legacy
 - **Size:** below `AUTOPILOT_FIT` (260×220 px of content) the tile shows status only, with no buttons. In narrow tiles TGT and HDG stack; in tiny ones HDG is dropped.
 - Disabled buttons use the theme's dark colours (LVGL's grey recolour is turned off; this applies to the footer buttons too).
 
-**Chart tiles** (`chart.cpp` and `chart_store.cpp`, ADR-0012 and ADR-0030; Web-Mercator maths ported from ESPTiles, MIT):
+**Chart tiles** (`chart.cpp` in the colour tile set, and the core's `chart_store.cpp`, compiled with the colour set's `USE_ESPHELM_CHARTS`; ADR-0012 and ADR-0030; Web-Mercator maths ported from ESPTiles, MIT):
 - **One store for every chart** (`ChartTileStore`, owned by the runtime): 256 px RGB565 map tiles (131,072 bytes each) in PSRAM, keyed by chart, zoom and tile. Charts are centred on the vessel, so charts of the same chart and zoom need the same tiles, and each is fetched and kept once.
   - **Budget:** set when the first tile is needed: 40 % of the free PSRAM, between 16 and 48 tiles (2–6 MB; logged as "Chart tiles: up to N"). Memory is allocated per tile as it arrives and reused.
   - **Wanting:** every tick, each chart tells the store which tiles cover its view, nearest to the vessel first. A tile wanted in the last second is never evicted; when the budget is full the least recently wanted other tile makes room, and if every tile is on screen, nothing more is fetched (the edges stay blank).

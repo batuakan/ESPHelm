@@ -15,9 +15,9 @@
 
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
-#include "chart_store.h"
-#include "esphelm_sizes.h"
-#include "widgets.h"
+#include "esphome/components/esphelm_runtime/chart_store.h"
+#include "esphome/components/esphelm_runtime/esphelm_sizes.h"
+#include "esphome/components/esphelm_runtime/widgets.h"
 
 namespace esphome {
 namespace esphelm_runtime {

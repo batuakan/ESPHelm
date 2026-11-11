@@ -16,7 +16,7 @@ The editor should **look and feel like Tessera** (https://github.com/MaxGramser/
 
 ESPHome LVGL YAML is compiled in, so it can't be swapped at runtime. Therefore:
 
-- **Firmware** contains a fixed **catalog of widget renderers** (C++ ESPHome external component, `esphelm_runtime`). At runtime it parses a JSON layout and builds LVGL objects through the LVGL C API.
+- **Firmware** contains a fixed **catalog of widget renderers** (C++ ESPHome external components: the core `esphelm_runtime` and one tile set, `esphelm_tiles_color`; ADR-0035). At runtime it parses a JSON layout and builds LVGL objects through the LVGL C API.
 - **Plugin** stores layouts, serves them to devices, notifies devices of changes, and hosts the editor.
 - New *widget types* require a firmware build. New *layouts, pages, tile placement, SignalK paths, units, labels, thresholds, themes* must **not**.
 
@@ -37,7 +37,9 @@ SignalK server
      └─ Change notifier   SignalK delta on plugins.esphelm.<deviceId>.version
 
 ESP32 display (ESPHome)
- ├─ esphelm_runtime (new)   layout client + cache (NVS) + layout engine + widget catalog
+ ├─ esphelm_runtime (new)   layout client + cache (NVS) + layout engine; the core (ADR-0035)
+ ├─ esphelm_tiles_color     the colour tile set: the widget catalog of the colour displays;
+ │                          a firmware is built with exactly one tile set
  ├─ EspHomeSignalK          existing external component; subscriptions + PUT.
  │                          Needs a runtime listener API + thread-safety fixes (ADR-0004).
  │                          Fetched from GitHub (batuakan/ESPHomeSignalK, ref main) by the firmware YAMLs.
@@ -71,6 +73,7 @@ ESPHelm/
 │   └─ editor/               # React + Vite UI
 ├─ firmware/
 │   ├─ components/esphelm_runtime/
+│   ├─ components/esphelm_tiles_color/   # the colour tile set (ADR-0035)
 │   ├─ components/sdl_screenshot/   # existing
 │   └─ esphelm.yaml          # base package using the runtime
 (legacy/ was removed from main; the static YAML apps live on in the ESPHelmv1 git tag)

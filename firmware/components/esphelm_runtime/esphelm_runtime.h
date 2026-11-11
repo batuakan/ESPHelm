@@ -34,6 +34,7 @@
 #endif
 
 #include "alarms.h"
+#include "chart_store.h"
 #include "display_prefs.h"
 #include "esphelm_server_zones.h"
 #include "history_popup.h"
@@ -213,8 +214,10 @@ class EsphelmRuntime : public Component {
   Fonts fonts_;
   LayoutStore store_;
   LayoutClient client_;
+#ifdef USE_ESPHELM_CHARTS
   LayoutClient tiles_;  // chart tiles, so they never delay hellos and layout fetches
   ChartTileStore charts_;  // the map tiles every chart tile shares (ADR-0030)
+#endif
 
   std::string board_;
   bool touch_{true};

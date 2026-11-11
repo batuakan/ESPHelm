@@ -82,6 +82,7 @@ void EsphelmRuntime::setup() {
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
   this->client_.start();
+#ifdef USE_ESPHELM_CHARTS
   this->tiles_.start();
   this->charts_.set_fetch([this](const std::string &path, uint32_t tag, size_t max_body) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
@@ -95,6 +96,7 @@ void EsphelmRuntime::setup() {
     this->tiles_.submit(std::move(req));
     return true;
   });
+#endif
   const char *clock_test = std::getenv("ESPHELM_TEST_CLOCK");
   this->clock_frozen_ = clock_test != nullptr && std::strcmp(clock_test, "frozen") == 0;
   const char *info_test = std::getenv("ESPHELM_TEST_INFO");
@@ -203,9 +205,11 @@ void EsphelmRuntime::loop() {
   HttpResult result;
   while (this->client_.poll(result))
     this->handle_result_(result);
+#ifdef USE_ESPHELM_CHARTS
   // Map tiles go to the store every chart tile shares.
   while (this->tiles_.poll(result))
     this->charts_.on_http(result, now);
+#endif
 
   const bool connected = this->signalk_->is_stream_connected();
   if (connected && !this->was_connected_) {
@@ -250,7 +254,9 @@ void EsphelmRuntime::loop() {
     }
     for (auto &w : this->widgets_)
       w->tick(now);
+#ifdef USE_ESPHELM_CHARTS
     this->charts_.pump(now);
+#endif
     history_closed = this->history_.tick(now);
     if (!this->history_wanted_.empty()) {
       this->open_history_(this->history_wanted_);
@@ -309,12 +315,12 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
   doc["display"]["rotation"] = this->rotation_();  // width and height are as rotated
-  // Renderable tile types and page kinds; the plugin refuses layouts using others. Chart pages
-  // need PSRAM for their tile buffer.
-  for (const char *w : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph", "heading_tape", "clock", "engine"})
+  // Renderable tile types, from the tile set this firmware is built with (ADR-0035); the plugin
+  // refuses layouts using others.
+  std::vector<const char *> types;
+  tile_types(types, this->psram_);
+  for (const char *w : types)
     doc["widgets"].add(w);
-  if (this->psram_)
-    doc["widgets"].add("chart");
   ArduinoJson::JsonArray fonts = doc["fonts"].to<ArduinoJson::JsonArray>();
   fonts.add("value");
   fonts.add("label");
@@ -507,6 +513,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
   this->apply_server_zones_();
   this->zones_dirty_ = false;  // the page is built next
   this->configure_history_();
+#ifdef USE_ESPHELM_CHARTS
   // Map tiles are kept across pages while the layout has charts (ADR-0030).
   bool charts = false;
   for (const auto &p : this->layout_.pages)
@@ -514,6 +521,7 @@ bool EsphelmRuntime::apply_(const std::string &body, const std::string &etag, bo
       charts = charts || t.type == esphelm::TileType::CHART;
   if (!charts)
     this->charts_.clear();
+#endif
   // The theme the page is built with: the layout's, or night by environment.sun (autoTheme),
   // or what was chosen on the display, unless this layout brings other values for it (ADR-0025).
   if (esphelm::reconcile_prefs(this->prefs_, this->layout_.settings, this->layout_.theme)) {
@@ -1452,7 +1460,9 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.utc_now = [this](int64_t &utc) { return this->utc_now_(utc); };
   env.time_zone = this->layout_.settings.time_zone;
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
+#ifdef USE_ESPHELM_CHARTS
   env.charts = &this->charts_;
+#endif
   if (!this->renderer_.show_page(this->layout_, index, env, this->widgets_))
     return false;
   this->page_ = index;

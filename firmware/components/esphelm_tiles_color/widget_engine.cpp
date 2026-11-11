@@ -8,8 +8,8 @@
 #include <cmath>
 #include <cstring>
 
-#include "esphelm_engine.h"
-#include "esphelm_icon_raster.h"
+#include "esphome/components/esphelm_runtime/esphelm_engine.h"
+#include "esphome/components/esphelm_runtime/esphelm_icon_raster.h"
 #include "esphome/core/hal.h"
 #include "src/misc/cache/instance/lv_image_cache.h"
 

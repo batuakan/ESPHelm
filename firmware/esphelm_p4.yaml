@@ -36,7 +36,7 @@ external_components:
   - source:
       type: local
       path: components
-    components: [esphelm_runtime]
+    components: [esphelm_runtime, esphelm_tiles_color]
 
 signalk:
 
@@ -54,6 +54,9 @@ lvgl:
             id: esphelm_container
             width: 100%
             height: 100%
+
+# The tiles this display renders (ADR-0035): the colour tile set.
+esphelm_tiles_color:
 
 esphelm_runtime:
   container: esphelm_container
