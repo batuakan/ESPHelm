@@ -406,6 +406,65 @@ select {
   --rose-card: #17202a;
   --rose-card-text: #e5ebf1;
 }
+/* A black-and-white display (hello.display.kind 'mono', ADR-0035): two colours only, the tiles
+   outlined on the page. Day is black on white; dark and night are inverted. More specific than
+   the theme rules above, so it wins whatever the theme. */
+.display-frame[data-display-kind='mono'][data-theme-preview] {
+  --tile-bg: #ffffff;
+  --tile-text: #000000;
+  --tile-muted: #000000;
+  --canvas-bg: #ffffff;
+  --zone-normal: #000000;
+  --zone-warn: #000000;
+  --zone-alarm: #000000;
+  --zone-emergency: #000000;
+  --tile-accent: #000000;
+  --tile-second: #000000;
+  --value-blue: #000000;
+  --value-green: #000000;
+  --value-yellow: #000000;
+  --value-orange: #000000;
+  --value-red: #000000;
+  --value-purple: #000000;
+  --value-zone-normal: #000000;
+  --rose-port: #000000;
+  --rose-stbd: #000000;
+  --rose-apparent: #000000;
+  --rose-true: #000000;
+  --rose-ring: #000000;
+  --rose-card: #ffffff;
+  --rose-card-text: #000000;
+}
+.display-frame[data-display-kind='mono'][data-theme-preview='dark'],
+.display-frame[data-display-kind='mono'][data-theme-preview='night'] {
+  --tile-bg: #000000;
+  --tile-text: #ffffff;
+  --tile-muted: #ffffff;
+  --canvas-bg: #000000;
+  --zone-normal: #ffffff;
+  --zone-warn: #ffffff;
+  --zone-alarm: #ffffff;
+  --zone-emergency: #ffffff;
+  --tile-accent: #ffffff;
+  --tile-second: #ffffff;
+  --value-blue: #ffffff;
+  --value-green: #ffffff;
+  --value-yellow: #ffffff;
+  --value-orange: #ffffff;
+  --value-red: #ffffff;
+  --value-purple: #ffffff;
+  --value-zone-normal: #ffffff;
+  --rose-port: #ffffff;
+  --rose-stbd: #ffffff;
+  --rose-apparent: #ffffff;
+  --rose-true: #ffffff;
+  --rose-ring: #ffffff;
+  --rose-card: #000000;
+  --rose-card-text: #ffffff;
+}
+.display-frame[data-display-kind='mono'] .tile {
+  box-shadow: inset 0 0 0 2px var(--tile-text);
+}
 .display-theme {
   display: flex;
   align-items: center;

@@ -553,39 +553,50 @@ function ServerZones(props: { zones: ValueZone[]; unit?: string }) {
 }
 
 /** A value tile's fixed colour and its colour-by-value zones (display units). */
-function ValueColorFields(props: { tile: ValueTile; serverZones: unknown; onChange(p: Patch): void }) {
+function ValueColorFields(props: {
+  tile: ValueTile;
+  /** A black-and-white display: no colour, and zones show as a style. */
+  mono: boolean;
+  serverZones: unknown;
+  onChange(p: Patch): void;
+}) {
   const { tile, onChange } = props;
   const zones = tile.zones ?? [];
   return (
     <>
-      <label className="field">
-        <span>Colour</span>
-        <span className="field-row color-field">
-          <select
-            value={tile.color ?? ''}
-            onChange={(e) => onChange({ color: e.target.value === '' ? undefined : e.target.value })}
-            aria-label="Colour"
-          >
-            <option value="">theme default</option>
-            {VALUE_COLORS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <span
-            className="color-swatch"
-            style={{ background: tile.color ? COLOR_SWATCH[tile.color] : 'transparent' }}
-            aria-hidden
-          />
-        </span>
-        <small className="hint">At night every colour shows in the night red.</small>
-      </label>
+      {!props.mono && (
+        <label className="field">
+          <span>Colour</span>
+          <span className="field-row color-field">
+            <select
+              value={tile.color ?? ''}
+              onChange={(e) => onChange({ color: e.target.value === '' ? undefined : e.target.value })}
+              aria-label="Colour"
+            >
+              <option value="">theme default</option>
+              {VALUE_COLORS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <span
+              className="color-swatch"
+              style={{ background: tile.color ? COLOR_SWATCH[tile.color] : 'transparent' }}
+              aria-hidden
+            />
+          </span>
+          <small className="hint">At night every colour shows in the night red.</small>
+        </label>
+      )}
       <fieldset className="zones">
-        <legend>Colour by value</legend>
+        <legend>{props.mono ? 'Zones by value' : 'Colour by value'}</legend>
         <small className="hint">
           In {tile.unit ?? 'the value as received'}; leave a bound empty for no limit. The last
-          matching row wins, over the colour above.
+          matching row wins
+          {props.mono
+            ? '. This display is black and white: a zone shows as a style, not a colour.'
+            : ', over the colour above.'}
         </small>
         <ServerZones zones={serverZonesToDisplay(props.serverZones, tile.unit)} unit={tile.unit} />
         <ZoneList
@@ -1608,6 +1619,8 @@ export function TileDrawer(
     openSlot?: SlotName | EngineSlotName;
     /** The layout's display theme (the history mock follows it). */
     theme?: Layout['theme'];
+    /** The display is black and white (hello.display.kind 'mono'): no colour choices. */
+    mono?: boolean;
     /** What the whole layout records (the history memory counter). */
     historyCount: HistoryCount;
     onRoseHistory(name: RoseHistoryKey, on: boolean): void;
@@ -1721,6 +1734,7 @@ export function TileDrawer(
           {tile.type === 'value' && (
             <ValueColorFields
               tile={tile}
+              mono={props.mono === true}
               serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
               onChange={onChange}
             />

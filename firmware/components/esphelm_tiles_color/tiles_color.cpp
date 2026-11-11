@@ -103,6 +103,8 @@ void tile_types(std::vector<const char *> &out, bool psram) {
     out.push_back("chart");
 }
 
+const char *display_kind() { return "color"; }
+
 std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env) {
   style_cell(cell, env.colors);
   switch (tile.type) {

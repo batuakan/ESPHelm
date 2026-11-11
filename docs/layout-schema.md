@@ -420,7 +420,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `fw.version` | firmware version string |
 | `schema.major` | highest layout major the firmware parses |
 | `board` | board/model name |
-| `display` | `width`, `height` (px), `rotation` (0/90/180/270) |
+| `display` | `width`, `height` (px), `rotation` (0/90/180/270), `kind?`: `color` or `mono` (black and white only, e.g. a reflective LCD; from the firmware's tile set, ADR-0035). Missing means `color`; colour firmware leaves it out, so plugins from before the field accept its hello |
 | `widgets` | tile types this firmware renders |
 | `fonts?` | semantic font sizes available |
 | `fontLineHeights?` | line heights (px) of the fonts tile text can use, smallest first; the editor sizes its preview text from them (ADR-0017). Integers ≥ 1 |
@@ -446,6 +446,6 @@ See `packages/schema/fixtures/valid/`:
 - `settings.json`: every display setting, with the second page as start page.
 - `position.json`: the four position formats, one with custom decimals.
 
-Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays.
+Starter layouts are in `packages/schema/templates/` (exported as `TEMPLATES`). Ids ending in `-720` are denser layouts for larger displays. *Passage* uses only the tiles a black-and-white display renders (value, bar, position, clock), on a 400×300 screen.
 
 The invalid examples in `fixtures/invalid/` each break one rule and list the expected `{ code, pointer }`.

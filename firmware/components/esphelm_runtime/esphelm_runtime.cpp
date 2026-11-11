@@ -315,6 +315,10 @@ void EsphelmRuntime::send_hello_() {
   doc["display"]["width"] = disp != nullptr ? lv_display_get_horizontal_resolution(disp) : 0;
   doc["display"]["height"] = disp != nullptr ? lv_display_get_vertical_resolution(disp) : 0;
   doc["display"]["rotation"] = this->rotation_();  // width and height are as rotated
+  // Only a mono tile set says so (ADR-0035): a missing kind is colour, which plugins from before
+  // the field still accept.
+  if (std::strcmp(display_kind(), "color") != 0)
+    doc["display"]["kind"] = display_kind();
   // Renderable tile types, from the tile set this firmware is built with (ADR-0035); the plugin
   // refuses layouts using others.
   std::vector<const char *> types;

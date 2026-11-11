@@ -106,6 +106,12 @@ function initialTheme(): Theme {
     : 'light';
 }
 
+/** The display theme button's text: a mono display has black on white and inverted. */
+function themeLabel(theme: Layout['theme'], mono: boolean): string {
+  if (mono) return theme === 'day' ? 'Plain' : 'Inverted';
+  return theme === 'day' ? 'Day' : theme === 'dark' ? 'Dark' : 'Night';
+}
+
 export function App(props: { api?: Api; live?: () => LiveSource }) {
   const api = useMemo(() => props.api ?? createApi(), [props.api]);
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -423,6 +429,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   // The screen this layout gets: turned by its settings.rotation where the display can (ADR-0028).
   const display = device ? shownSize(device.hello, layout?.settings?.rotation) : { width: 480, height: 480 };
   const largeDisplay = Math.min(display.width, display.height) >= 600;
+  // A black-and-white panel (hello.display.kind, ADR-0035): the preview and the choices follow it.
+  const mono = device?.hello.display.kind === 'mono';
   const tileBox = (t: Tile) => (layout ? tilePixels(display, layout, index, t) : { width: 0, height: 0 });
   const tilePx = (t: Tile) => {
     const { width, height } = tileBox(t);
@@ -546,21 +554,24 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 title="The display's colours; sent to the display with Save & send"
               >
                 <span>Display theme</span>
-                {(['day', 'dark', 'night'] as const).map((t) => {
+                {(mono ? (['day', 'dark'] as const) : (['day', 'dark', 'night'] as const)).map((t) => {
                   // Firmware without the dark theme refuses such a layout and keeps its last
                   // good one (ADR-0034), so it isn't offered for that display.
                   const unsupported =
                     t === 'dark' && device !== undefined && device.hello.capabilities.darkTheme !== true;
+                  // A mono display has black on white (day) and inverted (dark; night looks the
+                  // same there).
+                  const on = layout.theme === t || (mono && t === 'dark' && layout.theme === 'night');
                   return (
                     <button
                       key={t}
-                      className={`small ${layout.theme === t ? 'on' : ''}`}
-                      aria-pressed={layout.theme === t}
+                      className={`small ${on ? 'on' : ''}`}
+                      aria-pressed={on}
                       disabled={unsupported && layout.theme !== t}
                       title={unsupported ? "Update this display's firmware for the Dark theme" : undefined}
                       onClick={() => edit({ ...layout, theme: t })}
                     >
-                      {t === 'day' ? 'Day' : t === 'dark' ? 'Dark' : 'Night'}
+                      {themeLabel(t, mono)}
                     </button>
                   );
                 })}
@@ -657,7 +668,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 onSkip={() => setRemap(null)}
               />
             )}
-            <div className="display-frame" data-theme-preview={layout.theme}>
+            <div
+              className="display-frame"
+              data-theme-preview={layout.theme}
+              data-display-kind={mono ? 'mono' : undefined}
+            >
               {grid && (
                 <GridCanvas
                   page={grid}
@@ -776,6 +791,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           }
           openSlot={selection?.slot}
           theme={layout.theme}
+          mono={mono}
           historyCount={historyCount(layout)}
           onRoseHistory={(name, on) => edit(setRoseHistory(layout, index, tile.id, name, on))}
           onChange={(patch) => edit(updateTile(layout, index, tile.id, patch))}

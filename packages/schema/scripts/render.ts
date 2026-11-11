@@ -399,6 +399,7 @@ function renderTemplatesTs(): string {
     'switchboard',
     'autopilot',
     'chart',
+    'passage',
     'sailing-720',
     'wind-engine-720',
     'helm-720',

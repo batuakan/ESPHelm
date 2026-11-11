@@ -1,0 +1,38 @@
+{
+  "description": "display.kind must be color or mono",
+  "expect": [
+    {
+      "code": "INVALID_VALUE",
+      "pointer": "/display/kind"
+    }
+  ],
+  "hello": {
+    "deviceId": "aabbccdd-0011-2233-0ba2-aabbccddeeff",
+    "fw": {
+      "version": "0.3.0"
+    },
+    "schema": {
+      "major": 1
+    },
+    "board": "esp32-c3-gc9a01-240",
+    "display": {
+      "width": 240,
+      "height": 240,
+      "rotation": 0,
+      "kind": "grey"
+    },
+    "widgets": [
+      "value",
+      "bar"
+    ],
+    "capacity": {
+      "psram": false,
+      "maxLayoutBytes": 8192,
+      "freeHeapBytes": 95000
+    },
+    "capabilities": {
+      "touch": false,
+      "put": true
+    }
+  }
+}

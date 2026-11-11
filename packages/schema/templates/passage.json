@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "template-passage",
+  "name": "Passage (black and white)",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "passage",
+      "title": "Passage",
+      "grid": { "cols": 3, "rows": 3 },
+      "tiles": [
+        { "type": "value", "id": "sog", "x": 0, "y": 0, "w": 1, "h": 1, "path": "navigation.speedOverGround", "unit": "kn", "decimals": 1, "label": "SOG" },
+        { "type": "value", "id": "cog", "x": 1, "y": 0, "w": 1, "h": 1, "path": "navigation.courseOverGroundTrue", "unit": "deg", "decimals": 0, "label": "COG" },
+        { "type": "value", "id": "depth", "x": 2, "y": 0, "w": 1, "h": 1, "path": "environment.depth.belowTransducer", "unit": "m", "decimals": 1, "label": "Depth", "zones": [{ "to": 3, "state": "alarm" }] },
+        { "type": "position", "id": "position", "x": 0, "y": 1, "w": 2, "h": 1, "label": "Position" },
+        { "type": "clock", "id": "clock", "x": 2, "y": 1, "w": 1, "h": 1, "label": "Time" },
+        { "type": "bar", "id": "house", "x": 0, "y": 2, "w": 2, "h": 1, "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1, "label": "House", "min": 11, "max": 14.5, "orientation": "horizontal", "zones": [{ "from": 11, "to": 11.8, "state": "alarm" }] },
+        { "type": "value", "id": "tws", "x": 2, "y": 2, "w": 1, "h": 1, "path": "environment.wind.speedTrue", "unit": "kn", "decimals": 1, "label": "TWS" }
+      ]
+    }
+  ]
+}

@@ -139,7 +139,7 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
 All widgets are pure functions of (config, latest value, theme), redraw at most every 250 ms and only when something changed. Colours come from the theme (`colors_for`): **day** is light for sunlight (white page, light grey tiles `#E6EAEE`, dark text, white controls; the wind rose keeps the legacy red/green/orange/purple with a dark card), **night** is red on black with zones differing in brightness, not hue, and **dark** (ADR-0034) is the editor's dark theme: a `#0E141A` page, `#17202A` tiles, light text and full colours. `red_only()` (night) and `dark_page()` (night or dark) in `layout_model.h` say which a widget means.
 
 **Where the code is** (ADR-0035):
-- **The contract**, in the core: `widgets.h`. A tile set defines `colors_for()`, `make_tile_widget()` and `tile_types()`, the last being the list `hello.widgets` sends.
+- **The contract**, in the core: `widgets.h`. A tile set defines `colors_for()`, `make_tile_widget()`, `tile_types()` (the list `hello.widgets` sends) and `display_kind()` (`hello.display.kind`, sent only for `mono`).
 - **Helpers every tile set uses**, also in the core: `widget_base.h/.cpp`, covering labels, font fitting (ADR-0017), value formatting, `Binding` (throttling and staleness) and scale steps.
 - **The colour tile set** (`esphelm_tiles_color/`):
   - one file per tile type, `widget_<type>.cpp`, with its class and factory;

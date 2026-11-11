@@ -158,6 +158,9 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
 /// display has PSRAM.
 void tile_types(std::vector<const char *> &out, bool psram);
 
+/// Tile set: the kind of panel it draws for, as hello.display.kind: "color" or "mono".
+const char *display_kind();
+
 /// Format a SignalK value like the editor preview: converted, fixed decimals (default 1),
 /// on/off for booleans, printable text for strings, "--" otherwise.
 std::string format_value(ArduinoJson::JsonVariantConst value, const esphelm::units::UnitDef *unit, int decimals);

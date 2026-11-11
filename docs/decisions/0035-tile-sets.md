@@ -13,13 +13,14 @@ Status: **Accepted** (2026-11-11)
 ## Decision
 **`esphelm_runtime` is the core. A tile set is a separate ESPHome component, and a firmware has exactly one.**
 
-- **The contract** is `esphelm_runtime/widgets.h`: `Fonts`, `Colors`, `WidgetEnv`, `Widget`, and three functions the tile set defines:
+- **The contract** is `esphelm_runtime/widgets.h`: `Fonts`, `Colors`, `WidgetEnv`, `Widget`, and four functions the tile set defines:
 
   | Function | What it does |
   |---|---|
   | `colors_for(Theme)` | the palette, also used by the core's banner, footer, settings panel and popup |
   | `make_tile_widget(cell, tile, env)` | builds a tile |
   | `tile_types(out, psram)` | the types it renders, sent as `hello.widgets` |
+  | `display_kind()` | `"color"` or `"mono"`; `hello` sends `display.kind` only for mono, so older plugins accept a colour display's hello |
 
   They're resolved at link time, with no registry and no virtual dispatch.
 - **`esphelm_tiles_color`** holds today's tiles:
@@ -35,7 +36,8 @@ Status: **Accepted** (2026-11-11)
 - **The YAML:**
   - `esphelm_tiles_color:` goes next to `esphelm_runtime:`, and in `external_components`.
   - `esphelm_runtime`'s final validation refuses a config with no tile set or with more than one.
-- **Layouts aren't affected.** The schema doesn't change: a tile set renders the schema's tile types. The editor and plugin already go by `hello.widgets`.
+- **Layouts aren't affected.** The layout schema doesn't change: a tile set renders the schema's tile types. The editor and plugin already go by `hello.widgets`.
+- **The editor follows `display.kind`.** On a mono display the preview is black and white, the themes are *Plain* (`day`) and *Inverted* (`dark`; `night` looks the same there), and value tiles have no colour choice.
 
 ## Consequences
 - **Moving files changes nothing on the colour displays.** The SDL goldens stay identical.

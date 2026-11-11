@@ -92,6 +92,18 @@ describe('POST hello', () => {
     });
   });
 
+  it('keeps the display kind of a mono display for the editor (ADR-0035)', async () => {
+    const mono: Hello = {
+      ...p4,
+      display: { width: 400, height: 300, rotation: 0, kind: 'mono' },
+      widgets: ['value', 'bar', 'clock', 'position'],
+    };
+    expect((await hello(device(ID), mono)).status).toBe(200);
+    const res = await h.call('GET', '/plugins/esphelm/api/devices', { as: ADMIN });
+    const devices = (await res.json()) as { id: string; hello: Hello }[];
+    expect(devices.find((d) => d.id === ID)?.hello.display).toEqual(mono.display);
+  });
+
   it('reports the current layout ETag to an adopted device', async () => {
     await adoptWithLayout();
     const etag = (await getLayout(device(ID))).headers.get('etag');
