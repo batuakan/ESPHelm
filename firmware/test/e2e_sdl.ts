@@ -27,8 +27,31 @@ const PYTHON = process.env.PYTHON ?? join(homedir(), 'venv/bin/python');
 const PORT = Number(process.env.ESPHELM_E2E_PORT ?? 3993);
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
 const binary = (name: string) => join(FIRMWARE, `.esphome/build/${name}/.pioenvs/${name}/program`);
-// ESPHomeSignalK's host build uses a fixed device id (utils.h).
-const DEVICE_ID = '12345678-1234-1232-123456789012';
+// ESPHomeSignalK's ref for the builds (default: main, as in the YAML).
+const SIGNALK_REF = process.env.ESPHELM_SIGNALK_REF;
+
+/**
+ * A host build's device id, as ESPHomeSignalK makes it (components/signalk/host_device_id.h): a
+ * version 8 UUID from FNV-1a 64 over the ESPHome node name and the host MAC (ESPHome's default).
+ */
+function hostDeviceId(name: string, mac = [0x98, 0x35, 0x69, 0xab, 0xf6, 0x79]): string {
+  const MASK = (1n << 64n) - 1n;
+  const bytes = [...Buffer.from(name, 'utf8'), ...mac];
+  const fnv = (start: bigint) =>
+    bytes.reduce((h, b) => ((h ^ BigInt(b)) * 0x100000001b3n) & MASK, start);
+  const hi = fnv(0xcbf29ce484222325n);
+  const lo = fnv(hi);
+  const hex = (v: bigint, n: number) => v.toString(16).padStart(n, '0');
+  return [
+    hex(hi >> 32n, 8),
+    hex((hi >> 16n) & 0xffffn, 4),
+    hex(0x8000n | (hi & 0x0fffn), 4),
+    hex(0x8000n | ((lo >> 48n) & 0x3fffn), 4),
+    hex(lo & 0xffffffffffffn, 12),
+  ].join('-');
+}
+const DEVICE_ID = hostDeviceId('esphelm-sdl');
+const MONO_ID = hostDeviceId('esphelm-sdl-mono');
 
 let failures = 0;
 function check(label: string, ok: boolean, detail = ''): void {
@@ -134,7 +157,17 @@ async function main(): Promise<void> {
     console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
     execFileSync(
       ESPHOME,
-      ['-s', 'signalk_host', '127.0.0.1', '-s', 'signalk_port', String(PORT), 'compile', config],
+      [
+        '-s',
+        'signalk_host',
+        '127.0.0.1',
+        '-s',
+        'signalk_port',
+        String(PORT),
+        ...(SIGNALK_REF ? ['-s', 'signalk_ref', SIGNALK_REF] : []),
+        'compile',
+        config,
+      ],
       { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 30 * 60 * 1000 },
     );
   }
@@ -1986,14 +2019,14 @@ async function main(): Promise<void> {
       'mono: asks for access',
       await waitFor(() => fwMono.count(/Access request is pending approval/) > 0, 20000),
     );
-    await mono.approve(DEVICE_ID, 'readwrite');
+    await mono.approve(MONO_ID, 'readwrite');
     check('mono: registers as pending', await fwMono.waitLog(/pending adoption/, 20000));
     const monoDevices = (await mono.json('GET', '/plugins/esphelm/api/devices', mono.admin))
       .body as unknown as {
       id: string;
       hello: { display: { kind?: string }; widgets: string[] };
     }[];
-    const monoHello = monoDevices.find((d) => d.id === DEVICE_ID)?.hello;
+    const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
       'mono: hello says mono and lists its four tile types',
       monoHello?.display.kind === 'mono' &&
@@ -2002,15 +2035,10 @@ async function main(): Promise<void> {
     );
     const monoLayout = fixture('valid/mono-400.json');
     await mono.json('PUT', '/plugins/esphelm/api/layouts/mono-400', mono.admin, monoLayout);
-    const refused = await mono.json(
-      'PUT',
-      `/plugins/esphelm/api/devices/${DEVICE_ID}`,
-      mono.admin,
-      {
-        state: 'adopted',
-        layoutId: 'mono-400',
-      },
-    );
+    const refused = await mono.json('PUT', `/plugins/esphelm/api/devices/${MONO_ID}`, mono.admin, {
+      state: 'adopted',
+      layoutId: 'mono-400',
+    });
     check(
       'mono: the plugin refuses a layout with a wind rose',
       refused.status === 409 && JSON.stringify(refused.body).includes('wind_rose'),
@@ -2018,7 +2046,7 @@ async function main(): Promise<void> {
     );
     const monoOnly = { ...monoLayout, id: 'mono-boat', pages: monoLayout.pages.slice(0, 1) };
     await mono.json('PUT', '/plugins/esphelm/api/layouts/mono-boat', mono.admin, monoOnly);
-    await mono.json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, mono.admin, {
+    await mono.json('PUT', `/plugins/esphelm/api/devices/${MONO_ID}`, mono.admin, {
       state: 'adopted',
       layoutId: 'mono-boat',
     });
