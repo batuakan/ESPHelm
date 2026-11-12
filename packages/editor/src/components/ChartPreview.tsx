@@ -109,7 +109,7 @@ export function ChartPreview(props: {
       );
     }
     const h = typeof heading === 'number' ? heading * RAD : 0;
-    const s = Math.max(small ? 8 : 14, shorter / 22);
+    const s = Math.max(small ? 10 : 18, shorter / 16);
     body = (
       <>
         <g className={props.night ? 'chart-tiles night' : 'chart-tiles'}>{tiles}</g>

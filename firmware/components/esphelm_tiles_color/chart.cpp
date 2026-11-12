@@ -362,13 +362,14 @@ class ChartWidget : public Widget {
     }
     // Vessel: an arrowhead pointing along the heading (north up), in the middle of the view.
     const double cx = (box.x1 + box.x2) / 2.0, cy = (box.y1 + box.y2) / 2.0;
-    const double s = std::max<int32_t>(small_ ? 8 : 14, std::min(view_w_, view_h_) / 22);
+    const double s = std::max<int32_t>(small_ ? 10 : 18, std::min(view_w_, view_h_) / 16);
     const double h = (has_heading_ ? heading_ : 0.0);
     auto at = [&](double ang, double r) {
       return lv_point_precise_t{static_cast<lv_value_precise_t>(cx + std::sin(h + ang) * r),
                                 static_cast<lv_value_precise_t>(cy - std::cos(h + ang) * r)};
     };
-    const lv_color_t vessel = stale_ ? colors_.muted : colors_.accent;
+    // Red (the alarm zone's colour), which stands out on the blues of a chart by day.
+    const lv_color_t vessel = stale_ ? colors_.muted : colors_.zone[static_cast<int>(esphelm::ZoneState::ALARM)];
     lv_draw_triangle_dsc_t t;
     lv_draw_triangle_dsc_init(&t);
     t.color = vessel;
