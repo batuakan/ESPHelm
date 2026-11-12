@@ -123,4 +123,17 @@ The package is also a `signalk-webapp`: signalk-server serves `public/` (the edi
 ## Development install
 - **Unit and route tests:** `npm test`.
 - **End to end:** `npm run build && npm run e2e -w signalk-esphelm`. This starts a real signalk-server with security on, in a throwaway config dir, with real admin and device tokens. Set `SIGNALK_SERVER=/path/to/bin/signalk-server` to pick an install.
-- **Into your own server** (manual, when you want to try it): `npm run build`, then symlink `packages/plugin` into the server config dir's `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart, and enable *ESPHelm* under *Server → Plugin Config*. Packaging for npm/App Store comes later: the plugin currently resolves `@esphelm/schema` from the workspace.
+- **Into your own server** (manual, when you want to try it): `npm run build`, then symlink `packages/plugin` into the server config dir's `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart, and enable *ESPHelm* under *Server → Plugin Config*.
+
+## Publishing to npm
+Two packages go to npm: `@esphelm/schema` (the contract, which the plugin depends on) and `signalk-esphelm` (plugin and editor). The `@esphelm` scope belongs to the `esphelm` npm organisation; scoped packages are private by default, so the schema's `publishConfig` sets `access: public`.
+
+1. Bump the versions. A changed schema gets a new version first, and the plugin's `@esphelm/schema` dependency names it exactly. npm never takes the same version twice.
+2. From the repo root, logged in with `npm login`:
+   ```bash
+   npm ci
+   npm publish -w @esphelm/schema
+   npm publish -w signalk-esphelm
+   ```
+   Each package's `prepublishOnly` builds it first (the plugin's builds the schema, the plugin and the editor into `public/`), so a stale `dist/` is never published. `npm pack --dry-run -w <package>` shows what goes in.
+3. The SignalK App Store lists the plugin by its `signalk-node-server-plugin` keyword, usually within a few hours of publishing.

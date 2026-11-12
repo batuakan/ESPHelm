@@ -3,21 +3,41 @@
   "version": "0.1.0",
   "description": "ESPHelm: configure ESP32 SignalK displays at runtime. Stores layouts and serves them to devices.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/batuakan/ESPHelm.git",
+    "directory": "packages/plugin"
+  },
+  "author": "Batu Akan",
+  "homepage": "https://github.com/batuakan/ESPHelm#readme",
+  "bugs": {
+    "url": "https://github.com/batuakan/ESPHelm/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-webapp",
-    "signalk-category-instruments"
+    "signalk-category-instruments",
+    "esphelm",
+    "esp32",
+    "esphome",
+    "display",
+    "mfd"
   ],
   "files": [
     "dist",
-    "public"
+    "public",
+    "!dist/.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "prepublishOnly": "npm run build --prefix ../.."
   },
   "dependencies": {
     "@esphelm/schema": "1.0.0",
