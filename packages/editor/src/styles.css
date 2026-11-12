@@ -1593,7 +1593,7 @@ fieldset.modes {
   filter: brightness(0.35) sepia(1) hue-rotate(-50deg) saturate(3);
 }
 .chart-vessel polygon {
-  fill: var(--tile-accent);
+  fill: var(--zone-alarm);
 }
 .chart-anchor .ring {
   fill: var(--zone-normal);
