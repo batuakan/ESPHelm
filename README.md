@@ -143,7 +143,7 @@ npm ci
 npm run build
 ```
 
-**Plugin and editor:** symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm`, add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies, restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. (An npm / App Store package comes later.)
+**Plugin and editor:** install *ESPHelm* from your SignalK server's *Appstore* (the npm package [`signalk-esphelm`](https://www.npmjs.com/package/signalk-esphelm)), restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. To run this checkout instead, symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm` and add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies.
 
 **Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040, the cheap yellow display or the RLCD-4.2) and write it over USB with `esptool.py write_flash 0x0 <file>`.
 
