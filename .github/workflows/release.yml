@@ -2,7 +2,8 @@ name: Release firmware
 
 # Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N, a prerelease) builds the firmware of every supported board
 # and creates a draft GitHub release with the binaries (ADR-0031). The tag must match the
-# firmware's FIRMWARE_VERSION. Review the draft, check it on hardware, then publish it.
+# firmware's ESPHELM_FIRMWARE_VERSION. manifest.json lists the update images for the plugin's
+# Check GitHub button (ADR-0036). Review the draft, check it on hardware, then publish it.
 on:
   push:
     tags: ['v*']
@@ -33,9 +34,9 @@ jobs:
         run: |
           version="${TAG#v}"
           base="${version%%-*}"
-          fw=$(sed -n 's/.*FIRMWARE_VERSION = "\([^"]*\)".*/\1/p' firmware/components/esphelm_runtime/esphelm_runtime.h)
+          fw=$(sed -n 's/^#define ESPHELM_FIRMWARE_VERSION "\([^"]*\)".*/\1/p' firmware/components/esphelm_runtime/esphelm_runtime.h)
           if [ -z "$fw" ]; then
-            echo "::error::FIRMWARE_VERSION not found in esphelm_runtime.h"; exit 1
+            echo "::error::ESPHELM_FIRMWARE_VERSION not found in esphelm_runtime.h"; exit 1
           fi
           if [ "$base" != "$fw" ]; then
             echo "::error::Tag $TAG does not match FIRMWARE_VERSION $fw. Bump it in esphelm_runtime.h first, or tag v$fw."
@@ -135,7 +136,25 @@ jobs:
           SIGNALK_SHA: ${{ needs.prepare.outputs.signalk_sha }}
         run: |
           cd dist
-          sha256sum *.bin > SHA256SUMS
+          # manifest.json: what the plugin's Check GitHub reads (ADR-0036). Board, tile set and
+          # version come from the marker compiled into each image, as the plugin reads them.
+          python3 - <<'PY'
+          import glob, hashlib, json, os, re
+          images = []
+          for f in sorted(glob.glob('*.ota.bin')):
+              data = open(f, 'rb').read()
+              found = set(re.findall(rb'ESPHELM-IMAGE/1 fw=([0-9A-Za-z._-]{1,31}) board=([0-9A-Za-z._-]{1,64}) kind=(color|mono)\x00', data))
+              if len(found) != 1:
+                  raise SystemExit(f'{f}: expected one ESPHELM-IMAGE marker, found {len(found)}')
+              fw, board, kind = (x.decode() for x in found.pop())
+              if fw != os.environ['VERSION'].split('-')[0]:
+                  raise SystemExit(f'{f}: marker version {fw} does not match {os.environ["VERSION"]}')
+              images.append({'board': board, 'kind': kind, 'version': fw, 'file': f, 'size': len(data),
+                             'md5': hashlib.md5(data).hexdigest(), 'sha256': hashlib.sha256(data).hexdigest()})
+          json.dump({'version': os.environ['VERSION'], 'images': images}, open('manifest.json', 'w'), indent=2)
+          PY
+          cat manifest.json
+          sha256sum *.bin manifest.json > SHA256SUMS
           cat SHA256SUMS
           cat > ../notes.md <<EOF
           Firmware for the ESPHelm displays. Pick your board's files:
@@ -151,7 +170,7 @@ jobs:
 
               esptool.py write_flash 0x0 esphelm-<board>-$VERSION.factory.bin
 
-          **Updating:** write the factory image again over USB, or upload the \`.ota.bin\` on the display's setup network page (the captive portal) while that network is open: on a display without a saved Wi-Fi, or after a power-up that finds no Wi-Fi.
+          **Updating:** in the ESPHelm editor, open *Firmware*, press *Check GitHub for updates* (or upload the \`.ota.bin\`), then *Update* on the display. It downloads the image from the plugin, restarts, and goes back to its old firmware if the new one does not start. Displays on firmware before 0.4.0 have no updates over the network: write the factory image over USB once.
 
           Then set the display up as in the README: [Setting up a display](https://github.com/${{ github.repository }}/blob/$TAG/README.md#-setting-up-a-display). Check the files against \`SHA256SUMS\`.
 
@@ -159,4 +178,4 @@ jobs:
           EOF
           flags=(--draft --title "ESPHelm $TAG" --notes-file ../notes.md --verify-tag)
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
-          gh release create "$TAG" -R "${{ github.repository }}" "${flags[@]}" *.bin SHA256SUMS
+          gh release create "$TAG" -R "${{ github.repository }}" "${flags[@]}" *.bin manifest.json SHA256SUMS

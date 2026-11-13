@@ -45,7 +45,7 @@ export interface Harness {
   call(
     method: string,
     path: string,
-    opts?: { as?: Principal; body?: unknown; headers?: Record<string, string> },
+    opts?: { as?: Principal; body?: unknown; raw?: Uint8Array; headers?: Record<string, string> },
   ): Promise<Response>;
   restart(): void;
   close(): Promise<void>;
@@ -56,7 +56,12 @@ export interface Harness {
  * device API under /signalk/v1/api, editor API under /plugins/esphelm, plus a fake host.
  */
 export async function startHarness(
-  opts: { dataDir?: string; charts?: ChartSource } = {},
+  opts: {
+    dataDir?: string;
+    charts?: ChartSource;
+    releasesUrl?: string;
+    fetch?: typeof fetch;
+  } = {},
 ): Promise<Harness> {
   const dataDir = opts.dataDir ?? mkdtempSync(join(tmpdir(), 'esphelm-plugin-'));
   const deltas: Delta[] = [];
@@ -115,7 +120,12 @@ export async function startHarness(
     getMetadata: (path: string) => skMeta[path.replace(/^vessels\.self\./, '')] as never,
   };
   let now = Date.parse('2026-10-24T12:00:00Z');
-  const service = new Service(host, () => new Date((now += 1000)), opts.charts);
+  const service = new Service(host, {
+    now: () => new Date((now += 1000)),
+    ...(opts.charts ? { charts: opts.charts } : {}),
+    ...(opts.releasesUrl ? { releasesUrl: opts.releasesUrl } : {}),
+    ...(opts.fetch ? { fetch: opts.fetch } : {}),
+  });
   service.start();
 
   const app = express();
@@ -149,10 +159,11 @@ export async function startHarness(
         method,
         headers: {
           ...(o.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...(o.raw !== undefined ? { 'Content-Type': 'application/octet-stream' } : {}),
           ...(o.as ? { 'x-test-principal': JSON.stringify(o.as) } : {}),
           ...o.headers,
         },
-        body: o.body !== undefined ? JSON.stringify(o.body) : undefined,
+        body: o.raw ?? (o.body !== undefined ? JSON.stringify(o.body) : undefined),
       }),
     restart: () => {
       service.stop();
@@ -167,7 +178,15 @@ export async function startHarness(
 
 /** Value of the last version delta emitted for a device. */
 export function lastVersion(deltas: Delta[], deviceId: string): unknown {
-  const path = `plugins.esphelm.${deviceId}.version`;
+  return lastValue(deltas, `plugins.esphelm.${deviceId}.version`);
+}
+
+/** Value of the last firmware offer delta emitted for a device (ADR-0036). */
+export function lastFirmware(deltas: Delta[], deviceId: string): unknown {
+  return lastValue(deltas, `plugins.esphelm.${deviceId}.firmware`);
+}
+
+function lastValue(deltas: Delta[], path: string): unknown {
   for (let i = deltas.length - 1; i >= 0; i--) {
     for (const u of deltas[i]?.updates ?? []) {
       if ('values' in u) {

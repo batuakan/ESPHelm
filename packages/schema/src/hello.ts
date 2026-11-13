@@ -8,7 +8,20 @@ export const Hello = Type.Object(
       errorCode: 'INVALID_DEVICE_ID',
       description: 'Same MAC-derived UUID the device uses as its SignalK access-request clientId.',
     }),
-    fw: Type.Object({ version: Type.String() }, { additionalProperties: false }),
+    fw: Type.Object(
+      {
+        version: Type.String(),
+        build: Type.Optional(
+          Type.String({
+            pattern: '^[0-9a-f]{64}$',
+            errorCode: 'INVALID_FIRMWARE_BUILD',
+            description:
+              "Id of the running build (ADR-0036): the app descriptor's app_elf_sha256 on ESP32, the sha256 of the program on the host build. An update is done when the display reports the target build.",
+          }),
+        ),
+      },
+      { additionalProperties: false },
+    ),
     schema: Type.Object(
       {
         major: Type.Integer({ minimum: 1, description: 'Highest layout major the device parses.' }),
@@ -82,6 +95,12 @@ export const Hello = Type.Object(
           Type.Boolean({
             description:
               'The display has a speaker: touch clicks and alarm tones (settings.sound, ADR-0033).',
+          }),
+        ),
+        ota: Type.Optional(
+          Type.Boolean({
+            description:
+              'The firmware takes firmware updates from the plugin (ADR-0036); the editor offers Update only then.',
           }),
         ),
         darkTheme: Type.Optional(

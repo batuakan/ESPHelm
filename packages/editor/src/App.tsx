@@ -65,6 +65,7 @@ import { ImportConfirm, RemapDialog } from './components/ShareDialogs';
 import { IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, exportFile, missingRefs, parseImport, type MissingRef } from './share';
 import { FooterPreview } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
+import { FirmwareDialog } from './components/FirmwareDialog';
 import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
 import {
   AUTOPILOT_TIER_TEXT,
@@ -140,6 +141,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     null,
   );
   const [remap, setRemap] = useState<MissingRef[] | null>(null);
+  const [firmwareOpen, setFirmwareOpen] = useState(false);
 
   const device = devices.find((d) => d.id === deviceId);
 
@@ -486,9 +488,28 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         </div>
       )}
       {status && <div className={`banner ${status.kind}`} role="status">{status.text}</div>}
+      {firmwareOpen && (
+        <FirmwareDialog
+          api={api}
+          devices={devices}
+          displayName={displayName}
+          onChanged={() => void refreshDevices()}
+          onClose={() => setFirmwareOpen(false)}
+        />
+      )}
 
       <div className="sidebar">
-        <DeviceList devices={devices} selectedId={deviceId} onSelect={setDeviceId} onAdopt={(id) => void adopt(id)} />
+        <DeviceList
+          devices={devices}
+          selectedId={deviceId}
+          onSelect={setDeviceId}
+          onAdopt={(id) => void adopt(id)}
+          onFirmware={() => setFirmwareOpen(true)}
+          onUpdate={(id, buildId) =>
+            void api.requestUpdate(id, buildId).then(() => refreshDevices(), fail)
+          }
+          onClearUpdate={(id) => void api.clearUpdate(id).then(() => refreshDevices(), fail)}
+        />
         <TileLibrary
           types={catalog}
           supported={supported}

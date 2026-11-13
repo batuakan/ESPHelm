@@ -3,6 +3,72 @@ import { useState, type JSX, type PointerEvent as ReactPointerEvent } from 'reac
 import type { TileType } from '@esphelm/schema';
 import type { Device } from '../api';
 
+/** The firmware update line under a display (ADR-0036). */
+function UpdateLine(props: {
+  device: Device;
+  onUpdate(id: string, buildId: string): void;
+  onClearUpdate(id: string): void;
+}) {
+  const d = props.device;
+  const [confirming, setConfirming] = useState(false);
+  const u = d.update;
+  if (u && u.state !== 'done' && u.state !== 'failed') {
+    const text =
+      u.state === 'requested'
+        ? `Update to ${u.version} waits for the display`
+        : u.state === 'downloading'
+          ? `Downloading ${u.version}…`
+          : `Installing ${u.version}; the display restarts`;
+    return (
+      <div className="device-fw">
+        <span className="device-meta">{text}</span>
+        {u.state === 'requested' && (
+          <button className="small" onClick={() => props.onClearUpdate(d.id)}>
+            Cancel
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="device-fw">
+      {u?.state === 'failed' && (
+        <span className="device-warning" role="status">
+          Update to {u.version} failed: {u.error}{' '}
+          <button className="link" onClick={() => props.onClearUpdate(d.id)} aria-label="Dismiss">
+            ×
+          </button>
+        </span>
+      )}
+      {u?.state === 'done' && u.buildId === d.hello.fw.build && (
+        <span className="device-meta">Updated to {u.version}</span>
+      )}
+      {d.updateAvailable &&
+        (confirming ? (
+          <>
+            <span className="device-meta">The display restarts.</span>
+            <button
+              className="primary small"
+              onClick={() => {
+                setConfirming(false);
+                props.onUpdate(d.id, d.updateAvailable!.buildId);
+              }}
+            >
+              Update
+            </button>
+            <button className="small" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button className="chip" onClick={() => setConfirming(true)}>
+            Update to {d.updateAvailable.version}
+          </button>
+        ))}
+    </div>
+  );
+}
+
 /** Small line icons (inline SVG: no icon font, and no glyphs missing from system fonts). */
 const ICONS: Record<string, JSX.Element> = {
   value: (
@@ -103,10 +169,18 @@ export function DeviceList(props: {
   selectedId: string | undefined;
   onSelect(id: string): void;
   onAdopt(id: string): void;
+  onFirmware(): void;
+  onUpdate(id: string, buildId: string): void;
+  onClearUpdate(id: string): void;
 }) {
   return (
     <section className="panel devices" aria-label="Displays">
-      <h2>Displays</h2>
+      <div className="panel-head">
+        <h2>Displays</h2>
+        <button className="small" onClick={props.onFirmware} title="Firmware images and updates">
+          Firmware
+        </button>
+      </div>
       {props.devices.length === 0 && (
         <p className="hint">No display has said hello yet. Power one on and approve it in SignalK.</p>
       )}
@@ -117,7 +191,7 @@ export function DeviceList(props: {
               <span className={`dot ${d.state}`} aria-hidden />
               <span className="device-name">{d.name ?? d.hello.board ?? d.id}</span>
               <span className="device-meta">
-                {d.hello.display.width}×{d.hello.display.height} · {d.state}
+                {d.hello.display.width}×{d.hello.display.height} · {d.state} · {d.hello.fw.version}
               </span>
               {d.hello.recovery && (
                 <span className="device-warning">
@@ -129,6 +203,9 @@ export function DeviceList(props: {
               <button className="small" onClick={() => props.onAdopt(d.id)}>
                 Adopt
               </button>
+            )}
+            {d.state === 'adopted' && (d.update || d.updateAvailable) && (
+              <UpdateLine device={d} onUpdate={props.onUpdate} onClearUpdate={props.onClearUpdate} />
             )}
           </li>
         ))}

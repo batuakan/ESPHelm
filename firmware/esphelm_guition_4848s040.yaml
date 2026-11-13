@@ -9,6 +9,7 @@ substitutions:
 packages:
   hardware: !include hardware/guition-esp32-s3-4848s040.yaml
   wifi: !include wifi.yaml
+  ota: !include ota.yaml
   fonts: !include fonts.yaml
 
 esphome:

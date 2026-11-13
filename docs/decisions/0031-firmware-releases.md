@@ -7,7 +7,7 @@ Status: **Accepted** (2026-11-09)
 - **Moving parts:**
   - ESPHomeSignalK is fetched from its `main` branch at build time, so two builds of the same ESPHelm commit could differ.
   - The P4 embeds `network_adapter_esp32c6.bin`, which is not in this repository (its sha256 is pinned in `hardware/waveshare-esp32-p4-86.yaml`).
-- **The version:** the firmware reports a hard-coded `FIRMWARE_VERSION` (`esphelm_runtime.h`) in `hello` and on the Info tab.
+- **The version:** the firmware reports a hard-coded `FIRMWARE_VERSION` (`esphelm_runtime.h`; since ADR-0036 the define `ESPHELM_FIRMWARE_VERSION`, also in the image marker) in `hello` and on the Info tab.
 
 ## Decision
 **Pushing tag `vX.Y.Z`** runs `.github/workflows/release.yml`, which builds every supported board and creates a **draft** GitHub release. `vX.Y.Z-rc.N` makes a draft prerelease.

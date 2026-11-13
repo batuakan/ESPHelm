@@ -7,7 +7,17 @@
  * ~/venv/bin/python). Uses throwaway directories; never touches ~/.signalk.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +70,14 @@ function check(label: string, ok: boolean, detail = ''): void {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function waitForAsync(pred: () => Promise<boolean>, ms: number): Promise<boolean> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (await pred()) return true;
+    await sleep(250);
+  }
+  return pred();
+}
 const fixture = (rel: string) =>
   JSON.parse(readFileSync(join(FIXTURES, rel), 'utf8')) as Record<string, unknown> & {
     pages: { tiles: Record<string, unknown>[] }[];
@@ -313,10 +331,11 @@ async function main(): Promise<void> {
       'firmware picks up the edit',
       await fw.waitLog(/Showing fetched layout "grid-480"/, 15000, 2),
     );
-    // 3 tile paths, the layout version path and notifications.* (the alarm banner).
+    // 3 tile paths, the layout version and firmware offer paths, and notifications.* (the alarm
+    // banner).
     check(
       'firmware resubscribes when paths are removed',
-      await fw.waitLog(/Resubscribing to 5 paths/),
+      await fw.waitLog(/Resubscribing to 6 paths/),
     );
     check(
       'the SignalK socket stays connected',
@@ -1672,8 +1691,119 @@ async function main(): Promise<void> {
       'rotation: a layout without it turns the display back',
       (await fw.waitLog(/Rotation: 0 degrees, 480 x 480/)) && (await helloTurnedTo(0)),
     );
+    // Firmware updates from the editor (ADR-0036). A copy of the program in its own directory
+    // (ESPHome's host backend replaces the running program and starts it again), the same
+    // display (its preferences, so its token). The update is the program with bytes appended:
+    // still the same ELF, another build id.
+    await fw.stop();
+    {
+      const workOta = join(work, 'ota');
+      mkdirSync(workOta);
+      const otaProgram = join(workOta, 'program');
+      copyFileSync(binary('esphelm-sdl'), otaProgram);
+      chmodSync(otaProgram, 0o755);
+      const fwOta = new Firmware(workOta, otaProgram);
+      const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+      const original = readFileSync(otaProgram);
+      const deviceNow = async () =>
+        (
+          (await json('GET', '/plugins/esphelm/api/devices', admin)).body as unknown as {
+            id: string;
+            hello: { fw: { build?: string }; capabilities: { ota?: boolean } };
+            update?: { state: string; error?: string };
+          }[]
+        ).find((d) => d.id === DEVICE_ID);
+      fwOta.start({ ESPHOME_PREFDIR: fw.workDir });
+      await fwOta.waitLog(/Showing fetched layout "multi-480"/, 20000);
+      await waitForAsync(
+        async () => (await deviceNow())?.hello.fw.build === sha256(original),
+        10000,
+      );
+      const before = await deviceNow();
+      check(
+        'ota: hello reports updates and the build (the sha256 of the program)',
+        before?.hello.capabilities.ota === true && before.hello.fw.build === sha256(original),
+        JSON.stringify(before?.hello.fw),
+      );
+      const uploadImage = async (bytes: Buffer) => {
+        const res = await fetch(`${sk!.base}/plugins/esphelm/api/firmware`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${admin}` },
+          body: bytes,
+        });
+        return {
+          status: res.status,
+          body: (await res.json()) as { buildId?: string; board?: string },
+        };
+      };
+      const updated = Buffer.concat([original, Buffer.alloc(4096)]);
+      const up = await uploadImage(updated);
+      check(
+        'ota: the plugin takes the SDL program as an image for sdl-480',
+        up.status === 201 && up.body.buildId === sha256(updated) && up.body.board === 'sdl-480',
+        JSON.stringify(up),
+      );
+      await json('POST', `/plugins/esphelm/api/devices/${DEVICE_ID}/update`, admin, {
+        buildId: sha256(updated),
+      });
+      check(
+        'ota: the display downloads and writes the update, then restarts',
+        (await fwOta.waitLog(/Updating the firmware to 0\.4\.0/, 15000)) &&
+          (await fwOta.waitLog(/Firmware update written/, 30000)),
+      );
+      check(
+        'ota: the restarted display reports the new build; the update is done',
+        await waitForAsync(async () => (await deviceNow())?.update?.state === 'done', 30000),
+        JSON.stringify((await deviceNow())?.update),
+      );
+      check(
+        'ota: the program was replaced',
+        sha256(readFileSync(otaProgram)) === sha256(updated) &&
+          (await fwOta.waitLog(/Showing (cached|fetched) layout "multi-480"/, 20000, 2)),
+      );
+
+      // A damaged download: the display checks the MD5, keeps its firmware and says why.
+      const damaged = Buffer.concat([original, Buffer.alloc(8192)]);
+      await uploadImage(damaged);
+      const stored = join(
+        sk.config,
+        'plugin-config-data',
+        'esphelm',
+        'firmware',
+        `${sha256(damaged)}.bin`,
+      );
+      const bytes = readFileSync(stored);
+      bytes[bytes.length - 1] = 0xff; // same size, another MD5
+      writeFileSync(stored, bytes);
+      await json('POST', `/plugins/esphelm/api/devices/${DEVICE_ID}/update`, admin, {
+        buildId: sha256(damaged),
+      });
+      check(
+        'ota: a damaged image is refused on the display',
+        await fwOta.waitLog(/Firmware update failed: the image is damaged \(MD5 mismatch\)/, 30000),
+      );
+      await sleep(800);
+      await fwOta.screenshot('87-update-failed', shots);
+      check(
+        'ota: the plugin hears why',
+        await waitForAsync(async () => /MD5/.test((await deviceNow())?.update?.error ?? ''), 10000),
+        JSON.stringify((await deviceNow())?.update),
+      );
+      check(
+        'ota: the display keeps the program it runs',
+        sha256(readFileSync(otaProgram)) === sha256(updated),
+      );
+      await sleep(10500); // the message shows for 10 s, then the page comes back
+      check('ota: and carries on', fwOta.count(/Firmware update written/) === 1);
+      await fwOta.stop();
+      fwOta.saveLog();
+    }
+    fw.start();
+    await fw.waitLog(/Showing cached layout "multi-480"/, 15000);
+    await fw.waitLog(/Sending hello/, 15000);
+
     writeFileSync(join(fw.workDir, 'esphelm_page_request'), '4');
-    await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 2);
+    await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 1);
     await sleep(1500);
 
     // 10. Server gone: values and needles go stale, and the autopilot shows "offline" with

@@ -1075,6 +1075,66 @@ async function main(): Promise<void> {
     await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, hello);
     await sizeShown('720×720');
 
+    // Firmware updates (ADR-0036): the display reports updates; an image is uploaded in the
+    // dialog and installed, and the display is offered it.
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, {
+      ...hello,
+      fw: { version: '0.4.0', build: 'aa'.repeat(32) },
+      capabilities: { ...(hello as unknown as { capabilities: object }).capabilities, ota: true },
+    });
+    const image = Buffer.alloc(64 * 1024, 0x5a);
+    image[0] = 0xe9;
+    image.writeUInt32LE(0xabcd5432, 0x20);
+    Buffer.from('bb'.repeat(32), 'hex').copy(image, 0x20 + 0x90);
+    image.write(
+      `ESPHELM-IMAGE/1 fw=0.5.0 board=${(hello as unknown as { board: string }).board} kind=color\0`,
+      4096,
+      'latin1',
+    );
+    await page.getByRole('button', { name: 'Firmware', exact: true }).click();
+    const fwDialog = page.getByRole('dialog', { name: 'Firmware' });
+    await fwDialog.getByLabel('Firmware image').setInputFiles({
+      name: 'esphelm-p4-0.5.0.ota.bin',
+      mimeType: 'application/octet-stream',
+      buffer: image,
+    });
+    check(
+      'firmware: an uploaded image is read and listed',
+      await fwDialog
+        .getByText(/Added 0\.5\.0 for/)
+        .waitFor({ timeout: 10000 })
+        .then(
+          () => true,
+          () => false,
+        ),
+    );
+    await shot(page, '19-desktop-firmware');
+    await fwDialog.getByRole('button', { name: 'Install' }).click();
+    await fwDialog.getByRole('button', { name: 'Update', exact: true }).click();
+    await fwDialog.getByText(/is updating to 0\.5\.0/).waitFor({ timeout: 10000 });
+    const fwDevices = await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin);
+    const fwDevice = (
+      fwDevices.body as unknown as { id: string; update?: { state: string; version: string } }[]
+    ).find((d) => d.id === DEVICE_ID);
+    check(
+      'firmware: Install asks the display to update',
+      fwDevice?.update?.state === 'requested' && fwDevice.update.version === '0.5.0',
+      JSON.stringify(fwDevice?.update),
+    );
+    await fwDialog.getByRole('button', { name: 'Close' }).click();
+    check(
+      'firmware: the display list shows the update waiting',
+      await page
+        .getByText('Update to 0.5.0 waits for the display')
+        .waitFor({ timeout: 10000 })
+        .then(
+          () => true,
+          () => false,
+        ),
+    );
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, hello);
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

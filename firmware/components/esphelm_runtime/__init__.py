@@ -170,6 +170,8 @@ async def to_code(config):
     for digits in fonts[CONF_DIGITS]:
         cg.add(var.add_digit_font(await cg.get_variable(digits)))
     cg.add(var.set_board(config[CONF_BOARD]))
+    # In the image's marker (firmware_update.h), which tells the plugin which board an image is for.
+    cg.add_define("ESPHELM_BOARD", config[CONF_BOARD])
     cg.add(var.set_touch(config[CONF_TOUCH]))
     cg.add(var.set_stale_after(config[CONF_STALE_AFTER].total_milliseconds))
     if CONF_MAX_LAYOUT_BYTES in config:

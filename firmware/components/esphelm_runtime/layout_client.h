@@ -12,7 +12,7 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-enum class RequestKind : uint8_t { HELLO, LAYOUT, TILE, ACK, META };
+enum class RequestKind : uint8_t { HELLO, LAYOUT, TILE, ACK, META, FW_RESULT };
 
 struct HttpRequest {
   RequestKind kind;

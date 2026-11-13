@@ -91,6 +91,12 @@ Removing the start page, or replacing the pages with a starter layout, resets it
 
 A display that skipped a layout because it crashed while showing it (boot guard, ADR-0013) is marked in the display list until you send a changed layout.
 
+**Firmware** (the *Firmware* button above the display list, ADR-0036): updates over the network, for displays on firmware 0.4.0 or later (the first install is over USB).
+- **Upload .bin:** an update image (`esphelm-<board>-<version>.ota.bin` from a release, or `firmware.ota.bin` from your own build). The plugin reads its version, board and tile set from the image; a factory image or a file that isn't ESPHelm firmware is refused. Two images are kept per board.
+- **Check GitHub for updates:** fetches the latest release's images for the boards of your displays. Only when pressed; it needs an internet connection, the upload doesn't.
+- **Install** on a display that can take an image (same board and tile set), after *The display restarts.* The display shows its progress, restarts, and comes back with the new version, or on its old firmware if the new one doesn't start.
+- **In the display list:** each display's firmware version; *Update to X* when a newer image is there (asks once); the update's state while it runs (*Cancel* until the display starts downloading); *Updated to X*, or *Update to X failed* with the reason (× clears it).
+
 ## Developing
 - `npm run dev -w @esphelm/editor`: Vite dev server with hot reload. API and stream requests are proxied to `ESPHELM_SIGNALK` (default `http://localhost:3000`), which must run the plugin. Log in to that server in the same browser first (the cookie is per host, so open the admin UI through the dev server: `http://localhost:5173/admin/`).
 - `npm run build`: builds schema, plugin and editor; the editor goes into `packages/plugin/public/` (gitignored).

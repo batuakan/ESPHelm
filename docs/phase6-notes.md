@@ -314,3 +314,13 @@ Each value is switched on in the editor, so only chosen values take memory; the 
   - **SDL e2e:** the dark flow (panel pick, day brightness kept, dusk to night, sunrise back to dark, the footer toggle) and new goldens 82–86 and 720-18, reviewed by eye. The five settings-panel goldens changed for the fourth button and were reviewed; the other 91 are unchanged.
 - **Build sizes:** P4 flash 3,541,886 B (+1.3 KB), static RAM 104,106 B (unchanged); Guition flash 1,828,451 B, RAM 122,031 B; CYD flash 1,520,035 B (82.8 %), RAM 55,908 B; C3 flash 1,639,488 B (89.3 %), RAM 113,854 B.
 - **Checked on the P4** (2026-11-10).
+
+## Firmware updates from the editor (ADR-0036, branch `feat/ota`)
+- **What:** an admin uploads an update image in the editor (or presses *Check GitHub for updates*) and presses *Update* on a display; the display downloads it from the plugin with its device token, flashes it and restarts. The first install stays over USB.
+- **Why not ESPHome's HTTP OTA:** basic auth only (the device routes take a bearer token), `flash()` on the main loop (LVGL would freeze), and `update: http_request` has a compile-time URL while the server is found with mDNS. ESPHome's OTA core is used: an `OTAComponent` platform (`ota: - platform: esphelm_runtime`), its backends (MD5 checked in `end()`), `safe_mode` with ESP-IDF rollback, and the host backend that replaces the SDL program.
+- **Identity:** a marker compiled into every image (`ESPHELM-IMAGE/1 fw=… board=… kind=…`) and the build id (`app_elf_sha256` on ESP32, matching esptool's *ELF file SHA256*; the program's sha256 on the host) in `hello.fw.build`.
+- **One-shot requests:** each request is served once (409 after), so a display that keeps crashing can't loop on an update. Success is the next hello's build; a hello with the old build after the download means it didn't start or rolled back.
+- **Found by the e2e:** signalk-server's compression gzips the download for clients that accept it and drops `Content-Length`, which the display checks; the route sends `Cache-Control: no-transform`.
+- **Schema:** `hello.fw.build?` and `capabilities.ota?`, both optional (schema 1.x stays compatible; `@esphelm/schema` needs a minor release before the plugin is published).
+- **Release:** `release.yml` writes `manifest.json` from each `.ota.bin`'s marker (checked against the tag) and the notes describe updating from the editor.
+- **Build sizes with OTA:** P4 flash 3,549,258 B (+6.5 KB); Guition 1,834,687 B; CYD 1,526,171 B (83.2 %); RLCD 1,441,039 B; C3 1,647,088 B (89.8 %).
