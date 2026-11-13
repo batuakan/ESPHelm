@@ -1,0 +1,74 @@
+# Publishes @esphelm/schema and signalk-esphelm to npm when the `release` branch moves.
+# Only code already on main is published, and only versions npm doesn't have yet, schema first.
+# Auth is npm trusted publishing (OIDC): no token is stored here; each package names this
+# workflow as its trusted publisher on npmjs.com. See docs/plugin-api.md (Publishing to npm).
+name: npm
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release tags
+  id-token: write # npm trusted publishing
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+env:
+  SIGNALK_SERVER_VERSION: '2.36.0'
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: The release is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::release ($(git rev-parse --short HEAD)) is not on main; merge to main first"
+            exit 1
+          }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm i -g signalk-server@${{ env.SIGNALK_SERVER_VERSION }}
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Plugin end to end
+        run: npm run e2e -w signalk-esphelm
+      - name: Publish the versions npm doesn't have
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          published=0
+          for ws in packages/schema packages/plugin; do
+            name=$(node -p "require('./$ws/package.json').name")
+            version=$(node -p "require('./$ws/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is on npm already"
+              continue
+            fi
+            npm publish -w "$ws"
+            # Not v*: those tags build the firmware (release.yml).
+            tag="npm/$name@$version"
+            git tag "$tag"
+            git push origin "$tag"
+            echo "Published $name@$version" >> "$GITHUB_STEP_SUMMARY"
+            published=$((published + 1))
+          done
+          [ "$published" -gt 0 ] || echo "Nothing new to publish" >> "$GITHUB_STEP_SUMMARY"
