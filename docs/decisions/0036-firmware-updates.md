@@ -37,6 +37,7 @@ Status: **Accepted** (2026-11-13)
 
 ## Consequences
 - **Cost:** about 6 to 7 KB of flash per board. The CYD is at 1,526,171 of 1,835,008 bytes (83%), the C3 check at 90%.
+- **The P4 runs its code from PSRAM** (`CONFIG_SPIRAM_XIP_FROM_PSRAM`, in its hardware file): otherwise every flash erase turns the cache off, and the screen flickered for the whole update. Checked on the P4: no flicker, boots as before; about 10 KB more internal RAM.
 - **Every board has two app slots** already, so nothing changes in the partitions.
 - **`safe_mode` is off on the host build** (`esphelm_sdl.yaml`): ESPHome's `ota` loads it everywhere, there is nothing to roll back to on a desktop, and the e2e restarts the program more often than its boot-loop counter (10 boots within a minute each) allows; it then started in safe mode with nothing but the essentials running.
 - **The host build updates itself** in the SDL e2e: the program with bytes appended is a valid image with another build id; a damaged copy shows the failure screen (golden `87-update-failed`).
