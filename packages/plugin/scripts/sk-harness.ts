@@ -59,6 +59,8 @@ export interface SignalKHarness {
   approve(clientId: string, permissions: string): Promise<JsonResponse>;
   /** Open a stream as the given token; returns the socket and every received message. */
   stream(token: string): Promise<{ ws: WsClient; messages: unknown[] }>;
+  /** The throwaway config dir (plugin data under plugin-config-data/<plugin id>). */
+  config: string;
   stop(): Promise<void>;
 }
 
@@ -382,6 +384,7 @@ export async function startSignalK(
     version,
     bin,
     admin,
+    config,
     log: () => log,
     json,
     approve,

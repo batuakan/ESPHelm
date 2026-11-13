@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import type { Hello, Layout } from '@esphelm/schema';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { createApi, type Device, type PathInfo } from '../src/api';
+import { createApi, type Device, type FirmwareImage, type PathInfo } from '../src/api';
 import { layoutIdFor, pageTiles } from '../src/layoutOps';
 import { exportFile } from '../src/share';
 import type { LiveSource, ValueListener } from '../src/live';
@@ -14,7 +14,7 @@ const FIXTURES = join(__dirname, '../../schema/fixtures');
 const p4 = JSON.parse(readFileSync(join(FIXTURES, 'hello/valid/p4.json'), 'utf8')) as Hello;
 
 /** In-memory stand-in for the plugin's editor API, recording requests. */
-function fakeServer(devices: Device[]) {
+function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
   const layouts = new Map<string, Layout>();
   const requests: { method: string; path: string; body?: unknown }[] = [];
   const paths: PathInfo[] = [
@@ -40,6 +40,15 @@ function fakeServer(devices: Device[]) {
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
+    if (path === '/firmware') return json(firmware);
+    const upd = /^\/devices\/(.+)\/update$/.exec(path);
+    if (upd && method === 'POST') {
+      const d = devices.find((x) => x.id === decodeURIComponent(upd[1] ?? ''))!;
+      const buildId = (body as { buildId: string }).buildId;
+      d.update = { request: 'r1', buildId, version: '0.5.0', state: 'requested', at: '2026-10-25T10:00:00Z' };
+      d.updateAvailable = null;
+      return json({ device: d }, 202);
+    }
     const dev = /^\/devices\/(.+)$/.exec(path);
     if (dev && method === 'PUT') {
       const d = devices.find((x) => x.id === decodeURIComponent(dev[1] ?? ''))!;
@@ -977,5 +986,66 @@ describe('sharing layouts (ADR-0027)', { timeout: 20000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await waitFor(() => expect(lastLayoutPut(server)?.id).toBe(own));
     expect(server.layouts.get('display-cockpit')).toEqual(cockpitLayout);
+  });
+});
+
+describe('firmware updates', { timeout: 20000 }, () => {
+  const image: FirmwareImage = {
+    buildId: 'ab'.repeat(32),
+    version: '0.5.0',
+    board: p4.board,
+    kind: 'color',
+    format: 'esp32',
+    size: 3_500_000,
+    md5: '0'.repeat(32),
+    sha256: '1'.repeat(64),
+    source: 'upload',
+    added: '2026-10-25T10:00:00Z',
+    devices: [p4.deviceId],
+  };
+
+  it('offers a newer image on the display and asks before it restarts', async () => {
+    const d = { ...device('adopted'), updateAvailable: { buildId: image.buildId, version: '0.5.0' } };
+    const server = fakeServer([d], [image]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    fireEvent.click(await within(list).findByRole('button', { name: 'Update to 0.5.0' }));
+    expect(within(list).getByText('The display restarts.')).toBeTruthy();
+    fireEvent.click(within(list).getByRole('button', { name: 'Update' }));
+    await waitFor(() =>
+      expect(server.requests).toContainEqual({
+        method: 'POST',
+        path: `/devices/${p4.deviceId}/update`,
+        body: { buildId: image.buildId },
+      }),
+    );
+    await within(list).findByText('Update to 0.5.0 waits for the display');
+  });
+
+  it('lists images and installs one from the dialog', async () => {
+    const server = fakeServer([device('adopted')], [image]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Firmware' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Firmware' });
+    await within(dialog).findByText('0.5.0');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Install' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Update' }));
+    await within(dialog).findByText(/is updating to 0.5.0/);
+  });
+
+  it('shows why an update failed', async () => {
+    const d: Device = {
+      ...device('adopted'),
+      update: {
+        request: 'r1',
+        buildId: image.buildId,
+        version: '0.5.0',
+        state: 'failed',
+        error: 'the image is damaged (MD5 mismatch)',
+        at: '2026-10-25T10:00:00Z',
+      },
+    };
+    render(<App api={fakeServer([d]).api} live={fakeLive().factory} />);
+    expect((await screen.findByText(/Update to 0.5.0 failed/)).textContent).toMatch(/MD5 mismatch/);
   });
 });

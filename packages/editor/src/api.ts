@@ -13,6 +13,35 @@ export interface Device {
   firstSeen: string;
   lastSeen: string;
   servedEtag: string | null;
+  /** A firmware update asked of the display (ADR-0036). */
+  update?: DeviceUpdate;
+  /** The newest uploaded image this display can take that is newer than what it runs. */
+  updateAvailable?: { buildId: string; version: string } | null;
+}
+
+export interface DeviceUpdate {
+  request: string;
+  buildId: string;
+  version: string;
+  state: 'requested' | 'downloading' | 'installing' | 'done' | 'failed';
+  error?: string;
+  at: string;
+}
+
+/** A firmware image in the plugin (GET /api/firmware). */
+export interface FirmwareImage {
+  buildId: string;
+  version: string;
+  board: string;
+  kind: 'color' | 'mono';
+  format: 'esp32' | 'elf';
+  size: number;
+  md5: string;
+  sha256: string;
+  source: 'upload' | 'github';
+  added: string;
+  /** Displays that can take it. */
+  devices: string[];
 }
 
 export interface PathInfo {
@@ -72,11 +101,15 @@ export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init), base = API) {
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const raw = body instanceof Blob;
     const res = await fetchImpl(`${base}${path}`, {
       method,
       credentials: 'same-origin',
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers:
+        body === undefined
+          ? {}
+          : { 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
     });
     const text = await res.text();
     let data: unknown;
@@ -131,6 +164,20 @@ export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init)
     paths: () => call<PathInfo[]>('GET', '/paths'),
     widgets: () => call<WidgetCatalog>('GET', '/widgets'),
     charts: () => call<ChartInfo[]>('GET', '/charts'),
+    firmware: () => call<FirmwareImage[]>('GET', '/firmware'),
+    uploadFirmware: (file: Blob) =>
+      call<FirmwareImage & { removed: string[] }>('POST', '/firmware', file),
+    deleteFirmware: (buildId: string) =>
+      call<void>('DELETE', `/firmware/${encodeURIComponent(buildId)}`),
+    checkGithub: () =>
+      call<{
+        added: FirmwareImage[];
+        skipped: string[];
+        errors: { file: string; message: string }[];
+      }>('POST', '/firmware/github'),
+    requestUpdate: (id: string, buildId: string) =>
+      call<{ device: Device }>('POST', `/devices/${encodeURIComponent(id)}/update`, { buildId }),
+    clearUpdate: (id: string) => call<void>('DELETE', `/devices/${encodeURIComponent(id)}/update`),
   };
 }
 

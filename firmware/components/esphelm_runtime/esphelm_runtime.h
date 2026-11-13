@@ -38,6 +38,7 @@
 #include "display_prefs.h"
 #include "esphelm_mono.h"
 #include "esphelm_server_zones.h"
+#include "firmware_update.h"
 #include "history_popup.h"
 #include "layout_client.h"
 #include "layout_model.h"
@@ -51,7 +52,10 @@
 namespace esphome {
 namespace esphelm_runtime {
 
-static const char *const FIRMWARE_VERSION = "0.4.0";
+// The firmware's version: a literal, so the image marker (firmware_update.cpp) carries it too.
+// Release tags must match it (ADR-0031).
+#define ESPHELM_FIRMWARE_VERSION "0.4.0"
+static const char *const FIRMWARE_VERSION = ESPHELM_FIRMWARE_VERSION;
 
 class EsphelmRuntime : public Component {
  public:
@@ -89,6 +93,10 @@ class EsphelmRuntime : public Component {
   void set_sound_tune(int index, const std::string &tune) {
     this->sound_.set_tune(static_cast<esphelm::sound::Level>(index), tune);
   }
+#endif
+#ifdef USE_ESPHELM_OTA
+  /// Firmware updates from the plugin (ADR-0036): `ota: - platform: esphelm_runtime`.
+  void set_ota(EsphelmOta *ota) { this->ota_ = ota; }
 #endif
 #ifdef USE_ESPHELM_ROTATION
   /// ESPHome's LVGL, which turns the picture (and touch) at runtime (`lvgl: rotation:` set).
@@ -135,6 +143,10 @@ class EsphelmRuntime : public Component {
   void update_status_();
   void show_status_(const std::string &headline, const std::string &detail, const std::string &qr = "");
   void send_hello_();
+  void on_firmware_offer_(ArduinoJson::JsonVariantConst value);
+  bool tick_firmware_(uint32_t now);
+  void show_update_screen_(const std::string &title, const std::string &detail, float progress);
+  void hide_update_screen_();
   void send_fetch_();
   std::string base_url_() const;
   void compute_capacity_();
@@ -236,6 +248,24 @@ class EsphelmRuntime : public Component {
 
   std::string device_id_;
   std::string version_path_;
+  std::string firmware_path_;  // plugins.esphelm.<id>.firmware: an update the plugin offers (ADR-0036)
+#ifdef USE_ESPHELM_OTA
+  EsphelmOta *ota_{nullptr};
+  struct FirmwareOffer {
+    std::string request, version, md5;
+    size_t size{0};
+  };
+  FirmwareOffer fw_offer_;
+  bool fw_offer_wanted_{false};  // a new offer arrived: start it in loop()
+  std::string fw_handled_;       // requests already tried in this boot are never tried again
+  uint32_t fw_done_ms_{0};       // written: restart after the screen showed it
+  uint32_t fw_failed_ms_{0};     // failed: the error stays on screen for a while
+  lv_obj_t *update_screen_{nullptr};
+  lv_obj_t *update_title_{nullptr};
+  lv_obj_t *update_detail_{nullptr};
+  lv_obj_t *update_fill_{nullptr};
+  int update_shown_percent_{-1};
+#endif
 
   // What is shown
   bool has_layout_{false};

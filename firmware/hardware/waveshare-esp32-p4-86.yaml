@@ -45,8 +45,9 @@ esp32:
       # read asserted (esp_task_stack_is_sane_cache_disabled), a boot loop. Their stacks go to
       # PSRAM instead; they never touch flash. See docs/phase6-notes.md (sound).
       CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM: y
-      # CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
-      # CONFIG_SPIRAM_RODATA: y
+      # Code and constants run from PSRAM (copied at boot), so flash writes no longer turn the
+      # cache off: the screen kept flickering while a firmware update was written (ADR-0036).
+      CONFIG_SPIRAM_XIP_FROM_PSRAM: y
 
 logger:
   level: DEBUG

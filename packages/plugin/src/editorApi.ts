@@ -6,10 +6,19 @@ import {
   UNITS,
   validateLayout,
 } from '@esphelm/schema';
+import { createHash, randomBytes } from 'node:crypto';
 import type { IRouter, Request, Response } from 'express';
 import { checkCompatibility, type Compatibility } from './compat.js';
+import {
+  compareVersions,
+  MAX_IMAGE_BYTES,
+  parseImage,
+  parseManifest,
+  type FirmwareImage,
+  type FirmwareStore,
+} from './firmware.js';
 import type { Service } from './service.js';
-import type { DeviceRecord, DeviceState, Store } from './store.js';
+import { updateActive, type DeviceRecord, type DeviceState, type Store } from './store.js';
 
 /** Under /plugins/esphelm (registerWithRouter): admin-only when SignalK security is on. */
 export const EDITOR_API_PREFIX = '/api';
@@ -22,8 +31,50 @@ function requireStore(service: Service, res: Response): Store | undefined {
   return store;
 }
 
+/** The display can take this image: same board and tile set, firmware with updates. */
+export function canTake(image: FirmwareImage, device: DeviceRecord): boolean {
+  return (
+    device.hello.capabilities.ota === true &&
+    image.board === device.hello.board &&
+    image.kind === (device.hello.display.kind ?? 'color')
+  );
+}
+
+/** The newest image the display can take that is newer than what it runs, if any. */
+function updateAvailable(images: FirmwareStore | undefined, device: DeviceRecord) {
+  const best = images
+    ?.list()
+    .find(
+      (i) =>
+        canTake(i, device) &&
+        i.buildId !== device.hello.fw.build &&
+        compareVersions(i.version, device.hello.fw.version) > 0,
+    );
+  return best ? { buildId: best.buildId, version: best.version } : null;
+}
+
 function deviceView(service: Service, device: DeviceRecord) {
-  return { ...device, servedEtag: service.servedLayout(device)?.etag ?? null };
+  return {
+    ...device,
+    servedEtag: service.servedLayout(device)?.etag ?? null,
+    updateAvailable: updateAvailable(service.firmware, device),
+  };
+}
+
+/** Request body as bytes, up to `limit` (signalk-server only parses JSON bodies). */
+function readBody(req: Request, limit: number): Promise<Buffer | 'too-large'> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let over = false;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > limit) over = true;
+      else chunks.push(chunk);
+    });
+    req.on('end', () => resolve(over ? 'too-large' : Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
 }
 
 /**
@@ -33,6 +84,9 @@ function deviceView(service: Service, device: DeviceRecord) {
  *   GET    /plugins/esphelm/api/charts
  *   GET    /plugins/esphelm/api/layouts            GET|PUT|DELETE /plugins/esphelm/api/layouts/:id
  *   GET    /plugins/esphelm/api/devices            PUT|DELETE     /plugins/esphelm/api/devices/:id
+ *   GET|POST /plugins/esphelm/api/firmware          DELETE /plugins/esphelm/api/firmware/:buildId
+ *   POST   /plugins/esphelm/api/firmware/github     (only when pressed in the editor)
+ *   POST|DELETE /plugins/esphelm/api/devices/:id/update   { buildId }  (ADR-0036)
  */
 export function registerEditorApi(router: IRouter, service: Service): void {
   router.get(`${EDITOR_API_PREFIX}/widgets`, (_req: Request, res: Response) => {
@@ -205,6 +259,218 @@ export function registerEditorApi(router: IRouter, service: Service): void {
     service.notify({ ...device, state: 'pending' });
     res.status(204).end();
   });
+
+  // Firmware updates (ADR-0036)
+
+  router.get(`${EDITOR_API_PREFIX}/firmware`, (_req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const devices = store.listDevices();
+    res.json(
+      images.list().map((image) => ({
+        ...image,
+        devices: devices.filter((d) => canTake(image, d)).map((d) => d.id),
+      })),
+    );
+  });
+
+  router.post(`${EDITOR_API_PREFIX}/firmware`, async (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const body = await readBody(req, MAX_IMAGE_BYTES);
+    if (body === 'too-large') {
+      res.status(413).json({ error: 'TOO_LARGE', message: 'the image is larger than 64 MB' });
+      return;
+    }
+    const parsed = parseImage(body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error, message: parsed.message });
+      return;
+    }
+    const added = images.add(parsed.image, body, 'upload', service.clock, activeTargets(store));
+    refreshDevices(service, store);
+    res.status(added.created ? 201 : 200).json({ ...added.image, removed: added.removed });
+  });
+
+  router.delete(`${EDITOR_API_PREFIX}/firmware/:buildId`, (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const buildId = String(req.params.buildId);
+    if (!images.get(buildId)) {
+      res.status(404).json({ error: 'UNKNOWN_IMAGE' });
+      return;
+    }
+    const users = store
+      .listDevices()
+      .filter((d) => updateActive(d.update) && d.update?.buildId === buildId)
+      .map((d) => d.id);
+    if (users.length > 0) {
+      res.status(409).json({ error: 'IMAGE_IN_USE', devices: users });
+      return;
+    }
+    images.delete(buildId);
+    res.status(204).end();
+  });
+
+  // Fetch the latest release's images for the displays here. Only ever when pressed.
+  router.post(`${EDITOR_API_PREFIX}/firmware/github`, async (_req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const base = service.releasesUrl.endsWith('/')
+      ? service.releasesUrl
+      : `${service.releasesUrl}/`;
+    let manifest;
+    try {
+      const r = await service.fetch(`${base}manifest.json`, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      manifest = parseManifest(await r.json());
+    } catch (e) {
+      res.status(502).json({
+        error: 'GITHUB_UNREACHABLE',
+        message: `could not read the latest release (${(e as Error).message}); is there an internet connection? Uploading an image works offline`,
+      });
+      return;
+    }
+    if (!manifest) {
+      res
+        .status(502)
+        .json({ error: 'BAD_MANIFEST', message: 'the release has no valid manifest.json' });
+      return;
+    }
+    const devices = store.listDevices();
+    const have = new Set(images.list().map((i) => i.sha256));
+    const added: FirmwareImage[] = [];
+    const skipped: string[] = [];
+    const errors: { file: string; message: string }[] = [];
+    for (const entry of manifest) {
+      const wanted = devices.some(
+        (d) =>
+          d.hello.capabilities.ota === true &&
+          d.hello.board === entry.board &&
+          (d.hello.display.kind ?? 'color') === entry.kind,
+      );
+      if (!wanted || have.has(entry.sha256)) {
+        skipped.push(entry.file);
+        continue;
+      }
+      try {
+        const r = await service.fetch(`${base}${entry.file}`, {
+          signal: AbortSignal.timeout(120000),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const bytes = Buffer.from(await r.arrayBuffer());
+        if (bytes.length !== entry.size) throw new Error('wrong size');
+        if (createHash('sha256').update(bytes).digest('hex') !== entry.sha256) {
+          throw new Error('sha256 does not match the manifest');
+        }
+        const parsed = parseImage(bytes);
+        if (!parsed.ok) throw new Error(parsed.message);
+        const p = parsed.image;
+        if (p.board !== entry.board || p.kind !== entry.kind || p.version !== entry.version) {
+          throw new Error('the image does not match its manifest entry');
+        }
+        added.push(images.add(p, bytes, 'github', service.clock, activeTargets(store)).image);
+      } catch (e) {
+        errors.push({ file: entry.file, message: (e as Error).message });
+      }
+    }
+    refreshDevices(service, store);
+    res.json({ added, skipped, errors });
+  });
+
+  router.post(`${EDITOR_API_PREFIX}/devices/:id/update`, (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const device = store.getDevice(String(req.params.id));
+    if (!device) {
+      res.status(404).json({ error: 'UNKNOWN_DEVICE' });
+      return;
+    }
+    const buildId: unknown = (req.body as { buildId?: unknown } | undefined)?.buildId;
+    const image = typeof buildId === 'string' ? images.get(buildId) : undefined;
+    if (!image) {
+      res.status(404).json({ error: 'UNKNOWN_IMAGE' });
+      return;
+    }
+    if (device.state !== 'adopted') {
+      res.status(409).json({ error: 'NOT_ADOPTED', message: 'adopt the display first' });
+      return;
+    }
+    if (device.hello.capabilities.ota !== true) {
+      res.status(409).json({
+        error: 'NO_OTA',
+        message: 'this display has no firmware updates over the network; flash it over USB once',
+      });
+      return;
+    }
+    if (!canTake(image, device)) {
+      res.status(409).json({
+        error: 'WRONG_BOARD',
+        message: `the image is for ${image.board} (${image.kind}); this display is ${device.hello.board}`,
+      });
+      return;
+    }
+    if (device.hello.fw.build === image.buildId) {
+      res.status(409).json({ error: 'ALREADY_RUNNING', message: 'the display runs this build' });
+      return;
+    }
+    const updated = store.setUpdate(device.id, {
+      request: randomBytes(8).toString('hex'),
+      buildId: image.buildId,
+      version: image.version,
+      state: 'requested',
+      at: service.clock.toISOString(),
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'UNKNOWN_DEVICE' });
+      return;
+    }
+    service.notifyFirmware(updated);
+    res.status(202).json({ device: deviceView(service, updated) });
+  });
+
+  // Cancel a request not downloaded yet, or clear a finished one from the list.
+  router.delete(`${EDITOR_API_PREFIX}/devices/:id/update`, (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    if (!store) return;
+    const device = store.getDevice(String(req.params.id));
+    if (!device) {
+      res.status(404).json({ error: 'UNKNOWN_DEVICE' });
+      return;
+    }
+    const state = device.update?.state;
+    if (state === 'downloading' || state === 'installing') {
+      res.status(409).json({
+        error: 'UPDATE_RUNNING',
+        message: 'the display is installing it; wait for it to restart',
+      });
+      return;
+    }
+    const updated = store.setUpdate(device.id, undefined);
+    if (updated) service.notifyFirmware(updated);
+    res.status(204).end();
+  });
+}
+
+/** Images that updates in progress point at (never removed to make room). */
+function activeTargets(store: Store): Set<string> {
+  return new Set(
+    store
+      .listDevices()
+      .filter((d) => updateActive(d.update))
+      .map((d) => d.update!.buildId),
+  );
+}
+
+/** A removed image may have been an offer: publish every device's offer again. */
+function refreshDevices(service: Service, store: Store): void {
+  for (const d of store.listDevices())
+    if (d.update?.state === 'requested') service.notifyFirmware(d);
 }
 
 /** Byte size and ETag of a layout that is not saved yet, for compatibility checks. */

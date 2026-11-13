@@ -5,6 +5,7 @@
  * throwaway config dir and free ports (scripts/sk-harness.ts); never touches ~/.signalk.
  * Tokens come from the real login and access-request flows.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PLUGIN_DIR, startSignalK, waitFor } from './sk-harness.js';
@@ -297,6 +298,134 @@ async function main(): Promise<void> {
     );
     display.ws.close();
     alarmSource.ws.close();
+
+    // Firmware updates from the editor (ADR-0036): an image through the real server's body
+    // handling, the offer over a real WebSocket, the one-shot download with the device token.
+    const helloOta = {
+      ...fixture('hello/valid/p4-ota.json'),
+      deviceId: DEVICE_ID,
+    } as typeof hello & { board: string; fw: { version: string; build: string } };
+    r = await json('POST', '/signalk/v1/api/esphelm/devices/hello', rw, helloOta);
+    check('hello with fw.build and capabilities.ota', r.status === 200, String(r.status));
+    const image = Buffer.alloc(4 * 1024 * 1024, 0x5a);
+    image[0] = 0xe9;
+    image.writeUInt32LE(0xabcd5432, 0x20);
+    const newBuild = 'e2'.repeat(32);
+    Buffer.from(newBuild, 'hex').copy(image, 0x20 + 0x90);
+    image.write(
+      `ESPHELM-IMAGE/1 fw=0.9.0 board=${String(helloOta.board)} kind=color\0`,
+      1 << 20,
+      'latin1',
+    );
+    const upload = (token: string | undefined) =>
+      fetch(`${sk.base}/plugins/esphelm/api/firmware`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: image,
+      });
+    check('a device token cannot upload firmware', (await upload(rw)).status === 401);
+    const up = await upload(admin);
+    const upBody = (await up.json()) as { buildId?: string; version?: string };
+    check(
+      'admin uploads a 4 MB image; the plugin reads its build and version',
+      up.status === 201 && upBody.buildId === newBuild && upBody.version === '0.9.0',
+      `${up.status} ${JSON.stringify(upBody).slice(0, 160)}`,
+    );
+    r = await json('GET', '/plugins/esphelm/api/devices', admin);
+    const offered = (
+      r.body as unknown as { id: string; updateAvailable?: { version: string } }[]
+    ).find((d) => d.id === DEVICE_ID);
+    check(
+      'the editor sees an update for the display',
+      offered?.updateAvailable?.version === '0.9.0',
+    );
+
+    const fwStream = await sk.stream(rw);
+    const fwPath = `plugins.esphelm.${DEVICE_ID}.firmware`;
+    const offers = () =>
+      fwStream.messages.flatMap((m) =>
+        ((m as { updates?: { values?: { path: string; value: unknown }[] }[] }).updates ?? [])
+          .flatMap((u) => u.values ?? [])
+          .filter((v) => v.path === fwPath)
+          .map((v) => v.value as { request?: string; size?: number; md5?: string } | null),
+      );
+    fwStream.ws.send(
+      JSON.stringify({ context: 'vessels.self', subscribe: [{ path: fwPath, policy: 'instant' }] }),
+    );
+    r = await json('POST', `/plugins/esphelm/api/devices/${DEVICE_ID}/update`, admin, {
+      buildId: newBuild,
+    });
+    check(
+      'admin asks the display to update',
+      r.status === 202,
+      `${r.status} ${JSON.stringify(r.body)}`,
+    );
+    const md5 = createHash('md5').update(image).digest('hex');
+    check(
+      'the display is offered the image over its stream (an object value)',
+      await waitFor(() => offers().some((o) => o?.size === image.length && o.md5 === md5)),
+      JSON.stringify(offers()).slice(0, 200),
+    );
+    const request = offers().find((o) => o?.request)?.request ?? '';
+    const fwUrl = `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/firmware?request=${request}`;
+    r = await json('GET', fwUrl, ro);
+    check("another device's token cannot download it", r.status === 403, String(r.status));
+    const dl = await fetch(sk.base + fwUrl, { headers: { Authorization: `Bearer ${rw}` } });
+    const got = Buffer.from(await dl.arrayBuffer());
+    check(
+      'the display downloads the image with Content-Length',
+      dl.status === 200 &&
+        dl.headers.get('content-length') === String(image.length) &&
+        got.equals(image),
+      `${dl.status} ${dl.headers.get('content-length')} ${got.length}`,
+    );
+    check('the offer is withdrawn once downloading', await waitFor(() => offers().at(-1) === null));
+    r = await json('GET', fwUrl, rw);
+    check('a second download of the same request is refused (409)', r.status === 409);
+    r = await json('POST', `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/firmware/result`, rw, {
+      request,
+      error: 'the image is damaged (MD5 mismatch)',
+    });
+    check('the display reports a failure', r.status === 200 && r.body.state === 'failed');
+    r = await json('GET', '/plugins/esphelm/api/devices', admin);
+    const failedDev = (
+      r.body as unknown as { id: string; update?: { state: string; error?: string } }[]
+    ).find((d) => d.id === DEVICE_ID);
+    check(
+      'the editor shows why',
+      failedDev?.update?.state === 'failed' && /MD5/.test(failedDev.update.error ?? ''),
+      JSON.stringify(failedDev?.update),
+    );
+    // Again, and this time the display comes back on the new build.
+    await json('POST', `/plugins/esphelm/api/devices/${DEVICE_ID}/update`, admin, {
+      buildId: newBuild,
+    });
+    await waitFor(() => offers().filter((o) => o?.request && o.request !== request).length > 0);
+    const request2 =
+      offers()
+        .filter((o) => o?.request && o.request !== request)
+        .at(-1)?.request ?? '';
+    await (
+      await fetch(
+        `${sk.base}/signalk/v1/api/esphelm/devices/${DEVICE_ID}/firmware?request=${request2}`,
+        {
+          headers: { Authorization: `Bearer ${rw}` },
+        },
+      )
+    ).arrayBuffer();
+    await json('POST', '/signalk/v1/api/esphelm/devices/hello', rw, {
+      ...helloOta,
+      fw: { version: '0.9.0', build: newBuild },
+    });
+    r = await json('GET', '/plugins/esphelm/api/devices', admin);
+    const doneDev = (r.body as unknown as { id: string; update?: { state: string } }[]).find(
+      (d) => d.id === DEVICE_ID,
+    );
+    check('a hello with the new build completes the update', doneDev?.update?.state === 'done');
+    fwStream.ws.close();
   } finally {
     await sk.stop();
   }

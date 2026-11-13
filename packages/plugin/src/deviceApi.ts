@@ -1,9 +1,10 @@
+import { createReadStream } from 'node:fs';
 import { validateHello } from '@esphelm/schema';
 import type { IRouter, Request, Response } from 'express';
 import { authorizeDevice } from './auth.js';
 import { ifNoneMatchHits } from './etag.js';
 import { versionPath, type Service } from './service.js';
-import type { Store } from './store.js';
+import { updateActive, type DeviceUpdate, type Store } from './store.js';
 
 /** Prefix under /signalk/v1/api (mounted via the plugin's signalKApiRoutes). */
 export const DEVICE_API_PREFIX = '/esphelm';
@@ -20,6 +21,8 @@ function requireStore(service: Service, res: Response): Store | undefined {
  *   GET  /signalk/v1/api/esphelm/devices/:id/layout   (ETag / If-None-Match -> 304)
  *   GET  /signalk/v1/api/esphelm/tiles/:chart/:z/:x/:y  (raw RGB565 chart tile, ADR-0012)
  *   POST /signalk/v1/api/esphelm/notifications/ack     { path } (silence an alarm, ADR-0014)
+ *   GET  /signalk/v1/api/esphelm/devices/:id/firmware?request=  (the offered image, once; ADR-0036)
+ *   POST /signalk/v1/api/esphelm/devices/:id/firmware/result    { request, error }
  */
 export function registerDeviceApi(router: IRouter, service: Service): IRouter {
   router.post(`${DEVICE_API_PREFIX}/devices/hello`, (req: Request, res: Response) => {
@@ -40,8 +43,9 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       res.status(auth.status).json({ error: auth.error, message: auth.message });
       return;
     }
-    const { device, created } = store.upsertHello(result.value, service.clock);
+    const { device, created, updateSettled } = store.upsertHello(result.value, service.clock);
     if (created) service.notify(device);
+    if (updateSettled) service.notifyFirmware(device);
     const served = service.servedLayout(device);
     res.json({
       state: device.state,
@@ -128,5 +132,106 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
     res.json({ path, state: result.state });
   });
 
+  router.get(`${DEVICE_API_PREFIX}/devices/:id/firmware`, (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    const images = service.firmware;
+    if (!store || !images) return;
+    const id = String(req.params.id);
+    const auth = authorizeDevice(req, service.security, id);
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error, message: auth.message });
+      return;
+    }
+    const device = store.getDevice(id);
+    const update = device?.update;
+    if (!device || !update || update.request !== String(req.query.request ?? '')) {
+      res
+        .status(404)
+        .json({ error: 'NO_UPDATE', message: 'no such firmware update for this device' });
+      return;
+    }
+    // Served once per request: a display that keeps restarting can't loop on one update.
+    if (update.state !== 'requested') {
+      res
+        .status(409)
+        .json({ error: 'ALREADY_SERVED', message: 'this update was downloaded already' });
+      return;
+    }
+    const image = images.get(update.buildId);
+    if (!image) {
+      store.setUpdate(id, failed(update, 'the image was deleted', service.clock));
+      res.status(410).json({ error: 'IMAGE_GONE', message: 'the image was deleted' });
+      return;
+    }
+    const settle = (next: DeviceUpdate) => {
+      // Only while this request is still the device's update in that state.
+      const current = store.getDevice(id)?.update;
+      if (current?.request === update.request && current.state === 'downloading') {
+        store.setUpdate(id, next);
+      }
+    };
+    const downloading: DeviceUpdate = {
+      ...update,
+      state: 'downloading',
+      at: service.clock.toISOString(),
+    };
+    const updated = store.setUpdate(id, downloading);
+    if (updated) service.notifyFirmware(updated); // no longer offered
+    res.status(200);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', String(image.size));
+    // no-transform: signalk-server's compression would gzip it and drop Content-Length, which
+    // the display checks against the offer.
+    res.setHeader('Cache-Control', 'no-store, no-transform');
+    const stream = createReadStream(images.path(image.buildId));
+    stream.on('error', () => {
+      settle(failed(downloading, 'the image could not be read', service.clock));
+      res.destroy();
+    });
+    res.on('close', () => {
+      if (res.writableFinished) {
+        settle({ ...downloading, state: 'installing', at: service.clock.toISOString() });
+      } else {
+        settle(failed(downloading, 'the download broke off', service.clock));
+      }
+    });
+    stream.pipe(res);
+  });
+
+  router.post(`${DEVICE_API_PREFIX}/devices/:id/firmware/result`, (req: Request, res: Response) => {
+    const store = requireStore(service, res);
+    if (!store) return;
+    const id = String(req.params.id);
+    const auth = authorizeDevice(req, service.security, id);
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error, message: auth.message });
+      return;
+    }
+    const body = (req.body ?? {}) as { request?: unknown; error?: unknown };
+    const update = store.getDevice(id)?.update;
+    if (!update || typeof body.request !== 'string' || update.request !== body.request) {
+      res
+        .status(404)
+        .json({ error: 'NO_UPDATE', message: 'no such firmware update for this device' });
+      return;
+    }
+    if (!updateActive(update)) {
+      res.json({ state: update.state });
+      return;
+    }
+    // Shown in the editor: printable ASCII, bounded.
+    const why =
+      typeof body.error === 'string' && body.error.length > 0
+        ? body.error.replace(/[^\x20-\x7e]/g, ' ').slice(0, 200)
+        : 'the display reported a failure';
+    const device = store.setUpdate(id, failed(update, why, service.clock));
+    if (device) service.notifyFirmware(device);
+    res.json({ state: 'failed' });
+  });
+
   return router;
+}
+
+function failed(update: DeviceUpdate, error: string, now: Date): DeviceUpdate {
+  return { ...update, state: 'failed', error, at: now.toISOString() };
 }

@@ -58,6 +58,15 @@ esphelm_runtime:
   board: sdl-480
   touch: true
 
+# Firmware updates from the editor (ADR-0036): ESPHome's host backend replaces this program and
+# starts it again. ESPHome's ota loads safe_mode, which is off here: there is nothing to roll
+# back to, and the e2e restarts the program more often than its boot-loop counter allows.
+ota:
+  - platform: esphelm_runtime
+
+safe_mode:
+  disabled: true
+
 # Test hooks for firmware/test/e2e_sdl.ts (files in the working directory):
 #   esphelm_shot_request  <path>     save a screenshot there
 #   esphelm_page_request  <index>    show that page (same as the footer buttons)

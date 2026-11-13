@@ -418,6 +418,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 |---|---|
 | `deviceId` | hex + dashes; the same MAC-derived UUID used as the SignalK access-request `clientId` (ADR-0003) |
 | `fw.version` | firmware version string |
+| `fw.build?` | id of the running build, 64 lowercase hex characters (ADR-0036): the app descriptor's `app_elf_sha256` on ESP32, the sha256 of the program on the host build. An update is done when the display reports the target build |
 | `schema.major` | highest layout major the firmware parses |
 | `board` | board/model name |
 | `display` | `width`, `height` (px), `rotation` (0/90/180/270), `kind?`: `color` or `mono` (black and white only, e.g. a reflective LCD; from the firmware's tile set, ADR-0035). Missing means `color`; colour firmware leaves it out, so plugins from before the field accept its hello |
@@ -426,7 +427,7 @@ Sent by the device on boot and reconnect. Schema: `hello.schema.json`, validator
 | `fontLineHeights?` | line heights (px) of the fonts tile text can use, smallest first; the editor sizes its preview text from them (ADR-0017). Integers ≥ 1 |
 | `digitFontLineHeights?` | the same for the digits-only fonts (glyphs `0123456789.-`), which only a value tile's number uses, while its text is numeric |
 | `capacity` | `psram` (bool, required), `maxLayoutBytes?`, `freeHeapBytes?`; measured by the device |
-| `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight), `rotation?` (the firmware can turn the picture for `settings.rotation`; `display.width`/`height` are then as turned, and `display.rotation` says by how much), `sound?` (the display has a speaker: touch clicks and alarm tones, `settings.sound`) |
+| `capabilities` | `touch`, `put` (the token allows PUT), `backlight?` (the firmware can dim the backlight), `rotation?` (the firmware can turn the picture for `settings.rotation`; `display.width`/`height` are then as turned, and `display.rotation` says by how much), `sound?` (the display has a speaker: touch clicks and alarm tones, `settings.sound`), `ota?` (the firmware takes firmware updates from the plugin, ADR-0036; the editor offers *Update* only then) |
 | `layoutEtag?` | ETag of the cached layout |
 | `recovery?` | `skippedLayoutEtag`: a layout that crashed the display; refused until a changed one is sent (ADR-0013) |
 

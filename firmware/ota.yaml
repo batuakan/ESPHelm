@@ -1,0 +1,8 @@
+# Firmware updates from the editor (ADR-0036). An admin presses Update in the editor; the display
+# downloads the image from the ESPHelm plugin with its SignalK device token and flashes it.
+# safe_mode confirms a new image after a minute running (ESP-IDF rollback, on by default): one
+# that crashes before that gives way to the image it replaced.
+ota:
+  - platform: esphelm_runtime
+
+safe_mode:

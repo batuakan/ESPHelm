@@ -83,6 +83,19 @@ signalk-server before 2.26 has no acknowledge API (2.26.0 adds `POST /signalk/v2
 
 Acknowledgements are kept in memory; a plugin or server restart forgets them. Clients that ignore `method` (and sound for every alarm state) aren't affected.
 
+### `GET /signalk/v1/api/esphelm/devices/:id/firmware?request=<request>`
+The firmware image offered to the display (ADR-0036), as `application/octet-stream` with `Content-Length` and `Cache-Control: no-store, no-transform` (so signalk-server's compression leaves the length alone). Needs the device's own read/write token. **Served once per request:** the offer is withdrawn when the download starts, the update is `downloading`, then `installing` once the whole image went out (`failed` if the connection broke off).
+
+| Status | Meaning |
+|---|---|
+| 200 | the image |
+| 404 | `NO_UPDATE`: no update with that request for this device |
+| 409 | `ALREADY_SERVED`: this request was downloaded already |
+| 410 | `IMAGE_GONE`: the image was deleted (the update fails) |
+
+### `POST /signalk/v1/api/esphelm/devices/:id/firmware/result`
+Body `{ request, error }`: the display could not install it (download broke off, wrong size, MD5 mismatch, flash). The update becomes `failed` with `error` (printable ASCII, up to 200 characters). 200 `{ state }`; 404 `NO_UPDATE` for another request. Success needs no call: the next `hello` reporting the target `fw.build` completes it, and a `hello` with another build after the download fails it (the new firmware didn't start or was rolled back).
+
 ### Change notification
 On every change that alters what a device would download (layout saved with different bytes, assignment changed, adopted or un-adopted, device deleted), and once for every device on plugin start, the plugin emits:
 
@@ -93,6 +106,13 @@ value:   "<ETag>"   or null when nothing is served
 ```
 
 The device subscribes to that path over its existing SignalK WebSocket. The server replays the last value on subscribe (verified). When the value differs from the device's cached ETag, the device fetches the layout with `If-None-Match`.
+
+A firmware update asked of a display (ADR-0036) is offered the same way, as an object, and replayed on plugin start:
+
+```
+path:    plugins.esphelm.<deviceId>.firmware
+value:   { "request": "<16 hex>", "version": "0.5.0", "size": 3549664, "md5": "<32 hex>" }   or null
+```
 
 ## Editor API (admin)
 
@@ -105,9 +125,15 @@ The device subscribes to that path over its existing SignalK WebSocket. The serv
 | `GET /plugins/esphelm/api/layouts/:id` | | the layout (`ETag` header) |
 | `PUT /plugins/esphelm/api/layouts/:id` | Layout | 200 `{ id, etag, bytes, warnings }`. 400 `INVALID_LAYOUT` (validator codes) or `ID_MISMATCH`. 409 `INCOMPATIBLE` if a device using it can't render the new version (nothing is saved). |
 | `DELETE /plugins/esphelm/api/layouts/:id` | | 204. 404 `UNKNOWN_LAYOUT`. 409 `LAYOUT_IN_USE` with `devices`. |
-| `GET /plugins/esphelm/api/devices` | | device records plus `servedEtag` |
+| `GET /plugins/esphelm/api/devices` | | device records plus `servedEtag`, `update?` (`{ request, buildId, version, state: requested \| downloading \| installing \| done \| failed, error?, at }`) and `updateAvailable` (the newest image the display can take with a higher version, or null) |
 | `PUT /plugins/esphelm/api/devices/:id` | `{ state?: "pending" \| "adopted", name?: Label \| null, layoutId?: string \| null }` | 200 `{ device, warnings }`. 400 `INVALID_DEVICE_UPDATE`. 404 `UNKNOWN_DEVICE` / `UNKNOWN_LAYOUT`. 409 `INCOMPATIBLE`. |
 | `DELETE /plugins/esphelm/api/devices/:id` | | 204 (a `null` version is published). 404. |
+| `GET /plugins/esphelm/api/firmware` | | `[{ buildId, version, board, kind, format: esp32 \| elf, size, md5, sha256, source: upload \| github, added, devices }]`, newest version first; `devices` = the displays that can take it (same board and tile set, `capabilities.ota`) |
+| `POST /plugins/esphelm/api/firmware` | the image (`application/octet-stream`, up to 64 MB) | 201 (200 if it was there already) with the image and `removed` (older images of that board dropped; two are kept per board and tile set). 400 `NO_MARKER`, `FACTORY_IMAGE`, `UNKNOWN_FORMAT`, `AMBIGUOUS_MARKER`, `TOO_SMALL`. 413 `TOO_LARGE`. |
+| `DELETE /plugins/esphelm/api/firmware/:buildId` | | 204. 404 `UNKNOWN_IMAGE`. 409 `IMAGE_IN_USE` while an update is installing it. |
+| `POST /plugins/esphelm/api/firmware/github` | | `{ added, skipped, errors }`: reads `manifest.json` of the latest GitHub release and fetches the images for the boards of the displays here, checking size, sha256 and marker. Only when pressed. 502 `GITHUB_UNREACHABLE` (no internet) or `BAD_MANIFEST`. `ESPHELM_FIRMWARE_RELEASES` in the server's environment points it elsewhere. |
+| `POST /plugins/esphelm/api/devices/:id/update` | `{ buildId }` | 202 `{ device }`: the offer is published. 404 `UNKNOWN_DEVICE` / `UNKNOWN_IMAGE`. 409 `NOT_ADOPTED`, `NO_OTA`, `WRONG_BOARD`, `ALREADY_RUNNING`. |
+| `DELETE /plugins/esphelm/api/devices/:id/update` | | 204: cancels a request not downloaded yet, or clears a finished one. 409 `UPDATE_RUNNING` while downloading or installing. |
 
 **Compatibility.** These are checked against the device's last `hello`:
 

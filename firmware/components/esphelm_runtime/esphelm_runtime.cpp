@@ -81,6 +81,7 @@ void EsphelmRuntime::setup() {
   this->renderer_.set_menu([this]() { this->menu_wanted_ = true; });
   this->device_id_ = this->signalk_->get_device_id();
   this->version_path_ = "plugins.esphelm." + this->device_id_ + ".version";
+  this->firmware_path_ = "plugins.esphelm." + this->device_id_ + ".firmware";
   this->client_.start();
 #ifdef USE_ESPHELM_CHARTS
   this->tiles_.start();
@@ -155,6 +156,15 @@ void EsphelmRuntime::setup() {
     }
   });
 
+#ifdef USE_ESPHELM_OTA
+  // A firmware update an admin started in the editor (ADR-0036).
+  if (this->ota_ != nullptr) {
+    this->signalk_->add_listener(this->firmware_path_, [this](const std::string &, ArduinoJson::JsonVariantConst v) {
+      this->on_firmware_offer_(v);
+    });
+  }
+#endif
+
   // A hint that a path's metadata changed; it can be missed, so it is read again now and then too.
   this->signalk_->add_meta_listener([this](const std::string &path) { this->on_meta_changed_(path); });
 
@@ -197,6 +207,7 @@ void EsphelmRuntime::dump_config() {
   ESP_LOGCONFIG(TAG, "  Max layout: %u bytes (PSRAM: %s)", (unsigned) this->limits_.max_bytes,
                 YESNO(this->psram_));
   ESP_LOGCONFIG(TAG, "  Stale after: %u ms", (unsigned) this->stale_after_ms_);
+  ESP_LOGCONFIG(TAG, "  %s", image_marker());  // also keeps the marker in the image for the plugin
 }
 
 void EsphelmRuntime::loop() {
@@ -217,6 +228,9 @@ void EsphelmRuntime::loop() {
   HttpResult result;
   while (this->client_.poll(result))
     this->handle_result_(result);
+  // A firmware update in progress owns the screen and the network until it restarts or fails.
+  if (this->tick_firmware_(now))
+    return;
 #ifdef USE_ESPHELM_CHARTS
   // Map tiles go to the store every chart tile shares.
   while (this->tiles_.poll(result))
@@ -326,6 +340,9 @@ void EsphelmRuntime::send_hello_() {
   ArduinoJson::JsonDocument doc;
   doc["deviceId"] = this->device_id_;
   doc["fw"]["version"] = FIRMWARE_VERSION;
+  const std::string build = firmware_build_id();
+  if (!build.empty())
+    doc["fw"]["build"] = build;  // ADR-0036: an update is done when this is the target's
   doc["schema"]["major"] = 1;
   doc["board"] = this->board_;
   lv_display_t *disp = lv_display_get_default();
@@ -367,6 +384,10 @@ void EsphelmRuntime::send_hello_() {
   // Only when there is one, so a display without a speaker still says hello to an older plugin.
   if (this->has_sound_())
     doc["capabilities"]["sound"] = true;
+#ifdef USE_ESPHELM_OTA
+  if (this->ota_ != nullptr)
+    doc["capabilities"]["ota"] = true;  // only then, like sound: older plugins still accept the hello
+#endif
   if (!this->etag_.empty())
     doc["layoutEtag"] = this->etag_;
   if (!this->bad_etag_.empty())
@@ -398,6 +419,11 @@ void EsphelmRuntime::send_fetch_() {
 void EsphelmRuntime::handle_result_(HttpResult &result) {
   if (result.kind == RequestKind::META) {  // best effort: says nothing about the layout's connection
     this->handle_meta_(result);
+    return;
+  }
+  if (result.kind == RequestKind::FW_RESULT) {  // best effort: the plugin also learns it from the next hello
+    if (result.status != 200)
+      ESP_LOGW(TAG, "Firmware result not delivered (HTTP %d)", result.status);
     return;
   }
   if (result.status == 0) {
@@ -1392,7 +1418,14 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
 
   rows.push_back({"Display", "Id", this->device_id_});
   rows.push_back({nullptr, "Board", this->board_});
-  rows.push_back({nullptr, "Firmware", FIRMWARE_VERSION});
+  {
+    // The version, and the start of the build id (ADR-0036) unless the screenshot tests fix the values.
+    std::string fw = FIRMWARE_VERSION;
+    const std::string build = firmware_build_id();
+    if (!build.empty() && !this->info_fixed_)
+      fw += " (" + build.substr(0, 8) + ")";
+    rows.push_back({nullptr, "Firmware", fw});
+  }
   const int degrees = this->rotation_();
   if (degrees == 0)
     std::snprintf(buf, sizeof(buf), "%d x %d", (int) lv_display_get_horizontal_resolution(disp),
@@ -1946,6 +1979,183 @@ void EsphelmRuntime::update_status_() {
   } else {
     this->show_status_("Waiting for layout", "");
   }
+}
+
+// ---- Firmware updates (ADR-0036) ----
+
+void EsphelmRuntime::on_firmware_offer_(ArduinoJson::JsonVariantConst v) {
+#ifdef USE_ESPHELM_OTA
+  if (this->ota_ == nullptr || this->ota_->phase() != EsphelmOta::Phase::IDLE)
+    return;  // one at a time: the running update keeps its offer
+  if (v.isNull() || !v.is<ArduinoJson::JsonObjectConst>()) {
+    this->fw_offer_wanted_ = false;  // withdrawn (cancelled in the editor), or not an offer
+    return;
+  }
+  // Untrusted: every field is checked before anything is downloaded.
+  const char *request = v["request"] | "";
+  const char *version = v["version"] | "";
+  const char *md5 = v["md5"] | "";
+  ArduinoJson::JsonVariantConst size = v["size"];
+  auto token_ok = [](const char *s, size_t max) {
+    const size_t n = std::strlen(s);
+    if (n == 0 || n > max)
+      return false;
+    for (size_t i = 0; i < n; i++) {
+      const char c = s[i];
+      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '.' ||
+            c == '_'))
+        return false;
+    }
+    return true;
+  };
+  bool md5_ok = std::strlen(md5) == 32;
+  for (size_t i = 0; md5_ok && i < 32; i++)
+    md5_ok = (md5[i] >= '0' && md5[i] <= '9') || (md5[i] >= 'a' && md5[i] <= 'f');
+  if (!token_ok(request, 64) || !token_ok(version, 31) || !md5_ok || !size.is<uint32_t>() ||
+      size.as<uint32_t>() == 0 || size.as<uint32_t>() > 64u * 1024 * 1024) {
+    ESP_LOGW(TAG, "Ignoring a firmware offer that is not valid");
+    return;
+  }
+  if (this->fw_handled_ == request)
+    return;  // tried in this boot already
+  this->fw_offer_ = {request, version, md5, size.as<uint32_t>()};
+  this->fw_offer_wanted_ = true;
+#endif
+}
+
+bool EsphelmRuntime::tick_firmware_(uint32_t now) {
+#ifdef USE_ESPHELM_OTA
+  if (this->ota_ == nullptr)
+    return false;
+  using Phase = EsphelmOta::Phase;
+  if (this->fw_offer_wanted_ && this->ota_->phase() == Phase::IDLE &&
+      this->signalk_->access_state() == signalk::SignalKAccessState::AUTHORIZED) {
+    this->fw_offer_wanted_ = false;
+    this->fw_handled_ = this->fw_offer_.request;
+    ESP_LOGI(TAG, "Updating the firmware to %s (%u bytes)", this->fw_offer_.version.c_str(),
+             (unsigned) this->fw_offer_.size);
+    if (this->panel_.is_open())
+      this->panel_.close();
+    this->popup_.close();
+    const std::string url =
+        this->base_url_() + "/devices/" + this->device_id_ + "/firmware?request=" + this->fw_offer_.request;
+    if (this->ota_->start(url, this->signalk_->get_token(), this->fw_offer_.size, this->fw_offer_.md5))
+      this->show_update_screen_("Updating firmware", "to " + this->fw_offer_.version, 0.0f);
+  }
+  switch (this->ota_->phase()) {
+    case Phase::RUNNING:
+      this->show_update_screen_("Updating firmware", "to " + this->fw_offer_.version, this->ota_->progress());
+      return true;
+    case Phase::DONE:
+      if (this->fw_done_ms_ == 0) {
+        this->fw_done_ms_ = now;
+        this->show_update_screen_("Restarting", "Firmware " + this->fw_offer_.version + " is installed", 100.0f);
+      } else if (now - this->fw_done_ms_ > 1500) {
+        // Requested restarts don't count as crashes for the boot guard (ADR-0013).
+        this->clean_exit();
+        App.safe_reboot();
+      }
+      return true;
+    case Phase::FAILED:
+      if (this->fw_failed_ms_ == 0) {
+        this->fw_failed_ms_ = now;
+        const std::string why = this->ota_->error();
+        this->show_update_screen_("Update failed", why + "\nThe display keeps its firmware", -1.0f);
+        // Tell the plugin why; it also sees it from the next hello (the build didn't change).
+        ArduinoJson::JsonDocument doc;
+        doc["request"] = this->fw_offer_.request;
+        doc["error"] = why;
+        HttpRequest req;
+        req.kind = RequestKind::FW_RESULT;
+        req.url = this->base_url_() + "/devices/" + this->device_id_ + "/firmware/result";
+        req.token = this->signalk_->get_token();
+        serializeJson(doc, req.body);
+        req.max_body = 1024;
+        this->client_.submit(std::move(req));
+      } else if (now - this->fw_failed_ms_ > 10000) {
+        this->fw_failed_ms_ = 0;
+        this->hide_update_screen_();
+        this->ota_->reset();
+        this->hello_due_ = true;  // the plugin settles the request
+        this->next_hello_ms_ = 0;
+        return false;
+      }
+      return true;
+    case Phase::IDLE:
+      break;
+  }
+#endif
+  return false;
+}
+
+void EsphelmRuntime::show_update_screen_(const std::string &title, const std::string &detail, float progress) {
+#ifdef USE_ESPHELM_OTA
+  const Colors c = colors_for(this->theme_);
+  if (this->update_screen_ == nullptr) {
+    // Over everything (page, banner, panel), on LVGL's top layer; plain objects only.
+    lv_obj_t *s = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(s);
+    lv_obj_set_size(s, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(s, c.background, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);  // swallows touches meant for the page below
+    // A centred column, so a wrapped reason never runs into the title, at any screen size.
+    lv_obj_set_flex_flow(s, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(s, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(s, lv_font_get_line_height(this->fonts_.label) / 2, LV_PART_MAIN);
+    auto text = [&](const lv_font_t *font) {
+      lv_obj_t *l = lv_label_create(s);
+      lv_obj_set_width(l, lv_pct(90));
+      lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+      lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+      lv_obj_set_style_text_font(l, font, LV_PART_MAIN);
+      lv_obj_set_style_text_color(l, c.text, LV_PART_MAIN);
+      return l;
+    };
+    this->update_title_ = text(this->fonts_.value);
+    this->update_detail_ = text(this->fonts_.label);
+    // The progress bar: a frame and a fill, plain objects (no LVGL bar widget needed in the core).
+    lv_obj_t *frame = lv_obj_create(s);
+    lv_obj_remove_style_all(frame);
+    lv_obj_set_size(frame, lv_pct(70), 16);
+    lv_obj_set_style_border_width(frame, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(frame, c.text, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(frame, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(frame, 3, LV_PART_MAIN);
+    this->update_fill_ = lv_obj_create(frame);
+    lv_obj_remove_style_all(this->update_fill_);
+    lv_obj_set_style_bg_color(this->update_fill_, c.text, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(this->update_fill_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_height(this->update_fill_, lv_pct(100));
+    this->update_shown_percent_ = -1;
+    this->update_screen_ = s;
+  }
+  if (title != lv_label_get_text(this->update_title_))
+    lv_label_set_text(this->update_title_, title.c_str());
+  if (detail != lv_label_get_text(this->update_detail_))
+    lv_label_set_text(this->update_detail_, detail.c_str());
+  // progress < 0: no bar (the failure message)
+  lv_obj_t *frame = lv_obj_get_parent(this->update_fill_);
+  if (progress < 0) {
+    lv_obj_add_flag(frame, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  lv_obj_remove_flag(frame, LV_OBJ_FLAG_HIDDEN);
+  const int percent = std::clamp(static_cast<int>(progress), 0, 100);
+  if (percent != this->update_shown_percent_) {
+    this->update_shown_percent_ = percent;
+    lv_obj_set_width(this->update_fill_, lv_pct(percent));
+  }
+#endif
+}
+
+void EsphelmRuntime::hide_update_screen_() {
+#ifdef USE_ESPHELM_OTA
+  if (this->update_screen_ != nullptr) {
+    lv_obj_delete(this->update_screen_);
+    this->update_screen_ = nullptr;
+  }
+#endif
 }
 
 }  // namespace esphelm_runtime

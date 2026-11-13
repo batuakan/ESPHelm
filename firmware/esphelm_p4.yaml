@@ -18,6 +18,7 @@ substitutions:
 packages:
   hardware: !include hardware/waveshare-esp32-p4-86.yaml
   wifi: !include wifi.yaml
+  ota: !include ota.yaml
   fonts: !include fonts.yaml
 
 esphome:

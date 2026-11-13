@@ -16,6 +16,7 @@ substitutions:
 packages:
   hardware: !include hardware/esp32-2432s028r.yaml
   wifi: !include wifi.yaml
+  ota: !include ota.yaml
   fonts: !include fonts.yaml
 
 esphome:

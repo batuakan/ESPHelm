@@ -15,6 +15,7 @@ substitutions:
 
 packages:
   wifi: !include wifi.yaml
+  ota: !include ota.yaml
   fonts: !include fonts.yaml
 
 esphome:

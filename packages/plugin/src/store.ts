@@ -11,6 +11,36 @@ import { etagOf, serializeLayout } from './etag.js';
 
 export type DeviceState = 'pending' | 'adopted';
 
+/**
+ * A firmware update asked of a display (ADR-0036):
+ *   requested   offered on plugins.esphelm.<id>.firmware, not downloaded yet
+ *   downloading the display is downloading it (served once per request)
+ *   installing  downloaded; waiting for the display to report the new build in hello
+ *   done        hello reported the target build
+ *   failed      the display reported an error, the download broke off, or it came back on the
+ *               old build (the new one didn't start, or was rolled back)
+ */
+export type UpdateState = 'requested' | 'downloading' | 'installing' | 'done' | 'failed';
+
+export interface DeviceUpdate {
+  request: string;
+  buildId: string;
+  version: string;
+  state: UpdateState;
+  error?: string;
+  /** When the state last changed. */
+  at: string;
+}
+
+export function updateActive(update: DeviceUpdate | undefined): boolean {
+  return (
+    update !== undefined &&
+    (update.state === 'requested' ||
+      update.state === 'downloading' ||
+      update.state === 'installing')
+  );
+}
+
 export interface DeviceRecord {
   id: string;
   state: DeviceState;
@@ -19,6 +49,7 @@ export interface DeviceRecord {
   hello: Hello;
   firstSeen: string;
   lastSeen: string;
+  update?: DeviceUpdate;
 }
 
 export interface StoredLayout {
@@ -140,11 +171,23 @@ export class Store {
     return this.devices.get(id);
   }
 
-  /** Register or refresh a device from its hello. First contact creates a pending device. */
-  upsertHello(hello: Hello, now: Date): { device: DeviceRecord; created: boolean } {
+  /**
+   * Register or refresh a device from its hello. First contact creates a pending device.
+   * A firmware update in progress is settled by the build the display reports.
+   */
+  upsertHello(
+    hello: Hello,
+    now: Date,
+  ): { device: DeviceRecord; created: boolean; updateSettled: boolean } {
     const existing = this.devices.get(hello.deviceId);
+    const update = existing?.update && settleUpdate(existing.update, hello, now);
     const device: DeviceRecord = existing
-      ? { ...existing, hello, lastSeen: now.toISOString() }
+      ? {
+          ...existing,
+          hello,
+          lastSeen: now.toISOString(),
+          ...(update ? { update } : {}),
+        }
       : {
           id: hello.deviceId,
           state: 'pending',
@@ -154,7 +197,18 @@ export class Store {
         };
     this.devices.set(device.id, device);
     this.saveDevices();
-    return { device, created: !existing };
+    return { device, created: !existing, updateSettled: update !== undefined };
+  }
+
+  /** Set or clear (undefined) a device's firmware update. */
+  setUpdate(id: string, update: DeviceUpdate | undefined): DeviceRecord | undefined {
+    const existing = this.devices.get(id);
+    if (!existing) return undefined;
+    const device: DeviceRecord = { ...existing, update };
+    if (update === undefined) delete device.update;
+    this.devices.set(id, device);
+    this.saveDevices();
+    return device;
   }
 
   updateDevice(id: string, patch: Partial<Pick<DeviceRecord, 'state' | 'name' | 'layoutId'>>) {
@@ -178,6 +232,39 @@ export class Store {
   private saveDevices(): void {
     writeAtomic(this.devicesFile, `${JSON.stringify(Object.fromEntries(this.devices), null, 2)}\n`);
   }
+}
+
+/**
+ * The update after a hello, or undefined when the hello changes nothing. Done when the display
+ * runs the target build. A display that comes back on another build after it downloaded the image
+ * didn't start it (or rolled back). A hello while the request waits or downloads changes nothing:
+ * the display says hello when it reconnects, too.
+ */
+export function settleUpdate(
+  update: DeviceUpdate,
+  hello: Hello,
+  now: Date,
+): DeviceUpdate | undefined {
+  if (!updateActive(update)) return undefined;
+  if (hello.fw.build === update.buildId) {
+    return {
+      request: update.request,
+      buildId: update.buildId,
+      version: update.version,
+      state: 'done',
+      at: now.toISOString(),
+    };
+  }
+  if (update.state === 'installing') {
+    return {
+      ...update,
+      state: 'failed',
+      error:
+        'the display came back on its old firmware (the new one did not start, or was rolled back)',
+      at: now.toISOString(),
+    };
+  }
+  return undefined;
 }
 
 function stored(layout: Layout): StoredLayout {
