@@ -7,6 +7,8 @@ substitutions:
   screen_height: "480"
   signalk_host: "127.0.0.1"
   signalk_port: "3000"
+  # ESPHomeSignalK git ref (the e2e takes ESPHELM_SIGNALK_REF to try a branch before it is merged).
+  signalk_ref: main
 
 packages:
   hardware: !include hardware/sdl.yaml
@@ -20,7 +22,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/batuakan/ESPHomeSignalK
-      ref: main
+      ref: ${signalk_ref}
       path: components
     components: [signalk]
 
