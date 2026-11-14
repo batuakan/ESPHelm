@@ -2014,6 +2014,25 @@ fieldset.modes {
 .devices li {
   flex-wrap: wrap;
 }
+.device-id {
+  white-space: nowrap;
+}
+.device-rename {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 17px;
+}
+.device-rename button.link {
+  padding: 0;
+  font-size: 12px;
+  color: var(--accent);
+}
+.device-rename input {
+  flex: 1;
+  min-width: 0;
+}
 .device-fw {
   flex-basis: 100%;
   display: flex;

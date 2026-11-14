@@ -87,6 +87,25 @@ async function main(): Promise<void> {
       .click();
     await page.getByRole('status').filter({ hasText: 'adopted' }).waitFor();
     check('admin adopts the display', true);
+
+    // Name the display; the plugin keeps it.
+    const displays = page.getByRole('region', { name: 'Displays' });
+    await displays.getByRole('button', { name: 'Rename' }).click();
+    await displays.getByRole('textbox', { name: 'Display name' }).fill('Nav station');
+    await displays.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('status').filter({ hasText: 'Renamed to Nav station' }).waitFor();
+    const named = (await (
+      await fetch(`${sk.base}/plugins/esphelm/api/devices`, {
+        headers: { Authorization: `Bearer ${sk.admin}` },
+      })
+    ).json()) as { id: string; name?: string }[];
+    check('the display is renamed', named.find((d) => d.id === DEVICE_ID)?.name === 'Nav station');
+    check(
+      'the display list shows the end of its id',
+      await displays
+        .getByText(`…${DEVICE_ID.replace(/[^0-9a-zA-Z]/g, '').slice(-4)}`, { exact: false })
+        .isVisible(),
+    );
     await page.emulateMedia({ colorScheme: 'light' });
     await page.getByRole('button', { name: 'light theme' }).click();
 

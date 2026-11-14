@@ -168,7 +168,7 @@ esphome run firmware/esphelm_rlcd.yaml              # Waveshare ESP32-S3-RLCD-4.
 1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-`, `esphelm-guition-` or `esphelm-cyd-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
 2. **Pick the boat's Wi-Fi** on the page that opens (or at http://192.168.4.1). The display joins it and closes its setup network.
 3. **Approve it in SignalK.** The display finds the server with mDNS and asks for access: grant read/write under *Security → Access Requests*. It stays with that server from then on, also after a restart.
-4. **Adopt it in the editor** and assign a layout.
+4. **Adopt it in the editor**, name it (*Rename*; the end of its id on the display's *Info* tab tells two of the same board apart) and assign a layout.
 
 Mistyped the password? Power-cycle the display: when it finds no Wi-Fi for 2 minutes after a power-up, it opens its setup network again (for the first 10 minutes after power-up). Once connected, losing the network never opens it, so switching the router off doesn't expose the display. To move to another network, use *Factory reset* at the bottom of the *Network* tab, then approve the display again in SignalK; the plugin gives it its layout back. More in [ADR-0026](docs/decisions/0026-zero-config-setup.md).
 

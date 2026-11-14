@@ -301,6 +301,16 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     }
   };
 
+  const rename = async (id: string, name: string | null) => {
+    try {
+      await api.updateDevice(id, { name });
+      await refreshDevices();
+      setStatus({ kind: 'ok', text: name === null ? 'Name cleared.' : `Renamed to ${name}.` });
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const save = async () => {
     if (!layout || !device) return;
     setSaving(true);
@@ -504,6 +514,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           selectedId={deviceId}
           onSelect={setDeviceId}
           onAdopt={(id) => void adopt(id)}
+          onRename={(id, name) => void rename(id, name)}
           onFirmware={() => setFirmwareOpen(true)}
           onUpdate={(id, buildId) =>
             void api.requestUpdate(id, buildId).then(() => refreshDevices(), fail)

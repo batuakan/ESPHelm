@@ -3,6 +3,57 @@ import { useState, type JSX, type PointerEvent as ReactPointerEvent } from 'reac
 import type { TileType } from '@esphelm/schema';
 import type { Device } from '../api';
 
+/** The end of a display's id, to match against *Settings → Info → Display → Id* on the display. */
+export function shortId(id: string): string {
+  const hex = id.replace(/[^0-9a-zA-Z]/g, '');
+  return hex.length > 4 ? `…${hex.slice(-4)}` : id;
+}
+
+/** Renames the selected display; an empty name clears it (the board is shown again). */
+function RenameLine(props: { device: Device; onRename(id: string, name: string | null): void }) {
+  const d = props.device;
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft === null) {
+    return (
+      <div className="device-rename">
+        <button className="link" onClick={() => setDraft(d.name ?? '')}>
+          Rename
+        </button>
+      </div>
+    );
+  }
+  const done = () => {
+    const name = draft.trim();
+    setDraft(null);
+    if (name !== (d.name ?? '')) props.onRename(d.id, name === '' ? null : name);
+  };
+  return (
+    <form
+      className="device-rename"
+      onSubmit={(e) => {
+        e.preventDefault();
+        done();
+      }}
+    >
+      <input
+        autoFocus
+        value={draft}
+        maxLength={40}
+        placeholder={d.hello.board}
+        aria-label="Display name"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
+      />
+      <button className="primary small" type="submit">
+        Save
+      </button>
+      <button className="small" type="button" onClick={() => setDraft(null)}>
+        Cancel
+      </button>
+    </form>
+  );
+}
+
 /** The firmware update line under a display (ADR-0036). */
 function UpdateLine(props: {
   device: Device;
@@ -169,6 +220,7 @@ export function DeviceList(props: {
   selectedId: string | undefined;
   onSelect(id: string): void;
   onAdopt(id: string): void;
+  onRename(id: string, name: string | null): void;
   onFirmware(): void;
   onUpdate(id: string, buildId: string): void;
   onClearUpdate(id: string): void;
@@ -190,8 +242,9 @@ export function DeviceList(props: {
             <button className="device" onClick={() => props.onSelect(d.id)}>
               <span className={`dot ${d.state}`} aria-hidden />
               <span className="device-name">{d.name ?? d.hello.board ?? d.id}</span>
-              <span className="device-meta">
-                {d.hello.display.width}×{d.hello.display.height} · {d.state} · {d.hello.fw.version}
+              <span className="device-meta" title={`Id ${d.id}`}>
+                {d.hello.display.width}×{d.hello.display.height} · {d.state} · {d.hello.fw.version} ·{' '}
+                <span className="device-id">{shortId(d.id)}</span>
               </span>
               {d.hello.recovery && (
                 <span className="device-warning">
@@ -204,6 +257,7 @@ export function DeviceList(props: {
                 Adopt
               </button>
             )}
+            {d.id === props.selectedId && <RenameLine key={d.id} device={d} onRename={props.onRename} />}
             {d.state === 'adopted' && (d.update || d.updateAvailable) && (
               <UpdateLine device={d} onUpdate={props.onUpdate} onClearUpdate={props.onClearUpdate} />
             )}
