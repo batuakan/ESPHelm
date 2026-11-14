@@ -448,9 +448,18 @@ class ChartWidget : public Widget {
     const lv_color_t vessel = stale_ ? colors_.muted : colors_.zone[static_cast<int>(esphelm::ZoneState::ALARM)];
     lv_draw_triangle_dsc_t t;
     lv_draw_triangle_dsc_init(&t);
-    t.color = vessel;
     t.opa = LV_OPA_COVER;
-    // Two triangles make a notched arrowhead.
+    // Two triangles make a notched arrowhead; the same a little larger in black first, an
+    // outline that keeps it visible on any chart colour, by day and at night.
+    const double o = std::max(2.0, s / 7);
+    t.color = lv_color_black();
+    t.p[0] = at(0, s + o * 1.8);
+    t.p[1] = at(2.5, s * 0.8 + o * 1.3);
+    t.p[2] = at(M_PI, s * 0.25 + o * 1.4);
+    lv_draw_triangle(layer, &t);
+    t.p[1] = at(-2.5, s * 0.8 + o * 1.3);
+    lv_draw_triangle(layer, &t);
+    t.color = vessel;
     t.p[0] = at(0, s);
     t.p[1] = at(2.5, s * 0.8);
     t.p[2] = at(M_PI, s * 0.25);

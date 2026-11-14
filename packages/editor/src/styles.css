@@ -1636,6 +1636,10 @@ fieldset.modes {
 .chart-vessel polygon {
   fill: var(--zone-alarm);
 }
+/* A black outline under the vessel, as on the display. */
+.chart-vessel polygon.outline {
+  fill: #000;
+}
 .chart-anchor .ring {
   fill: var(--zone-normal);
   fill-opacity: 0.2;

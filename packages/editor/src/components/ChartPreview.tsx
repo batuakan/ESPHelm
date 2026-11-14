@@ -202,6 +202,17 @@ export function ChartPreview(props: {
         {course && <g className={props.night ? 'chart-course night' : 'chart-course'}>{course}</g>}
         {anchor}
         <g transform={`translate(${W / 2} ${H / 2}) rotate(${h})`} className="chart-vessel">
+          {(() => {
+            // The display's outline: the arrowhead a little larger in black behind it.
+            const o = Math.max(2, s / 7);
+            const p = (ang: number, r: number) => `${Math.sin(ang) * r},${-Math.cos(ang) * r}`;
+            return (
+              <polygon
+                className="outline"
+                points={`${p(0, s + o * 1.8)} ${p(2.5, s * 0.8 + o * 1.3)} ${p(Math.PI, s * 0.25 + o * 1.4)} ${p(-2.5, s * 0.8 + o * 1.3)}`}
+              />
+            );
+          })()}
           <polygon points={`0,${-s} ${s * 0.48},${s * 0.64} 0,${s * 0.25} ${-s * 0.48},${s * 0.64}`} />
         </g>
         {shorter >= CHART_FIT.info && (() => {
