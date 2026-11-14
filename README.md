@@ -15,6 +15,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-wind-laylines.png">
  <img width="200px" src="/docs/images/display-wind-dark.png">
  <img width="200px" src="/docs/images/display-chart-tiles.png">
+ <img width="200px" src="/docs/images/display-chart-route.png">
  <img width="200px" src="/docs/images/display-engine-day.png">
  <img width="200px" src="/docs/images/display-engine-dark.png">
  <img width="200px" src="/docs/images/display-energy-night.png">
@@ -102,7 +103,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Zones from SignalK:** zones in a path's SignalK metadata replace a value, gauge, bar or graph tile's own zones (and an engine tile's RPM zones), and the display follows them when they change on the server.
 - **History graphs:** tap a value that records to see its last 10 min, 1 h or 6 h. You choose which values record, per value, in the editor, so values nobody looks at take no memory: nothing records unless you switch it on. A wind rose can record any of its values, with buttons in the graph to switch between them, and angles such as the heading are averaged on the circle, so a graph across north has no jump. The editor counts what a layout records against the board's limit (48 values with PSRAM, 6 without). The display records from when it starts, and keeps the 6 h graph only with PSRAM.
 - **Pages:** as many as you like, with page buttons in the footer.
-- **Charts:** a chart tile with anchor watch (SignalK charts, PSRAM boards), beside a wind rose or depth, or filling its page. Several charts share their map tiles, so a second chart of the same chart and zoom costs no extra memory.
+- **Charts:** a chart tile with anchor watch and the active route (SignalK charts, PSRAM boards), beside a wind rose or depth, or filling its page. The next waypoint shows as a ring, or as an arrow at the edge with the distance when it's off the chart. Several charts share their map tiles, so a second chart of the same chart and zoom costs no extra memory.
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
@@ -180,7 +181,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 109 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 112 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

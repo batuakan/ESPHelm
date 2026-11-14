@@ -1384,14 +1384,22 @@ function HeadingTapeFields(
   );
 }
 
-const CHART_PATHS: { key: keyof Omit<typeof CHART_DEFAULTS, 'zoom' | 'anchor'>; label: string; anchor?: boolean }[] =
-  [
-    { key: 'positionPath', label: 'Position' },
-    { key: 'headingPath', label: 'Heading' },
-    { key: 'anchorPositionPath', label: 'Anchor position', anchor: true },
-    { key: 'anchorRadiusPath', label: 'Anchor alarm radius (m)', anchor: true },
-    { key: 'anchorAlarmPath', label: 'Anchor alarm notification', anchor: true },
-  ];
+const CHART_PATHS: {
+  key: keyof Omit<typeof CHART_DEFAULTS, 'zoom' | 'anchor' | 'route'>;
+  label: string;
+  anchor?: boolean;
+  route?: boolean;
+}[] = [
+  { key: 'positionPath', label: 'Position' },
+  { key: 'headingPath', label: 'Heading' },
+  { key: 'anchorPositionPath', label: 'Anchor position', anchor: true },
+  { key: 'anchorRadiusPath', label: 'Anchor alarm radius (m)', anchor: true },
+  { key: 'anchorAlarmPath', label: 'Anchor alarm notification', anchor: true },
+  { key: 'activeRoutePath', label: 'Active route', route: true },
+  { key: 'nextPointPath', label: 'Next waypoint', route: true },
+  { key: 'previousPointPath', label: 'Previous waypoint', route: true },
+  { key: 'distancePath', label: 'Distance to the next waypoint (m)', route: true },
+];
 
 /**
  * Chart tile settings (ADR-0030): which chart, zoom, anchor watch, and the paths it follows.
@@ -1405,13 +1413,14 @@ export function ChartDrawer(
     supported: boolean;
     /** What the display will draw at this size (CHART_FIT). */
     sizeHint: string;
-    onChange(patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Patch }): void;
+    onChange(patch: { chart?: string; zoom?: number; anchor?: boolean; route?: boolean; config?: Patch }): void;
     onDelete(): void;
   },
 ) {
   const { tile: page, charts } = props;
   const config = page.config ?? {};
   const anchor = page.anchor ?? CHART_DEFAULTS.anchor;
+  const route = page.route ?? CHART_DEFAULTS.route;
   const known = charts.some((c) => c.identifier === page.chart);
   return (
     <Drawer title="Chart" label="Tile settings" onClose={props.onClose}>
@@ -1455,9 +1464,14 @@ export function ChartDrawer(
         <input type="checkbox" checked={anchor} onChange={(e) => props.onChange({ anchor: e.target.checked })} />
         Anchor watch (anchor position, alarm radius, alarm)
       </label>
+      <label className="check">
+        <input type="checkbox" checked={route} onChange={(e) => props.onChange({ route: e.target.checked ? undefined : false })} />
+        Route and next waypoint (SignalK&apos;s active route, and an arrow at the edge when the waypoint is out of
+        view)
+      </label>
       <details className="slot-section">
         <summary>SignalK paths</summary>
-        {CHART_PATHS.filter((p) => anchor || !p.anchor).map(({ key, label }) => (
+        {CHART_PATHS.filter((p) => (anchor || !p.anchor) && (route || !p.route)).map(({ key, label }) => (
           <div key={key}>
             <PathPicker
               path={config[key] ?? ''}

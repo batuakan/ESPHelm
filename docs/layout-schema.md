@@ -154,9 +154,9 @@ A `fixedBeat`/`fixedGybe` outside its range gives `OUT_OF_RANGE`, a fraction `IN
 The editor shows the expected tier for the selected display.
 
 ### Chart tiles
-A map (ADR-0012; a tile since ADR-0030, a page before): tiles of a SignalK chart centred on the vessel, north up, with the vessel, and the anchor position, alarm radius and alarm when `anchor` is on. Only displays with PSRAM render it; they list `chart` in `hello.widgets`, so the plugin refuses chart layouts for others. Several chart tiles can share a page or a layout: the display keeps one store of map tiles for all of them, so charts of the same chart and zoom cost no extra memory.
+A map (ADR-0012; a tile since ADR-0030, a page before): tiles of a SignalK chart centred on the vessel, north up, with the vessel, the anchor position, alarm radius and alarm when `anchor` is on, and the active route with the next waypoint when `route` is on (ADR-0037). Only displays with PSRAM render it; they list `chart` in `hello.widgets`, so the plugin refuses chart layouts for others. Several chart tiles can share a page or a layout: the display keeps one store of map tiles for all of them, so charts of the same chart and zoom cost no extra memory.
 
-`ChartTile`: `type: "chart"`, the common placement, `chart` (ChartId: `[A-Za-z0-9][A-Za-z0-9._-]*`, a SignalK chart identifier), `zoom?` (1–20), `anchor?` (boolean) and `config?` with the paths below. Defaults are exported as `CHART_DEFAULTS`:
+`ChartTile`: `type: "chart"`, the common placement, `chart` (ChartId: `[A-Za-z0-9][A-Za-z0-9._-]*`, a SignalK chart identifier), `zoom?` (1–20), `anchor?` (boolean), `route?` (boolean) and `config?` with the paths below. Defaults are exported as `CHART_DEFAULTS`:
 
 | Field | Default |
 |---|---|
@@ -167,10 +167,17 @@ A map (ADR-0012; a tile since ADR-0030, a page before): tiles of a SignalK chart
 | `config.anchorPositionPath` | `navigation.anchor.position` (null when the anchor is up) |
 | `config.anchorRadiusPath` | `navigation.anchor.maxRadius` (metres) |
 | `config.anchorAlarmPath` | `notifications.navigation.anchor` (alarm when `state` is not `normal`/`nominal`) |
+| `route` | true |
+| `config.activeRoutePath` | `navigation.course.activeRoute` (`{href: "/resources/routes/<id>", pointIndex, pointTotal, reverse}`, null without a route) |
+| `config.nextPointPath` | `navigation.course.nextPoint` (`{position, ...}`, null without a course) |
+| `config.previousPointPath` | `navigation.course.previousPoint` (the start of the leg sailed) |
+| `config.distancePath` | `navigation.course.calcValues.distance` (metres, shown in nm) |
+
+**The route (ADR-0037):** the course delta only names the route; the display gets its points from the plugin (`GET /signalk/v1/api/esphelm/routes/:id`, at most `MAX_ROUTE_POINTS` = 500, thinned by the plugin). It draws the legs (those sailed faint), a dot per point, and the leg being sailed bold; the next waypoint is a ring, or an arrow at the edge pointing at it when it is off the chart (`edgeArrow()` in `src/chartRoute.ts`, mirrored in `esphelm_chart_route.h`, `fixtures/chart-route.cases.json`). Old firmware ignores `route` and the new paths.
 
 A bad or missing `chart` is `INVALID_ID` / `MISSING_FIELD` at `/pages/i/tiles/j/chart`; `zoom` outside 1–20 is `OUT_OF_RANGE`.
 
-**Size is the device's business** (`CHART_FIT`, generated into `esphelm_sizes.h`): the zoom buttons show from 200 px on the cell's shorter side and the position line from 260 px; below 200 px an anchor alarm frames the tile in red instead of the banner (the alarm banner above the page names it).
+**Size is the device's business** (`CHART_FIT`, generated into `esphelm_sizes.h`): the zoom buttons show from 200 px on the cell's shorter side and the position line and the distance to the next waypoint from 260 px; below 200 px an anchor alarm frames the tile in red instead of the banner (the alarm banner above the page names it).
 
 ### Position tiles
 GPS position as text: latitude over longitude. The display picks the largest font that fits the tile.
@@ -443,6 +450,7 @@ See `packages/schema/fixtures/valid/`:
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 - `chart-page.json`: a page with a default chart tile filling it, an anchor page with every path set, and a value page.
+- `chart-route.json`: a chart with the route on (the default), one with every route path set, and one with `route: false` (ADR-0037).
 - `chart-tiles.json`: a 2x2 chart beside a wind rose and a 1x1 chart of the same chart (they share their map tiles), and a value page.
 - `settings.json`: every display setting, with the second page as start page.
 - `position.json`: the four position formats, one with custom decimals.

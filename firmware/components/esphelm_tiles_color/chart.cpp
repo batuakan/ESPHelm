@@ -1,6 +1,6 @@
 // Chart tile (ADR-0030; a page until then, ADR-0012): map tiles of a SignalK chart centred on
-// the vessel, north up, with the vessel, and the anchor position and alarm radius when anchor
-// watch is on.
+// the vessel, north up, with the vessel, the anchor position and alarm radius when anchor watch
+// is on, and the active route and the next waypoint from SignalK's course API (ADR-0037).
 //
 // The Web-Mercator maths are ported from ESPTiles (github.com/batuakan/ESPTiles, Batu Akan,
 // MIT). Map tiles come from the signalk-esphelm plugin (GET .../tiles/<chart>/<z>/<x>/<y>, raw
@@ -11,11 +11,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <cstring>
 
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/esphelm_runtime/chart_store.h"
+#include "esphome/components/esphelm_runtime/esphelm_chart_route.h"
 #include "esphome/components/esphelm_runtime/esphelm_sizes.h"
 #include "esphome/components/esphelm_runtime/widgets.h"
 
@@ -27,6 +29,37 @@ static const char *const TAG = "esphelm.chart";
 static constexpr int TILE = ChartTileStore::TILE;
 static constexpr uint32_t DRAW_MS = 250;
 static constexpr int MIN_ZOOM = 1, MAX_ZOOM = 20;
+/// The route's colour by day and in the dark theme: magenta, as on chartplotters, apart from the
+/// chart's blues and the red vessel. At night the theme's red.
+static const uint32_t ROUTE_COLOR = 0xD0209C;
+
+/// Clips the segment a-b to the box [x0, x1] x [y0, y1] (Liang-Barsky); false when it misses.
+static bool clip_segment(double &ax, double &ay, double &bx, double &by, double x0, double y0, double x1,
+                         double y1) {
+  double t0 = 0, t1 = 1;
+  const double dx = bx - ax, dy = by - ay;
+  const double p[4] = {-dx, dx, -dy, dy}, q[4] = {ax - x0, x1 - ax, ay - y0, y1 - ay};
+  for (int i = 0; i < 4; i++) {
+    if (p[i] == 0) {
+      if (q[i] < 0)
+        return false;
+    } else {
+      const double t = q[i] / p[i];
+      if (p[i] < 0)
+        t0 = std::max(t0, t);
+      else
+        t1 = std::min(t1, t);
+    }
+  }
+  if (t0 > t1)
+    return false;
+  const double sx = ax, sy = ay;
+  ax = sx + t0 * dx;
+  ay = sy + t0 * dy;
+  bx = sx + t1 * dx;
+  by = sy + t1 * dy;
+  return true;
+}
 
 /// Fractional Web-Mercator tile coordinates of a position at `zoom`.
 static void latlon_to_tile(double lat, double lon, int zoom, double &x, double &y) {
@@ -71,6 +104,11 @@ class ChartWidget : public Widget {
     anchor_position_path_ = cfg.anchor_position_path;
     anchor_radius_path_ = cfg.anchor_radius_path;
     anchor_alarm_path_ = cfg.anchor_alarm_path;
+    route_ = cfg.route;
+    active_route_path_ = cfg.active_route_path;
+    next_point_path_ = cfg.next_point_path;
+    previous_point_path_ = cfg.previous_point_path;
+    distance_path_ = cfg.distance_path;
 
     lv_obj_remove_flag(cell, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(cell, LV_OBJ_FLAG_CLICKABLE);
@@ -122,6 +160,12 @@ class ChartWidget : public Widget {
       out.push_back(anchor_position_path_);
       out.push_back(anchor_radius_path_);
       out.push_back(anchor_alarm_path_);
+    }
+    if (route_) {
+      out.push_back(active_route_path_);
+      out.push_back(next_point_path_);
+      out.push_back(previous_point_path_);
+      out.push_back(distance_path_);
     }
   }
 
@@ -176,6 +220,29 @@ class ChartWidget : public Widget {
       const char *state = v["state"].is<const char *>() ? v["state"].as<const char *>() : nullptr;
       alarm_ = state != nullptr && std::strcmp(state, "normal") != 0 && std::strcmp(state, "nominal") != 0;
       dirty_ = true;
+    } else if (route_ && path == active_route_path_) {
+      // {href: "/resources/routes/<id>", pointIndex, pointTotal, reverse}, or null (no route).
+      char id[esphelm::chart_route::MAX_ID + 1];
+      const char *href = v["href"].is<const char *>() ? v["href"].as<const char *>() : nullptr;
+      const bool ok = esphelm::chart_route::route_id(href, id);
+      route_index_ = v["pointIndex"].is<long>() ? v["pointIndex"].as<long>() : 0;
+      route_total_ = v["pointTotal"].is<long>() ? v["pointTotal"].as<long>() : 0;
+      route_reverse_ = v["reverse"].is<bool>() && v["reverse"].as<bool>();
+      if (store_ != nullptr)
+        store_->want_route(ok ? std::string(id) : std::string(), now);
+      dirty_ = true;
+    } else if (route_ && path == next_point_path_) {
+      // {position: {latitude, longitude}, type, ...}, or null (no course).
+      has_next_ = read_position(v["position"], next_lat_, next_lon_);
+      next_ms_ = now;
+      dirty_ = true;
+    } else if (route_ && path == previous_point_path_) {
+      has_previous_ = read_position(v["position"], previous_lat_, previous_lon_);
+      dirty_ = true;
+    } else if (route_ && path == distance_path_) {
+      has_distance_ = v.is<double>() && std::isfinite(v.as<double>()) && v.as<double>() >= 0;
+      distance_ = has_distance_ ? v.as<double>() : 0;
+      dirty_ = true;
     }
   }
 
@@ -194,6 +261,11 @@ class ChartWidget : public Widget {
     const bool stale = !has_position_ || now - position_ms_ > stale_ms_;
     if (stale != stale_) {
       stale_ = stale;
+      dirty_ = true;
+    }
+    const bool next_stale = has_next_ && now - next_ms_ > stale_ms_;
+    if (next_stale != next_stale_) {
+      next_stale_ = next_stale;
       dirty_ = true;
     }
     if (has_position_)
@@ -333,6 +405,8 @@ class ChartWidget : public Widget {
     lv_area_t box;
     lv_obj_get_coords(view_, &box);
     draw_map_(layer, box);
+    if (route_)
+      draw_route_(layer, box);
     // Anchor: the alarm circle and the anchor's position.
     int32_t ax, ay;
     if (anchor_ && has_anchor_) {
@@ -360,6 +434,8 @@ class ChartWidget : public Widget {
       lv_area_t a{box.x1 + ax - 7, box.y1 + ay - 7, box.x1 + ax + 7, box.y1 + ay + 7};
       lv_draw_rect(layer, &m, &a);
     }
+    if (route_ && has_next_)
+      draw_waypoint_(layer, box);
     // Vessel: an arrowhead pointing along the heading (north up), in the middle of the view.
     const double cx = (box.x1 + box.x2) / 2.0, cy = (box.y1 + box.y2) / 2.0;
     const double s = std::max<int32_t>(small_ ? 10 : 18, std::min(view_w_, view_h_) / 16);
@@ -383,6 +459,163 @@ class ChartWidget : public Widget {
     lv_draw_triangle(layer, &t);
   }
 
+  lv_color_t route_color_() const { return night_ ? colors_.text : lv_color_hex(ROUTE_COLOR); }
+
+  /// A line between two view points, clipped to the view (a route leg can be far off screen).
+  void line_(lv_layer_t *layer, const lv_area_t &box, double ax, double ay, double bx, double by, int32_t width,
+             lv_color_t color, lv_opa_t opa) {
+    const double m = width;
+    if (!clip_segment(ax, ay, bx, by, -m, -m, view_w_ + m, view_h_ + m))
+      return;
+    lv_draw_line_dsc_t l;
+    lv_draw_line_dsc_init(&l);
+    l.color = color;
+    l.opa = opa;
+    l.width = width;
+    l.round_start = 1;
+    l.round_end = 1;
+    l.p1 = {static_cast<lv_value_precise_t>(box.x1 + ax), static_cast<lv_value_precise_t>(box.y1 + ay)};
+    l.p2 = {static_cast<lv_value_precise_t>(box.x1 + bx), static_cast<lv_value_precise_t>(box.y1 + by)};
+    lv_draw_line(layer, &l);
+  }
+
+  /// The active route: legs sailed thin and faint, the rest solid with a dot at each point, and
+  /// the leg being sailed (previous point to next point) bold.
+  void draw_route_(lv_layer_t *layer, const lv_area_t &box) {
+    const lv_color_t color = route_color_();
+    const int32_t d = std::min(view_w_, view_h_);
+    const int32_t w = std::max<int32_t>(3, d / 160);
+    const auto &pts = store_->route();
+    if (pts.size() >= 2) {
+      // A point's place in the order it is sailed; legs before the next point are behind.
+      const long total = route_total_ > 0 ? route_total_ : static_cast<long>(pts.back().index) + 1;
+      auto order = [&](const ChartTileStore::RoutePoint &p) {
+        return route_reverse_ ? total - 1 - static_cast<long>(p.index) : static_cast<long>(p.index);
+      };
+      int32_t px = 0, py = 0;
+      view_point_(pts[0].lat, pts[0].lon, px, py);
+      for (size_t i = 1; i < pts.size(); i++) {
+        int32_t qx, qy;
+        view_point_(pts[i].lat, pts[i].lon, qx, qy);
+        const bool behind = std::max(order(pts[i - 1]), order(pts[i])) < route_index_;
+        line_(layer, box, px, py, qx, qy, behind ? std::max<int32_t>(2, w - 1) : w, color,
+              behind ? LV_OPA_50 : LV_OPA_COVER);
+        px = qx;
+        py = qy;
+      }
+      // Route points, skipping one closer than a few dots to the last one drawn.
+      lv_draw_rect_dsc_t dot;
+      lv_draw_rect_dsc_init(&dot);
+      dot.radius = LV_RADIUS_CIRCLE;
+      dot.bg_color = colors_.background;
+      dot.border_color = color;
+      dot.border_width = std::max<int32_t>(2, w - 1);
+      const int32_t r = w + 2;
+      int32_t lx = 0, ly = 0;
+      bool first = true;
+      for (const auto &p : pts) {
+        int32_t x, y;
+        view_point_(p.lat, p.lon, x, y);
+        if (x < -r || y < -r || x > view_w_ + r || y > view_h_ + r)
+          continue;
+        if (!first && std::abs(x - lx) + std::abs(y - ly) < 4 * r)
+          continue;
+        first = false;
+        lx = x;
+        ly = y;
+        lv_area_t a{box.x1 + x - r, box.y1 + y - r, box.x1 + x + r, box.y1 + y + r};
+        lv_draw_rect(layer, &dot, &a);
+      }
+    }
+    if (has_previous_ && has_next_) {
+      int32_t ax, ay, bx, by;
+      view_point_(previous_lat_, previous_lon_, ax, ay);
+      view_point_(next_lat_, next_lon_, bx, by);
+      line_(layer, box, ax, ay, bx, by, w * 2, next_stale_ ? colors_.muted : color, LV_OPA_COVER);
+    }
+  }
+
+  /// The next waypoint: a ring on screen, else a small arrow at the edge pointing at it; a thin
+  /// line from the vessel to it, and the distance to go on charts big enough for text.
+  void draw_waypoint_(lv_layer_t *layer, const lv_area_t &box) {
+    const lv_color_t color = next_stale_ ? colors_.muted : route_color_();
+    const int32_t d = std::min(view_w_, view_h_);
+    const double s = std::max<int32_t>(small_ ? 9 : 12, d / 28);
+    int32_t wx, wy;
+    view_point_(next_lat_, next_lon_, wx, wy);
+    const double cx = view_w_ / 2.0, cy = view_h_ / 2.0;
+    // The arrow stays clear of the zoom buttons (a ninth of the view, at least 48 px, 8 px from
+    // the edge) and so of the position line too; on a small chart, of the edge only.
+    const double inset = small_ ? s * 1.6 : std::max<int32_t>(48, d / 9) + 8 + s;
+    const auto at = esphelm::chart_route::edge_arrow(wx - cx, wy - cy, view_w_, view_h_, inset);
+    line_(layer, box, cx, cy, at.x, at.y, 2, color, LV_OPA_70);
+    double lx, ly;  // where the distance goes
+    if (at.on_screen) {
+      const int32_t r = static_cast<int32_t>(s * 0.8);
+      lv_draw_rect_dsc_t ring;
+      lv_draw_rect_dsc_init(&ring);
+      ring.radius = LV_RADIUS_CIRCLE;
+      ring.bg_color = colors_.background;
+      ring.bg_opa = LV_OPA_60;
+      ring.border_color = color;
+      ring.border_width = std::max<int32_t>(3, d / 160);
+      lv_area_t a{box.x1 + wx - r, box.y1 + wy - r, box.x1 + wx + r, box.y1 + wy + r};
+      lv_draw_rect(layer, &ring, &a);
+      lx = wx;
+      ly = wy + r + s * 0.9;
+    } else {
+      const double ux = std::sin(at.angle), uy = -std::cos(at.angle);
+      auto pt = [&](double ang, double r) {
+        return lv_point_precise_t{static_cast<lv_value_precise_t>(box.x1 + at.x + std::sin(at.angle + ang) * r),
+                                  static_cast<lv_value_precise_t>(box.y1 + at.y - std::cos(at.angle + ang) * r)};
+      };
+      lv_draw_triangle_dsc_t t;
+      lv_draw_triangle_dsc_init(&t);
+      t.opa = LV_OPA_COVER;
+      // A background-coloured outline, so the arrow stands out on any chart.
+      t.color = colors_.background;
+      t.p[0] = pt(0, s * 1.35);
+      t.p[1] = pt(2.45, s * 1.05);
+      t.p[2] = pt(-2.45, s * 1.05);
+      lv_draw_triangle(layer, &t);
+      t.color = color;
+      t.p[0] = pt(0, s);
+      t.p[1] = pt(2.45, s * 0.7);
+      t.p[2] = pt(-2.45, s * 0.7);
+      lv_draw_triangle(layer, &t);
+      lx = at.x - ux * s * 2.4;
+      ly = at.y - uy * s * 2.4;
+    }
+    if (!has_distance_ || d < esphelm::sizes::CHART_INFO)
+      return;
+    char text[24];
+    const double nm = distance_ / 1852.0;
+    std::snprintf(text, sizeof(text), nm < 10 ? "%.2f nm" : nm < 100 ? "%.1f nm" : "%.0f nm", nm);
+    const lv_font_t *font = fonts_.small;
+    lv_point_t size;
+    lv_text_get_size(&size, text, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    // Kept inside the view, on a translucent box like the position line.
+    const int32_t hw = size.x / 2 + 6, hh = size.y / 2 + 2;
+    const int32_t x = std::max(hw, std::min(view_w_ - hw, static_cast<int32_t>(std::lround(lx))));
+    const int32_t y = std::max(hh, std::min(view_h_ - hh, static_cast<int32_t>(std::lround(ly))));
+    lv_draw_rect_dsc_t bg;
+    lv_draw_rect_dsc_init(&bg);
+    bg.radius = 6;
+    bg.bg_color = colors_.background;
+    bg.bg_opa = LV_OPA_70;
+    lv_area_t a{box.x1 + x - hw, box.y1 + y - hh, box.x1 + x + hw, box.y1 + y + hh};
+    lv_draw_rect(layer, &bg, &a);
+    lv_draw_label_dsc_t label;
+    lv_draw_label_dsc_init(&label);
+    label.text = text;
+    label.text_local = 1;
+    label.font = font;
+    label.color = color;
+    label.align = LV_TEXT_ALIGN_CENTER;
+    lv_area_t ta{box.x1 + x - hw, box.y1 + y - size.y / 2, box.x1 + x + hw, box.y1 + y + size.y / 2};
+    lv_draw_label(layer, &label, &ta);
+  }
+
   std::string id_;
   Colors colors_;
   Fonts fonts_;
@@ -404,6 +637,13 @@ class ChartWidget : public Widget {
 
   double lat_{0}, lon_{0}, heading_{0}, anchor_lat_{0}, anchor_lon_{0}, anchor_radius_{0};
   bool has_position_{false}, has_heading_{false}, has_anchor_{false}, alarm_{false}, stale_{true};
+  // The course (ADR-0037).
+  bool route_{true};
+  std::string active_route_path_, next_point_path_, previous_point_path_, distance_path_;
+  double next_lat_{0}, next_lon_{0}, previous_lat_{0}, previous_lon_{0}, distance_{0};
+  bool has_next_{false}, has_previous_{false}, has_distance_{false}, next_stale_{false}, route_reverse_{false};
+  long route_index_{0}, route_total_{0};
+  uint32_t next_ms_{0};
   uint32_t position_ms_{0}, last_draw_ms_{0};
   bool dirty_{true};
   std::string shown_;

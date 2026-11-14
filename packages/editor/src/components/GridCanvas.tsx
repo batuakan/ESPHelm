@@ -40,6 +40,8 @@ interface Props {
   timeZone?: string;
   /** Chart tiles: the server's charts, a tile's size on the display, and the night theme. */
   charts?: ChartInfo[];
+  /** The active route's points for chart tiles (ADR-0037). */
+  route?: [number, number, number][];
   tileSize?(tile: Tile): { width: number; height: number };
   night?: boolean;
   /** The display's full fonts' line heights (engine tiles show text only where one fits). */
@@ -219,6 +221,7 @@ export function GridCanvas(props: Props) {
                         info: props.charts?.find((c) => c.identifier === tile.chart),
                         ...(props.tileSize?.(tile) ?? { width: 480, height: 480 }),
                         night: props.night ?? false,
+                        ...(props.route ? { route: props.route } : {}),
                       }
                     : undefined
                 }

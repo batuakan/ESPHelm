@@ -29,6 +29,8 @@ function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
     requests.push({ method, path, body });
     if (path === '/devices') return json(devices);
     if (path === '/paths') return json(paths);
+    if (path === '/routes/home')
+      return json({ points: [[60.15, 24.95, 0], [60.2, 25.0, 1], [60.4, 25.3, 2]] });
     if (path === '/charts')
       return json([
         { identifier: 'sea', name: 'Sea chart', format: 'png', tilemapUrl: '/tiles/sea/{z}/{x}/{y}.png', supported: true },
@@ -534,6 +536,10 @@ describe('editor', { timeout: 20000 }, () => {
       'navigation.anchor.position',
       'navigation.anchor.maxRadius',
       'notifications.navigation.anchor',
+      'navigation.course.activeRoute',
+      'navigation.course.nextPoint',
+      'navigation.course.previousPoint',
+      'navigation.course.calcValues.distance',
     ]);
     live.emit('navigation.position', { latitude: 60.15, longitude: 24.95 });
     const preview = screen.getByTestId('chart-chart-1-map');
@@ -541,6 +547,26 @@ describe('editor', { timeout: 20000 }, () => {
     // z12 at 60.15N 24.95E is tile 2331/1186.
     expect(hrefs).toContain('/tiles/sea/12/2331/1186.png');
     expect(preview.textContent).toMatch(/60\.1500 N\s+24\.9500 E\s+z12/);
+
+    // The active route (ADR-0037): its legs, the leg sailed, and the next waypoint off the chart
+    // as an arrow at the edge with the distance to go.
+    live.emit('navigation.course.activeRoute', { href: '/resources/routes/home', pointIndex: 2, pointTotal: 3 });
+    live.emit('navigation.course.previousPoint', { position: { latitude: 60.2, longitude: 25.0 } });
+    live.emit('navigation.course.nextPoint', { position: { latitude: 60.4, longitude: 25.3 } });
+    live.emit('navigation.course.calcValues.distance', 27780);
+    await waitFor(() => expect(preview.querySelectorAll('.chart-route .leg')).toHaveLength(2));
+    expect(preview.querySelectorAll('.chart-route .leg.behind')).toHaveLength(1);
+    expect(preview.querySelector('.chart-waypoint .arrow')).not.toBeNull();
+    expect(preview.querySelector('.chart-waypoint .ring')).toBeNull();
+    expect(preview.querySelector('.chart-waypoint .distance')?.textContent).toBe('15.0 nm');
+    // A waypoint on the chart is a ring.
+    live.emit('navigation.course.nextPoint', { position: { latitude: 60.151, longitude: 24.951 } });
+    expect(preview.querySelector('.chart-waypoint .ring')).not.toBeNull();
+    // Off: no course, and the course paths are no longer followed.
+    fireEvent.click(within(drawer).getByLabelText(/Route and next waypoint/));
+    expect(preview.querySelector('.chart-waypoint')).toBeNull();
+    expect(live.paths()).not.toContain('navigation.course.nextPoint');
+    fireEvent.click(within(drawer).getByLabelText(/Route and next waypoint/));
     await screen.findByText('No problems');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);

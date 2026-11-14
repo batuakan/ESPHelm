@@ -283,7 +283,7 @@ async function main(): Promise<void> {
 
     // 4. Live values (SI) arrive via the layout-derived subscription and are shown converted.
     const { ws } = await sk.stream(admin);
-    const publish = (values: Record<string, number | boolean | string | object>) =>
+    const publish = (values: Record<string, number | boolean | string | object | null>) =>
       ws.send(
         JSON.stringify({
           context: 'vessels.self',
@@ -515,6 +515,81 @@ async function main(): Promise<void> {
       loaded(15).length + loaded(16).length === beforeTrip,
       String(loaded(15).length + loaded(16).length - beforeTrip),
     );
+
+    // 8b3. The active route on a chart (ADR-0037): the route's points come from the plugin
+    //      (the stand-in's route through the resources API), the course from deltas. The whole
+    //      route with the sailed legs faint and the next waypoint as a ring, then a close-up where
+    //      the waypoint is off the chart: an arrow at the edge with the distance to go.
+    const routeLayout = fixture('valid/chart-route.json');
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(routeLayout.id)}`, admin, routeLayout);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: routeLayout.id,
+    });
+    check(
+      'chart route: the layout renders',
+      await fw.waitLog(/Showing fetched layout "chart-route" \(3 pages/),
+    );
+    publish({
+      'navigation.position': { latitude: 60.1505, longitude: 24.9505 },
+      'navigation.headingTrue': 0.9,
+      'navigation.course.activeRoute': {
+        href: '/resources/routes/e2e-route',
+        name: 'E2E route',
+        pointIndex: 2,
+        pointTotal: 5,
+        reverse: false,
+      },
+      'navigation.course.previousPoint': {
+        position: { latitude: 60.149, longitude: 24.948 },
+        type: 'RoutePoint',
+      },
+      'navigation.course.nextPoint': {
+        position: { latitude: 60.153, longitude: 24.955 },
+        type: 'RoutePoint',
+      },
+      'navigation.course.calcValues.distance': 370,
+    });
+    check(
+      'chart route: the display fetches the route',
+      await fw.waitLog(/Route e2e-route: 5 points/),
+    );
+    await sleep(5000);
+    await fw.screenshot('88-chart-route', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_page_request'), '1');
+    await fw.waitLog(/Page 2\/3 "Close"/);
+    await sleep(5000);
+    await fw.screenshot('89-chart-route-arrow', shots);
+    // Night: red, like the rest of the page.
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(routeLayout.id)}`, admin, {
+      ...routeLayout,
+      theme: 'night',
+    });
+    check(
+      'chart route: the night layout renders',
+      await fw.waitLog(/Showing fetched layout "chart-route" \(3 pages/, 15000, 2),
+    );
+    // Fresh position and course again: the time since the last ones made them stale.
+    publish({
+      'navigation.position': { latitude: 60.1505, longitude: 24.9505 },
+      'navigation.course.nextPoint': {
+        position: { latitude: 60.153, longitude: 24.955 },
+        type: 'RoutePoint',
+      },
+    });
+    await sleep(3000);
+    await fw.screenshot('90-chart-route-night', shots);
+    // The course ends: route and waypoint go.
+    const routeFetches = fw.count(/Route e2e-route: 5 points/);
+    publish({ 'navigation.course.activeRoute': null, 'navigation.course.nextPoint': null });
+    await sleep(1500);
+    check(
+      'chart route: a cleared course draws nothing and fetches nothing',
+      fw.count(/Route e2e-route: 5 points/) === routeFetches && fw.count(/Route .* refused/) === 0,
+    );
+    publish({
+      'navigation.course.previousPoint': null,
+      'navigation.course.calcValues.distance': null,
+    });
 
     await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: multi.id });
     check(

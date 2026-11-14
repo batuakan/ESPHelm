@@ -164,6 +164,9 @@ export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init)
     paths: () => call<PathInfo[]>('GET', '/paths'),
     widgets: () => call<WidgetCatalog>('GET', '/widgets'),
     charts: () => call<ChartInfo[]>('GET', '/charts'),
+    /** The active route's points as displays get them: [lat, lon, index in the route] (ADR-0037). */
+    route: (id: string) =>
+      call<{ points: [number, number, number][] }>('GET', `/routes/${encodeURIComponent(id)}`),
     firmware: () => call<FirmwareImage[]>('GET', '/firmware'),
     uploadFirmware: (file: Blob) =>
       call<FirmwareImage & { removed: string[] }>('POST', '/firmware', file),

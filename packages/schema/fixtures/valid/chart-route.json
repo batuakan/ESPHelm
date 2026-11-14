@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "id": "chart-route",
+  "name": "Chart with the active route",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "route",
+      "title": "Route",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "chart",
+          "id": "route-map",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "chart": "test-chart",
+          "zoom": 14,
+          "anchor": false
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "close",
+      "title": "Close",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "chart",
+          "id": "close-map",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "chart": "test-chart",
+          "zoom": 16,
+          "anchor": false,
+          "route": true,
+          "config": {
+            "activeRoutePath": "navigation.course.activeRoute",
+            "nextPointPath": "navigation.course.nextPoint",
+            "previousPointPath": "navigation.course.previousPoint",
+            "distancePath": "navigation.course.calcValues.distance"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "grid",
+      "id": "plain",
+      "title": "No route",
+      "grid": {
+        "cols": 1,
+        "rows": 1
+      },
+      "tiles": [
+        {
+          "type": "chart",
+          "id": "plain-map",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "chart": "test-chart",
+          "zoom": 14,
+          "route": false
+        }
+      ]
+    }
+  ]
+}

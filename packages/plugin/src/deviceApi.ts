@@ -20,6 +20,7 @@ function requireStore(service: Service, res: Response): Store | undefined {
  *   POST /signalk/v1/api/esphelm/devices/hello
  *   GET  /signalk/v1/api/esphelm/devices/:id/layout   (ETag / If-None-Match -> 304)
  *   GET  /signalk/v1/api/esphelm/tiles/:chart/:z/:x/:y  (raw RGB565 chart tile, ADR-0012)
+ *   GET  /signalk/v1/api/esphelm/routes/:id           (the route's points, ETag; ADR-0037)
  *   POST /signalk/v1/api/esphelm/notifications/ack     { path } (silence an alarm, ADR-0014)
  *   GET  /signalk/v1/api/esphelm/devices/:id/firmware?request=  (the offered image, once; ADR-0036)
  *   POST /signalk/v1/api/esphelm/devices/:id/firmware/result    { request, error }
@@ -114,6 +115,26 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       return;
     }
     res.status(200).type('application/octet-stream').send(tile.body);
+  });
+
+  router.get(`${DEVICE_API_PREFIX}/routes/:id`, async (req: Request, res: Response) => {
+    const auth = authorizeDevice(req, service.security);
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error, message: auth.message });
+      return;
+    }
+    const route = await service.routes.compact(String(req.params.id));
+    if (!route.ok) {
+      res.status(route.status).json({ error: route.error, message: route.message });
+      return;
+    }
+    res.setHeader('ETag', route.etag);
+    res.setHeader('Cache-Control', 'no-cache');
+    if (ifNoneMatchHits(req.header('If-None-Match'), route.etag)) {
+      res.status(304).end();
+      return;
+    }
+    res.status(200).type('application/json').send(route.bytes);
   });
 
   router.post(`${DEVICE_API_PREFIX}/notifications/ack`, (req: Request, res: Response) => {

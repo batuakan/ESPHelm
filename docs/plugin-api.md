@@ -67,6 +67,20 @@ The plugin looks `:chart` up in the SignalK resources API and fetches its tile f
 
 Converted tiles are kept in a 64-tile LRU (about 8 MB).
 
+### `GET /signalk/v1/api/esphelm/routes/:id`
+The active route's points for chart tiles (ADR-0037). Needs a device token like the other device routes. `:id` is the id in `navigation.course.activeRoute.href` (`/resources/routes/<id>`, `ROUTE_ID_PATTERN`).
+
+The plugin reads the route through the SignalK resources API (whichever provider has it) and answers compact JSON: `{"points": [[lat, lon, index], ...]}`, `index` being the point's place in the route. A route of more than `MAX_ROUTE_POINTS` (500) points is thinned to the points that shape it most (Douglas–Peucker ranking, both ends kept), so the body stays under the display's 16 KB.
+
+| Status | Meaning |
+|---|---|
+| 200 | the points; `ETag`, `Cache-Control: no-cache` |
+| 304 | `If-None-Match` matches (the display asks again on every course delta) |
+| 400 | `INVALID_ROUTE_ID` |
+| 404 | `UNKNOWN_ROUTE`: no such route, or not a GeoJSON LineString of at least two valid points |
+
+The editor gets the same body from `GET /plugins/esphelm/api/routes/:id` for its chart preview.
+
 ### `POST /signalk/v1/api/esphelm/notifications/ack`
 Acknowledges an alarm from a display (ADR-0014). Body `{ "path": "notifications.…" }`. Needs a read/write device token.
 
