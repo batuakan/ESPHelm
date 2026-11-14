@@ -2083,6 +2083,9 @@
                         "anchor": {
                           "type": "boolean"
                         },
+                        "route": {
+                          "type": "boolean"
+                        },
                         "config": {
                           "type": "object",
                           "properties": {
@@ -2111,6 +2114,30 @@
                               "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
                             },
                             "anchorAlarmPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "activeRoutePath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "nextPointPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "previousPointPath": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+                              "errorCode": "INVALID_PATH",
+                              "description": "Dot-separated SignalK path relative to vessels.self, without wildcards."
+                            },
+                            "distancePath": {
                               "type": "string",
                               "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
                               "errorCode": "INVALID_PATH",

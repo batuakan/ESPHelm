@@ -129,6 +129,10 @@ describe('layoutPathRefs and replacePath', () => {
         'anchorPositionPath',
         'anchorRadiusPath',
         'anchorAlarmPath', // chart page
+        'activeRoutePath',
+        'nextPointPath',
+        'previousPointPath',
+        'distancePath', // chart route (ADR-0037)
         'autoThemePath',
         'clockPath', // settings
       ].sort(),

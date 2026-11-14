@@ -1,0 +1,179 @@
+{
+  "description": "Chart route (ADR-0037): edgeArrow() and routeId() in src/chartRoute.ts and esphelm_chart_route.h must both reproduce these; x, y and angle (radians) to 0.001.",
+  "arrows": [
+    {
+      "note": "waypoint on screen, up and right",
+      "dx": 100,
+      "dy": -80,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": true,
+        "x": 460,
+        "y": 280,
+        "angle": 0.896
+      }
+    },
+    {
+      "note": "straight up, off screen",
+      "dx": 0,
+      "dy": -2000,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": false,
+        "x": 360,
+        "y": 40,
+        "angle": 0
+      }
+    },
+    {
+      "note": "straight down, off screen",
+      "dx": 0,
+      "dy": 5000,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": false,
+        "x": 360,
+        "y": 680,
+        "angle": 3.142
+      }
+    },
+    {
+      "note": "east, off screen, wide view",
+      "dx": 3000,
+      "dy": 0,
+      "w": 1280,
+      "h": 400,
+      "inset": 30,
+      "expected": {
+        "onScreen": false,
+        "x": 1250,
+        "y": 200,
+        "angle": 1.571
+      }
+    },
+    {
+      "note": "north-east, leaves through the top",
+      "dx": 400,
+      "dy": -900,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": false,
+        "x": 502.222,
+        "y": 40,
+        "angle": 0.418
+      }
+    },
+    {
+      "note": "south-west, leaves through the left",
+      "dx": -2000,
+      "dy": 600,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": false,
+        "x": 40,
+        "y": 456,
+        "angle": -1.862
+      }
+    },
+    {
+      "note": "just inside the inset",
+      "dx": 319,
+      "dy": 0,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": true,
+        "x": 679,
+        "y": 360,
+        "angle": 1.571
+      }
+    },
+    {
+      "note": "just outside the inset",
+      "dx": 321,
+      "dy": 0,
+      "w": 720,
+      "h": 720,
+      "inset": 40,
+      "expected": {
+        "onScreen": false,
+        "x": 680,
+        "y": 360,
+        "angle": 1.571
+      }
+    },
+    {
+      "note": "at the vessel",
+      "dx": 0,
+      "dy": 0,
+      "w": 480,
+      "h": 480,
+      "inset": 30,
+      "expected": {
+        "onScreen": true,
+        "x": 240,
+        "y": 240,
+        "angle": 3.142
+      }
+    },
+    {
+      "note": "tiny view: inset larger than half",
+      "dx": 50,
+      "dy": 50,
+      "w": 40,
+      "h": 40,
+      "inset": 30,
+      "expected": {
+        "onScreen": false,
+        "x": 20,
+        "y": 20,
+        "angle": 2.356
+      }
+    }
+  ],
+  "ids": [
+    {
+      "href": "/resources/routes/ac3a3b2d-07e8-4f25-92bc-98e7c92f7f1a",
+      "expected": "ac3a3b2d-07e8-4f25-92bc-98e7c92f7f1a"
+    },
+    {
+      "href": "/resources/routes/urn:mrn:signalk:uuid:1d4c",
+      "expected": "urn:mrn:signalk:uuid:1d4c"
+    },
+    {
+      "href": "/resources/waypoints/abc",
+      "expected": null
+    },
+    {
+      "href": "/resources/routes/",
+      "expected": null
+    },
+    {
+      "href": "/resources/routes/a/b",
+      "expected": null
+    },
+    {
+      "href": "/resources/routes/a b",
+      "expected": null
+    },
+    {
+      "href": "resources/routes/abc",
+      "expected": null
+    },
+    {
+      "href": "/resources/routes/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": null
+    }
+  ]
+}

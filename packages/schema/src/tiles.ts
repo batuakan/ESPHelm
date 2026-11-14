@@ -539,8 +539,8 @@ export const SERVER_ZONES = {
 
 /**
  * Chart (ADR-0030, before that a page kind, ADR-0012): map tiles of a SignalK chart centred on
- * the vessel, north up, with the vessel, and the anchor position and alarm radius when `anchor`
- * is on. Charts on one display share their map tiles. Only displays with PSRAM render it (they
+ * the vessel, north up, with the vessel, the anchor position and alarm radius when `anchor` is
+ * on, and the active route and next waypoint when `route` is on (ADR-0037). Charts on one display share their map tiles. Only displays with PSRAM render it (they
  * list "chart" in hello.widgets).
  */
 export const ChartTile = Type.Object(
@@ -550,6 +550,8 @@ export const ChartTile = Type.Object(
     chart: ChartId,
     zoom: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
     anchor: Type.Optional(Type.Boolean()),
+    /** The active route and the next waypoint (ADR-0037); on when omitted. */
+    route: Type.Optional(Type.Boolean()),
     config: Type.Optional(
       Type.Object(
         {
@@ -558,6 +560,10 @@ export const ChartTile = Type.Object(
           anchorPositionPath: Type.Optional(SkPath),
           anchorRadiusPath: Type.Optional(SkPath),
           anchorAlarmPath: Type.Optional(SkPath),
+          activeRoutePath: Type.Optional(SkPath),
+          nextPointPath: Type.Optional(SkPath),
+          previousPointPath: Type.Optional(SkPath),
+          distancePath: Type.Optional(SkPath),
         },
         { additionalProperties: false },
       ),
@@ -575,6 +581,12 @@ export const CHART_DEFAULTS = {
   anchorPositionPath: 'navigation.anchor.position',
   anchorRadiusPath: 'navigation.anchor.maxRadius',
   anchorAlarmPath: 'notifications.navigation.anchor',
+  // SignalK's course API (v2): the route, the waypoints of the leg sailed, the distance to go.
+  route: true,
+  activeRoutePath: 'navigation.course.activeRoute',
+  nextPointPath: 'navigation.course.nextPoint',
+  previousPointPath: 'navigation.course.previousPoint',
+  distancePath: 'navigation.course.calcValues.distance',
 } as const;
 
 /**

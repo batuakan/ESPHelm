@@ -85,15 +85,17 @@ void EsphelmRuntime::setup() {
   this->client_.start();
 #ifdef USE_ESPHELM_CHARTS
   this->tiles_.start();
-  this->charts_.set_fetch([this](const std::string &path, uint32_t tag, size_t max_body) {
+  this->charts_.set_fetch([this](RequestKind kind, const std::string &path, uint32_t tag, size_t max_body,
+                                 const std::string &etag) {
     if (this->tiles_.busy() || this->signalk_->access_state() != signalk::SignalKAccessState::AUTHORIZED)
       return false;
     HttpRequest req;
-    req.kind = RequestKind::TILE;
+    req.kind = kind;
     req.url = this->base_url_() + path;
     req.token = this->signalk_->get_token();
     req.max_body = max_body;
     req.tag = tag;
+    req.if_none_match = etag;
     this->tiles_.submit(std::move(req));
     return true;
   });
@@ -1652,10 +1654,30 @@ void EsphelmRuntime::subscribe_page_() {
     this->listeners_.push_back(this->signalk_->add_listener(
         path, [this](const std::string &p, ArduinoJson::JsonVariantConst v) { this->on_value_(p, v); }));
   }
+  // The new page's tiles get the last value of every path that stays subscribed (SignalK only
+  // replays the paths it newly subscribes), at the time they came; values of paths no longer
+  // followed are dropped.
+  for (auto it = this->last_values_.begin(); it != this->last_values_.end();) {
+    if (!std::binary_search(paths.begin(), paths.end(), it->first)) {
+      it = this->last_values_.erase(it);
+      continue;
+    }
+    ArduinoJson::JsonDocument doc;
+    if (ArduinoJson::deserializeJson(doc, it->second.json) == ArduinoJson::DeserializationError::Ok) {
+      for (auto &w : this->widgets_)
+        w->on_value(it->first, doc.as<ArduinoJson::JsonVariantConst>(), it->second.ms);
+    }
+    ++it;
+  }
 }
 
 void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariantConst value) {
   const uint32_t now = millis();
+  // Kept for the next page (subscribe_page_); the string keeps its capacity between updates.
+  LastValue &last = this->last_values_[path];
+  last.json.clear();
+  ArduinoJson::serializeJson(value, last.json);
+  last.ms = now;
   for (auto &w : this->widgets_)
     w->on_value(path, value, now);
   for (size_t i = 0; i < this->history_.size(); i++) {

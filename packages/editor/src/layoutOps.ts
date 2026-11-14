@@ -134,11 +134,21 @@ export function headingTapeSettings(tile: HeadingTapeTile): {
   };
 }
 
-/** The paths a chart follows: position and heading, and the anchor's when anchor watch is on. */
+/** The chart config keys a chart follows: position and heading, the anchor's, the course's. */
+export function chartPathKeys(tile: ChartTile) {
+  const anchor = tile.anchor ?? CHART_DEFAULTS.anchor;
+  const route = tile.route ?? CHART_DEFAULTS.route;
+  return [
+    ...CHART_PATH_KEYS,
+    ...(anchor ? CHART_ANCHOR_PATH_KEYS : []),
+    ...(route ? CHART_ROUTE_PATH_KEYS : []),
+  ];
+}
+
+/** The paths a chart follows (chartPathKeys, defaults filled in). */
 function chartPaths(tile: ChartTile): string[] {
   const c = { ...CHART_DEFAULTS, ...tile.config };
-  const anchor = tile.anchor ?? CHART_DEFAULTS.anchor;
-  return [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])].map((k) => c[k]);
+  return chartPathKeys(tile).map((k) => c[k]);
 }
 
 /** SignalK paths a tile shows (what the live preview subscribes to). */
@@ -517,7 +527,13 @@ export function updateChartTile(
   layout: Layout,
   index: number,
   id: string,
-  patch: { chart?: string; zoom?: number; anchor?: boolean; config?: Record<string, unknown> },
+  patch: {
+    chart?: string;
+    zoom?: number;
+    anchor?: boolean;
+    route?: boolean;
+    config?: Record<string, unknown>;
+  },
 ): Layout {
   return withGrid(layout, index, (p) => ({
     ...p,
@@ -645,6 +661,13 @@ const CHART_ANCHOR_PATH_KEYS = [
   'anchorRadiusPath',
   'anchorAlarmPath',
 ] as const;
+/** The course paths a chart follows while `route` is on (ADR-0037). */
+const CHART_ROUTE_PATH_KEYS = [
+  'activeRoutePath',
+  'nextPointPath',
+  'previousPointPath',
+  'distancePath',
+] as const;
 const AUTOPILOT_PATH_KEYS = ['statePath', 'targetPath', 'adjustPath', 'headingPath'] as const;
 const WIND_ROSE_PATH_KEYS = ['apparentAngle', 'trueDirection', 'heading'] as const;
 /** A rose's performance paths (ADR-0029), used only while their graphic is on. */
@@ -669,9 +692,7 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
           return; // the display's own clock (settings.clockPath below)
         case 'chart': {
           const c = { ...CHART_DEFAULTS, ...t.config };
-          const anchor = t.anchor ?? CHART_DEFAULTS.anchor;
-          for (const k of [...CHART_PATH_KEYS, ...(anchor ? CHART_ANCHOR_PATH_KEYS : [])])
-            add(c[k], ...at, 'config', k);
+          for (const k of chartPathKeys(t)) add(c[k], ...at, 'config', k);
           return;
         }
         case 'position':

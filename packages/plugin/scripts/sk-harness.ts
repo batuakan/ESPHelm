@@ -155,6 +155,12 @@ const CHART = {
   format: 'png', type: 'tilelayer', url: '/signalk/chart-tiles/test-chart/{z}/{x}/{y}.png',
   bounds: [[-180, -85], [180, 85]],
 };
+const ROUTE = {
+  name: 'E2E route', description: 'through the chart stand-in',
+  feature: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [
+    [24.940, 60.145], [24.948, 60.149], [24.955, 60.153], [24.962, 60.156], [24.975, 60.160],
+  ] } },
+};
 function tile(z, x, y) {
   const png = new PNG({ width: 256, height: 256 });
   const hue = ((x * 7 + y * 13 + z * 3) % 6);
@@ -184,6 +190,16 @@ module.exports = (app) => ({
         deleteResource: async () => { throw new Error('read only'); },
       },
     });
+    // A route for the chart's active route (ADR-0037), GeoJSON as resources-provider stores it.
+    app.registerResourceProvider({
+      type: 'routes',
+      methods: {
+        listResources: async () => ({ 'e2e-route': ROUTE }),
+        getResource: async (id) => { if (id !== 'e2e-route') throw new Error('not found'); return ROUTE; },
+        setResource: async () => { throw new Error('read only'); },
+        deleteResource: async () => { throw new Error('read only'); },
+      },
+    });
     app.get('/signalk/chart-tiles/test-chart/:z/:x/:y.png', (req, res) => {
       app.tileRequests = (app.tileRequests || 0) + 1;
       res.type('image/png').send(tile(Number(req.params.z), Number(req.params.x), Number(req.params.y)));
@@ -198,7 +214,7 @@ module.exports = (app) => ({
  * first `signalk-server` on PATH. `port` fixes the HTTP port (default: a free one);
  * `sampleData` feeds the server's bundled NMEA 0183 sample (live wind, speed, depth, ...);
  * `putEcho` lists paths whose PUTs are accepted and echoed back as deltas; `autopilotSim`
- * installs the autopilot stand-in above; `chartSim` the charts stand-in.
+ * installs the autopilot stand-in above; `chartSim` the charts stand-in (a test chart and a route).
  */
 export async function startSignalK(
   opts: {

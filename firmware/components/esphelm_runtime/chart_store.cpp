@@ -2,11 +2,15 @@
 
 #ifdef USE_ESPHELM_CHARTS
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <new>
 
 #include "esphome/core/log.h"
+#include "esphelm_chart_route.h"
+
+#include <ArduinoJson.h>
 // Not in lvgl.h: dropping a cached image after its pixels changed.
 #include "src/misc/cache/instance/lv_image_cache.h"
 
@@ -22,7 +26,8 @@ static const char *const TAG = "esphelm.chart";
 static constexpr uint32_t PIN_MS = 1000;     // a tile wanted this recently is never evicted
 static constexpr uint32_t RETRY_MS = 30000;  // failed tiles are retried at most this often
 static constexpr size_t MIN_TILES = 16, MAX_TILES = 48;
-static constexpr size_t MISSES = 32;  // slots for 404s and failures, without pixel memory
+static constexpr size_t MISSES = 32;
+static constexpr size_t ROUTE_MAX_BODY = 16 * 1024;  // 500 points as the plugin sends them  // slots for 404s and failures, without pixel memory
 
 static uint8_t *alloc_tile() {
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
@@ -162,8 +167,33 @@ ChartTileStore::Slot *ChartTileStore::room_for_miss_(uint32_t now) {
   return oldest;
 }
 
+void ChartTileStore::want_route(const std::string &id, uint32_t now) {
+  if (id != this->route_id_) {
+    this->route_id_ = id;
+    this->route_etag_.clear();
+    if (id.empty() && !this->route_.empty()) {
+      this->route_.clear();
+      this->route_loaded_.clear();
+      this->version_++;
+    }
+  }
+  this->route_due_ = !id.empty();
+  this->route_failed_ms_ = 0;  // a new course delta: ask now
+  (void) now;
+}
+
 void ChartTileStore::pump(uint32_t now) {
-  if (!this->in_flight_ && this->fetch_ && !this->wishes_.empty()) {
+  // The route first: it is small, and every chart draws it.
+  if (this->route_due_ && !this->route_in_flight_ && !this->in_flight_ && this->fetch_ &&
+      (this->route_failed_ms_ == 0 || now - this->route_failed_ms_ >= RETRY_MS)) {
+    if (this->fetch_(RequestKind::ROUTE, "/routes/" + this->route_id_, this->route_tag_ + 1, ROUTE_MAX_BODY,
+                     this->route_loaded_ == this->route_id_ ? this->route_etag_ : std::string())) {
+      this->route_tag_++;
+      this->route_in_flight_ = true;
+      this->route_due_ = false;
+    }
+  }
+  if (!this->in_flight_ && !this->route_in_flight_ && this->fetch_ && !this->wishes_.empty()) {
     const Wish *best = &this->wishes_[0];
     for (const auto &w : this->wishes_) {
       if (w.priority < best->priority)
@@ -179,7 +209,7 @@ void ChartTileStore::pump(uint32_t now) {
       char path[160];
       std::snprintf(path, sizeof(path), "/tiles/%s/%d/%d/%d", this->charts_[best->key.chart].c_str(), best->key.z,
                     best->key.x, best->key.y);
-      if (this->fetch_(path, this->tag_ + 1, TILE_BYTES + 1024)) {
+      if (this->fetch_(RequestKind::TILE, path, this->tag_ + 1, TILE_BYTES + 1024, std::string())) {
         this->tag_++;
         this->in_flight_ = true;
         this->in_flight_key_ = best->key;
@@ -189,7 +219,74 @@ void ChartTileStore::pump(uint32_t now) {
   this->wishes_.clear();
 }
 
+/// Reads the plugin's {"points": [[lat, lon, index], ...]} into `out`, checking every field.
+static bool parse_route(const std::string &body, std::vector<ChartTileStore::RoutePoint> &out) {
+  ArduinoJson::JsonDocument doc;
+  if (ArduinoJson::deserializeJson(doc, body) != ArduinoJson::DeserializationError::Ok)
+    return false;
+  ArduinoJson::JsonArrayConst points = doc["points"].as<ArduinoJson::JsonArrayConst>();
+  if (points.isNull() || points.size() < 2 || points.size() > esphelm::chart_route::MAX_POINTS)
+    return false;
+  out.clear();
+  out.reserve(points.size());
+  long last = -1;
+  for (ArduinoJson::JsonVariantConst p : points) {
+    ArduinoJson::JsonArrayConst a = p.as<ArduinoJson::JsonArrayConst>();
+    if (a.isNull() || a.size() != 3 || !a[0].is<double>() || !a[1].is<double>() || !a[2].is<long>())
+      return false;
+    const double lat = a[0].as<double>(), lon = a[1].as<double>();
+    const long index = a[2].as<long>();
+    // Web Mercator stops short of the poles, like the vessel's position.
+    if (!std::isfinite(lat) || !std::isfinite(lon) || std::fabs(lat) > 85.0 || std::fabs(lon) > 180.0 ||
+        index <= last || index > 65535)
+      return false;
+    last = index;
+    out.push_back({static_cast<float>(lat), static_cast<float>(lon), static_cast<uint16_t>(index)});
+  }
+  return true;
+}
+
+void ChartTileStore::on_route_(const HttpResult &r, uint32_t now) {
+  if (!this->route_in_flight_ || r.tag != this->route_tag_)
+    return;
+  this->route_in_flight_ = false;
+  const std::string id = this->route_id_;
+  if (r.status == 304)
+    return;
+  if (r.status == 200 && !r.truncated) {
+    if (parse_route(r.body, this->route_)) {
+      this->route_loaded_ = id;
+      this->route_etag_ = r.etag;
+      ESP_LOGI(TAG, "Route %s: %u points", id.c_str(), (unsigned) this->route_.size());
+    } else {
+      this->route_.clear();
+      this->route_loaded_.clear();
+      ESP_LOGW(TAG, "Route %s refused: not a route this display can draw", id.c_str());
+    }
+    this->version_++;
+    return;
+  }
+  if (r.status == 404 || r.status == 400 || r.truncated) {
+    // No such route, or too big: draw none; the next waypoint still shows.
+    ESP_LOGW(TAG, "Route %s: %s", id.c_str(), r.truncated ? "too big" : "the plugin has no such route");
+    if (!this->route_.empty()) {
+      this->route_.clear();
+      this->version_++;
+    }
+    this->route_loaded_.clear();
+    return;
+  }
+  // The server or the network: keep what is drawn, ask again later.
+  ESP_LOGD(TAG, "Route %s: HTTP %d %s, retrying", id.c_str(), r.status, r.error.c_str());
+  this->route_due_ = true;
+  this->route_failed_ms_ = now == 0 ? 1 : now;
+}
+
 void ChartTileStore::on_http(const HttpResult &r, uint32_t now) {
+  if (r.kind == RequestKind::ROUTE) {
+    this->on_route_(r, now);
+    return;
+  }
   if (r.kind != RequestKind::TILE || !this->in_flight_ || r.tag != this->tag_)
     return;
   this->in_flight_ = false;
@@ -251,6 +348,13 @@ void ChartTileStore::clear() {
   this->budget_tiles_ = 0;
   this->buffers_ = 0;
   this->in_flight_ = false;  // a late result no longer matches
+  this->route_.clear();
+  this->route_.shrink_to_fit();
+  this->route_id_.clear();
+  this->route_loaded_.clear();
+  this->route_etag_.clear();
+  this->route_due_ = false;
+  this->route_in_flight_ = false;
 }
 
 size_t ChartTileStore::loaded() const {

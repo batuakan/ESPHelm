@@ -295,6 +295,15 @@ class EsphelmRuntime : public Component {
   bool lkg_saved_{false};
   std::string lkg_etag_;
   std::vector<uint32_t> listeners_;
+  /// The last value of each subscribed path, as JSON, handed to the tiles of a page when it is
+  /// built: SignalK replays a path only when it is newly subscribed, and values like the course
+  /// or a switch state come only when they change. With the time it came, so a replayed value
+  /// is as stale as it was. Pruned to the subscribed paths.
+  struct LastValue {
+    std::string json;
+    uint32_t ms{0};
+  };
+  std::map<std::string, LastValue> last_values_;
   std::string status_key_;  // last status page shown, to avoid rebuilding it every loop
 
   // Boot guard (ADR-0013): the layout being tried and how often it was shown when the display

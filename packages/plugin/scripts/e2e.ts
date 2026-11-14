@@ -209,6 +209,31 @@ async function main(): Promise<void> {
     });
     check('an unknown chart is 404', unknown.status === 404, String(unknown.status));
 
+    // The active route for chart tiles (ADR-0037): the stand-in's route through the resources API.
+    const routePath = '/signalk/v1/api/esphelm/routes/e2e-route';
+    const route = await fetch(sk.base + routePath, { headers: { Authorization: `Bearer ${rw}` } });
+    const routeBody = (await route.json().catch(() => ({}))) as { points?: number[][] };
+    check(
+      'a device gets the route compact, [lat, lon, index]',
+      route.status === 200 &&
+        routeBody.points?.length === 5 &&
+        JSON.stringify(routeBody.points[0]) === '[60.145,24.94,0]',
+      `${route.status} ${JSON.stringify(routeBody).slice(0, 120)}`,
+    );
+    const routeAgain = await fetch(sk.base + routePath, {
+      headers: { Authorization: `Bearer ${rw}`, 'If-None-Match': route.headers.get('etag') ?? '' },
+    });
+    check(
+      'the same route again with its ETag is 304',
+      routeAgain.status === 304,
+      String(routeAgain.status),
+    );
+    const routeUnknown = await fetch(sk.base + '/signalk/v1/api/esphelm/routes/nope', {
+      headers: { Authorization: `Bearer ${rw}` },
+    });
+    check('an unknown route is 404', routeUnknown.status === 404, String(routeUnknown.status));
+    check('routes need a device token', (await fetch(sk.base + routePath)).status === 401);
+
     // Alarms (ADR-0014): another source raises a notification with sound; a display
     // acknowledges it; the plugin silences it, and keeps it silent when it is sent again.
     const notifPath = 'notifications.environment.depth.belowTransducer';

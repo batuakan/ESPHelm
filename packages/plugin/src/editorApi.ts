@@ -82,6 +82,7 @@ function readBody(req: Request, limit: number): Promise<Buffer | 'too-large'> {
  *   GET    /plugins/esphelm/api/widgets
  *   GET    /plugins/esphelm/api/paths
  *   GET    /plugins/esphelm/api/charts
+ *   GET    /plugins/esphelm/api/routes/:id         (the route as displays get it, for the preview)
  *   GET    /plugins/esphelm/api/layouts            GET|PUT|DELETE /plugins/esphelm/api/layouts/:id
  *   GET    /plugins/esphelm/api/devices            PUT|DELETE     /plugins/esphelm/api/devices/:id
  *   GET|POST /plugins/esphelm/api/firmware          DELETE /plugins/esphelm/api/firmware/:buildId
@@ -101,6 +102,16 @@ export function registerEditorApi(router: IRouter, service: Service): void {
   // Charts the boat's SignalK charts plugin offers, for chart pages (ADR-0012)
   router.get(`${EDITOR_API_PREFIX}/charts`, async (_req: Request, res: Response) => {
     res.json(await service.tiles.listCharts());
+  });
+
+  // The active route as displays get it (ADR-0037), for the chart preview.
+  router.get(`${EDITOR_API_PREFIX}/routes/:id`, async (req: Request, res: Response) => {
+    const route = await service.routes.compact(String(req.params.id));
+    if (!route.ok) {
+      res.status(route.status).json({ error: route.error, message: route.message });
+      return;
+    }
+    res.type('application/json').send(route.bytes);
   });
 
   // SignalK paths for the editor's path picker

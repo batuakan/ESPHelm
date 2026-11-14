@@ -541,6 +541,12 @@ void check_chart(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile
     else
       chart->anchor = obj["anchor"].as<bool>();
   }
+  if (has(obj, "route")) {
+    if (!obj["route"].is<bool>())
+      chk.add(ptr + "/route", "INVALID_TYPE");
+    else
+      chart->route = obj["route"].as<bool>();
+  }
   if (has(obj, "config")) {
     JsonVariantConst config = obj["config"];
     const std::string cp = ptr + "/config";
@@ -553,6 +559,10 @@ void check_chart(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile
       string_field(chk, c, cp, "anchorPositionPath", false, StrKind::PATH, chart->anchor_position_path);
       string_field(chk, c, cp, "anchorRadiusPath", false, StrKind::PATH, chart->anchor_radius_path);
       string_field(chk, c, cp, "anchorAlarmPath", false, StrKind::PATH, chart->anchor_alarm_path);
+      string_field(chk, c, cp, "activeRoutePath", false, StrKind::PATH, chart->active_route_path);
+      string_field(chk, c, cp, "nextPointPath", false, StrKind::PATH, chart->next_point_path);
+      string_field(chk, c, cp, "previousPointPath", false, StrKind::PATH, chart->previous_point_path);
+      string_field(chk, c, cp, "distancePath", false, StrKind::PATH, chart->distance_path);
     }
   }
   tile.chart = std::move(chart);

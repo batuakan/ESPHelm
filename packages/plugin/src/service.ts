@@ -4,6 +4,7 @@ import { FirmwareStore, GITHUB_RELEASES } from './firmware.js';
 import { httpPort, securityMode, type PluginHost, type SecurityMode } from './host.js';
 import { Store, type DeviceRecord, type StoredLayout } from './store.js';
 import { resourcesChartSource, TileService, type ChartSource } from './tiles.js';
+import { resourcesRouteSource, RouteService, type RouteSource } from './routes.js';
 
 export const PLUGIN_ID = 'esphelm';
 
@@ -41,6 +42,7 @@ export interface FirmwareOffer {
 export interface ServiceOptions {
   now?: () => Date;
   charts?: ChartSource;
+  routes?: RouteSource;
   /** Where Check GitHub looks (tests point it elsewhere). */
   releasesUrl?: string;
   fetch?: typeof fetch;
@@ -58,6 +60,8 @@ export class Service {
   readonly fetch: typeof fetch;
   /** RGB565 chart tiles for displays (ADR-0012). */
   readonly tiles: TileService;
+  /** The active route's points for chart tiles (ADR-0037). */
+  readonly routes: RouteService;
   /** Alarm acknowledgements from displays (ADR-0014). */
   readonly alarms: AlarmAcks;
   private filtering = false;
@@ -73,6 +77,7 @@ export class Service {
     this.tiles = new TileService(
       options.charts ?? resourcesChartSource(host.resourcesApi, () => httpPort(host)),
     );
+    this.routes = new RouteService(options.routes ?? resourcesRouteSource(host.resourcesApi));
     this.alarms = new AlarmAcks(host, PLUGIN_ID);
   }
 

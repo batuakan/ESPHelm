@@ -1592,8 +1592,53 @@ fieldset.modes {
   /* the display darkens and red-tints charts at night */
   filter: brightness(0.35) sepia(1) hue-rotate(-50deg) saturate(3);
 }
+/* The active route and next waypoint (ADR-0037): magenta, red at night, as on the display. */
+.chart-course {
+  --route: #d0209c;
+}
+.chart-course.night {
+  --route: var(--tile-text);
+}
+.chart-course .leg {
+  stroke: var(--route);
+  stroke-linecap: round;
+}
+.chart-course .leg.behind {
+  opacity: 0.5;
+}
+.chart-course .point {
+  fill: var(--canvas-bg);
+  stroke: var(--route);
+}
+.chart-course .to-waypoint {
+  stroke: var(--route);
+  stroke-width: 2;
+  opacity: 0.7;
+}
+.chart-course .ring {
+  fill: color-mix(in srgb, var(--canvas-bg) 60%, transparent);
+  stroke: var(--route);
+}
+.chart-course .arrow {
+  fill: var(--route);
+}
+.chart-course .outline {
+  fill: var(--canvas-bg);
+}
+.chart-course .distance {
+  fill: var(--route);
+  font-size: 18px;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--canvas-bg);
+  stroke-width: 4px;
+}
 .chart-vessel polygon {
   fill: var(--zone-alarm);
+}
+/* A black outline under the vessel, as on the display. */
+.chart-vessel polygon.outline {
+  fill: #000;
 }
 .chart-anchor .ring {
   fill: var(--zone-normal);

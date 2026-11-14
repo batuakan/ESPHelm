@@ -133,6 +133,12 @@ struct ChartConfig {
   std::string anchor_position_path{"navigation.anchor.position"};
   std::string anchor_radius_path{"navigation.anchor.maxRadius"};
   std::string anchor_alarm_path{"notifications.navigation.anchor"};
+  // The active route and the next waypoint (ADR-0037).
+  bool route{true};
+  std::string active_route_path{"navigation.course.activeRoute"};
+  std::string next_point_path{"navigation.course.nextPoint"};
+  std::string previous_point_path{"navigation.course.previousPoint"};
+  std::string distance_path{"navigation.course.calcValues.distance"};
 };
 
 /// Engine slot icons, in the order of ENGINE_ICON_NAMES (esphelm_engine_shapes.h ICONS).

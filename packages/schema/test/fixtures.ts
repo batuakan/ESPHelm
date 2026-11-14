@@ -183,3 +183,21 @@ export interface SoundCases {
 export const SOUND_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'sound.cases.json'), 'utf8'),
 ) as SoundCases;
+
+/** Chart route cases (ADR-0037), shared by the TS and C++ tests. */
+export interface ChartRouteCases {
+  arrows: {
+    note: string;
+    dx: number;
+    dy: number;
+    w: number;
+    h: number;
+    inset: number;
+    expected: { onScreen: boolean; x: number; y: number; angle: number };
+  }[];
+  ids: { href: string; expected: string | null }[];
+}
+
+export const CHART_ROUTE_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'chart-route.cases.json'), 'utf8'),
+) as ChartRouteCases;

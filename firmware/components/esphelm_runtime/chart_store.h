@@ -4,7 +4,8 @@
 // and kept once, whatever the number of chart tiles. Each chart says every tick which tiles
 // cover its view (want); the store fetches the nearest missing one on the tile worker, keeps up
 // to a budget of 256 px RGB565 tiles in PSRAM, and evicts the least recently wanted when full,
-// never one a chart wanted in the last second. Main loop only.
+// never one a chart wanted in the last second. It also keeps the points of the active route
+// (ADR-0037), which every chart draws. Main loop only.
 
 #include <cstddef>
 #include <cstdint>
@@ -27,9 +28,16 @@ class ChartTileStore {
  public:
   static constexpr int TILE = 256;
   static constexpr size_t TILE_BYTES = static_cast<size_t>(TILE) * TILE * 2;
-  /// GET `path` under the device API on the tile worker, `tag` coming back in the result.
-  /// False when the worker is busy or the display isn't authorized yet.
-  using Fetch = std::function<bool(const std::string &path, uint32_t tag, size_t max_body)>;
+  /// GET `path` under the device API on the tile worker, `tag` coming back in the result, with
+  /// If-None-Match `etag` when not empty. False when the worker is busy or the display isn't
+  /// authorized yet.
+  using Fetch = std::function<bool(RequestKind kind, const std::string &path, uint32_t tag, size_t max_body,
+                                   const std::string &etag)>;
+  /// A point of the active route: where, and its place in the route (a thinned route skips some).
+  struct RoutePoint {
+    float lat, lon;
+    uint16_t index;
+  };
 
   ~ChartTileStore() { this->clear(); }
 
@@ -50,7 +58,14 @@ class ChartTileStore {
   /// A tile worker result.
   void on_http(const HttpResult &result, uint32_t now);
 
-  /// Bumped whenever a tile arrives, so charts know to redraw.
+  /// A chart follows the active route `id` (from navigation.course.activeRoute; empty: there is
+  /// none). Every call with a route asks for its points again, answered 304 when unchanged, so a
+  /// route edited while active shows on the next course delta.
+  void want_route(const std::string &id, uint32_t now);
+  /// The active route's points, in route order; empty while there is none or it isn't loaded.
+  const std::vector<RoutePoint> &route() const { return this->route_; }
+
+  /// Bumped whenever a tile or the route arrives, so charts know to redraw.
   uint32_t version() const { return this->version_; }
 
   /// Forget every tile and free their memory (a layout without charts).
@@ -85,6 +100,7 @@ class ChartTileStore {
   /// A slot for a 404 or failure (no pixel memory needed).
   Slot *room_for_miss_(uint32_t now);
   size_t budget_();
+  void on_route_(const HttpResult &r, uint32_t now);
 
   Fetch fetch_;
   std::vector<std::string> charts_;
@@ -96,6 +112,16 @@ class ChartTileStore {
   Key in_flight_key_;
   uint32_t tag_{0};
   uint32_t version_{0};
+
+  // The active route (ADR-0037).
+  std::string route_id_;        // what the charts follow
+  std::string route_loaded_;    // whose points route_ holds
+  std::string route_etag_;
+  std::vector<RoutePoint> route_;
+  bool route_due_{false};       // ask the plugin (again)
+  bool route_in_flight_{false};
+  uint32_t route_tag_{0};
+  uint32_t route_failed_ms_{0};
 };
 
 }  // namespace esphelm_runtime

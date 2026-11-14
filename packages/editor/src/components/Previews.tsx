@@ -305,7 +305,14 @@ export function TilePreview(props: {
   /** Clock only: the layout's time zone as a POSIX rule (settings.timeZone.posix); absent: UTC. */
   timeZone?: string;
   /** Chart only: its chart, the tile's size on the display, and the night theme. */
-  chart?: { info: ChartInfo | undefined; width: number; height: number; night: boolean };
+  chart?: {
+    info: ChartInfo | undefined;
+    width: number;
+    height: number;
+    night: boolean;
+    /** The active route's points (ADR-0037), when one is active and loaded. */
+    route?: [number, number, number][];
+  };
   /** Engine only: the tile's size on the display, in pixels, and the display's font ladder. */
   engineBox?: { width: number; height: number };
   fontLines?: readonly number[];
@@ -350,6 +357,7 @@ export function TilePreview(props: {
         width={props.chart?.width ?? 480}
         height={props.chart?.height ?? 480}
         night={props.chart?.night ?? false}
+        route={props.chart?.route}
       />
     );
   const value = tile.path ? values.get(tile.path) : undefined;

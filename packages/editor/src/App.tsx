@@ -12,12 +12,15 @@ import {
 import {
   DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
   DEFAULT_FONT_LINE_HEIGHTS,
+  CHART_DEFAULTS,
   CHART_FIT,
   GRAPH_FIT,
   TEMPLATES,
   TILE_TYPES,
   historyCount,
+  routeId,
   validateLayout,
+  type ChartTile,
   type Layout,
   type EngineSlotName,
   type Page,
@@ -239,6 +242,32 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     values.forEach((v, k) => m.set(k, v));
     return m;
   }, [paths, values]);
+
+  // The active route of the page's chart tiles (ADR-0037), as the display gets it.
+  const routeChart = page?.tiles.find(
+    (t): t is ChartTile => t.type === 'chart' && (t.route ?? CHART_DEFAULTS.route),
+  );
+  const activeRoute = routeChart
+    ? routeId(
+        (shownValues.get(routeChart.config?.activeRoutePath ?? CHART_DEFAULTS.activeRoutePath) as
+          | { href?: unknown }
+          | null
+          | undefined)?.href,
+      )
+    : undefined;
+  const [route, setRoute] = useState<{ id: string; points: [number, number, number][] } | undefined>();
+  useEffect(() => {
+    if (!activeRoute) return;
+    let cancelled = false;
+    api.route(activeRoute).then(
+      (r) => !cancelled && setRoute({ id: activeRoute, points: r.points }),
+      () => !cancelled && setRoute(undefined),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, activeRoute]);
+  const routePoints = activeRoute && route?.id === activeRoute ? route.points : undefined;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -719,6 +748,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   tileWidth={(t) => tileBox(t).width}
                   timeZone={layout.settings?.timeZone?.posix}
                   charts={charts}
+                  route={routePoints}
                   tileSize={tileBox}
                   night={layout.theme === 'night'}
                   fontLines={fontLines}
@@ -850,9 +880,9 @@ function chartSizeHint(px: number, known: boolean): string {
   const where = known ? 'on this display' : 'on a 480×480 display';
   const what =
     px >= CHART_FIT.info
-      ? 'the map with zoom buttons and the position line'
+      ? 'the map with zoom buttons, the position line and the distance to the next waypoint'
       : px >= CHART_FIT.buttons
-        ? `the map with zoom buttons; ${CHART_FIT.info} px or more adds the position line`
+        ? `the map with zoom buttons; ${CHART_FIT.info} px or more adds the position line and the distance to the next waypoint`
         : `the map only (an anchor alarm frames it in red); ${CHART_FIT.buttons} px or more adds zoom buttons`;
   return `About ${px} px ${where}: ${what}.`;
 }

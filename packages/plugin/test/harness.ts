@@ -9,6 +9,7 @@ import { registerDeviceApi } from '../src/deviceApi.js';
 import { registerEditorApi } from '../src/editorApi.js';
 import type { PluginHost } from '../src/host.js';
 import { Service } from '../src/service.js';
+import type { RouteSource } from '../src/routes.js';
 import type { ChartSource } from '../src/tiles.js';
 
 const SCHEMA_FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '../../schema/fixtures');
@@ -59,6 +60,7 @@ export async function startHarness(
   opts: {
     dataDir?: string;
     charts?: ChartSource;
+    routes?: RouteSource;
     releasesUrl?: string;
     fetch?: typeof fetch;
   } = {},
@@ -123,6 +125,7 @@ export async function startHarness(
   const service = new Service(host, {
     now: () => new Date((now += 1000)),
     ...(opts.charts ? { charts: opts.charts } : {}),
+    ...(opts.routes ? { routes: opts.routes } : {}),
     ...(opts.releasesUrl ? { releasesUrl: opts.releasesUrl } : {}),
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   });
