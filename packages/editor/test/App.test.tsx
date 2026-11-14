@@ -111,6 +111,40 @@ describe('editor', { timeout: 20000 }, () => {
     expect((await screen.findByRole('status')).textContent).toMatch(/adopted/);
   });
 
+  it('renames a display and shows the end of its id', async () => {
+    const server = fakeServer([device('adopted')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    // The id's last four characters, as on the display's Info tab.
+    const tail = p4.deviceId.replace(/[^0-9a-zA-Z]/g, '').slice(-4);
+    expect(within(list).getByText(new RegExp(`…${tail}`))).toBeTruthy();
+
+    fireEvent.click(await within(list).findByRole('button', { name: 'Rename' }));
+    fireEvent.change(within(list).getByRole('textbox', { name: 'Display name' }), { target: { value: '  Helm ' } });
+    fireEvent.click(within(list).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(server.requests).toContainEqual({ method: 'PUT', path: `/devices/${p4.deviceId}`, body: { name: 'Helm' } }),
+    );
+    expect(await within(list).findByText('Helm')).toBeTruthy();
+
+    // An empty name clears it: the board shows again.
+    fireEvent.click(within(list).getByRole('button', { name: 'Rename' }));
+    fireEvent.change(within(list).getByRole('textbox', { name: 'Display name' }), { target: { value: '' } });
+    fireEvent.click(within(list).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(server.requests).toContainEqual({ method: 'PUT', path: `/devices/${p4.deviceId}`, body: { name: null } }),
+    );
+
+    // Cancel sends nothing.
+    const puts = () => server.requests.filter((r) => r.method === 'PUT').length;
+    const before = puts();
+    fireEvent.click(within(list).getByRole('button', { name: 'Rename' }));
+    fireEvent.change(within(list).getByRole('textbox', { name: 'Display name' }), { target: { value: 'Nav' } });
+    fireEvent.click(within(list).getByRole('button', { name: 'Cancel' }));
+    expect(within(list).queryByRole('textbox', { name: 'Display name' })).toBeNull();
+    expect(puts()).toBe(before);
+  });
+
   it('builds a tile with the path picker, blocks invalid labels, and saves & sends', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();
