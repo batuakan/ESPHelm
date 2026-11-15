@@ -23,6 +23,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-autopilot-night.png">
  <img width="200px" src="/docs/images/display-grid-day.png">
  <img width="200px" src="/docs/images/display-alarm-night.png">
+ <img width="200px" src="/docs/images/display-alarms-day.png">
  <img width="200px" src="/docs/images/display-graph-day.png">
  <img width="200px" src="/docs/images/display-heading-tape-night.png">
  <img width="200px" src="/docs/images/display-center-zero-day.png">
@@ -106,7 +107,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Charts:** a chart tile with anchor watch and the active route (SignalK charts, PSRAM boards), beside a wind rose or depth, or filling its page. The next waypoint shows as a ring, or as an arrow at the edge with the distance when it's off the chart. Several charts share their map tiles, so a second chart of the same chart and zoom costs no extra memory.
 - **Templates** porting the original apps (wind, speeds, energy, engine, switchboard, autopilot, chart) and denser layouts for 720×720 displays.
 - **Sharing layouts:** export a layout as a file and import it on any display, here or on another boat, with a list to replace the SignalK paths and charts that server doesn't have. Displays on one boat can copy another display's layout, or link to it so both show one layout.
-- **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
+- **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. An **alarms panel** tile lists every active alarm at once, worst first, with how long each has been on and its own ACK (optionally only one branch, e.g. the electrical alarms). On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
 - **Touch sounds:** a short click when you press a button or tile, with the volume and an on/off switch in the editor's display settings and on the display.
 - **Three display themes:** *Day* (light, for sunlight), *Dark* (a dark page with full colours, like the editor's dark theme) and *Night* (red on black, for night vision). Automatic day/night switches between Night and your Day or Dark.
 - **Black-and-white displays:** reflective LCDs, readable in full sun without a backlight, get tiles of their own: value, bar, position and clock as outlined frames, a heavy frame for a warning and an inverted tile for an alarm, every pixel pure black or white. The editor previews such a display in black and white, with *Plain* and *Inverted* themes. Its firmware carries only these tiles, and colour firmware only the colour ones. A display without touch uses its buttons: the next page, Plain or Inverted, and acknowledge an alarm.
@@ -181,7 +182,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 112 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 116 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

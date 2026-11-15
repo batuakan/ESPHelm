@@ -38,7 +38,8 @@ enum class TileType : uint8_t {
   HEADING_TAPE,
   CLOCK,
   CHART,
-  ENGINE
+  ENGINE,
+  ALARMS
 };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
@@ -123,6 +124,12 @@ struct ClockConfig {
   bool utc{false};
 };
 
+/// Alarms tile settings (ADR-0038): which notifications it lists.
+struct AlarmsConfig {
+  std::string prefix{"notifications"};
+  bool show_acknowledged{true};
+};
+
 /// Chart tile settings (ADR-0030): which SignalK chart, zoom, and the paths it follows.
 struct ChartConfig {
   std::string chart;
@@ -194,6 +201,8 @@ struct Tile {
   std::shared_ptr<const HeadingTapeConfig> tape;
   // clock
   ClockConfig clock;
+  // alarms (data.label is its title)
+  AlarmsConfig alarms;
   // chart
   std::shared_ptr<const ChartConfig> chart;
   // engine: the RPM in data, min, max and zones like a gauge; the slots here

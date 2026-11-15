@@ -198,7 +198,7 @@ export function GridCanvas(props: Props) {
               data-testid={`tile-${tile.id}`}
             >
               <span className="tile-label">
-                {tile.type === 'wind_rose' || tile.type === 'chart' || tile.type === 'engine'
+                {tile.type === 'wind_rose' || tile.type === 'chart' || tile.type === 'engine' || tile.type === 'alarms'
                   ? ''
                   : tile.type === 'clock'
                     ? [tile.label, tile.utc ? 'UTC' : ''].filter(Boolean).join(' ')
@@ -226,7 +226,9 @@ export function GridCanvas(props: Props) {
                     : undefined
                 }
                 engineBox={tile.type === 'engine' ? (props.tileSize?.(tile) ?? { width: 480, height: 480 }) : undefined}
-                fontLines={tile.type === 'engine' ? props.fontLines : undefined}
+                alarmsBox={tile.type === 'alarms' ? (props.tileSize?.(tile) ?? { width: 480, height: 240 }) : undefined}
+                fontLines={tile.type === 'engine' || tile.type === 'alarms' ? props.fontLines : undefined}
+                night={tile.type === 'alarms' ? (props.night ?? false) : undefined}
                 selectedSlot={
                   tile.id === selectedId && (tile.type === 'wind_rose' || tile.type === 'engine')
                     ? (props.selectedSlot as SlotName | undefined)

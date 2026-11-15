@@ -1,0 +1,68 @@
+{
+  "description": "Alarms panel (ADR-0038): alarmAge() and underPrefix() in src/alarms.ts and esphelm_alarm_age.h must both reproduce these.",
+  "ages": [
+    {
+      "seconds": 0,
+      "expected": "now"
+    },
+    {
+      "seconds": 59,
+      "expected": "now"
+    },
+    {
+      "seconds": 60,
+      "expected": "1 min"
+    },
+    {
+      "seconds": 3599,
+      "expected": "59 min"
+    },
+    {
+      "seconds": 3600,
+      "expected": "1 h 00"
+    },
+    {
+      "seconds": 3725,
+      "expected": "1 h 02"
+    },
+    {
+      "seconds": 86399,
+      "expected": "23 h 59"
+    },
+    {
+      "seconds": 86400,
+      "expected": "1 d"
+    },
+    {
+      "seconds": 200000,
+      "expected": "2 d"
+    }
+  ],
+  "prefixes": [
+    {
+      "path": "notifications.electrical.battery",
+      "prefix": "notifications.electrical",
+      "expected": true
+    },
+    {
+      "path": "notifications.electrical",
+      "prefix": "notifications.electrical",
+      "expected": true
+    },
+    {
+      "path": "notifications.electricalx",
+      "prefix": "notifications.electrical",
+      "expected": false
+    },
+    {
+      "path": "notifications.navigation.anchor",
+      "prefix": "notifications",
+      "expected": true
+    },
+    {
+      "path": "notifications.e",
+      "prefix": "notifications.el",
+      "expected": false
+    }
+  ]
+}

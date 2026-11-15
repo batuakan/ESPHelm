@@ -790,6 +790,75 @@ async function main(): Promise<void> {
       (await fw.waitLog(/belowTransducer cleared/)) && (await fw.waitLog(/house\.voltage cleared/)),
     );
 
+    // 9b2. Alarms panel (ADR-0038): a tile listing every active notification worst first, each
+    //      with its ACK, beside a narrow one that lists only the electrical branch and drops
+    //      acknowledged alarms. The banner stays above the page.
+    const ALTERNATOR = 'notifications.electrical.alternator';
+    const alarmsLayout = fixture('valid/alarms.json');
+    await json(
+      'PUT',
+      `/plugins/esphelm/api/layouts/${String(alarmsLayout.id)}`,
+      admin,
+      alarmsLayout,
+    );
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: alarmsLayout.id,
+    });
+    check(
+      'alarms panel: the layout renders',
+      await fw.waitLog(/Showing fetched layout "alarms" \(1 pages/),
+    );
+    notify(BATTERY, 'warn', 'House battery low', ['visual']);
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    notify(ALTERNATOR, 'alert', 'Alternator not charging', ['visual']);
+    publish({ 'environment.depth.belowTransducer': 2.1 });
+    check(
+      'alarms panel: the three alarms reach the display',
+      (await fw.waitLog(/ALERT notifications\.electrical\.alternator/)) &&
+        (await fw.waitLog(/ALARM notifications\.environment\.depth\.belowTransducer/, 15000, 2)),
+    );
+    await sleep(1500);
+    await fw.screenshot('91-alarms-panel', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'all ack:0');
+    check(
+      "alarms panel: a row's ACK acknowledges that alarm (the worst, first row)",
+      await fw.waitLog(
+        /Acknowledging notifications\.environment\.depth\.belowTransducer/,
+        15000,
+        2,
+      ),
+    );
+    let panelSilenced = false;
+    for (let i = 0; i < 20 && !panelSilenced; i++) {
+      panelSilenced = JSON.stringify(await methodOf(DEPTH)) === '["visual"]';
+      if (!panelSilenced) await sleep(250);
+    }
+    check('alarms panel: the plugin silenced it', panelSilenced);
+    await sleep(1500);
+    await fw.screenshot('92-alarms-acked', shots);
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(alarmsLayout.id)}`, admin, {
+      ...alarmsLayout,
+      theme: 'night',
+    });
+    check(
+      'alarms panel: the night layout renders',
+      await fw.waitLog(/Showing fetched layout "alarms" \(1 pages/, 15000, 2),
+    );
+    publish({ 'environment.depth.belowTransducer': 2.1 });
+    await sleep(1500);
+    await fw.screenshot('93-alarms-night', shots);
+    notify(DEPTH, 'normal', '', []);
+    notify(BATTERY, 'normal', '', []);
+    notify(ALTERNATOR, 'normal', '', []);
+    check(
+      'alarms panel: all clear',
+      (await fw.waitLog(/belowTransducer cleared/, 15000, 2)) &&
+        (await fw.waitLog(/alternator cleared/)),
+    );
+    publish({ 'environment.depth.belowTransducer': 4.6 });
+    await sleep(1500);
+    await fw.screenshot('94-alarms-none', shots);
+
     // 9c. Display settings (ADR-0015): the start page, day/night by environment.sun, and the
     //     screen switching off without a touch (woken by an alarm and by a touch). The SDL
     //     build has no backlight, so brightness is only logged.

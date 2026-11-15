@@ -1,4 +1,5 @@
 #include "layout_parser.h"
+#include "esphelm_alarm_age.h"
 
 #include <cmath>
 #include <cstring>
@@ -673,6 +674,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::CHART;
   } else if (t != nullptr && std::strcmp(t, "engine") == 0) {
     tile.type = TileType::ENGINE;
+  } else if (t != nullptr && std::strcmp(t, "alarms") == 0) {
+    tile.type = TileType::ALARMS;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -718,6 +721,19 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
   }
   if (tile.type == TileType::CHART) {
     check_chart(chk, obj, ptr, tile);
+    return;
+  }
+  if (tile.type == TileType::ALARMS) {
+    string_field(chk, obj, ptr, "label", false, StrKind::LABEL, tile.data.label);
+    // notifications, or a branch of it, at most 96 characters (NotificationPrefix).
+    if (has(obj, "prefix") &&
+        string_field(chk, obj, ptr, "prefix", false, StrKind::PATH, tile.alarms.prefix) &&
+        (tile.alarms.prefix.size() > 96 ||
+         !esphelm::alarm_age::under_prefix(tile.alarms.prefix.c_str(), "notifications"))) {
+      chk.add(ptr + "/prefix", "INVALID_PATH");
+      tile.alarms.prefix = "notifications";
+    }
+    bool_field(chk, obj, ptr, "showAcknowledged", tile.alarms.show_acknowledged);
     return;
   }
   if (tile.type == TileType::WIND_ROSE) {

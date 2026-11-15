@@ -96,7 +96,7 @@ lv_obj_t *make_history_mark(lv_obj_t *parent, const Colors &c) {
 
 void tile_types(std::vector<const char *> &out, bool psram) {
   for (const char *t : {"value", "gauge", "bar", "switch", "position", "wind_rose", "autopilot", "graph",
-                        "heading_tape", "clock", "engine"})
+                        "heading_tape", "clock", "engine", "alarms"})
     out.push_back(t);
   // Chart tiles keep their map tiles in PSRAM (ADR-0030).
   if (psram)
@@ -128,6 +128,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return make_heading_tape_widget(cell, tile, env);
     case esphelm::TileType::CLOCK:
       return make_clock_widget(cell, tile, env);
+    case esphelm::TileType::ALARMS:
+      return make_alarms_widget(cell, tile, env);
     case esphelm::TileType::ENGINE:
       // Like the rose, it sits on the page background, as on the legacy engine page.
       lv_obj_set_style_bg_color(cell, env.colors.background, LV_PART_MAIN);
