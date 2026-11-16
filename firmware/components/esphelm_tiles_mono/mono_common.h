@@ -48,6 +48,7 @@ std::unique_ptr<Widget> make_value(lv_obj_t *cell, const esphelm::Tile &tile, co
 std::unique_ptr<Widget> make_bar(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_clock(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_position(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_wind_rose(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 /// A tile type this set doesn't render (the plugin doesn't send one; a cached layout might).
 std::unique_ptr<Widget> make_unsupported(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
