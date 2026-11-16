@@ -5,7 +5,7 @@
 # (github.com/waveshareteam/ESP32-S3-RLCD-4.2, examples/esphome).
 #
 # The panel driver is kylehase/ESPHome-ST7305-RLCD (Apache-2.0), an ESPHome binary display: LVGL
-# draws into its buffer and `update_when_display_idle` sends each finished frame to the panel.
+# draws into its buffer and `on_draw_end` sends each finished frame to the panel.
 
 esphome:
   min_version: 2026.1.1
@@ -116,6 +116,12 @@ rtttl:
 
 lvgl:
   displays: [board_display]
-  # Draw a frame, then let the driver send it to the panel; no new frame while it is busy.
-  update_when_display_idle: true
+  # Draw a frame, then let the driver send it to the panel (on_draw_end below). Not
+  # `update_when_display_idle: true`: from ESPHome 2026.10 that pauses LVGL's refresh timer for
+  # 5 minutes while the display's `is_idle()` (Component::is_idle(), true only once its loop is
+  # disabled) is false. The ST7305 driver never disables its loop, so the screen would be
+  # redrawn about every 5 minutes.
+  update_when_display_idle: false
+  on_draw_end:
+    - component.update: board_display
   buffer_size: 100%
