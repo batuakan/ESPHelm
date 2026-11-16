@@ -78,7 +78,7 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
 | Situation | Screen |
 |---|---|
 | Boot with a cached layout | the cached layout (`cur`, else `lkg`), before any network traffic |
-| The setup network is up (ADR-0026) | "Set up Wi-Fi": a QR code to join it, its name and this display's password, then "choose the boat's network"; the menu button is in the corner |
+| The setup network is up (ADR-0026) | "Set up Wi-Fi": a QR code to join it, its name and this display's password, then "choose the boat's network" (on a display at least 5:4 wide, such as the 400×300 RLCD, the code is on the left with the text beside it, and the footer is dropped if the text still does not fit: `esphelm_status_layout.h`); the menu button is in the corner |
 | Wi-Fi not connected | "Joining Wi-Fi" |
 | No server found yet (mDNS) | "Looking for a SignalK server" |
 | No SignalK connection or token yet | "Connecting to SignalK" + host:port |
