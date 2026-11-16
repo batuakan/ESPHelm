@@ -305,6 +305,46 @@ export const POSITION_DEFAULTS = {
   format: 'ddm',
 } as const;
 
+/** A notifications path, or a prefix of one: `notifications` and its branches (ADR-0038). */
+export const NotificationPrefix = Type.String({
+  pattern: '^notifications(\\.[A-Za-z0-9_-]+)*$',
+  maxLength: 96,
+  errorCode: 'INVALID_PATH',
+  description: 'notifications, or a branch of it such as notifications.electrical.',
+});
+
+/**
+ * Alarms panel (ADR-0038): every active SignalK notification (`notifications.*` in a state above
+ * normal), worst first, with its state, message and age and an ACK per row. The display reads the
+ * alarm banner's table (ADR-0014), so the tile follows no paths of its own; the banner stays.
+ */
+export const AlarmsTile = Type.Object(
+  {
+    type: Type.Literal('alarms'),
+    ...Placement,
+    label: Type.Optional(Label),
+    prefix: Type.Optional(NotificationPrefix),
+    showAcknowledged: Type.Optional(
+      Type.Boolean({ description: 'List acknowledged alarms too (dimmed). Absent: true.' }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** Defaults for omitted alarms tile fields. */
+export const ALARMS_DEFAULTS = {
+  label: 'Alarms',
+  prefix: 'notifications',
+  showAcknowledged: true,
+} as const;
+
+/**
+ * What an alarms tile draws (ADR-0038), in device pixels: rows `rowHeight` tall (a touch target),
+ * as many as fit under the title; an ACK button per row from `ackWidth` of content width.
+ * Generated into esphelm_sizes.h.
+ */
+export const ALARMS_FIT = { rowHeight: 48, ackWidth: 220 } as const;
+
 /**
  * Wind rose: apparent and true wind pointers relative to the bow, heading, and named slots at
  * predetermined positions in the centre, each showing a user-chosen DataItem.
@@ -734,6 +774,7 @@ export const TILE_TYPES = {
   clock: ClockTile,
   chart: ChartTile,
   engine: EngineTile,
+  alarms: AlarmsTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -756,6 +797,7 @@ export const Tile = Type.Union([
   ClockTile,
   ChartTile,
   EngineTile,
+  AlarmsTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -769,4 +811,5 @@ export type HeadingTapeTile = Type.Static<typeof HeadingTapeTile>;
 export type ClockTile = Type.Static<typeof ClockTile>;
 export type ChartTile = Type.Static<typeof ChartTile>;
 export type EngineTile = Type.Static<typeof EngineTile>;
+export type AlarmsTile = Type.Static<typeof AlarmsTile>;
 export type Tile = Type.Static<typeof Tile>;

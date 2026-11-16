@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -53,6 +54,9 @@ static lv_color_t colour_of(Severity s, const Colors &c) {
   }
 }
 
+lv_color_t AlarmBanner::colour(Severity s, const Colors &c) { return colour_of(s, c); }
+const char *AlarmBanner::name(Severity s) { return state_name(s); }
+
 void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantConst value) {
   Severity sev = Severity::NONE;
   bool sound = false;
@@ -72,7 +76,7 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
       if (this->pending_ == it->path)
         this->pending_.clear();
       this->entries_.erase(it);
-      this->dirty_ = true;
+      this->changed_();
     }
     return;
   }
@@ -97,13 +101,14 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     e.severity = sev;
     e.sound = e.had_sound = sound;
     e.message = std::move(text);
+    e.since_ms = millis();
     ESP_LOGW(TAG, "%s %s: %s", state_name(sev), e.path.c_str(), e.message.c_str());
     if (sev >= Severity::ALARM)
       this->wake_ = true;
     if (sound)
       this->sound_generation_++;
     this->entries_.push_back(std::move(e));
-    this->dirty_ = true;
+    this->changed_();
     return;
   }
   Entry &e = *it;
@@ -113,11 +118,12 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     if (sev > e.severity && sev >= Severity::ALARM)
       this->wake_ = true;
     e.severity = sev;
+    e.since_ms = millis();
     e.acked = false;
     e.had_sound = sound;
     if (sound)
       this->sound_generation_++;
-    this->dirty_ = true;
+    this->changed_();
   } else if (sound && !e.had_sound && !e.acked) {
     // Same state, sound added: it asks to be heard now.
     e.had_sound = true;
@@ -126,12 +132,12 @@ void AlarmBanner::on_value(const std::string &path, ArduinoJson::JsonVariantCons
     // Same state, sound removed: acknowledged by this or another display, or another app.
     ESP_LOGI(TAG, "%s acknowledged", e.path.c_str());
     e.acked = true;
-    this->dirty_ = true;
+    this->changed_();
   }
   e.sound = sound;
   if (e.message != text) {
     e.message = std::move(text);
-    this->dirty_ = true;
+    this->changed_();
   }
 }
 
@@ -155,7 +161,7 @@ void AlarmBanner::ack_result(int status) {
   if (status != 200 && status != 404)
     ESP_LOGW(TAG, "Acknowledge of %s failed (HTTP %d)", this->pending_.c_str(), status);
   this->pending_.clear();
-  this->dirty_ = true;
+  this->changed_();
 }
 
 std::vector<size_t> AlarmBanner::unacked_() const {
@@ -179,13 +185,19 @@ const AlarmBanner::Entry *AlarmBanner::shown_entry_() const {
 
 void AlarmBanner::ack_shown_() {
   const Entry *e = this->shown_entry_();
-  if (e == nullptr || !this->pending_.empty() || !this->send_)
-    return;
-  if (this->send_(e->path)) {
-    ESP_LOGI(TAG, "Acknowledging %s", e->path.c_str());
-    this->pending_ = e->path;
-    this->dirty_ = true;
-  }
+  if (e != nullptr)
+    this->ack(e->path);
+}
+
+bool AlarmBanner::ack(const std::string &path) {
+  if (!this->pending_.empty() || !this->send_)
+    return false;
+  if (!this->send_(path))
+    return false;
+  ESP_LOGI(TAG, "Acknowledging %s", path.c_str());
+  this->pending_ = path;
+  this->changed_();
+  return true;
 }
 
 void AlarmBanner::tap(const std::string &part) {
@@ -233,6 +245,10 @@ void AlarmBanner::build_() {
 }
 
 void AlarmBanner::tick(esphelm::Theme theme, bool online, bool can_ack) {
+  if (online != this->online_ || can_ack != this->can_ack_)
+    this->version_++;  // alarms tiles show it too
+  this->online_ = online;
+  this->can_ack_ = can_ack;
   // The screen's width changes when a layout turns the display (ADR-0028): the text is cut anew.
   const int32_t width = lv_display_get_horizontal_resolution(lv_display_get_default());
   if (theme != this->drawn_theme_ || online != this->drawn_online_ || can_ack != this->drawn_can_ack_ ||

@@ -1537,6 +1537,8 @@ bool EsphelmRuntime::build_page_(size_t index) {
   env.utc_now = [this](int64_t &utc) { return this->utc_now_(utc); };
   env.time_zone = this->layout_.settings.time_zone;
   env.open_history = [this](const std::string &id) { this->history_wanted_ = id; };
+  env.alarms = &this->alarms_;
+  env.ack_alarm = [this](const std::string &path) { return this->alarms_.ack(path); };
 #ifdef USE_ESPHELM_CHARTS
   env.charts = &this->charts_;
 #endif

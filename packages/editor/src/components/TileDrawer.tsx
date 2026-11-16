@@ -15,6 +15,7 @@ import {
   type ClockShow,
   type ClockTile,
   AUTOPILOT_DEFAULTS,
+  ALARMS_DEFAULTS,
   CHART_DEFAULTS,
   LABEL_PATTERN,
   POSITION_DEFAULT_DECIMALS,
@@ -53,6 +54,7 @@ import {
   type Layout,
   type PositionFormat,
   type PositionTile,
+  type AlarmsTile,
   type RoseHistoryKey,
   type Tile,
   type UnitId,
@@ -1208,6 +1210,60 @@ const CLOCK_SHOWS: { key: ClockShow; name: string }[] = [
 const CLOCK_EXAMPLE = Date.UTC(2026, 10, 4, 14, 5, 9) / 1000;
 
 /** A clock's caption, what it shows and how it writes it (ADR-0024). */
+/**
+ * Alarms panel settings (ADR-0038): its title, which notifications it lists (a branch such as
+ * notifications.electrical, picked from the server's or typed) and whether acknowledged ones stay.
+ */
+function AlarmsFields(props: Common & { tile: AlarmsTile; sizeHint?: string; onChange(patch: Patch): void }) {
+  const { tile, onChange } = props;
+  // The notification branches the server has, for the prefix's suggestions.
+  const branches = [
+    ...new Set(
+      props.paths
+        .map((p) => p.path)
+        .filter((p) => p.startsWith('notifications.'))
+        .flatMap((p) => {
+          const parts = p.split('.');
+          return parts.slice(2).map((_, i) => parts.slice(0, i + 2).join('.'));
+        }),
+    ),
+  ].sort();
+  return (
+    <>
+      {props.sizeHint && <p className="hint size-hint">{props.sizeHint}</p>}
+      <LabelField label={tile.label ?? ''} placeholder={ALARMS_DEFAULTS.label} onChange={onChange} />
+      <label className="field">
+        <span>Only notifications under</span>
+        <input
+          value={tile.prefix ?? ''}
+          placeholder={`${ALARMS_DEFAULTS.prefix} (all)`}
+          list={`alarm-branches-${tile.id}`}
+          onChange={(e) => onChange({ prefix: e.target.value.trim() || undefined })}
+          aria-label="Only notifications under"
+        />
+        <datalist id={`alarm-branches-${tile.id}`}>
+          {branches.map((b) => (
+            <option key={b} value={b} />
+          ))}
+        </datalist>
+        <small className="hint">e.g. notifications.electrical for an engine-room panel</small>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={tile.showAcknowledged ?? ALARMS_DEFAULTS.showAcknowledged}
+          onChange={(e) => onChange({ showAcknowledged: e.target.checked ? undefined : false })}
+          aria-label="Show acknowledged"
+        />
+        Show acknowledged alarms (dimmed) until they clear
+      </label>
+      <p className="hint">
+        The alarm banner above the page stays; this tile lists every active alarm at once, each with its own ACK.
+      </p>
+    </>
+  );
+}
+
 function ClockFields(props: Common & { tile: ClockTile; onChange(patch: Patch): void }) {
   const { tile, onChange } = props;
   const show = tile.show ?? CLOCK_DEFAULTS.show;
@@ -1653,6 +1709,8 @@ export function TileDrawer(
         ? 'Engine'
         : tile.type === 'autopilot'
         ? 'Autopilot'
+        : tile.type === 'alarms'
+        ? tile.label || 'Alarms'
         : tile.label ||
           (tile.type === 'position' ? 'Position' : tile.type === 'clock' ? 'Clock' : tile.id);
   return (
@@ -1677,6 +1735,15 @@ export function TileDrawer(
           tile={tile}
           paths={props.paths}
           values={props.values}
+          onChange={onChange}
+          onClose={props.onClose}
+        />
+      ) : tile.type === 'alarms' ? (
+        <AlarmsFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          sizeHint={props.sizeHint}
           onChange={onChange}
           onClose={props.onClose}
         />

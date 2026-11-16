@@ -2,6 +2,10 @@
 // SDL screenshots in firmware/test/golden). Values arrive in SI and are converted like the
 // firmware does.
 import {
+  ALARMS_DEFAULTS,
+  ALARMS_FIT,
+  underPrefix,
+  type AlarmsTile,
   CLOCK_DEFAULTS,
   clockDate,
   clockTime,
@@ -42,6 +46,7 @@ import {
   type HeadingTapeTile,
 } from '@esphelm/schema';
 import { useEffect, useState } from 'react';
+import { DEFAULT_FONT_LINE_HEIGHTS, textWidth } from '@esphelm/schema';
 import { formatValue } from '../format';
 import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
@@ -316,6 +321,10 @@ export function TilePreview(props: {
   /** Engine only: the tile's size on the display, in pixels, and the display's font ladder. */
   engineBox?: { width: number; height: number };
   fontLines?: readonly number[];
+  /** Alarms only: the tile's size on the display, in pixels (rows and ACK buttons depend on it). */
+  alarmsBox?: { width: number; height: number };
+  /** Alarms only: the night theme (ACK buttons are outlined at night). */
+  night?: boolean;
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -337,6 +346,14 @@ export function TilePreview(props: {
   if (tile.type === 'heading_tape')
     return <HeadingTapePreview tile={tile} values={values} width={props.tapeWidth ?? 440} />;
   if (tile.type === 'clock') return <ClockPreview tile={tile} timeZone={props.timeZone} />;
+  if (tile.type === 'alarms')
+    return <AlarmsPreview
+        tile={tile}
+        values={values}
+        box={props.alarmsBox ?? { width: 480, height: 240 }}
+        fontLines={props.fontLines}
+        night={props.night}
+      />;
   if (tile.type === 'engine')
     return (
       <EnginePreview
@@ -554,6 +571,187 @@ function useNow(): number {
  * display writes it (clock.ts). The display shows "--" until it has a time from SignalK or
  * its board.
  */
+/** Line height per font size of the display's Roboto (EnginePreview uses the same). */
+const LINE_PER_SIZE = 1.17;
+const ALARM_STATES = ['alert', 'warn', 'alarm', 'emergency'] as const;
+
+/** The alarms panel's geometry on the display, in its pixels (widget_alarms.cpp, ADR-0038). */
+function alarmsGeometry(box: { width: number; height: number }, ladder: readonly number[]) {
+  const small = ladder[0] ?? DEFAULT_FONT_LINE_HEIGHTS[0]!;
+  const label = ladder[1] ?? small;
+  const top = small + 4;
+  const ack = box.width >= ALARMS_FIT.ackWidth;
+  const line = ack ? label : small; // a narrow panel writes small
+  const rowH = Math.max(ALARMS_FIT.rowHeight, line + 12);
+  return {
+    small,
+    label,
+    line,
+    top,
+    ack,
+    rowH,
+    rows: Math.max(0, Math.min(8, Math.floor((box.height - top) / (rowH + 4)))),
+    ackW: ack ? Math.max(64, rowH + 16) : 0,
+    ageW: measure('23 h 59', small) + 8,
+  };
+}
+
+/** Rows an alarms tile shows at this size on the display (ADR-0038). */
+export function alarmsFit(
+  box: { width: number; height: number },
+  ladder: readonly number[] = DEFAULT_FONT_LINE_HEIGHTS,
+): { rows: number; ack: boolean } {
+  const g = alarmsGeometry(box, ladder);
+  return { rows: g.rows, ack: g.ack };
+}
+
+/** The display's own Roboto, bundled by styles.css. */
+const DISPLAY_FONT = "'ESPHelm Display', Roboto, system-ui, sans-serif";
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
+/** Re-renders once the display font has loaded, so measured text cuts where the display's does. */
+function useDisplayFont(): void {
+  const [, setLoaded] = useState(false);
+  useEffect(() => {
+    let live = true;
+    document.fonts?.load(`20px ${DISPLAY_FONT}`).then(
+      () => live && setLoaded(true),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+}
+/** Width of `text` in pixels in the display's font of line height `line`: measured in Roboto by the
+ *  browser where it can, else Roboto's estimate (textFit.ts; tests without a canvas). */
+function measure(text: string, line: number): number {
+  if (measureCtx === undefined) {
+    try {
+      measureCtx = document.createElement('canvas').getContext('2d');
+    } catch {
+      measureCtx = null;
+    }
+  }
+  if (!measureCtx) return textWidth(text, line);
+  measureCtx.font = `${line / LINE_PER_SIZE}px ${DISPLAY_FONT}`;
+  return measureCtx.measureText(text).width;
+}
+
+/** `text` cut with "..." to `max` pixels in the font of line height `line`, as LVGL's DOTS mode. */
+function elide(text: string, max: number, line: number): string {
+  if (measure(text, line) <= max) return text;
+  let t = text;
+  while (t.length > 0 && measure(`${t}...`, line) > max) t = t.slice(0, -1);
+  return `${t}...`;
+}
+
+const ALARM_COLOURS: Record<(typeof ALARM_STATES)[number], string> = {
+  alert: 'var(--tile-accent)',
+  warn: 'var(--zone-warn)',
+  alarm: 'var(--zone-alarm)',
+  emergency: 'var(--zone-emergency)',
+};
+
+/**
+ * Alarms panel preview: the server's active notifications under the tile's prefix, worst first,
+ * drawn in the display's pixels as widget_alarms.cpp draws them (ADR-0038). The display counts
+ * each alarm's age from when it saw it; the preview shows "now".
+ */
+export function AlarmsPreview(props: {
+  tile: AlarmsTile;
+  values: Map<string, unknown>;
+  box: { width: number; height: number };
+  fontLines?: readonly number[];
+  night?: boolean;
+}) {
+  useDisplayFont();
+  const { tile, values } = props;
+  const prefix = tile.prefix ?? ALARMS_DEFAULTS.prefix;
+  const active = [...values.entries()]
+    .filter(([path]) => underPrefix(path, prefix))
+    .map(([path, v]) => {
+      const n = v as { state?: unknown; message?: unknown } | null | undefined;
+      const rank = ALARM_STATES.indexOf(n?.state as (typeof ALARM_STATES)[number]);
+      return {
+        path,
+        rank,
+        state: ALARM_STATES[rank]!,
+        text: typeof n?.message === 'string' && n.message ? n.message : path.slice('notifications.'.length),
+      };
+    })
+    .filter((a) => a.rank >= 0)
+    .sort((a, b) => b.rank - a.rank);
+  const W = Math.max(1, props.box.width);
+  const H = Math.max(1, props.box.height);
+  const g = alarmsGeometry({ width: W, height: H }, props.fontLines ?? DEFAULT_FONT_LINE_HEIGHTS);
+  const rows = Math.min(active.length, g.rows);
+  const more = active.length > rows && rows > 0 ? `+${active.length - rows} more` : '';
+  const title = elide(tile.label ?? ALARMS_DEFAULTS.label, W - measure('+8 more', g.small) - 8, g.small);
+  const size = (line: number) => line / LINE_PER_SIZE;
+  const textW = Math.max(10, W - 6 - 4 - 8 - g.ageW - g.ackW - (g.ack ? 8 : 4));
+  const ageRight = W - (g.ackW + (g.ack ? 8 : 4));
+  return (
+    <span className="tile-graphic alarms-preview" data-testid={`alarms-${tile.id}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="alarms">
+        <text x={0} y={g.small / 2} fontSize={size(g.small)} className="alarms-title">
+          {title}
+        </text>
+        {more && (
+          <text x={W} y={g.small / 2} fontSize={size(g.small)} textAnchor="end" className="alarms-more">
+            {more}
+          </text>
+        )}
+        {active.length === 0 && (
+          <text x={W / 2} y={H / 2 + g.top / 2} fontSize={size(g.label)} textAnchor="middle" className="alarms-empty">
+            No alarms
+          </text>
+        )}
+        {active.slice(0, rows).map((a, i) => {
+          const y = g.top + i * (g.rowH + 4);
+          const mid = y + g.rowH / 2;
+          const c = ALARM_COLOURS[a.state];
+          return (
+            <g key={a.path} className={`alarms-row ${a.state}`} aria-label={a.text}>
+              <rect x={1} y={y + 1} width={W - 2} height={g.rowH - 2} rx={8} className="alarms-box" stroke={c} />
+              <rect x={4} y={y + 4} width={6} height={g.rowH - 8} rx={3} fill={c} />
+              <text x={18} y={mid} fontSize={size(g.line)} className="alarms-text" data-text={a.text}>
+                {elide(a.text, textW, g.line)}
+              </text>
+              <text x={ageRight} y={mid} fontSize={size(g.small)} textAnchor="end" className="alarms-age">
+                now
+              </text>
+              {g.ack && (
+                <g className="alarms-ack">
+                  <rect
+                    x={W - 4 - g.ackW}
+                    y={y + 4}
+                    width={g.ackW}
+                    height={g.rowH - 8}
+                    rx={8}
+                    fill={props.night ? 'var(--canvas-bg)' : c}
+                    stroke={props.night ? c : 'none'}
+                    strokeWidth={2}
+                  />
+                  <text
+                    x={W - 4 - g.ackW / 2}
+                    y={mid}
+                    fontSize={size(g.small)}
+                    textAnchor="middle"
+                    fill={props.night ? c : 'var(--canvas-bg)'}
+                  >
+                    ACK
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </span>
+  );
+}
+
 export function ClockPreview(props: { tile: ClockTile; timeZone?: string; now?: number }) {
   const { tile } = props;
   const ticking = useNow();
