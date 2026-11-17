@@ -1,4 +1,4 @@
-// The mono engine tile (ADR-0039): a large RPM arc with three small gauges inside it, drawn in one
+// The mono engine tile (ADR-0040): a large RPM arc with three small gauges inside it, drawn in one
 // LV_EVENT_DRAW_MAIN callback from the shared geometry (esphelm_engine.h, esphelm_engine_shapes.h,
 // mirrored by packages/schema/src/engine.ts and the editor's preview). Shared helpers:
 // mono_common.h. The values, their units, zones, the redraw throttle and the stale tracking work as

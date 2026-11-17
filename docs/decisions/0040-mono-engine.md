@@ -1,9 +1,9 @@
-# ADR-0039: The engine tile in the mono tile set
+# ADR-0040: The engine tile in the mono tile set
 
 Status: **Proposed** (2026-11-16)
 
 ## Context
-- **The mono tile set** (ADR-0035, ADR-0038) did not have the `engine` tile (ADR-0032): a layout for the Waveshare ESP32-S3-RLCD-4.2 with an engine page showed "not on this display".
+- **The mono tile set** (ADR-0035, ADR-0039) did not have the `engine` tile (ADR-0032): a layout for the Waveshare ESP32-S3-RLCD-4.2 with an engine page showed "not on this display".
 - **The colour engine tile** is a large RPM arc with a labelled scale and zones in colour, three small gauges inside it with icons (oil, fuel, coolant), and four corner values. The arcs, radii, scale and icons are defined once for the firmware and the editor (`engine.ts`, `esphelm_engine.h`, `esphelm_engine_shapes.h`), in the core.
 - **A 1-bit panel** has no colour and no grey.
 - **A tile beside the page footer on a 400x300 display is only about 215 px**, which is less than the colour tile's 260 px for the small gauges, and too small for its tick labels (it asks for a font of 14 % of the radius and finds none).
