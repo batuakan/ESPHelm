@@ -2233,9 +2233,9 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its four tile types',
+      'mono: hello says mono and lists its five tile types',
       monoHello?.display.kind === 'mono' &&
-        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position"]',
+        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position","wind_rose"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
@@ -2245,8 +2245,8 @@ async function main(): Promise<void> {
       layoutId: 'mono-400',
     });
     check(
-      'mono: the plugin refuses a layout with a wind rose',
-      refused.status === 409 && JSON.stringify(refused.body).includes('wind_rose'),
+      'mono: the plugin refuses a layout with a gauge',
+      refused.status === 409 && JSON.stringify(refused.body).includes('gauge'),
       JSON.stringify(refused.body),
     );
     const monoOnly = { ...monoLayout, id: 'mono-boat', pages: monoLayout.pages.slice(0, 1) };
@@ -2319,8 +2319,8 @@ async function main(): Promise<void> {
     await mono.stop();
     sk = undefined;
 
-    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a wind rose): a
-    //      placeholder in its place, the rest of the page as usual.
+    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a gauge): a
+    //      placeholder in its place, the rest of the page (and the wind rose) as usual.
     writeFileSync(
       join(workMono, 'esphelm_cur.bin'),
       cacheRecord(JSON.stringify({ ...monoLayout, theme: 'day' }), '"seed-mono"'),
@@ -2328,7 +2328,7 @@ async function main(): Promise<void> {
     rmSync(join(workMono, 'esphelm_prefs.bin'), { force: true });
     fwMono.start();
     check(
-      'mono: the cached layout with a wind rose loads',
+      'mono: the cached layout with a gauge loads',
       await fwMono.waitLog(/Showing cached layout "mono-400" \(2 pages/),
     );
     // A button for the next page (displays without touch): page 2, then round to page 1.
