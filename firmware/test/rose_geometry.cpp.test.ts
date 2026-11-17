@@ -1,5 +1,5 @@
 /**
- * Host test of the mono wind rose's geometry (esphelm_rose_geometry.h, ADR-0038): the radii of
+ * Host test of the mono wind rose's geometry (esphelm_rose_geometry.h, ADR-0039): the radii of
  * its parts and the strokes of the marker letters. Built with g++.
  */
 import { execFileSync } from 'node:child_process';

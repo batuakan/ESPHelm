@@ -1,6 +1,6 @@
 #pragma once
 // Values in a mono tile's corners, outside its round drawing: the wind rose's corner slots
-// (ADR-0038). A copy of the colour set's CornerValues
+// (ADR-0039). A copy of the colour set's CornerValues
 // (esphelm_tiles_color/widget_common.h) that uses the core's helpers only, so this set does not
 // depend on the colour one. Each is a value over its caption (label and unit).
 

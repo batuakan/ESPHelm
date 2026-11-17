@@ -1,4 +1,4 @@
-# ADR-0038: The wind rose in the mono tile set
+# ADR-0039: The wind rose in the mono tile set
 
 Status: **Proposed** (2026-11-16)
 

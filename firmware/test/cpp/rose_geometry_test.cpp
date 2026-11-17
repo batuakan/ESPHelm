@@ -1,4 +1,4 @@
-// Host test of the mono wind rose's geometry (esphelm_rose_geometry.h, ADR-0038).
+// Host test of the mono wind rose's geometry (esphelm_rose_geometry.h, ADR-0039).
 // Prints "N failures"; run by rose_geometry.cpp.test.ts.
 #include <algorithm>
 #include <cmath>

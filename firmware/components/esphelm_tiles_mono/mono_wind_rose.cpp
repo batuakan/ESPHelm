@@ -1,4 +1,4 @@
-// The mono wind rose tile (ADR-0038). Shared helpers: mono_common.h. The values, their units, the
+// The mono wind rose tile (ADR-0039). Shared helpers: mono_common.h. The values, their units, the
 // redraw throttle and the stale tracking work as in the colour wind rose (ADR-0010); what differs
 // is the drawing, in the ink and the page colour only: a ring of ticks, a solid starboard and an
 // outlined port sector in place of green and red, a compass card with white letters on a black

@@ -1,5 +1,5 @@
 #pragma once
-// Geometry of the black-and-white wind rose (the mono tile set, ADR-0038): the radii of its parts
+// Geometry of the black-and-white wind rose (the mono tile set, ADR-0039): the radii of its parts
 // for a rose of a given size, and the strokes of the letters on its markers. Angles are degrees
 // clockwise from the bow (up). Pure C++ (no ESPHome or LVGL), so g++ tests it on the host.
 
