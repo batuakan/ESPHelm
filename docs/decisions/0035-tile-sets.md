@@ -38,7 +38,7 @@ Status: **Accepted** (2026-11-11)
 - **The first board** is the Waveshare ESP32-S3-RLCD-4.2 (`firmware/esphelm_rlcd.yaml`):
   - its panel driver is kylehase/ESPHome-ST7305-RLCD (Apache-2.0), pinned to a commit;
   - ESPHome's LVGL sends each finished frame to it (`update_when_display_idle`).
-  - **No touch:** its two buttons call the runtime's `tap()`. KEY is the next page (`@next`, wrapping round), and a long press switches between Plain and Inverted. BOOT acknowledges the alarm shown.
+  - **No touch:** its two buttons call the runtime's `tap()`. KEY is the next page (`@next`, wrapping round), and a long press switches between Plain and Inverted. BOOT acknowledges the alarm shown, and a long press hides the page footer (its buttons can't be pressed without touch; `@footer`, `Renderer::set_footer_visible`) or shows it again; the choice lasts until the next restart.
   - **Not reachable from the buttons:** the settings panel. Wi-Fi comes from the captive portal and the server from mDNS, so nothing there is needed to get going.
 - **The core keeps what any tile set shares:**
   - **Helpers** in `widget_base.h/.cpp`: labels, font fitting, value formatting, `Binding`, scale steps.

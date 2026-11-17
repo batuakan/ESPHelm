@@ -284,7 +284,8 @@ bool Renderer::show_page(const esphelm::Layout &layout, size_t index, const Widg
   lv_obj_set_width(area, lv_pct(100));
   lv_obj_set_flex_grow(area, 1);
   lv_obj_set_style_pad_all(area, 8, LV_PART_MAIN);
-  this->build_footer_(layout, index, env.colors);
+  if (this->footer_visible_)
+    this->build_footer_(layout, index, env.colors);
 
   const size_t used_before = heap_used();
   lv_obj_set_style_pad_row(area, 8, LV_PART_MAIN);

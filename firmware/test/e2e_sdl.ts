@@ -2367,6 +2367,11 @@ async function main(): Promise<void> {
     );
     tapMono('@settings close');
     await monoNext(/Settings closed/);
+    // A button for the footer (displays without touch): hidden, and back again.
+    tapMono('@footer');
+    check('mono: the footer button hides the footer', await monoNext(/Footer hidden/));
+    tapMono('@footer');
+    check('mono: and shows it again', await monoNext(/Footer shown/));
     // Fresh values (the earlier ones went stale while the panel was open).
     const monoLive = {
       'navigation.speedOverGround': 3.2,

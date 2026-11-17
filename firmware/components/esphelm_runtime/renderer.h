@@ -40,6 +40,12 @@ class Renderer {
 
   const Fonts &fonts() const { return this->fonts_; }
 
+  /// Show or hide the page footer (page buttons, title, menu button) from the next page built on.
+  /// For displays without touch, where the footer's buttons can't be pressed and only costs
+  /// height; the page area takes the freed strip.
+  void set_footer_visible(bool visible) { this->footer_visible_ = visible; }
+  bool footer_visible() const { return this->footer_visible_; }
+
   /// Keep the top `px` of the screen free (the alarm banner), so nothing on the page sits under
   /// it. The page is laid out again, not rebuilt; true if the inset changed (the widgets then
   /// need layout_done() again).
@@ -53,6 +59,7 @@ class Renderer {
 
   lv_obj_t *container_{nullptr};
   int32_t top_inset_{0};
+  bool footer_visible_{true};
   Fonts fonts_;
   std::function<void(int)> navigate_;
   std::function<void()> menu_;

@@ -3,7 +3,8 @@
 #   ~/venv/bin/esphome run firmware/esphelm_rlcd.yaml
 # Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
 # The black-and-white tile set (ADR-0035) with 1-bit fonts. No touch: the KEY button shows the next
-# page (a long press switches between Plain and Inverted), BOOT acknowledges the alarm shown.
+# page (a long press switches between Plain and Inverted), BOOT acknowledges the alarm shown (a
+# long press hides the footer, and shows it again).
 substitutions:
   # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
   signalk_ref: main
@@ -108,5 +109,13 @@ binary_sensor:
     filters:
       - delayed_on_off: 20ms
     on_click:
-      - then:
+      # Short: acknowledge the alarm. Long: hide the footer (it can't be pressed without touch and
+      # costs about a tenth of the height), and bring it back.
+      - min_length: 20ms
+        max_length: 600ms
+        then:
           - lambda: id(esphelm_rt)->tap("@alarm", "ack");
+      - min_length: 600ms
+        max_length: 5s
+        then:
+          - lambda: id(esphelm_rt)->tap("@footer");
