@@ -2302,9 +2302,10 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its five tile types',
+      'mono: hello says mono and lists its six tile types',
       monoHello?.display.kind === 'mono' &&
-        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position","wind_rose"]',
+        JSON.stringify(monoHello.widgets) ===
+          '["value","bar","clock","position","wind_rose","engine"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
@@ -2384,9 +2385,10 @@ async function main(): Promise<void> {
     });
     await sleep(2000);
     await monoShot('mono-05-alarm');
-    // 15a. The mono wind rose (ADR-0039) with live values on a page of its own, so it draws its
-    //      detail (from 180 px): the card turned by the heading, the A and T markers, centre and
-    //      corner values. Plain theme again for it.
+    // 15a. The mono wind rose (ADR-0039) and engine (ADR-0040) with live values, a page each so
+    //      they draw their detail (from 180 px): the rose's card turned by the heading, the A and T
+    //      markers, centre and corner values; the engine's RPM arc with its zones, the slot gauges
+    //      with icons and the corner values, then its alarm zones. Plain theme again for them.
     publishMono({ 'notifications.electrical.batteries.house': { state: 'normal', message: '' } });
     tapMono('@menu');
     await monoNext(/Settings opened/);
@@ -2394,6 +2396,9 @@ async function main(): Promise<void> {
     check('mono: Plain is the day theme', await monoNext(/Theme switched on the display: day/));
     tapMono('@settings close');
     await monoNext(/Settings closed/);
+    const engineFixture = fixture('valid/engine.json') as {
+      pages: { tiles: Record<string, unknown>[] }[];
+    };
     const onePage = (id: string, title: string, tile: Record<string, unknown>) => ({
       kind: 'grid',
       id,
@@ -2433,6 +2438,7 @@ async function main(): Promise<void> {
             bottomRight: { path: 'navigation.headingTrue', unit: 'deg', decimals: 0, label: 'HDG' },
           },
         }),
+        onePage('engine-page', 'Engine', { ...engineFixture.pages[0]!.tiles[0]!, id: 'engine' }),
       ],
     };
     const instrumentsSaved = await mono.json(
@@ -2451,13 +2457,13 @@ async function main(): Promise<void> {
       },
     );
     check(
-      'mono: the plugin takes a layout with a wind rose for the mono display',
+      'mono: the plugin takes a layout with a wind rose and an engine for the mono display',
       instrumentsSaved.status === 200 && instrumentsLinked.status === 200,
       JSON.stringify([instrumentsSaved.body, instrumentsLinked.body]).slice(0, 300),
     );
     check(
-      'mono: the wind rose layout is shown',
-      await fwMono.waitLog(/Showing fetched layout "mono-instruments" \(1 pages/),
+      'mono: the wind rose and engine layout is shown',
+      await fwMono.waitLog(/Showing fetched layout "mono-instruments" \(2 pages/),
     );
     const instrumentValues: Record<string, number> = {
       'navigation.headingTrue': 0.52, // 30 degrees: the card turns
@@ -2467,10 +2473,32 @@ async function main(): Promise<void> {
       'environment.wind.speedTrue': 5.4,
       'navigation.speedOverGround': 3.2,
       'environment.depth.belowTransducer': 8.4,
+      'propulsion.p0.revolutions': 36.7, // 2200 rpm
+      'propulsion.p0.oilPressure': 380000, // 3.8 bar
+      'tanks.fuel.0.currentLevel': 0.62,
+      'propulsion.p0.temperature': 355.15, // 82 degC
+      'propulsion.p0.runTime': 4636800, // 1288 h
+      'electrical.alternators.0.voltage': 14.1,
+      'propulsion.p0.exhaustTemperature': 333.15,
+      'propulsion.p0.fuel.rate': 0.00000083, // about 3 L/h
     };
     publishMono(instrumentValues);
     await sleep(2500);
     await monoShot('mono-07-rose');
+    writeFileSync(join(workMono, 'esphelm_page_request'), '1');
+    check('mono: the engine page shows', await monoNext(/Page 2\/2 "Engine"/));
+    publishMono(instrumentValues);
+    await sleep(2500);
+    await monoShot('mono-08-engine');
+    publishMono({
+      ...instrumentValues,
+      'propulsion.p0.revolutions': 70, // 4200 rpm: the alarm zone
+      'propulsion.p0.oilPressure': 60000, // 0.6 bar: alarm
+      'propulsion.p0.temperature': 375.15, // 102 degC: alarm
+      'tanks.fuel.0.currentLevel': 0.1, // alarm
+    });
+    await sleep(2500);
+    await monoShot('mono-09-engine-alarm');
     await fwMono.stop();
     await mono.stop();
     sk = undefined;
