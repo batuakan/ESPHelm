@@ -32,8 +32,8 @@ constexpr int32_t SLOTS_FROM = 180;
 // An icon is at least this many px a side: at the colour tile's 17 % of the radius it would be
 // about 18 px on that display, too small to tell a pump from a can at 1 bit.
 constexpr int32_t ICON_MIN_PX = 24;
-/// How far (fraction of R) the right slot's icon moves towards the centre.
-constexpr float RIGHT_ICON_INSET = 0.03f;
+/// How far (fraction of R) the left and right slots' icons move towards the centre.
+constexpr float SIDE_ICON_INSET = 0.03f;
 
 class EngineWidget : public Widget {
  public:
@@ -164,13 +164,14 @@ class EngineWidget : public Widget {
   };
   /// A slot's icon (or label) box: centre and side as fractions of R.
   static Box box_(Gauge gauge) {
-    // The right icon (the fuel pump, its hose reaching right) sits a little nearer the centre than
-    // the colour tile's, so the needle's base at 0.34 R doesn't touch it in the middle of the scale.
+    // The side icons (the fuel pump with its hose reaching right, the oil can with its spout
+    // reaching left) sit a little nearer the centre than the colour tile's, so the needle's base at
+    // 0.34 R doesn't touch them in the middle of the scale.
     if (gauge == Gauge::RIGHT)
-      return {es::ICONS_RIGHT_X - RIGHT_ICON_INSET, es::ICONS_RIGHT_Y, es::ICONS_RIGHT_SIZE};
+      return {es::ICONS_RIGHT_X - SIDE_ICON_INSET, es::ICONS_RIGHT_Y, es::ICONS_RIGHT_SIZE};
     if (gauge == Gauge::BOTTOM)
       return {es::ICONS_BOTTOM_X, es::ICONS_BOTTOM_Y, es::ICONS_BOTTOM_SIZE};
-    return {es::ICONS_LEFT_X, es::ICONS_LEFT_Y, es::ICONS_LEFT_SIZE};
+    return {es::ICONS_LEFT_X + SIDE_ICON_INSET, es::ICONS_LEFT_Y, es::ICONS_LEFT_SIZE};
   }
 
   static void drop_mask_(GaugeState &g) {
