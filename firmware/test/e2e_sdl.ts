@@ -2233,9 +2233,10 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its five tile types',
+      'mono: hello says mono and lists its six tile types',
       monoHello?.display.kind === 'mono' &&
-        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position","wind_rose"]',
+        JSON.stringify(monoHello.widgets) ===
+          '["value","bar","clock","position","wind_rose","engine"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
