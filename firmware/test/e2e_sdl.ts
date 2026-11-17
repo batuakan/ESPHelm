@@ -2302,9 +2302,9 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its four tile types',
+      'mono: hello says mono and lists its five tile types',
       monoHello?.display.kind === 'mono' &&
-        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position"]',
+        JSON.stringify(monoHello.widgets) === '["value","bar","clock","position","wind_rose"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
@@ -2314,8 +2314,8 @@ async function main(): Promise<void> {
       layoutId: 'mono-400',
     });
     check(
-      'mono: the plugin refuses a layout with a wind rose',
-      refused.status === 409 && JSON.stringify(refused.body).includes('wind_rose'),
+      'mono: the plugin refuses a layout with a gauge',
+      refused.status === 409 && JSON.stringify(refused.body).includes('gauge'),
       JSON.stringify(refused.body),
     );
     const monoOnly = { ...monoLayout, id: 'mono-boat', pages: monoLayout.pages.slice(0, 1) };
@@ -2384,12 +2384,99 @@ async function main(): Promise<void> {
     });
     await sleep(2000);
     await monoShot('mono-05-alarm');
+    // 15a. The mono wind rose (ADR-0039) with live values on a page of its own, so it draws its
+    //      detail (from 180 px): the card turned by the heading, the A and T markers, centre and
+    //      corner values. Plain theme again for it.
+    publishMono({ 'notifications.electrical.batteries.house': { state: 'normal', message: '' } });
+    tapMono('@menu');
+    await monoNext(/Settings opened/);
+    tapMono('@settings day');
+    check('mono: Plain is the day theme', await monoNext(/Theme switched on the display: day/));
+    tapMono('@settings close');
+    await monoNext(/Settings closed/);
+    const onePage = (id: string, title: string, tile: Record<string, unknown>) => ({
+      kind: 'grid',
+      id,
+      title,
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ ...tile, x: 0, y: 0, w: 1, h: 1 }],
+    });
+    const instruments = {
+      ...monoOnly,
+      id: 'mono-instruments',
+      theme: 'day',
+      pages: [
+        onePage('wind-page', 'Wind', {
+          type: 'wind_rose',
+          id: 'rose',
+          slots: {
+            center1: {
+              path: 'environment.wind.speedApparent',
+              unit: 'kn',
+              decimals: 1,
+              label: 'AWS',
+            },
+            center2: { path: 'environment.wind.speedTrue', unit: 'kn', decimals: 1, label: 'TWS' },
+            topLeft: { path: 'navigation.speedOverGround', unit: 'kn', decimals: 1, label: 'SOG' },
+            topRight: {
+              path: 'environment.depth.belowTransducer',
+              unit: 'm',
+              decimals: 1,
+              label: 'Depth',
+            },
+            bottomLeft: {
+              path: 'environment.wind.angleApparent',
+              unit: 'deg',
+              decimals: 0,
+              label: 'AWA',
+            },
+            bottomRight: { path: 'navigation.headingTrue', unit: 'deg', decimals: 0, label: 'HDG' },
+          },
+        }),
+      ],
+    };
+    const instrumentsSaved = await mono.json(
+      'PUT',
+      '/plugins/esphelm/api/layouts/mono-instruments',
+      mono.admin,
+      instruments,
+    );
+    const instrumentsLinked = await mono.json(
+      'PUT',
+      `/plugins/esphelm/api/devices/${MONO_ID}`,
+      mono.admin,
+      {
+        state: 'adopted',
+        layoutId: 'mono-instruments',
+      },
+    );
+    check(
+      'mono: the plugin takes a layout with a wind rose for the mono display',
+      instrumentsSaved.status === 200 && instrumentsLinked.status === 200,
+      JSON.stringify([instrumentsSaved.body, instrumentsLinked.body]).slice(0, 300),
+    );
+    check(
+      'mono: the wind rose layout is shown',
+      await fwMono.waitLog(/Showing fetched layout "mono-instruments" \(1 pages/),
+    );
+    const instrumentValues: Record<string, number> = {
+      'navigation.headingTrue': 0.52, // 30 degrees: the card turns
+      'environment.wind.angleApparent': 0.61, // 35 degrees to starboard
+      'environment.wind.directionTrue': 1.4, // 80 degrees: 50 degrees off the bow
+      'environment.wind.speedApparent': 7.2,
+      'environment.wind.speedTrue': 5.4,
+      'navigation.speedOverGround': 3.2,
+      'environment.depth.belowTransducer': 8.4,
+    };
+    publishMono(instrumentValues);
+    await sleep(2500);
+    await monoShot('mono-07-rose');
     await fwMono.stop();
     await mono.stop();
     sk = undefined;
 
-    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a wind rose): a
-    //      placeholder in its place, the rest of the page as usual.
+    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a gauge): a
+    //      placeholder in its place, the rest of the page (and the wind rose) as usual.
     writeFileSync(
       join(workMono, 'esphelm_cur.bin'),
       cacheRecord(JSON.stringify({ ...monoLayout, theme: 'day' }), '"seed-mono"'),
@@ -2397,7 +2484,7 @@ async function main(): Promise<void> {
     rmSync(join(workMono, 'esphelm_prefs.bin'), { force: true });
     fwMono.start();
     check(
-      'mono: the cached layout with a wind rose loads',
+      'mono: the cached layout with a gauge loads',
       await fwMono.waitLog(/Showing cached layout "mono-400" \(2 pages/),
     );
     // A button for the next page (displays without touch): page 2, then round to page 1.
