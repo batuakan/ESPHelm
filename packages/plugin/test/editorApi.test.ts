@@ -257,6 +257,7 @@ describe('widget catalog', () => {
       'clock',
       'chart',
       'engine',
+      'alarms',
     ]);
     expect(body.tileSlots).toEqual({
       wind_rose: [

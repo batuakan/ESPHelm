@@ -26,6 +26,7 @@ namespace esphome {
 namespace esphelm_runtime {
 
 class ChartTileStore;  // chart_store.h, with USE_ESPHELM_CHARTS
+class AlarmBanner;     // alarms.h
 
 struct Fonts {
   const lv_font_t *value{nullptr};
@@ -130,6 +131,10 @@ struct WidgetEnv {
   /// The display's clock (ADR-0024): Unix seconds now, false until it has been set. Clock tiles
   /// show it in `time_zone` (UTC when the layout has none).
   std::function<bool(int64_t &utc)> utc_now;
+  /// The active notifications the alarm banner keeps (ADR-0014), read by alarms tiles (ADR-0038),
+  /// and acknowledging one of them. Live as long as the runtime.
+  const AlarmBanner *alarms{nullptr};
+  std::function<bool(const std::string &path)> ack_alarm;
   esphelm::wallclock::Tz time_zone;
 };
 

@@ -3135,6 +3135,63 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "id",
+                        "x",
+                        "y",
+                        "w",
+                        "h"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "alarms"
+                        },
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                          "errorCode": "INVALID_ID",
+                          "description": "Lowercase ASCII identifier: a-z, 0-9, \"_\" and \"-\", starting with a letter or digit."
+                        },
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "w": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "h": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "pattern": "^[\\x20-\\x7E\\u00B0]*$",
+                          "errorCode": "INVALID_LABEL",
+                          "description": "Printable ASCII plus the degree sign (U+00B0)."
+                        },
+                        "prefix": {
+                          "type": "string",
+                          "pattern": "^notifications(\\.[A-Za-z0-9_-]+)*$",
+                          "maxLength": 96,
+                          "errorCode": "INVALID_PATH",
+                          "description": "notifications, or a branch of it such as notifications.electrical."
+                        },
+                        "showAcknowledged": {
+                          "type": "boolean",
+                          "description": "List acknowledged alarms too (dimmed). Absent: true."
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   ]
                 },

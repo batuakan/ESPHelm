@@ -790,6 +790,75 @@ async function main(): Promise<void> {
       (await fw.waitLog(/belowTransducer cleared/)) && (await fw.waitLog(/house\.voltage cleared/)),
     );
 
+    // 9b2. Alarms panel (ADR-0038): a tile listing every active notification worst first, each
+    //      with its ACK, beside a narrow one that lists only the electrical branch and drops
+    //      acknowledged alarms. The banner stays above the page.
+    const ALTERNATOR = 'notifications.electrical.alternator';
+    const alarmsLayout = fixture('valid/alarms.json');
+    await json(
+      'PUT',
+      `/plugins/esphelm/api/layouts/${String(alarmsLayout.id)}`,
+      admin,
+      alarmsLayout,
+    );
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, {
+      layoutId: alarmsLayout.id,
+    });
+    check(
+      'alarms panel: the layout renders',
+      await fw.waitLog(/Showing fetched layout "alarms" \(1 pages/),
+    );
+    notify(BATTERY, 'warn', 'House battery low', ['visual']);
+    notify(DEPTH, 'alarm', 'Shallow water: 2.1 m');
+    notify(ALTERNATOR, 'alert', 'Alternator not charging', ['visual']);
+    publish({ 'environment.depth.belowTransducer': 2.1 });
+    check(
+      'alarms panel: the three alarms reach the display',
+      (await fw.waitLog(/ALERT notifications\.electrical\.alternator/)) &&
+        (await fw.waitLog(/ALARM notifications\.environment\.depth\.belowTransducer/, 15000, 2)),
+    );
+    await sleep(1500);
+    await fw.screenshot('91-alarms-panel', shots);
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), 'all ack:0');
+    check(
+      "alarms panel: a row's ACK acknowledges that alarm (the worst, first row)",
+      await fw.waitLog(
+        /Acknowledging notifications\.environment\.depth\.belowTransducer/,
+        15000,
+        2,
+      ),
+    );
+    let panelSilenced = false;
+    for (let i = 0; i < 20 && !panelSilenced; i++) {
+      panelSilenced = JSON.stringify(await methodOf(DEPTH)) === '["visual"]';
+      if (!panelSilenced) await sleep(250);
+    }
+    check('alarms panel: the plugin silenced it', panelSilenced);
+    await sleep(1500);
+    await fw.screenshot('92-alarms-acked', shots);
+    await json('PUT', `/plugins/esphelm/api/layouts/${String(alarmsLayout.id)}`, admin, {
+      ...alarmsLayout,
+      theme: 'night',
+    });
+    check(
+      'alarms panel: the night layout renders',
+      await fw.waitLog(/Showing fetched layout "alarms" \(1 pages/, 15000, 2),
+    );
+    publish({ 'environment.depth.belowTransducer': 2.1 });
+    await sleep(1500);
+    await fw.screenshot('93-alarms-night', shots);
+    notify(DEPTH, 'normal', '', []);
+    notify(BATTERY, 'normal', '', []);
+    notify(ALTERNATOR, 'normal', '', []);
+    check(
+      'alarms panel: all clear',
+      (await fw.waitLog(/belowTransducer cleared/, 15000, 2)) &&
+        (await fw.waitLog(/alternator cleared/)),
+    );
+    publish({ 'environment.depth.belowTransducer': 4.6 });
+    await sleep(1500);
+    await fw.screenshot('94-alarms-none', shots);
+
     // 9c. Display settings (ADR-0015): the start page, day/night by environment.sun, and the
     //     screen switching off without a touch (woken by an alarm and by a touch). The SDL
     //     build has no backlight, so brightness is only logged.
@@ -2316,6 +2385,93 @@ async function main(): Promise<void> {
     });
     await sleep(2000);
     await monoShot('mono-05-alarm');
+    // 15a. The mono wind rose (ADR-0039) with live values on a page of its own, so it draws its
+    //      detail (from 180 px): the card turned by the heading, the A and T markers, centre and
+    //      corner values. Plain theme again for it.
+    publishMono({ 'notifications.electrical.batteries.house': { state: 'normal', message: '' } });
+    tapMono('@menu');
+    await monoNext(/Settings opened/);
+    tapMono('@settings day');
+    check('mono: Plain is the day theme', await monoNext(/Theme switched on the display: day/));
+    tapMono('@settings close');
+    await monoNext(/Settings closed/);
+    const onePage = (id: string, title: string, tile: Record<string, unknown>) => ({
+      kind: 'grid',
+      id,
+      title,
+      grid: { cols: 1, rows: 1 },
+      tiles: [{ ...tile, x: 0, y: 0, w: 1, h: 1 }],
+    });
+    const instruments = {
+      ...monoOnly,
+      id: 'mono-instruments',
+      theme: 'day',
+      pages: [
+        onePage('wind-page', 'Wind', {
+          type: 'wind_rose',
+          id: 'rose',
+          slots: {
+            center1: {
+              path: 'environment.wind.speedApparent',
+              unit: 'kn',
+              decimals: 1,
+              label: 'AWS',
+            },
+            center2: { path: 'environment.wind.speedTrue', unit: 'kn', decimals: 1, label: 'TWS' },
+            topLeft: { path: 'navigation.speedOverGround', unit: 'kn', decimals: 1, label: 'SOG' },
+            topRight: {
+              path: 'environment.depth.belowTransducer',
+              unit: 'm',
+              decimals: 1,
+              label: 'Depth',
+            },
+            bottomLeft: {
+              path: 'environment.wind.angleApparent',
+              unit: 'deg',
+              decimals: 0,
+              label: 'AWA',
+            },
+            bottomRight: { path: 'navigation.headingTrue', unit: 'deg', decimals: 0, label: 'HDG' },
+          },
+        }),
+      ],
+    };
+    const instrumentsSaved = await mono.json(
+      'PUT',
+      '/plugins/esphelm/api/layouts/mono-instruments',
+      mono.admin,
+      instruments,
+    );
+    const instrumentsLinked = await mono.json(
+      'PUT',
+      `/plugins/esphelm/api/devices/${MONO_ID}`,
+      mono.admin,
+      {
+        state: 'adopted',
+        layoutId: 'mono-instruments',
+      },
+    );
+    check(
+      'mono: the plugin takes a layout with a wind rose for the mono display',
+      instrumentsSaved.status === 200 && instrumentsLinked.status === 200,
+      JSON.stringify([instrumentsSaved.body, instrumentsLinked.body]).slice(0, 300),
+    );
+    check(
+      'mono: the wind rose layout is shown',
+      await fwMono.waitLog(/Showing fetched layout "mono-instruments" \(1 pages/),
+    );
+    const instrumentValues: Record<string, number> = {
+      'navigation.headingTrue': 0.52, // 30 degrees: the card turns
+      'environment.wind.angleApparent': 0.61, // 35 degrees to starboard
+      'environment.wind.directionTrue': 1.4, // 80 degrees: 50 degrees off the bow
+      'environment.wind.speedApparent': 7.2,
+      'environment.wind.speedTrue': 5.4,
+      'navigation.speedOverGround': 3.2,
+      'environment.depth.belowTransducer': 8.4,
+    };
+    publishMono(instrumentValues);
+    await sleep(2500);
+    await monoShot('mono-07-rose');
     await fwMono.stop();
     await mono.stop();
     sk = undefined;

@@ -5,6 +5,7 @@
 import {
   posixTz,
   AUTOPILOT_DEFAULTS,
+  ALARMS_DEFAULTS,
   CHART_DEFAULTS,
   ENGINE_DEFAULTS,
   type EngineSlot,
@@ -160,6 +161,8 @@ export function tilePaths(tile: Tile): string[] {
   }
   if (tile.type === 'position') return [tile.path ?? POSITION_DEFAULTS.path];
   if (tile.type === 'clock') return []; // the display's own clock
+  // The display reads the alarm banner's table; the preview follows the notifications under it.
+  if (tile.type === 'alarms') return [`${tile.prefix ?? ALARMS_DEFAULTS.prefix}.*`];
   if (tile.type === 'chart') return chartPaths(tile);
   if (tile.type === 'heading_tape') {
     const t = headingTapeSettings(tile);
@@ -225,6 +228,8 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place };
     case 'clock':
       return { type, ...place, show: 'both' };
+    case 'alarms':
+      return { type, ...place };
     case 'chart':
       // The chart starts unset: the validator asks for one until it is picked.
       return { type, ...place, chart: '' };
@@ -272,10 +277,17 @@ export function addTile(
                   ? 'chart'
                   : type === 'engine'
                     ? 'engine'
-                    : 'tile';
+                    : type === 'alarms'
+                      ? 'alarms'
+                      : 'tile';
   const id = nextId(usedIds(layout), prefix);
   const tile = newTile(type, id, cell);
-  const big = type === 'wind_rose' || type === 'autopilot' || type === 'chart' || type === 'engine';
+  const big =
+    type === 'wind_rose' ||
+    type === 'autopilot' ||
+    type === 'chart' ||
+    type === 'engine' ||
+    type === 'alarms';
   if (big && fits(page, { ...cell, w: 2, h: 2 })) {
     tile.w = 2;
     tile.h = 2;
@@ -690,6 +702,8 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
       switch (t.type) {
         case 'clock':
           return; // the display's own clock (settings.clockPath below)
+        case 'alarms':
+          return; // every notification under its prefix, not one path
         case 'chart': {
           const c = { ...CHART_DEFAULTS, ...t.config };
           for (const k of chartPathKeys(t)) add(c[k], ...at, 'config', k);

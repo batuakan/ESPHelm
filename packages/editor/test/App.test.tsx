@@ -38,7 +38,7 @@ function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock', 'engine'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock', 'engine', 'alarms'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -579,6 +579,50 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('adds an alarms panel, lists the active notifications worst first, filters and saves it', async () => {
+    const server = fakeServer([device('adopted')]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Alarms/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    expect(live.paths()).toEqual(['notifications.*']);
+    const preview = screen.getByTestId('alarms-alarms-1');
+    expect(preview.textContent).toContain('No alarms');
+    live.emit('notifications.environment.depth', { state: 'warn', message: 'Shallow water', method: ['visual'] });
+    live.emit('notifications.electrical.batteries.house', { state: 'alarm', message: 'House battery low' });
+    live.emit('notifications.navigation.anchor', { state: 'normal', message: 'Anchor watch' });
+    await waitFor(() => expect(preview.querySelectorAll('.alarms-row')).toHaveLength(2));
+    expect([...preview.querySelectorAll('.alarms-text')].map((t) => t.getAttribute('data-text'))).toEqual([
+      'House battery low',
+      'Shallow water',
+    ]);
+    expect(preview.querySelectorAll('.alarms-ack')).toHaveLength(2);
+    within(drawer).getByText(/with an ACK on each/);
+    // Only the electrical branch.
+    fireEvent.change(within(drawer).getByLabelText('Only notifications under'), {
+      target: { value: 'notifications.electrical' },
+    });
+    expect(live.paths()).toEqual(['notifications.electrical.*']);
+    expect([...preview.querySelectorAll('.alarms-text')].map((t) => t.getAttribute('data-text'))).toEqual(['House battery low']);
+    fireEvent.click(within(drawer).getByLabelText('Show acknowledged'));
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [
+        {
+          type: 'alarms',
+          id: 'alarms-1',
+          w: 2,
+          h: 2,
+          prefix: 'notifications.electrical',
+          showAcknowledged: false,
+        },
+      ],
+    });
+  });
+
   it('adds a position tile, previews the live position in each format and saves it', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();
@@ -934,7 +978,7 @@ describe('editor', { timeout: 20000 }, () => {
       .getAllByRole('button')
       .map((b) => b.textContent ?? '');
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
-    expect(names[0]).toMatch(/^Autopilot/);
+    expect(names[0]).toMatch(/^Alarms/);
   });
 
   it('shows a login hint when SignalK refuses the editor API', async () => {

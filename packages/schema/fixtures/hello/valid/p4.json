@@ -24,7 +24,8 @@
     "heading_tape",
     "clock",
     "chart",
-    "engine"
+    "engine",
+    "alarms"
   ],
   "fonts": [
     "tiny",

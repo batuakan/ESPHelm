@@ -72,6 +72,7 @@ std::unique_ptr<Widget> make_graph_widget(lv_obj_t *cell, const esphelm::Tile &t
 std::unique_ptr<Widget> make_heading_tape_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_clock_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_chart_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_alarms_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_engine_widget(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 
 }  // namespace esphelm_runtime
