@@ -2154,3 +2154,39 @@ button.link {
   align-items: center;
   gap: 6px;
 }
+
+/* Alarms panel preview (ADR-0038): an SVG in the display's pixels, as widget_alarms.cpp draws it. */
+.tile-type-alarms {
+  grid-template-rows: 0 1fr; /* no caption line: the panel writes its own title */
+}
+.tile-graphic.alarms-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.alarms-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.alarms-preview text {
+  dominant-baseline: central;
+  font-family: 'ESPHelm Display', Roboto, system-ui, sans-serif;
+}
+.alarms-title,
+.alarms-more,
+.alarms-age {
+  fill: var(--tile-muted);
+}
+.alarms-empty {
+  fill: var(--zone-normal);
+}
+.alarms-text {
+  fill: var(--tile-text);
+}
+.alarms-box {
+  fill: var(--canvas-bg);
+  fill-opacity: 0.5;
+  stroke-width: 2;
+}

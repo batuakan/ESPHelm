@@ -1,5 +1,6 @@
 #include "renderer.h"
 
+#include "esphelm_status_layout.h"
 #include "esphome/core/log.h"
 
 #include <algorithm>
@@ -88,39 +89,78 @@ void Renderer::show_status(const std::string &headline, const std::string &detai
   lv_display_t *disp = lv_display_get_default();
   const int32_t sw = lv_display_get_horizontal_resolution(disp);
   const int32_t sh = lv_display_get_vertical_resolution(disp);
+  const esphelm::status_layout::Plan plan = esphelm::status_layout::plan(sw, sh, !qr.empty());
 
   lv_obj_t *title = make_label(this->container_, this->fonts_.label, c.text, headline);
   lv_obj_set_width(title, lv_pct(100));
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_label_set_long_mode(title, LV_LABEL_LONG_MODE_WRAP);
+  lv_obj_t *code = nullptr;
   if (qr.empty()) {
     lv_obj_align(title, LV_ALIGN_CENTER, 0, -30);
   } else {
-    // The setup network: its QR code at the top (phone cameras join from it), the text below.
-    const int32_t size = std::min(sw, sh) * 4 / 10;
-    lv_obj_t *code = lv_qrcode_create(this->container_);
-    lv_qrcode_set_size(code, size);
+    // The setup network: its QR code (phone cameras join from it), the text below it, or on a
+    // wide, short display beside it (see below).
+    code = lv_qrcode_create(this->container_);
+    lv_qrcode_set_size(code, plan.qr_size);
     lv_color_t dark, light;
     qr_colors(theme, c, dark, light);
     lv_qrcode_set_dark_color(code, dark);
     lv_qrcode_set_light_color(code, light);
     lv_qrcode_set_quiet_zone(code, true);
     lv_qrcode_update(code, qr.data(), qr.size());
-    lv_obj_align(code, LV_ALIGN_TOP_MID, 0, sh / 20);
-    lv_obj_align_to(title, code, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
+    if (!plan.side_by_side) {
+      lv_obj_align(code, LV_ALIGN_TOP_MID, 0, sh / 20);
+      lv_obj_align_to(title, code, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
+    }
   }
 
   lv_obj_t *body = make_label(this->container_, this->fonts_.small, c.muted, detail);
   lv_obj_set_width(body, lv_pct(100));
   lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_label_set_long_mode(body, LV_LABEL_LONG_MODE_WRAP);
-  lv_obj_align_to(body, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
+  if (!plan.side_by_side)
+    lv_obj_align_to(body, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
 
   lv_obj_t *foot = make_label(this->container_, this->fonts_.small, c.muted, footer);
   lv_obj_set_width(foot, lv_pct(100));
   lv_obj_set_style_text_align(foot, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_label_set_long_mode(foot, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_align(foot, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+  if (plan.side_by_side && code != nullptr) {
+    // A wide, short display (the 400x300 reflective LCD: code, headline, text and footer stacked
+    // need more height than it has): the code on the left, the headline and text in a column
+    // beside it, both centred in the space above the footer. If the column still does not fit
+    // there, the footer (version and device id, also on the Info tab) is dropped.
+    const int32_t pad = 16, gap = 16;
+    const int32_t content_h = sh - 2 * pad;
+    lv_obj_update_layout(this->container_);
+    const int32_t foot_h = lv_obj_get_height(foot);
+
+    lv_obj_t *column = lv_obj_create(this->container_);
+    plain(column);
+    lv_obj_set_width(column, sw - 2 * pad - plan.qr_size - gap);
+    lv_obj_set_height(column, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(column, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(column, 12, LV_PART_MAIN);
+    lv_obj_set_parent(title, column);
+    lv_obj_set_parent(body, column);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_update_layout(column);
+    const int32_t column_h = lv_obj_get_height(column);
+
+    int32_t free_h = content_h - foot_h - 8;
+    if (column_h > free_h) {
+      lv_obj_add_flag(foot, LV_OBJ_FLAG_HIDDEN);
+      free_h = content_h;
+    }
+    // The menu button (touch displays) sits in the top right corner, above the column.
+    const int32_t menu_h = menu ? lv_font_get_line_height(this->fonts_.small) * 22 / 10 - 12 + 8 : 0;
+    lv_obj_align(code, LV_ALIGN_TOP_LEFT, 0, std::max<int32_t>(0, (free_h - plan.qr_size) / 2));
+    lv_obj_align(column, LV_ALIGN_TOP_LEFT, plan.qr_size + gap, std::max<int32_t>(menu_h, (free_h - column_h) / 2));
+  }
 
   if (menu) {
     // As big as the footer's, in the top right corner: the Network tab before any layout is shown.

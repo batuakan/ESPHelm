@@ -53,6 +53,10 @@ inline constexpr int ENGINE_SLOTS = 260;
 inline constexpr int ENGINE_LABELS = 160;
 inline constexpr int ENGINE_MINOR_TICK_PX = 5;
 
+// Alarms tile (ADR-0038): row height in pixels, and the content width from which rows get an ACK button.
+inline constexpr int ALARMS_ROW_HEIGHT = 48;
+inline constexpr int ALARMS_ACK_WIDTH = 220;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

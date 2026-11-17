@@ -204,6 +204,7 @@ function renderSizesHeader(
   tack: Record<'beat' | 'gybe', { min: number; max: number; fixed: number }>,
   chart: { buttons: number; info: number },
   engine: { slots: number; labels: number; minorTickPx: number },
+  alarms: { rowHeight: number; ackWidth: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -260,6 +261,10 @@ function renderSizesHeader(
     `inline constexpr int ENGINE_SLOTS = ${engine.slots};`,
     `inline constexpr int ENGINE_LABELS = ${engine.labels};`,
     `inline constexpr int ENGINE_MINOR_TICK_PX = ${engine.minorTickPx};`,
+    '',
+    '// Alarms tile (ADR-0038): row height in pixels, and the content width from which rows get an ACK button.',
+    `inline constexpr int ALARMS_ROW_HEIGHT = ${alarms.rowHeight};`,
+    `inline constexpr int ALARMS_ACK_WIDTH = ${alarms.ackWidth};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -459,6 +464,7 @@ export async function renderAll(): Promise<Record<string, string>> {
     CHART_FIT,
     ENGINE_FIT,
     ENGINE_ICON_NAMES,
+    ALARMS_FIT,
   } = await import('../src/tiles.js');
   const { ENGINE_ARCS, ENGINE_GEOMETRY, ENGINE_ICONS } = await import('../src/engine.js');
   const engineShapes = renderEngineShapesHeader(
@@ -485,6 +491,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       WIND_ROSE_TACK,
       CHART_FIT,
       ENGINE_FIT,
+      ALARMS_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -497,6 +504,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       WIND_ROSE_TACK,
       CHART_FIT,
       ENGINE_FIT,
+      ALARMS_FIT,
     ),
     'generated/esphelm_engine_shapes.h': engineShapes,
     '../../firmware/components/esphelm_runtime/esphelm_engine_shapes.h': engineShapes,

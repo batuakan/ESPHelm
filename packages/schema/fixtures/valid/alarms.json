@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "id": "alarms",
+  "name": "Alarms panel",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "alarms",
+      "title": "Alarms",
+      "grid": {
+        "cols": 2,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "alarms",
+          "id": "all",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1
+        },
+        {
+          "type": "alarms",
+          "id": "electrical",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "label": "Electrical",
+          "prefix": "notifications.electrical",
+          "showAcknowledged": false
+        },
+        {
+          "type": "value",
+          "id": "depth",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "environment.depth.belowTransducer",
+          "unit": "m",
+          "label": "Depth"
+        }
+      ]
+    }
+  ]
+}

@@ -201,3 +201,13 @@ export interface ChartRouteCases {
 export const CHART_ROUTE_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'chart-route.cases.json'), 'utf8'),
 ) as ChartRouteCases;
+
+/** Alarms panel cases (ADR-0038), shared by the TS and C++ tests. */
+export interface AlarmsCases {
+  ages: { seconds: number; expected: string }[];
+  prefixes: { path: string; prefix: string; expected: boolean }[];
+}
+
+export const ALARMS_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'alarms.cases.json'), 'utf8'),
+) as AlarmsCases;

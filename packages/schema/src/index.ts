@@ -6,6 +6,7 @@ export * from './windRose.js';
 export * from './chartRoute.js';
 export * from './centerZero.js';
 export * from './clock.js';
+export * from './alarms.js';
 export * from './engine.js';
 export * from './svgPath.js';
 export * from './valueZones.js';

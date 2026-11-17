@@ -296,6 +296,24 @@ The display's own time and/or date, in the layout's time zone (`settings.timeZon
   "show": "both", "hour12": true, "dateFormat": "weekday" }
 ```
 
+### Alarms tiles
+Every active SignalK notification (`notifications.*` in a state above `normal`/`nominal`), worst first, each with its state, message and age and an ACK (ADR-0038). Like a clock it has no `path`: the display reads the alarm banner's table (ADR-0014), so the tile adds no subscriptions, and the banner stays above the page.
+
+| Field | Notes |
+|---|---|
+| `label` | optional title; default "Alarms" |
+| `prefix` | only notifications under this branch, e.g. `notifications.electrical` (`NotificationPrefix`: `notifications` or a branch of it, at most 96 characters, else `INVALID_PATH`); default all |
+| `showAcknowledged` | list acknowledged alarms too, dimmed; default true |
+
+- **Order:** unacknowledged before acknowledged, then by state (emergency, alarm, warn, alert), then newest first.
+- **Text** (`alarmAge()` and `underPrefix()` in `alarms.ts`, mirrored by the firmware's `esphelm_alarm_age.h`, shared cases in `fixtures/alarms.cases.json`): the age is "now", "12 min", "3 h 05" or "2 d"; a prefix matches whole segments.
+- **Size is the device's business** (`ALARMS_FIT`, generated into `esphelm_sizes.h`): rows are at least 48 px tall, as many as fit under the title, with "+N more" when they don't; each row has an ACK from 220 px of content width. Defaults are exported as `ALARMS_DEFAULTS`.
+
+```json
+{ "type": "alarms", "id": "engine-room", "x": 0, "y": 0, "w": 2, "h": 2,
+  "label": "Engine room", "prefix": "notifications.propulsion", "showAcknowledged": false }
+```
+
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
 
@@ -450,6 +468,7 @@ See `packages/schema/fixtures/valid/`:
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 - `chart-page.json`: a page with a default chart tile filling it, an anchor page with every path set, and a value page.
+- `alarms.json`: a full-width alarms panel and a narrow one filtered to `notifications.electrical` without acknowledged alarms (ADR-0038).
 - `chart-route.json`: a chart with the route on (the default), one with every route path set, and one with `route: false` (ADR-0037).
 - `chart-tiles.json`: a 2x2 chart beside a wind rose and a 1x1 chart of the same chart (they share their map tiles), and a value page.
 - `settings.json`: every display setting, with the second page as start page.

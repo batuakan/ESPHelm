@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_DIGIT_FONT_LINE_HEIGHTS,
   DEFAULT_FONT_LINE_HEIGHTS,
+  ALARMS_FIT,
   CHART_DEFAULTS,
   CHART_FIT,
   GRAPH_FIT,
@@ -66,7 +67,7 @@ import { LayoutBar } from './components/LayoutBar';
 import { PageTabs, pageWidgets } from './components/PageTabs';
 import { ImportConfirm, RemapDialog } from './components/ShareDialogs';
 import { IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, exportFile, missingRefs, parseImport, type MissingRef } from './share';
-import { FooterPreview } from './components/Previews';
+import { FooterPreview, alarmsFit } from './components/Previews';
 import { DeviceList, TileLibrary } from './components/Sidebar';
 import { FirmwareDialog } from './components/FirmwareDialog';
 import { ChartDrawer, SLOT_TITLES, TileDrawer } from './components/TileDrawer';
@@ -849,7 +850,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                 ? autopilotHint(tileBox(tile), !!device)
                 : tile.type === 'graph'
                   ? graphHint(tileBox(tile), !!device)
-                  : undefined
+                  : tile.type === 'alarms'
+                    ? alarmsHint(tileBox(tile), !!device, fontLines)
+                    : undefined
           }
           openSlot={selection?.slot}
           theme={layout.theme}
@@ -885,6 +888,16 @@ function chartSizeHint(px: number, known: boolean): string {
         ? `the map with zoom buttons; ${CHART_FIT.info} px or more adds the position line and the distance to the next waypoint`
         : `the map only (an anchor alarm frames it in red); ${CHART_FIT.buttons} px or more adds zoom buttons`;
   return `About ${px} px ${where}: ${what}.`;
+}
+
+function alarmsHint(box: { width: number; height: number }, known: boolean, fontLines: readonly number[]): string {
+  const where = known ? 'on this display' : 'on a 480×480 display';
+  const fit = alarmsFit(box, fontLines);
+  const rows = fit.rows === 0 ? 'no room for a row' : fit.rows === 1 ? 'one alarm' : `${fit.rows} alarms`;
+  const ack = fit.ack
+    ? 'with an ACK on each'
+    : `without ACK buttons (${ALARMS_FIT.ackWidth} px wide or more adds them; the banner's ACK still works)`;
+  return `About ${box.width}×${box.height} px ${where}: ${rows}, ${ack}.`;
 }
 
 function autopilotHint(box: { width: number; height: number }, known: boolean): string {

@@ -24,6 +24,17 @@ class AlarmBanner {
   /// SignalK alarm states above normal, in rising severity.
   enum class Severity : uint8_t { NONE, ALERT, WARN, ALARM, EMERGENCY };
 
+  /// An active notification, as alarms tiles read it (ADR-0038).
+  struct Entry {
+    std::string path;     // notifications.<...>, at most MAX_PATH characters
+    std::string message;  // printable ASCII, at most MAX_MESSAGE characters
+    Severity severity{Severity::NONE};
+    bool sound{false};      // method includes "sound" now
+    bool had_sound{false};  // ... when this state began; losing it later means acknowledged
+    bool acked{false};
+    uint32_t since_ms{0};   // millis() when this state began
+  };
+
   void set_fonts(const Fonts &fonts) { this->fonts_ = fonts; }
   void set_capacity(size_t entries) { this->capacity_ = entries; }
   /// Sends the acknowledge for a notification path; false when it can't be sent now.
@@ -59,20 +70,30 @@ class AlarmBanner {
   /// Height the banner takes at the top of the screen (0 when hidden).
   int32_t height() const { return this->height_; }
 
- protected:
-  struct Entry {
-    std::string path;     // notifications.<...>, at most MAX_PATH characters
-    std::string message;  // printable ASCII, at most MAX_MESSAGE characters
-    Severity severity{Severity::NONE};
-    bool sound{false};      // method includes "sound" now
-    bool had_sound{false};  // ... when this state began; losing it later means acknowledged
-    bool acked{false};
-  };
+  // For alarms tiles (ADR-0038): the table, read-only, and acknowledging one of its alarms.
+  const std::vector<Entry> &entries() const { return this->entries_; }
+  /// Counts up whenever the table changes (an alarm comes, goes, changes, is acknowledged).
+  uint32_t version() const { return this->version_; }
+  /// The path whose acknowledge is in flight; empty when none.
+  const std::string &pending() const { return this->pending_; }
+  /// Values are live, and the plugin can take an acknowledge now (as of the last tick).
+  bool online() const { return this->online_; }
+  bool can_ack() const { return this->can_ack_ && this->pending_.empty(); }
+  /// Acknowledges the alarm at `path`, as the banner's ACK does; false when it can't be sent now.
+  bool ack(const std::string &path);
+  /// A state's colour (the theme's zone colours, red shades at night) and its name ("WARN").
+  static lv_color_t colour(Severity s, const Colors &c);
+  static const char *name(Severity s);
 
+ protected:
   static constexpr size_t MAX_PATH = 96;
   static constexpr size_t MAX_MESSAGE = 64;
 
   void build_();
+  void changed_() {
+    this->dirty_ = true;
+    this->version_++;
+  }
   void ack_shown_();
   /// Unacknowledged entries, worst first (indices into entries_).
   std::vector<size_t> unacked_() const;
@@ -87,6 +108,9 @@ class AlarmBanner {
   bool dirty_{true};
   bool wake_{false};
   uint32_t sound_generation_{0};
+  uint32_t version_{0};
+  bool online_{true};
+  bool can_ack_{false};
   bool dropped_logged_{false};
   int32_t height_{0};
   // What was drawn last, to redraw only on change.
