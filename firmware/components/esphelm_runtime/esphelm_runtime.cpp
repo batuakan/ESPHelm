@@ -285,6 +285,20 @@ void EsphelmRuntime::loop() {
       if (!this->layout_.pages.empty())
         this->show_page((this->page_ + 1) % this->layout_.pages.size());
     }
+    if (this->footer_toggle_wanted_) {
+      this->footer_toggle_wanted_ = false;
+      // The page is built again without (or with) the footer; the panel and popup sit on top of it.
+      if (!this->panel_.is_open() && !this->popup_.is_open() && !this->layout_.pages.empty()) {
+        this->renderer_.set_footer_visible(!this->renderer_.footer_visible());
+        if (!this->build_page_(this->page_)) {
+          // Out of memory: back to how it was.
+          this->renderer_.set_footer_visible(!this->renderer_.footer_visible());
+          this->build_page_(this->page_);
+        }
+        ESP_LOGI(TAG, "Footer %s", this->renderer_.footer_visible() ? "shown" : "hidden");
+        this->queue_meta_reads_();
+      }
+    }
     for (auto &w : this->widgets_)
       w->tick(now);
 #ifdef USE_ESPHELM_CHARTS
@@ -1580,6 +1594,14 @@ void EsphelmRuntime::tap(const std::string &tile_id, const std::string &part) {
       this->wake_wanted_ = true;  // the first press only wakes the screen
     else
       this->next_page_wanted_ = true;
+    lv_display_trigger_activity(nullptr);
+    return;
+  }
+  if (tile_id == "@footer") {  // a hardware button: hide the footer, or bring it back
+    if (this->asleep_)
+      this->wake_wanted_ = true;  // the first press only wakes the screen
+    else
+      this->footer_toggle_wanted_ = true;
     lv_display_trigger_activity(nullptr);
     return;
   }

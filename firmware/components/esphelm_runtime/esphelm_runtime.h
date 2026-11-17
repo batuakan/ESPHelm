@@ -275,6 +275,7 @@ class EsphelmRuntime : public Component {
   int pending_step_{0};  // footer button presses, applied in loop() (never inside LVGL events)
   bool theme_toggle_wanted_{false};  // test hook @theme: switch day/night in loop()
   bool menu_wanted_{false};          // the footer's menu button: open the settings in loop()
+  bool footer_toggle_wanted_{false};  // "@footer": a hardware button, hide or show the footer in loop()
   SettingsPanel panel_;
   const char *layout_origin_{""};  // where the shown layout came from: fetched, cached, ...
   bool info_fixed_{false};  // test hook ESPHELM_TEST_INFO=fixed: values that change by themselves read "test"
