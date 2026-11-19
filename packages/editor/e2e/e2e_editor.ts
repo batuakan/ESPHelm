@@ -1186,6 +1186,47 @@ async function main(): Promise<void> {
     await shot(mobile, '08-phone-dark-rose-slot');
     check('phone: tapping a rose slot opens it in the tile drawer', open);
     await phone.close();
+
+    // Demo displays (ADR-0041): listed after the real one; a layout is saved, never sent.
+    const demoPage = await context.newPage();
+    await demoPage.goto(editorUrl);
+    const demoList = demoPage.getByRole('region', { name: 'Displays' });
+    // A real display is registered, so the demo group starts collapsed.
+    const demoToggle = demoList.getByRole('button', { name: /^Demo \(4\)/ });
+    check(
+      'demo displays start collapsed next to a real display',
+      (await demoToggle.getAttribute('aria-expanded')) === 'false' &&
+        (await demoList.getByRole('button', { name: /Demo 480x480/ }).count()) === 0,
+    );
+    await shot(demoPage, '19-demo-collapsed');
+    await demoToggle.click();
+    await demoList.getByRole('button', { name: /Demo 480x480/ }).click();
+    await demoPage.getByText(/Demo display: try the editor here/).waitFor();
+    await demoPage
+      .getByRole('region', { name: 'Tiles' })
+      .getByRole('button', { name: /Value/ })
+      .click();
+    await demoPage.getByLabel('Search SignalK paths').fill('speedOverGround');
+    await demoPage.getByRole('option', { name: /^navigation\.speedOverGround/ }).click();
+    await demoPage.getByText('No problems').waitFor();
+    await demoPage.getByRole('button', { name: 'Save', exact: true }).first().click();
+    await demoPage
+      .getByRole('status')
+      .filter({ hasText: 'Nothing receives a demo layout' })
+      .waitFor();
+    await demoPage.getByRole('button', { name: 'Saved ✓' }).waitFor();
+    const demoDevices = (await (
+      await fetch(`${sk.base}/plugins/esphelm/api/devices`, {
+        headers: { Authorization: `Bearer ${sk.admin}` },
+      })
+    ).json()) as { id: string; demo?: boolean; layoutId?: string }[];
+    check(
+      'a demo display saves its layout with Save',
+      demoDevices.some((d) => d.demo && d.layoutId !== undefined),
+    );
+    await demoPage.waitForTimeout(500);
+    await shot(demoPage, '20-demo-display');
+    await demoPage.close();
   } finally {
     await browser.close();
     await sk.stop();

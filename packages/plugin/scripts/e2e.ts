@@ -451,6 +451,34 @@ async function main(): Promise<void> {
     );
     check('a hello with the new build completes the update', doneDev?.update?.state === 'done');
     fwStream.ws.close();
+
+    // Demo displays (ADR-0041): on with the plugin's default settings, only in the editor.
+    r = await json('GET', '/plugins/esphelm/api/devices', admin);
+    const demos = (
+      r.body as unknown as { id: string; name?: string; state: string; demo?: boolean }[]
+    ).filter((d) => d.demo);
+    check(
+      'the editor lists four adopted demo displays',
+      demos.length === 4 && demos.every((d) => d.state === 'adopted'),
+      JSON.stringify(demos.map((d) => d.name)),
+    );
+    const demoId = demos[0]?.id ?? '';
+    const demoLayout = { ...(layout as object), id: 'demo-e2e' };
+    await json('PUT', '/plugins/esphelm/api/layouts/demo-e2e', admin, demoLayout);
+    r = await json('PUT', `/plugins/esphelm/api/devices/${demoId}`, admin, {
+      layoutId: 'demo-e2e',
+    });
+    check('a demo display takes a layout', r.status === 200, JSON.stringify(r.body));
+    r = await json('GET', `/signalk/v1/api/vessels/self/plugins/esphelm/${demoId}/version`, admin);
+    check('and no version is published for it', r.status === 404, `${r.status}`);
+    r = await json('POST', '/signalk/v1/api/esphelm/devices/hello', admin, {
+      ...hello,
+      deviceId: demoId,
+    });
+    check(
+      'a hello with a demo id is refused (403 DEMO_DEVICE)',
+      r.status === 403 && r.body.error === 'DEMO_DEVICE',
+    );
   } finally {
     await sk.stop();
   }
