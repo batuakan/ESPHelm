@@ -262,6 +262,13 @@ export function registerEditorApi(router: IRouter, service: Service): void {
     const store = requireStore(service, res);
     if (!store) return;
     const device = store.getDevice(String(req.params.id));
+    if (device?.demo) {
+      res.status(409).json({
+        error: 'DEMO_DEVICE',
+        message: 'demo displays are turned off in the plugin settings, not deleted',
+      });
+      return;
+    }
     if (!device || !store.deleteDevice(device.id)) {
       res.status(404).json({ error: 'UNKNOWN_DEVICE' });
       return;
@@ -400,6 +407,12 @@ export function registerEditorApi(router: IRouter, service: Service): void {
     const device = store.getDevice(String(req.params.id));
     if (!device) {
       res.status(404).json({ error: 'UNKNOWN_DEVICE' });
+      return;
+    }
+    if (device.demo) {
+      res
+        .status(409)
+        .json({ error: 'DEMO_DEVICE', message: 'a demo display has no firmware to update' });
       return;
     }
     const buildId: unknown = (req.body as { buildId?: unknown } | undefined)?.buildId;

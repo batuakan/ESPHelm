@@ -15,8 +15,15 @@ export interface Device {
   servedEtag: string | null;
   /** A firmware update asked of the display (ADR-0036). */
   update?: DeviceUpdate;
+  /** A demo display (ADR-0041): only in the editor; nothing receives its layout. */
+  demo?: boolean;
   /** The newest uploaded image this display can take that is newer than what it runs. */
   updateAvailable?: { buildId: string; version: string } | null;
+}
+
+/** Real displays first, demo displays after, each in the plugin's order. */
+export function orderDevices(list: Device[]): Device[] {
+  return [...list.filter((d) => !d.demo), ...list.filter((d) => d.demo)];
 }
 
 export interface DeviceUpdate {

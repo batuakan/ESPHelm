@@ -48,7 +48,8 @@ export interface Harness {
     path: string,
     opts?: { as?: Principal; body?: unknown; raw?: Uint8Array; headers?: Record<string, string> },
   ): Promise<Response>;
-  restart(): void;
+  /** Stop and start the service, optionally with other demo display settings. */
+  restart(config?: { demoDisplays?: boolean }): void;
   close(): Promise<void>;
 }
 
@@ -63,6 +64,8 @@ export async function startHarness(
     routes?: RouteSource;
     releasesUrl?: string;
     fetch?: typeof fetch;
+    /** Demo displays (ADR-0041); off unless asked for, as Service.start() has them. */
+    demoDisplays?: boolean;
   } = {},
 ): Promise<Harness> {
   const dataDir = opts.dataDir ?? mkdtempSync(join(tmpdir(), 'esphelm-plugin-'));
@@ -129,7 +132,7 @@ export async function startHarness(
     ...(opts.releasesUrl ? { releasesUrl: opts.releasesUrl } : {}),
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   });
-  service.start();
+  service.start({ demoDisplays: opts.demoDisplays ?? false });
 
   const app = express();
   app.use(express.json());
@@ -168,9 +171,9 @@ export async function startHarness(
         },
         body: o.raw ?? (o.body !== undefined ? JSON.stringify(o.body) : undefined),
       }),
-    restart: () => {
+    restart: (config) => {
       service.stop();
-      service.start();
+      service.start({ demoDisplays: config?.demoDisplays ?? opts.demoDisplays ?? false });
     },
     close: async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));

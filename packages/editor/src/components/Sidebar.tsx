@@ -232,6 +232,46 @@ export function DeviceList(props: {
   onUpdate(id: string, buildId: string): void;
   onClearUpdate(id: string): void;
 }) {
+  const real = props.devices.filter((d) => !d.demo);
+  const demos = props.devices.filter((d) => d.demo);
+  // Open while there is no real display, collapsed once one is registered, unless toggled.
+  const [demosToggled, setDemosToggled] = useState<boolean | null>(null);
+  const demosOpen = demosToggled ?? real.length === 0;
+  const setDemosOpen = (open: boolean) => setDemosToggled(open);
+  const row = (d: Device) => (
+    <li key={d.id} className={d.id === props.selectedId ? 'selected' : ''}>
+      <button className="device" onClick={() => props.onSelect(d.id)}>
+        <span className={`dot ${d.state}`} aria-hidden />
+        <span className="device-name">{d.name ?? d.hello.board ?? d.id}</span>
+        {d.demo ? (
+          <span className="device-meta">
+            {d.hello.display.width}×{d.hello.display.height}
+            {d.hello.display.kind === 'mono' ? ' · black and white' : ''}
+            {d.hello.capacity.psram ? '' : ' · no charts'}
+          </span>
+        ) : (
+          <span className="device-meta" title={`Id ${d.id}`}>
+            {d.hello.display.width}×{d.hello.display.height} · {d.state} · {d.hello.fw.version} ·{' '}
+            <span className="device-id">{shortId(d.id)}</span>
+          </span>
+        )}
+        {d.hello.recovery && (
+          <span className="device-warning">
+            A layout crashed this display; it shows an older one until you send a changed layout
+          </span>
+        )}
+      </button>
+      {d.state === 'pending' && (
+        <button className="small" onClick={() => props.onAdopt(d.id)}>
+          Adopt
+        </button>
+      )}
+      {d.id === props.selectedId && <RenameLine key={d.id} device={d} onRename={props.onRename} />}
+      {d.state === 'adopted' && (d.update || d.updateAvailable) && (
+        <UpdateLine device={d} onUpdate={props.onUpdate} onClearUpdate={props.onClearUpdate} />
+      )}
+    </li>
+  );
   return (
     <section className="panel devices" aria-label="Displays">
       <div className="panel-head">
@@ -240,37 +280,31 @@ export function DeviceList(props: {
           Firmware
         </button>
       </div>
-      {props.devices.length === 0 && (
-        <p className="hint">No display has said hello yet. Power one on and approve it in SignalK.</p>
+      {real.length === 0 && (
+        <p className="hint">
+          No display has said hello yet. Power one on and approve it in SignalK.
+          {demos.length > 0 && ' Meanwhile, try the editor on a demo display.'}
+        </p>
       )}
-      <ul>
-        {props.devices.map((d) => (
-          <li key={d.id} className={d.id === props.selectedId ? 'selected' : ''}>
-            <button className="device" onClick={() => props.onSelect(d.id)}>
-              <span className={`dot ${d.state}`} aria-hidden />
-              <span className="device-name">{d.name ?? d.hello.board ?? d.id}</span>
-              <span className="device-meta" title={`Id ${d.id}`}>
-                {d.hello.display.width}×{d.hello.display.height} · {d.state} · {d.hello.fw.version} ·{' '}
-                <span className="device-id">{shortId(d.id)}</span>
+      {real.length > 0 && <ul>{real.map(row)}</ul>}
+      {demos.length > 0 && (
+        <>
+          <h3 className="devices-group">
+            <button
+              className="group-toggle"
+              aria-expanded={demosOpen}
+              onClick={() => setDemosOpen(!demosOpen)}
+              title="Displays that exist only in this editor (ADR-0041)"
+            >
+              <span className="chevron" aria-hidden>
+                {demosOpen ? '▾' : '▸'}
               </span>
-              {d.hello.recovery && (
-                <span className="device-warning">
-                  A layout crashed this display; it shows an older one until you send a changed layout
-                </span>
-              )}
+              Demo ({demos.length})
             </button>
-            {d.state === 'pending' && (
-              <button className="small" onClick={() => props.onAdopt(d.id)}>
-                Adopt
-              </button>
-            )}
-            {d.id === props.selectedId && <RenameLine key={d.id} device={d} onRename={props.onRename} />}
-            {d.state === 'adopted' && (d.update || d.updateAvailable) && (
-              <UpdateLine device={d} onUpdate={props.onUpdate} onClearUpdate={props.onClearUpdate} />
-            )}
-          </li>
-        ))}
-      </ul>
+          </h3>
+          {demosOpen && <ul>{demos.map(row)}</ul>}
+        </>
+      )}
     </section>
   );
 }

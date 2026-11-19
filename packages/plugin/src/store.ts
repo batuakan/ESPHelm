@@ -7,6 +7,7 @@ import {
   type Hello,
   type Layout,
 } from '@esphelm/schema';
+import type { DemoDisplay } from './demo.js';
 import { etagOf, serializeLayout } from './etag.js';
 
 export type DeviceState = 'pending' | 'adopted';
@@ -50,6 +51,8 @@ export interface DeviceRecord {
   firstSeen: string;
   lastSeen: string;
   update?: DeviceUpdate;
+  /** A demo display (ADR-0041): only in the editor, never served, never updated. */
+  demo?: true;
 }
 
 export interface StoredLayout {
@@ -221,6 +224,38 @@ export class Store {
     this.devices.set(id, device);
     this.saveDevices();
     return device;
+  }
+
+  /**
+   * Put the demo displays in the registry (adopted, their hellos refreshed; names and layouts
+   * kept), or with `demos` empty remove any there are. Their layouts stay either way.
+   */
+  syncDemos(demos: readonly DemoDisplay[], now: Date): void {
+    const wanted = new Set(demos.map((d) => d.hello.deviceId));
+    let changed = false;
+    for (const [id, rec] of this.devices)
+      if (rec.demo && !wanted.has(id)) {
+        this.devices.delete(id);
+        changed = true;
+      }
+    for (const { name, hello } of demos) {
+      const existing = this.devices.get(hello.deviceId);
+      const device: DeviceRecord = {
+        id: hello.deviceId,
+        state: 'adopted',
+        name: existing?.name ?? name,
+        ...(existing?.layoutId !== undefined ? { layoutId: existing.layoutId } : {}),
+        hello,
+        firstSeen: existing?.firstSeen ?? now.toISOString(),
+        lastSeen: existing?.lastSeen ?? now.toISOString(),
+        demo: true,
+      };
+      if (JSON.stringify(device) !== JSON.stringify(existing)) {
+        this.devices.set(device.id, device);
+        changed = true;
+      }
+    }
+    if (changed) this.saveDevices();
   }
 
   deleteDevice(id: string): boolean {

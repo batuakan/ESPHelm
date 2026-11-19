@@ -5,6 +5,13 @@ Web editor for display layouts (`packages/editor`, React 19 + Vite). It is built
 ## Using it
 1. **Log in to SignalK as an administrator** (admin UI). The editor uses that login: its API lives under `/plugins/esphelm/api`, which SignalK restricts to admins. Without a login the editor shows a *Log in* link.
 2. **Displays** (left column, or the drop-down on a phone): every display that has said hello. A new one is *pending*: press **Adopt**. **Rename** under the selected display gives it a name ("Helm", "Nav station"; empty shows the board again), kept by the plugin. Each line ends with the last four characters of the display's id, the same as *Settings → Info → Display → Id* on the display, so two displays of one board can be told apart. A display only appears after its own SignalK access request was approved with read/write permission (*Security → Access Requests*).
+   - **No display yet?** Under *Demo* the plugin lists four demo displays (ADR-0041): 480x480, 720x720, 400x300 black and white, and 320x240 without PSRAM.
+     - The *Demo* group is open while no real display is registered, and collapsed once one is; click it to open or close it.
+     - Design pages on them with your server's live values.
+     - **Save** keeps the layout on the server, but nothing receives it.
+     - When a display arrives, take the layout over with *Share → Use another display's layout* (Copy or Link).
+     - The editor opens on a demo display only when there is no real one.
+     - Turn them off with *Show demo displays in the editor* in the plugin's settings (*Server → Plugin Config → ESPHelm*).
 3. **Pages.** Each display has one layout, created on the first save.
    - **The layout bar** at the top holds what applies to the whole layout: **Templates** and **Share** (below), **Display theme** and **Display settings**, and the display's size.
    - **The tabs** under it are the pages, in the order the display shows them. They wrap onto more rows when there are many. The display's footer buttons step through them; the canvas shows a preview of that footer, which every layout has: the page title and the display's settings menu button, ADR-0025, plus the page buttons when there are several pages.

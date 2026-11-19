@@ -28,7 +28,7 @@ import {
   type Tile,
   type TileType,
 } from '@esphelm/schema';
-import { ApiError, createApi, type Api, type ChartInfo, type Device, type PathInfo } from './api';
+import { ApiError, createApi, orderDevices, type Api, type ChartInfo, type Device, type PathInfo } from './api';
 import { formatValue } from './format';
 import { createLiveSource, type LiveSource } from './live';
 import {
@@ -156,7 +156,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 
   const refreshDevices = useCallback(async () => {
     try {
-      const list = await api.devices();
+      const list = orderDevices(await api.devices());
       setDevices(list);
       setNeedsLogin(false);
       return list;
@@ -171,7 +171,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   // new size in hello, ADR-0028).
   useEffect(() => {
     void refreshDevices().then((list) => {
-      if (list.length > 0) setDeviceId((cur) => cur ?? list.find((d) => d.state === 'adopted')?.id ?? list[0]?.id);
+      // A real display first (an adopted one, else a pending one), a demo display only without.
+      if (list.length > 0)
+        setDeviceId((cur) => cur ?? list.find((d) => !d.demo && d.state === 'adopted')?.id ?? list[0]?.id);
     });
     api.widgets().then((w) => setCatalog(w.tiles), () => undefined);
     api.charts().then(setCharts, () => undefined);
@@ -180,7 +182,10 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     const pathsTimer = setInterval(loadPaths, 15000);
     const pollDevices = () =>
       api.devices().then(
-        (list) => setDevices((cur) => (JSON.stringify(cur) === JSON.stringify(list) ? cur : list)),
+        (all) => {
+          const list = orderDevices(all);
+          setDevices((cur) => (JSON.stringify(cur) === JSON.stringify(list) ? cur : list));
+        },
         () => undefined,
       );
     const devicesTimer = setInterval(pollDevices, 5000);
@@ -356,7 +361,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
       setStatus({
         kind: warnings.length > 0 ? 'info' : 'ok',
         text:
-          `Sent to ${device.name ?? device.hello.board}.` +
+          (device.demo
+            ? `Saved for ${device.name ?? 'the demo display'}. Nothing receives a demo layout.`
+            : `Sent to ${device.name ?? device.hello.board}.`) +
           (warnings.length > 0 ? ` Warning: ${warnings.map((w) => w.message).join('; ')}` : ''),
       });
     } catch (e) {
@@ -416,7 +423,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
       new Set(charts.map((c) => c.identifier)),
     );
     setRemap(missing.length > 0 ? missing : null);
-    setStatus({ kind: 'info', text: `Imported “${pendingImport.name}”. Press Save & send to send it to the display.` });
+    setStatus({ kind: 'info', text: `Imported “${pendingImport.name}”. ${device?.demo ? 'Press Save to keep it.' : 'Press Save & send to send it to the display.'}` });
   };
 
   const applyRemap = (replacements: { kind: MissingRef['kind']; from: string; to: string }[]) => {
@@ -443,7 +450,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
         ...(layout.name !== undefined ? { name: layout.name } : {}),
       });
       showPage(0);
-      setStatus({ kind: 'info', text: `Copied the layout of ${displayName(other)}. Press Save & send to send it.` });
+      setStatus({ kind: 'info', text: `Copied the layout of ${displayName(other)}. ${device?.demo ? 'Press Save to keep it.' : 'Press Save & send to send it.'}` });
     } catch (e) {
       fail(e);
     }
@@ -515,7 +522,17 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           ))}
         </div>
         <button className="primary save" disabled={!canSave} onClick={() => void save()}>
-          {saving ? 'Sending…' : dirty || !device?.layoutId ? 'Save & send' : 'Sent ✓'}
+          {device?.demo
+            ? saving
+              ? 'Saving…'
+              : dirty || !device.layoutId
+                ? 'Save'
+                : 'Saved ✓'
+            : saving
+              ? 'Sending…'
+              : dirty || !device?.layoutId
+                ? 'Save & send'
+                : 'Sent ✓'}
         </button>
       </header>
 
@@ -568,6 +585,12 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
             </button>
           </div>
         )}
+        {device?.demo && (
+          <div className="banner info demo-note">
+            Demo display: try the editor here. Nothing receives this layout; when a display arrives, copy
+            or link it with <em>Share</em>.
+          </div>
+        )}
         {layout && page ? (
           <>
             <LayoutBar
@@ -602,7 +625,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                         edit({ ...layout, id: layoutIdFor(device.id) });
                         setStatus({
                           kind: 'info',
-                          text: 'Press Save & send to give this display its own copy of the layout.',
+                          text: `Press ${device?.demo ? 'Save' : 'Save & send'} to give this display its own copy of the layout.`,
                         });
                       },
                     }
