@@ -7,6 +7,7 @@
 // are black wedges, and a stale gauge loses its needle, as grey is not there to dim it.
 #include "mono_common.h"
 #include "mono_corner_values.h"
+#include "mono_draw.h"
 
 #include <algorithm>
 #include <cmath>
@@ -195,115 +196,20 @@ class EngineWidget : public Widget {
     return best;
   }
 
-  static lv_point_precise_t at(double cx, double cy, double r, double deg) {
-    const double a = deg * M_PI / 180.0;
-    return {static_cast<lv_value_precise_t>(cx + r * std::cos(a)), static_cast<lv_value_precise_t>(cy + r * std::sin(a))};
-  }
-
-  /// A line with flat ends (a round cap would poke past the track).
-  void line_(lv_layer_t *layer, lv_point_precise_t p1, lv_point_precise_t p2, int32_t width) {
-    lv_draw_line_dsc_t line;
-    lv_draw_line_dsc_init(&line);
-    line.color = ink_;
-    line.opa = LV_OPA_COVER;
-    line.width = std::max<int32_t>(1, width);
-    line.p1 = p1;
-    line.p2 = p2;
-    lv_draw_line(layer, &line);
-  }
-
-  /// An arc of radius `r` (its outer edge) and `width` between two angles in either order.
-  void arc_(lv_layer_t *layer, double cx, double cy, double r, double width, double a1, double a2) {
-    if (a2 < a1)
-      std::swap(a1, a2);
-    if (a2 - a1 < 0.5)
-      return;
-    lv_draw_arc_dsc_t arc;
-    lv_draw_arc_dsc_init(&arc);
-    arc.color = ink_;
-    arc.opa = LV_OPA_COVER;
-    arc.center = {static_cast<int32_t>(std::lround(cx)), static_cast<int32_t>(std::lround(cy))};
-    arc.radius = static_cast<uint16_t>(std::max(1.0, r));
-    arc.width = static_cast<int32_t>(std::max(1.0, width));
-    arc.start_angle = static_cast<lv_value_precise_t>(std::fmod(a1 + 360.0, 360.0));
-    arc.end_angle = static_cast<lv_value_precise_t>(std::fmod(a2 + 360.0, 360.0));
-    lv_draw_arc(layer, &arc);
-  }
-
-  /// A zone as a band along an arc, in the ink only: a thin line for normal, dashes for warn and a
-  /// solid heavy band for alarm and emergency. `radius` is the band's outer edge, `width` the width
-  /// the colour tile gives it; the heavy styles are a little wider.
-  void zone_(lv_layer_t *layer, double cx, double cy, double radius, double width, double a1, double a2,
-             esphelm::ZoneState state) {
-    if (a2 < a1)
-      std::swap(a1, a2);
-    switch (state) {
-      case esphelm::ZoneState::ALARM:
-      case esphelm::ZoneState::EMERGENCY:
-        arc_(layer, cx, cy, radius, std::max(3.0, std::round(width * 1.5)), a1, a2);
-        break;
-      case esphelm::ZoneState::WARN: {
-        // Dashes of 3.5 degrees with a gap of 2.5: more of a dash than a dot, on a small arc too.
-        const double w = std::max(2.0, std::round(width * 1.25));
-        for (double a = a1; a < a2; a += 6.0)
-          arc_(layer, cx, cy, radius, w, a, std::min(a + 3.5, a2));
-        break;
-      }
-      default:
-        arc_(layer, cx, cy, radius, 1.0, a1, a2);
-        break;
-    }
-  }
-
-  static bool is_alarm_(esphelm::ZoneState s) {
-    return s == esphelm::ZoneState::ALARM || s == esphelm::ZoneState::EMERGENCY;
-  }
-
   /// Whether `v` lies in an alarm zone of the gauge: its ticks are then drawn heavier.
   bool in_alarm_(const GaugeState &g, double v) const {
     for (const auto &z : g.zones) {
-      if (v >= z.from && v <= z.to && is_alarm_(z.state))
+      if (v >= z.from && v <= z.to && draw::is_alarm(z.state))
         return true;
     }
     return false;
-  }
-
-  /// A wedge pointing outward along `deg`, from radius `base` to `tip`, `half` wide each side.
-  void wedge_(lv_layer_t *layer, double cx, double cy, double deg, double base, double tip, double half) {
-    const double a = deg * M_PI / 180.0;
-    const double ux = std::cos(a), uy = std::sin(a), px = -uy, py = ux;
-    lv_draw_triangle_dsc_t tri;
-    lv_draw_triangle_dsc_init(&tri);
-    tri.color = ink_;
-    tri.opa = LV_OPA_COVER;
-    tri.p[0] = {static_cast<lv_value_precise_t>(cx + ux * base + px * half),
-                static_cast<lv_value_precise_t>(cy + uy * base + py * half)};
-    tri.p[1] = {static_cast<lv_value_precise_t>(cx + ux * base - px * half),
-                static_cast<lv_value_precise_t>(cy + uy * base - py * half)};
-    tri.p[2] = {static_cast<lv_value_precise_t>(cx + ux * tip), static_cast<lv_value_precise_t>(cy + uy * tip)};
-    lv_draw_triangle(layer, &tri);
-  }
-
-  void text_(lv_layer_t *layer, const char *text, const lv_font_t *font, int32_t x, int32_t y) {
-    const int32_t fh = lv_font_get_line_height(font);
-    // Centred in a box wide enough for the text (glyphs are narrower than the line height).
-    const int32_t w = static_cast<int32_t>(std::strlen(text)) * fh;
-    lv_draw_label_dsc_t label;
-    lv_draw_label_dsc_init(&label);
-    label.text = text;
-    label.text_local = 1;  // copied: the buffer is on this stack
-    label.font = font;
-    label.color = ink_;
-    label.align = LV_TEXT_ALIGN_CENTER;
-    lv_area_t area{x - w / 2 - 2, y - fh / 2, x + w / 2 + 2, y + fh / 2};
-    lv_draw_label(layer, &label, &area);
   }
 
   void draw_rpm_(lv_layer_t *layer, double cx, double cy) {
     const GaugeState &g = gauges_[0];
     const double R = r_;
     for (const auto &z : g.zones) {
-      zone_(layer, cx, cy, R * es::RPM_BAND_RADIUS, R * es::RPM_BAND_WIDTH,
+      draw::zone_band(layer, ink_, cx, cy, R * es::RPM_BAND_RADIUS, R * es::RPM_BAND_WIDTH,
             esphelm::engine::angle(Gauge::RPM, z.from, g.min, g.max),
             esphelm::engine::angle(Gauge::RPM, z.to, g.min, g.max), z.state);
     }
@@ -320,11 +226,11 @@ class EngineWidget : public Widget {
         w = es::RPM_MEDIUM_WIDTH;
       }
       // A tick in an alarm zone is a pixel heavier.
-      line_(layer, at(cx, cy, R * es::RPM_TICK_OUTER, a), at(cx, cy, R * (es::RPM_TICK_OUTER - len), a),
+      draw::line(layer, ink_, draw::at(cx, cy, R * es::RPM_TICK_OUTER, a), draw::at(cx, cy, R * (es::RPM_TICK_OUTER - len), a),
             static_cast<int32_t>(std::lround(R * w)) + (in_alarm_(g, t.value) ? 1 : 0));
       if (labels_ && t.kind == esphelm::engine::Kind::MAJOR) {
-        const lv_point_precise_t p = at(cx, cy, R * es::RPM_LABEL_RADIUS, a);
-        text_(layer, esphelm::engine::tick_label(t.value / scale_.divisor, buf), label_font_,
+        const lv_point_precise_t p = draw::at(cx, cy, R * es::RPM_LABEL_RADIUS, a);
+        draw::text(layer, ink_, esphelm::engine::tick_label(t.value / scale_.divisor, buf), label_font_,
               static_cast<int32_t>(p.x), static_cast<int32_t>(p.y));
       }
     }
@@ -332,12 +238,12 @@ class EngineWidget : public Widget {
       const int32_t fh = lv_font_get_line_height(label_font_);
       const int32_t y = static_cast<int32_t>(cy + R * es::RPM_UNIT_Y);
       if (!title_.empty())
-        text_(layer, title_.c_str(), label_font_, static_cast<int32_t>(cx), y);
+        draw::text(layer, ink_, title_.c_str(), label_font_, static_cast<int32_t>(cx), y);
       if (scale_.divisor == 100)
-        text_(layer, "x100", label_font_, static_cast<int32_t>(cx), y + fh);
+        draw::text(layer, ink_, "x100", label_font_, static_cast<int32_t>(cx), y + fh);
     }
     if (g.b.has_number && !g.stale) {
-      wedge_(layer, cx, cy, esphelm::engine::angle(Gauge::RPM, g.b.number, g.min, g.max), R * es::RPM_NEEDLE_BASE,
+      draw::wedge(layer, ink_, cx, cy, esphelm::engine::angle(Gauge::RPM, g.b.number, g.min, g.max), R * es::RPM_NEEDLE_BASE,
              R * es::RPM_NEEDLE_TIP, R * es::RPM_NEEDLE_HALF_WIDTH);
     }
   }
@@ -356,14 +262,14 @@ class EngineWidget : public Widget {
     for (const auto &z : g.zones) {
       if (z.state == esphelm::ZoneState::NORMAL)
         continue;
-      zone_(layer, cx, cy, radius + 1, band, esphelm::engine::angle(g.gauge, z.from, g.min, g.max),
+      draw::zone_band(layer, ink_, cx, cy, radius + 1, band, esphelm::engine::angle(g.gauge, z.from, g.min, g.max),
             esphelm::engine::angle(g.gauge, z.to, g.min, g.max), z.state);
     }
-    arc_(layer, cx, cy, radius, track, a_min, a_max);
+    draw::arc(layer, ink_, cx, cy, radius, track, a_min, a_max);
     for (int i = 0; i < es::SLOT_TICKS; i++) {
       const double a = a_min + (a_max - a_min) * i / (es::SLOT_TICKS - 1);
       // From the track's inner edge inward, so no tick crosses the arc.
-      line_(layer, at(cx, cy, radius - track, a), at(cx, cy, radius - track - tick, a),
+      draw::line(layer, ink_, draw::at(cx, cy, radius - track, a), draw::at(cx, cy, radius - track - tick, a),
             static_cast<int32_t>(std::lround(tick_w)));
     }
     // The icon, else the label, in the slot's box.
@@ -381,11 +287,11 @@ class EngineWidget : public Widget {
         lv_draw_image(layer, &img, &a);
       }
     } else if (!g.item.label.empty() && slot_font_ != nullptr) {
-      text_(layer, g.item.label.c_str(), slot_font_, static_cast<int32_t>(cx + R * bx.x),
+      draw::text(layer, ink_, g.item.label.c_str(), slot_font_, static_cast<int32_t>(cx + R * bx.x),
             static_cast<int32_t>(cy + R * bx.y));
     }
     if (g.b.has_number && !g.stale) {
-      wedge_(layer, cx, cy, esphelm::engine::angle(g.gauge, g.b.number, g.min, g.max),
+      draw::wedge(layer, ink_, cx, cy, esphelm::engine::angle(g.gauge, g.b.number, g.min, g.max),
              R * (bottom ? es::BOTTOM_NEEDLE_BASE : es::SIDE_NEEDLE_BASE),
              R * (bottom ? es::BOTTOM_NEEDLE_TIP : es::SIDE_NEEDLE_TIP),
              R * (bottom ? es::BOTTOM_NEEDLE_HALF_WIDTH : es::SIDE_NEEDLE_HALF_WIDTH));

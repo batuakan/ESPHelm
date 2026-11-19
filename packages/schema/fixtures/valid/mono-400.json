@@ -26,7 +26,7 @@
       "grid": { "cols": 2, "rows": 2 },
       "tiles": [
         { "type": "value", "id": "aws", "x": 0, "y": 0, "w": 1, "h": 1, "path": "environment.wind.speedApparent", "unit": "kn", "decimals": 1, "label": "AWS" },
-        { "type": "gauge", "id": "rpm", "x": 0, "y": 1, "w": 1, "h": 1, "path": "propulsion.p0.revolutions", "unit": "rpm", "decimals": 0, "label": "RPM", "min": 0, "max": 5000 },
+        { "type": "switch", "id": "nav-lights", "x": 0, "y": 1, "w": 1, "h": 1, "path": "electrical.switches.navigationLights.state", "label": "Nav lights" },
         { "type": "wind_rose", "id": "rose", "x": 1, "y": 0, "w": 1, "h": 2, "slots": {} }
       ]
     }

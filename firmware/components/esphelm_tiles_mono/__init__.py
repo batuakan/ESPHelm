@@ -13,8 +13,8 @@ CODEOWNERS = ["@batuakan"]
 DEPENDENCIES = ["esphelm_runtime"]
 
 # LVGL features the mono tiles need on top of the core's (esphelm_runtime LVGL_FEATURES).
-# "arc": the wind rose's compass band and sectors.
-LVGL_FEATURES = ("arc", "bar", "label")
+# "arc": the wind rose's compass band and sectors; "chart": the graph tile's line.
+LVGL_FEATURES = ("arc", "bar", "chart", "label")
 
 CONF_INK_ON = "ink_on"
 
