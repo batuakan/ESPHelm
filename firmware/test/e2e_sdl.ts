@@ -2302,10 +2302,10 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its six tile types',
+      'mono: hello says mono and lists its nine tile types',
       monoHello?.display.kind === 'mono' &&
         JSON.stringify(monoHello.widgets) ===
-          '["value","bar","clock","position","wind_rose","engine"]',
+          '["value","bar","clock","position","wind_rose","engine","gauge","heading_tape","graph"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
@@ -2315,8 +2315,8 @@ async function main(): Promise<void> {
       layoutId: 'mono-400',
     });
     check(
-      'mono: the plugin refuses a layout with a gauge',
-      refused.status === 409 && JSON.stringify(refused.body).includes('gauge'),
+      'mono: the plugin refuses a layout with a switch',
+      refused.status === 409 && JSON.stringify(refused.body).includes('switch'),
       JSON.stringify(refused.body),
     );
     const monoOnly = { ...monoLayout, id: 'mono-boat', pages: monoLayout.pages.slice(0, 1) };
@@ -2504,11 +2504,118 @@ async function main(): Promise<void> {
     });
     await sleep(2500);
     await monoShot('mono-09-engine-alarm');
+
+    // 15a. Gauge, heading tape and graph in the mono set (ADR-0042): zones in the ink, the
+    //      graph's zones as a ruler beside its line, a marker beyond the tape's edge.
+    const helm = {
+      ...monoOnly,
+      id: 'mono-helm',
+      theme: 'day',
+      pages: [
+        {
+          kind: 'grid',
+          id: 'helm',
+          title: 'Helm',
+          grid: { cols: 2, rows: 3 },
+          tiles: [
+            {
+              type: 'gauge',
+              id: 'volts',
+              x: 0,
+              y: 0,
+              w: 1,
+              h: 2,
+              path: 'electrical.batteries.0.voltage',
+              unit: 'V',
+              decimals: 1,
+              label: 'Battery',
+              min: 10,
+              max: 16,
+              zones: [
+                { from: 10, to: 11.5, state: 'alarm' },
+                { from: 11.5, to: 12.2, state: 'warn' },
+                { from: 15, to: 16, state: 'alarm' },
+              ],
+            },
+            {
+              type: 'graph',
+              id: 'depth',
+              x: 1,
+              y: 0,
+              w: 1,
+              h: 2,
+              path: 'environment.depth.belowTransducer',
+              unit: 'm',
+              decimals: 1,
+              label: 'Depth',
+              zones: [
+                { to: 4.6, state: 'alarm' },
+                { from: 4.6, to: 5.5, state: 'warn' },
+              ],
+            },
+            { type: 'heading_tape', id: 'tape', x: 0, y: 2, w: 2, h: 1, label: 'HDG' },
+          ],
+        },
+      ],
+    };
+    const helmSaved = await mono.json(
+      'PUT',
+      '/plugins/esphelm/api/layouts/mono-helm',
+      mono.admin,
+      helm,
+    );
+    const helmLinked = await mono.json(
+      'PUT',
+      `/plugins/esphelm/api/devices/${MONO_ID}`,
+      mono.admin,
+      {
+        state: 'adopted',
+        layoutId: 'mono-helm',
+      },
+    );
+    check(
+      'mono: the plugin takes a layout with a gauge, a heading tape and a graph',
+      helmSaved.status === 200 && helmLinked.status === 200,
+      JSON.stringify([helmSaved.body, helmLinked.body]).slice(0, 300),
+    );
+    check(
+      'mono: the helm layout is shown',
+      await fwMono.waitLog(/Showing fetched layout "mono-helm" \(1 pages/),
+    );
+    // Goldens need a fixed curve: restart with the test hook seeding the graph.
+    await fwMono.stop();
+    fwMono.start({ ESPHELM_TEST_CLOCK: 'frozen', ESPHELM_TEST_HISTORY: 'depth' });
+    check(
+      'mono: restarted with a seeded graph',
+      (await fwMono.waitLog(/Showing cached layout "mono-helm"/)) &&
+        (await fwMono.waitLog(/ESPHELM_TEST_HISTORY: seeded depth/)),
+    );
+    await fwMono.waitLog(/Sending hello/, 15000);
+    await sleep(1500); // subscribed
+    const helmValues: Record<string, number> = {
+      'electrical.batteries.0.voltage': 12.8,
+      'environment.depth.belowTransducer': 6.3,
+      'navigation.headingTrue': 0.52, // 30 degrees
+      'navigation.courseOverGroundTrue': 0.61, // 35 degrees
+      'navigation.course.calcValues.bearingTrue': 0.35, // 20 degrees
+      'steering.autopilot.target': 0.44, // 25 degrees
+    };
+    publishMono(helmValues);
+    await sleep(2500);
+    await monoShot('mono-11-helm');
+    publishMono({
+      ...helmValues,
+      'electrical.batteries.0.voltage': 11.2, // alarm: the gauge inverted
+      'environment.depth.belowTransducer': 5.1, // warn: the graph's heavy frame
+      'navigation.course.calcValues.bearingTrue': 2.6, // 149 degrees: an arrow at the right edge
+    });
+    await sleep(2500);
+    await monoShot('mono-12-helm-alarm');
     await fwMono.stop();
     await mono.stop();
     sk = undefined;
 
-    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a gauge): a
+    // 15b. Offline, a cached layout with a tile the mono set doesn't have (a switch): a
     //      placeholder in its place, the rest of the page (and the wind rose) as usual.
     writeFileSync(
       join(workMono, 'esphelm_cur.bin'),
@@ -2517,7 +2624,7 @@ async function main(): Promise<void> {
     rmSync(join(workMono, 'esphelm_prefs.bin'), { force: true });
     fwMono.start();
     check(
-      'mono: the cached layout with a gauge loads',
+      'mono: the cached layout with a switch loads',
       await fwMono.waitLog(/Showing cached layout "mono-400" \(2 pages/),
     );
     // A button for the next page (displays without touch): page 2, then round to page 1.

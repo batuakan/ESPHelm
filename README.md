@@ -35,6 +35,7 @@ It connects directly to SignalK (and HomeAssistant) to show real-time vessel dat
  <img width="200px" src="/docs/images/display-setup-wifi.png">
  <img width="200px" src="/docs/images/display-mono-zones.png">
  <img width="200px" src="/docs/images/display-mono-inverted.png">
+ <img width="200px" src="/docs/images/display-mono-helm.png">
 </p>
 
 <p align="center"><em>Screens rendered by the ESPHelm firmware (desktop build at 480×480) with live SignalK data, in the day, dark and night themes.</em></p>
@@ -116,7 +117,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Alarms:** every SignalK notification shows in a banner at the top of the display, worst first. **ACK** silences it through the plugin; an escalation sounds again. An **alarms panel** tile lists every active alarm at once, worst first, with how long each has been on and its own ACK (optionally only one branch, e.g. the electrical alarms). On a display with a speaker (the P4-86), alarms that ask for sound play a tone until acknowledged: once for an alert or a warning, every 5 s for an alarm, without a pause for an emergency.
 - **Touch sounds:** a short click when you press a button or tile, with the volume and an on/off switch in the editor's display settings and on the display.
 - **Three display themes:** *Day* (light, for sunlight), *Dark* (a dark page with full colours, like the editor's dark theme) and *Night* (red on black, for night vision). Automatic day/night switches between Night and your Day or Dark.
-- **Black-and-white displays:** reflective LCDs, readable in full sun without a backlight, get tiles of their own: value, bar, position and clock as outlined frames, a heavy frame for a warning and an inverted tile for an alarm, every pixel pure black or white. The editor previews such a display in black and white, with *Plain* and *Inverted* themes. Its firmware carries only these tiles, and colour firmware only the colour ones. A display without touch uses its buttons: the next page, Plain or Inverted, and acknowledge an alarm.
+- **Black-and-white displays:** reflective LCDs, readable in full sun without a backlight, get tiles of their own: value, bar, gauge, graph, heading tape, position and clock as outlined frames, plus the wind rose and the engine. A warning shows as a heavy frame and an alarm as an inverted tile, every pixel pure black or white. The editor previews such a display in black and white, with *Plain* and *Inverted* themes. Its firmware carries only these tiles, and colour firmware only the colour ones. A display without touch uses its buttons: the next page, Plain or Inverted, and acknowledge an alarm.
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
 - **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Dark / Night / Auto, the volume and touch sounds (on a display with a speaker) and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
@@ -189,7 +190,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 119 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 121 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```

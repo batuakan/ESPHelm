@@ -29,7 +29,17 @@ export const COLOR_TILES = [
   'engine',
   'alarms',
 ] as const;
-export const MONO_TILES = ['value', 'bar', 'clock', 'position', 'wind_rose', 'engine'] as const;
+export const MONO_TILES = [
+  'value',
+  'bar',
+  'clock',
+  'position',
+  'wind_rose',
+  'engine',
+  'gauge',
+  'heading_tape',
+  'graph',
+] as const;
 
 const FONTS = ['value', 'label', 'small'];
 
