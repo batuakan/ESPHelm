@@ -1,5 +1,6 @@
 import type { Path } from '@signalk/server-api';
 import { AlarmAcks } from './alarms.js';
+import { DEMO_DISPLAYS } from './demo.js';
 import { FirmwareStore, GITHUB_RELEASES } from './firmware.js';
 import { httpPort, securityMode, type PluginHost, type SecurityMode } from './host.js';
 import { Store, type DeviceRecord, type StoredLayout } from './store.js';
@@ -48,6 +49,12 @@ export interface ServiceOptions {
   fetch?: typeof fetch;
 }
 
+/** The plugin's settings (its schema in index.ts). */
+export interface PluginConfig {
+  /** Demo displays in the editor (ADR-0041); on unless turned off. */
+  demoDisplays?: boolean;
+}
+
 /**
  * Shared state of a running plugin: the store and the change notifier. Routers are registered
  * before start(), so they reach the store through here and answer 503 until it is loaded.
@@ -81,7 +88,7 @@ export class Service {
     this.alarms = new AlarmAcks(host, PLUGIN_ID);
   }
 
-  start(): void {
+  start(config: PluginConfig = { demoDisplays: false }): void {
     const store = new Store(
       this.host.getDataDirPath(),
       (msg) => {
@@ -91,6 +98,7 @@ export class Service {
       (msg) => this.host.debug(msg),
     );
     store.load();
+    store.syncDemos(config.demoDisplays === false ? [] : DEMO_DISPLAYS, this.now());
     this.store = store;
     const images = new FirmwareStore(this.host.getDataDirPath(), (msg) => {
       this.host.error(msg);
@@ -111,8 +119,9 @@ export class Service {
       this.notifyFirmware(device);
     }
     const mode = securityMode(this.host);
+    const real = store.listDevices().filter((d) => !d.demo).length;
     this.host.setPluginStatus(
-      `${store.listLayouts().length} layouts, ${store.listDevices().length} devices` +
+      `${store.listLayouts().length} layouts, ${real} devices` +
         (mode === 'disabled'
           ? '. SignalK security is disabled: devices are not authenticated'
           : ''),
@@ -172,6 +181,7 @@ export class Service {
 
   /** Emit the device's current layout version (ETag, or null when nothing is served). */
   notify(device: DeviceRecord): void {
+    if (device.demo) return; // nothing subscribes to a demo display's version
     this.host.handleMessage(PLUGIN_ID, {
       updates: [
         {
@@ -197,6 +207,7 @@ export class Service {
 
   /** Emit the device's firmware offer (null when there is none). */
   notifyFirmware(device: DeviceRecord): void {
+    if (device.demo) return;
     this.host.handleMessage(PLUGIN_ID, {
       updates: [
         {

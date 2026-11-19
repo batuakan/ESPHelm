@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import { validateHello } from '@esphelm/schema';
 import type { IRouter, Request, Response } from 'express';
 import { authorizeDevice } from './auth.js';
+import { isDemoId } from './demo.js';
 import { ifNoneMatchHits } from './etag.js';
 import { versionPath, type Service } from './service.js';
 import { updateActive, type DeviceUpdate, type Store } from './store.js';
@@ -44,6 +45,12 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       res.status(auth.status).json({ error: auth.error, message: auth.message });
       return;
     }
+    if (isDemoId(result.value.deviceId)) {
+      res
+        .status(403)
+        .json({ error: 'DEMO_DEVICE', message: 'this id belongs to a demo display (ADR-0041)' });
+      return;
+    }
     const { device, created, updateSettled } = store.upsertHello(result.value, service.clock);
     if (created) service.notify(device);
     if (updateSettled) service.notifyFirmware(device);
@@ -66,7 +73,7 @@ export function registerDeviceApi(router: IRouter, service: Service): IRouter {
       return;
     }
     const device = store.getDevice(id);
-    if (!device) {
+    if (!device || device.demo) {
       res.status(404).json({ error: 'NOT_REGISTERED', message: 'send hello first' });
       return;
     }

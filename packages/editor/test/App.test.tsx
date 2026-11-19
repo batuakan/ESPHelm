@@ -209,6 +209,43 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('opens on a demo display when there is no real one, saves it without sending (ADR-0041)', async () => {
+    const demoHello: Hello = { ...p4, deviceId: 'de300000-0000-4000-8000-000000000480', board: 'demo', display: { width: 480, height: 480, rotation: 0 } };
+    const demo: Device = { ...device('adopted'), id: demoHello.deviceId, hello: demoHello, name: 'Demo 480x480', demo: true };
+    const server = fakeServer([demo]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    expect(within(list).getByText(/No display has said hello yet.*demo display/)).toBeTruthy();
+    // Without a real display the demo group is open.
+    expect(within(list).getByRole('button', { name: 'Demo (1)' }).getAttribute('aria-expanded')).toBe('true');
+    await screen.findByText(/Demo display: try the editor here/);
+    const save = await screen.findByRole('button', { name: 'Save' });
+    fireEvent.click(screen.getByRole('button', { name: /^Clock/ }));
+    await screen.findByText('No problems');
+    fireEvent.click(save);
+    await screen.findByText(/Saved for Demo 480x480. Nothing receives a demo layout./);
+    expect(await screen.findByRole('button', { name: 'Saved ✓' })).toBeTruthy();
+    expect(server.requests).toContainEqual({ method: 'PUT', path: `/devices/${demo.id}`, body: { layoutId: `display-${demo.id}` } });
+  });
+
+  it('lists real displays before demo ones and selects a real one first', async () => {
+    const demoHello: Hello = { ...p4, deviceId: 'de300000-0000-4000-8000-000000000720', board: 'demo' };
+    const demo: Device = { ...device('adopted'), id: demoHello.deviceId, hello: demoHello, name: 'Demo 720x720', demo: true };
+    render(<App api={fakeServer([demo, device('adopted')]).api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    const names = () => within(list).getAllByRole('listitem').map((li) => li.querySelector('.device-name')?.textContent);
+    // With a real display the demo group starts collapsed; it opens on a click.
+    await waitFor(() => expect(names()).toEqual([p4.board]));
+    const toggle = within(list).getByRole('button', { name: 'Demo (1)' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(names()).toEqual([p4.board, 'Demo 720x720']);
+    fireEvent.click(toggle);
+    expect(names()).toEqual([p4.board]);
+    await screen.findByRole('button', { name: 'Save & send' });
+    expect(screen.queryByText(/Demo display: try the editor here/)).toBeNull();
+  });
+
   it('adds a wind-rose page, fills a slot and saves both pages', async () => {
     const server = fakeServer([device('adopted')]);
     const live = fakeLive();

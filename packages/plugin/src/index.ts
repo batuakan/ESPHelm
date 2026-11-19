@@ -3,7 +3,7 @@ import type { IRouter } from 'express';
 import { registerDeviceApi } from './deviceApi.js';
 import { registerEditorApi } from './editorApi.js';
 import type { PluginHost } from './host.js';
-import { PLUGIN_ID, Service } from './service.js';
+import { PLUGIN_ID, Service, type PluginConfig } from './service.js';
 
 export { versionPath, PLUGIN_ID } from './service.js';
 
@@ -20,8 +20,21 @@ export default function esphelmPlugin(app: ServerAPI): Plugin {
     id: PLUGIN_ID,
     name: 'ESPHelm',
     description: 'Runtime-configurable ESP32 displays: layouts, device registry and delivery',
-    schema: () => ({ type: 'object', properties: {} }),
-    start: () => service.start(),
+    schema: () => ({
+      type: 'object',
+      properties: {
+        demoDisplays: {
+          type: 'boolean',
+          title: 'Show demo displays in the editor',
+          description:
+            'Displays that exist only in the editor, to try it without an ESPHelm display. Nothing receives their layouts.',
+          default: true,
+        },
+      },
+    }),
+    // A plugin never configured starts with no settings: demo displays are on by default.
+    start: (config: object) =>
+      service.start({ demoDisplays: (config as PluginConfig | undefined)?.demoDisplays !== false }),
     stop: () => service.stop(),
     registerWithRouter: (router) => registerEditorApi(router, service),
     signalKApiRoutes: (router: IRouter) => registerDeviceApi(router, service),
