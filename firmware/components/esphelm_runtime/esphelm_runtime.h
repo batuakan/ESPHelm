@@ -54,7 +54,7 @@ namespace esphelm_runtime {
 
 // The firmware's version: a literal, so the image marker (firmware_update.cpp) carries it too.
 // Release tags must match it (ADR-0031).
-#define ESPHELM_FIRMWARE_VERSION "0.4.0"
+#define ESPHELM_FIRMWARE_VERSION "0.5.0"
 static const char *const FIRMWARE_VERSION = ESPHELM_FIRMWARE_VERSION;
 
 class EsphelmRuntime : public Component {
