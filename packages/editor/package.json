@@ -1,6 +1,6 @@
 {
   "name": "@esphelm/editor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "ESPHelm layout editor (SignalK webapp, built into signalk-esphelm/public)",
   "license": "MIT",
@@ -10,7 +10,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@esphelm/schema": "1.1.0",
+    "@esphelm/schema": "1.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
