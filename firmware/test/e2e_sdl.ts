@@ -1853,7 +1853,7 @@ async function main(): Promise<void> {
         (
           (await json('GET', '/plugins/esphelm/api/devices', admin)).body as unknown as {
             id: string;
-            hello: { fw: { build?: string }; capabilities: { ota?: boolean } };
+            hello: { fw: { version: string; build?: string }; capabilities: { ota?: boolean } };
             update?: { state: string; error?: string };
           }[]
         ).find((d) => d.id === DEVICE_ID);
@@ -1892,8 +1892,10 @@ async function main(): Promise<void> {
       });
       check(
         'ota: the display downloads and writes the update, then restarts',
-        (await fwOta.waitLog(/Updating the firmware to 0\.4\.0/, 15000)) &&
-          (await fwOta.waitLog(/Firmware update written/, 30000)),
+        (await fwOta.waitLog(
+          new RegExp(`Updating the firmware to ${before!.hello.fw.version.replaceAll('.', '\\.')}`),
+          15000,
+        )) && (await fwOta.waitLog(/Firmware update written/, 30000)),
       );
       check(
         'ota: the restarted display reports the new build; the update is done',
