@@ -680,21 +680,21 @@ async function main(): Promise<void> {
     // The display theme is part of the layout (the editor's own theme is not).
     await page
       .getByRole('group', { name: 'Display theme' })
-      .getByRole('button', { name: 'Day' })
+      .getByRole('button', { name: 'Night' })
       .click();
     await page.waitForTimeout(500);
-    await shot(page, '07b-desktop-night-editor-day-display');
+    await shot(page, '07b-desktop-night-editor-night-display');
     await save.click();
     await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
-    const dayLayout = await sk.json(
+    const nightLayout = await sk.json(
       'GET',
       `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
       deviceToken,
     );
     check(
-      'the display gets the day theme',
-      dayLayout.body.theme === 'day',
-      String(dayLayout.body.theme),
+      'the display gets the night theme',
+      nightLayout.body.theme === 'night',
+      String(nightLayout.body.theme),
     );
 
     // Display settings (ADR-0015) travel with the layout too.

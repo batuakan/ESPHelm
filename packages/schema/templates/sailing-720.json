@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-sailing-720",
   "name": "Sailing (large display)",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

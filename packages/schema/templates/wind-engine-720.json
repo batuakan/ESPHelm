@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-wind-engine-720",
   "name": "Wind and engine (large display)",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

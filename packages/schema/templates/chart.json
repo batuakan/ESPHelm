@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-chart",
   "name": "Chart and anchor watch",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

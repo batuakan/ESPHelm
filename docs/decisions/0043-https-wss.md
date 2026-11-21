@@ -1,6 +1,6 @@
 # ADR-0043: HTTPS and WSS to the SignalK server, its certificate pinned on first use
 
-Status: **Proposed** (2026-11-21)
+Status: **Accepted** (2026-11-21)
 
 ## Context
 - **What a server with SSL does:** signalk-server with `ssl: true` serves HTTPS and WSS on `sslport` (3443 by default). Its plain port only answers with a redirect to https, and mDNS announces `_signalk-https._tcp` / `_signalk-wss._tcp` in place of `_signalk-http._tcp`. A display that speaks only HTTP can't use such a server at all.
@@ -37,7 +37,8 @@ TLS lives in ESPHomeSignalK (`tls:` option, `components/signalk/tls_pin.h`; PR b
 - **Measured on the P4** (2026-11-21, signalk-server 2.37 with SSL, security on):
   - **Discovery and pinning:** it found the server with mDNS and pinned its certificate; the fingerprint matched openssl's.
   - **Timing:** the WSS stream connected about 250 ms after starting. Each HTTPS request took about 220 ms, handshake included (no session reuse).
-  - **Memory:** free internal RAM was 325 KB with TLS and the stream open, 358 KB plain (stream not yet open). TLS costs about 33 KB of internal RAM, with `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` off.
+  - **Memory:** free internal RAM (the *Info* tab) was 318 KB with TLS and 340 KB plain, against the same server, the same layout and the stream open both times: TLS costs about 22 KB of internal RAM, with `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` off. A single reading moves by a few KB; an earlier pair taken before the plain stream had opened gave 33 KB.
+  - **Refusal:** after the server got a new certificate the display sent it nothing (no token check, no hello, no layout), kept its page, and after *Forget server* pinned the new certificate and asked for access again.
   - **Flash:** the certificate-bundle option ESPHome turns off by default is required for `crt_bundle_attach`; with an empty bundle it adds no measurable flash.
 - **Trust on first use has a window.** A server impersonated at the very first connection would be pinned instead. Approving the access request in the real server's admin UI narrows it: a fake server would have to forward that too. The fingerprint on the *Network* tab lets a careful user check it.
 - **A new certificate needs a user.** Renewing or regenerating the server's certificate (also restoring a config without `ssl-cert.pem`) makes every display refuse it until *Forget server* on each, and a fresh approval if the token doesn't carry over. Deliberately so: the display can't tell a renewal from an attacker.
