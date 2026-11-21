@@ -348,8 +348,7 @@ void EsphelmRuntime::loop() {
 // ---- Network ----
 
 std::string EsphelmRuntime::base_url_() const {
-  return "http://" + this->signalk_->get_host() + ":" + std::to_string(this->signalk_->get_port()) +
-         "/signalk/v1/api/esphelm";
+  return this->signalk_->base_url() + "/signalk/v1/api/esphelm";
 }
 
 void EsphelmRuntime::send_hello_() {
@@ -1123,6 +1122,9 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
   }
   s.server_choice = this->test_servers_ || !this->signalk_->server_configured();
   s.scanning = !this->test_servers_ && this->signalk_->scanning();
+  s.refused_certificate = this->signalk_->tls_refused_fingerprint(8);
+  if (this->info_fixed_ && !s.refused_certificate.empty())
+    s.refused_certificate = "test";  // it differs per run
   for (const signalk::ServerCandidate &server : this->servers_()) {
     // "name  address:port"; the fonts only have ASCII.
     std::string text = server.hostname.empty() ? server.address : server.hostname;
@@ -1369,13 +1371,15 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
   const uint32_t now = millis();
   lv_display_t *disp = lv_display_get_default();
   // Values that change by themselves read "test" under ESPHELM_TEST_INFO=fixed, for screenshots.
-  static const char *const CHANGING[] = {"Up", "Free memory", "Signal", "Deltas", "Dropped", "Last delta", "UTC"};
+  static const char *const CHANGING[] = {"Up", "Free memory", "Signal", "Deltas", "Dropped", "Last delta", "UTC",
+                                         "Certificate"};
   const auto fix = [&]() {
     if (!this->info_fixed_)
       return;
     for (InfoRow &row : rows) {
       for (const char *n : CHANGING) {
-        if (std::strcmp(row.name, n) == 0)
+        // No certificate pinned ("-") is the same on every run.
+        if (std::strcmp(row.name, n) == 0 && !(std::strcmp(n, "Certificate") == 0 && row.value == "-"))
           row.value = "test";
       }
     }
@@ -1395,6 +1399,12 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
     default:
       stream = this->signalk_->is_stream_connected() ? "connected" : "not connected";
   }
+  // HTTPS with the server's certificate pinned on first use (ADR-0043).
+  const signalk::SignalKTlsState tls = this->signalk_->tls_state();
+  static const char *const SECURITY[] = {"HTTP", "HTTPS, pinning", "HTTPS", "HTTPS, refused"};
+  const char *security = SECURITY[static_cast<int>(tls)];
+  if (tls == signalk::SignalKTlsState::REFUSED)
+    stream = "certificate changed";
 
   if (network) {
     // As many rows on every build: the panel builds its labels once.
@@ -1428,6 +1438,10 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
                                          ? std::string("-")
                                          : bound.hostname});
     rows.push_back({nullptr, "Stream", stream});
+    rows.push_back({nullptr, "Security", security});
+    // The start of the pinned certificate's SHA-256, as `openssl x509 -fingerprint -sha256` shows it.
+    const std::string pin = this->signalk_->tls_fingerprint(8);
+    rows.push_back({nullptr, "Certificate", pin.empty() ? std::string("-") : pin});
     fix();
     return;
   }
@@ -1463,6 +1477,7 @@ void EsphelmRuntime::fill_info_(std::vector<InfoRow> &rows, bool network) const 
 
   rows.push_back({"SignalK", "Server", server});
   rows.push_back({nullptr, "Stream", stream});
+  rows.push_back({nullptr, "Security", security});
   rows.push_back({nullptr, "Deltas", std::to_string(this->signalk_->deltas_received())});
   rows.push_back({nullptr, "Dropped", std::to_string(this->signalk_->messages_dropped())});
   const uint32_t last = this->signalk_->last_delta_ms();
@@ -1764,8 +1779,7 @@ void EsphelmRuntime::pump_meta_(uint32_t now, bool ready) {
     std::replace(url.begin(), url.end(), '.', '/');
     HttpRequest req;
     req.kind = RequestKind::META;
-    req.url = "http://" + this->signalk_->get_host() + ":" + std::to_string(this->signalk_->get_port()) +
-              "/signalk/v1/api/vessels/self/" + url + "/meta";
+    req.url = this->signalk_->base_url() + "/signalk/v1/api/vessels/self/" + url + "/meta";
     req.token = this->signalk_->get_token();
     req.max_body = META_MAX_BODY;
     req.tag = this->meta_generation_;

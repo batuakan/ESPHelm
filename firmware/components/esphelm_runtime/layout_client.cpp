@@ -1,4 +1,5 @@
 #include "layout_client.h"
+#include "server_tls.h"
 
 #include "esphome/core/log.h"
 
@@ -115,6 +116,7 @@ HttpResult LayoutClient::perform_(const HttpRequest &request) {
   config.event_handler = on_http_event;
   config.user_data = &capture;
   config.disable_auto_redirect = true;
+  apply_server_tls(config, request.url);
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (client == nullptr) {
     result.error = "esp_http_client_init failed";
@@ -168,6 +170,7 @@ HttpResult LayoutClient::perform_(const HttpRequest &request) {
   result.kind = request.kind;
   result.tag = request.tag;
   ix::HttpClient http;
+  apply_server_tls(http, request.url);
   ix::HttpRequestArgsPtr args = http.createRequest();
   args->connectTimeout = TIMEOUT_MS / 1000;
   args->transferTimeout = TIMEOUT_MS / 1000;

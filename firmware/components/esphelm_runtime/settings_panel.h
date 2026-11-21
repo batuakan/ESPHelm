@@ -50,6 +50,8 @@ class SettingsPanel {
     bool server_choice{false};  // the server is found with mDNS, not set in the firmware
     bool scanning{false};       // a search for servers is running
     std::vector<std::string> servers;  // what the last search found, as shown
+    // The start of the certificate the server presented instead of the pinned one (ADR-0043), else empty.
+    std::string refused_certificate;
   };
 
   void set_fonts(const Fonts &fonts) { this->fonts_ = fonts; }

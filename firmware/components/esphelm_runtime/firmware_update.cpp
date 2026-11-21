@@ -5,6 +5,7 @@
 
 #include "esphome/core/log.h"
 #include "esphelm_runtime.h"
+#include "server_tls.h"
 
 #ifdef USE_ESP32
 #include <esp_app_desc.h>
@@ -206,6 +207,7 @@ void EsphelmOta::run_() {
   config.timeout_ms = TIMEOUT_MS;
   config.disable_auto_redirect = true;
   config.buffer_size = 2048;
+  apply_server_tls(config, this->url_);
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (client == nullptr) {
     backend->abort();
@@ -250,6 +252,7 @@ void EsphelmOta::run_() {
   esp_http_client_cleanup(client);
 #else  // host (SDL): ix::HttpClient reads the whole body; fine on a desktop
   ix::HttpClient http;
+  apply_server_tls(http, this->url_);
   ix::HttpRequestArgsPtr args = http.createRequest();
   args->connectTimeout = TIMEOUT_MS / 1000;
   args->transferTimeout = 120;

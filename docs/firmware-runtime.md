@@ -71,7 +71,9 @@ Ready-made configs:
 | `firmware/esphelm_rlcd.yaml` | Waveshare ESP32-S3-RLCD-4.2, 4.2" 400×300 reflective LCD, black and white, no touch, no backlight, S3 with PSRAM (`hardware/waveshare-esp32-s3-rlcd-42.yaml`: kylehase's `st7305_rlcd` driver, pinned to a commit, an ESPHome binary display, so `esphelm_tiles_mono: ink_on: true`; LVGL's `on_draw_end` sends each frame (not `update_when_display_idle`: since ESPHome 2026.10 that pauses LVGL's refresh timer for 5 minutes while the display's `is_idle()` is false, and this driver never disables its loop); PCF85063 clock as `time_id`; ES8311 speaker like the P4). Buttons: KEY is the next page (`@next`, a long press `@theme`), BOOT acknowledges (`@alarm ack`) | compiles; **not yet run on hardware** |
 | `firmware/esphelm_c3_compile_check.yaml` | ESP32-C3 + 240×240 GC9A01A (placeholder pins) | compile-only check |
 
-The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`).
+The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in no network, only the setup network and its captive portal, and the SignalK server is found with mDNS. The SDL configs set `signalk_host`/`signalk_port` (the e2e passes them with `-s`); `firmware/esphelm_sdl_tls.yaml` reaches its server over HTTPS and WSS (`tls: true`).
+
+**HTTPS and WSS (ADR-0043).** ESPHomeSignalK's `tls:` option: with mDNS (no `host:`), servers with SSL (`_signalk-https._tcp`) are found and preferred. The server's certificate is pinned on first use (SHA-256 of its DER, preference 10004) and required on every connection after; a changed certificate is refused until *Forget server*. The runtime's own clients (layout, hello, firmware, metadata, chart tiles) use the same base URL and pin (`server_tls.h`). The CYD and C3 set `tls: false` (no PSRAM).
 
 ## What the display does
 
@@ -125,13 +127,13 @@ The device configs have no secrets (ADR-0026): `firmware/wifi.yaml` compiles in 
   - **Record:** `v=3;th=…;ds=…;bd=…` (`ds`: the day side, -1 for the layout's); records `v=1` (before sound) and `v=2` (before the dark theme) still read.
 - **Information** (the *Info* tab, one column of sections that scrolls) is refreshed once a second while it shows.
   - **Display:** id, board, firmware, screen, uptime, free memory (internal, and PSRAM). Free memory is not on the host.
-  - **SignalK:** server, stream, deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
+  - **SignalK:** server, stream, security (`HTTP`, `HTTPS, pinning`, `HTTPS`, `HTTPS, refused`; ADR-0043), deltas received and messages dropped, the last delta's age, subscribed paths. The counters come from ESPHomeSignalK.
   - **Layout:** name, version, where it came from (fetched, cached, last known good), pages, the plugin's state for the device.
   - **Clock:** UTC, its source, the time zone.
   - **Long values** are shortened with "..". Each section is a box with three labels (heading, names, values), so the row count of a section is fixed.
 - **Network tab** (ADR-0026), rows refreshed like *Info*, with controls below each section:
   - **Wi-Fi:** network and signal (`USE_WIFI`), IP (`USE_NETWORK`), whether the setup network is on. While it is, its QR code, name and password.
-  - **SignalK server:** address, host name, stream. *Change server* runs `SignalK::scan_servers()` and lists up to 6 of `servers_found()`; a tap calls `choose_server()`. *Forget server* asks *Yes* and calls `forget_server()`. With `host:` in the YAML: "Set in the firmware".
+  - **SignalK server:** address, host name, stream, security and the start of the pinned certificate's SHA-256 (ADR-0043). When the server presents another certificate, a note says so with its fingerprint; *Forget server* trusts the next one. *Change server* runs `SignalK::scan_servers()` and lists up to 6 of `servers_found()`; a tap calls `choose_server()`. *Forget server* asks *Yes* and calls `forget_server()`. With `host:` in the YAML: "Set in the firmware".
   - **Factory reset:** last, under its own heading (with `USE_ESPHELM_WIFI_SETUP`: no network in the YAML; tap part `factory-reset`). It asks *Yes*, then runs ESPHome's factory reset (`global_preferences->reset()`, which erases the whole NVS partition: Wi-Fi, token, server, cached layouts, the display's choices) and restarts into the setup network.
 
 ## Setup without configuration (ADR-0026)
@@ -262,6 +264,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | Settings panel (ADR-0025) | about 20 LVGL objects with the *Settings* tab, about 30 with *Info* (four per section), none when closed; the saved choices are one record of under 100 B in NVS |
 | Sound (ADR-0033) | the five tune strings (under 200 B) and a few words of state in the runtime, one LVGL input-device callback; the I2S speaker's buffer (100 ms at 16 kHz, 16 bit: 3.2 KB), the mixer's buffers and ESPHome's speaker and mixer tasks, only with `sound:` (the P4); I2S writes silence all the time |
 | Firmware updates (ADR-0036) | 6–7 KB of flash on every board; while an update runs, an 8 KB worker task, a 4 KB buffer, the HTTP client and four LVGL objects; nothing otherwise. The host build reads the whole image (its program, about 19 MB) |
+| HTTPS and WSS (ADR-0043) | about 33 KB of internal RAM on the P4 with the stream open (325 KB free against 358 KB plain), mbedTLS buffers included, `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` off; 68 B of preferences; about 220 ms per HTTPS request (a handshake each). Off on the CYD and C3 |
 | Rotation (ADR-0028) | a second LVGL draw buffer as large as the first while rotation is enabled in the YAML (in PSRAM on the P4 and the Guition); nothing per layout |
 | Layout JSON | transient: body + ArduinoJson document, freed after parsing; the model keeps its own compact copies. Only wind rose tiles carry a `RoseConfig` |
 | P4 runtime firmware, static | RAM 98,742 B (17.1 %), flash 3.37 MB (20.4 %; the settings panel with LVGL's slider and the delta counters 15.5 KB, the history popup, its circular maths and LVGL's chart widget about 40 KB of it, the graph tile 6.5 KB, the heading tape 7.1 KB, centre zero with LVGL's arc 9.8 KB, the clock and its screen saver 14.8 KB); the five full fonts (up to 144 px) are about 0.6 MB of that, the two digit fonts 197 KB |

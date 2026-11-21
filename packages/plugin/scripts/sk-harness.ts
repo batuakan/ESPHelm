@@ -31,7 +31,10 @@ export interface WsClient {
   send(data: string): void;
   close(): void;
 }
-type WsConstructor = new (url: string, opts: { headers: Record<string, string> }) => WsClient;
+type WsConstructor = new (
+  url: string,
+  opts: { headers: Record<string, string>; rejectUnauthorized?: boolean },
+) => WsClient;
 
 export interface JsonResponse {
   status: number;
@@ -61,6 +64,8 @@ export interface SignalKHarness {
   stream(token: string): Promise<{ ws: WsClient; messages: unknown[] }>;
   /** The throwaway config dir (plugin data under plugin-config-data/<plugin id>). */
   config: string;
+  /** Stops the server and starts it again on the same config dir and ports. */
+  restart(): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -223,6 +228,12 @@ export async function startSignalK(
     putEcho?: string[];
     autopilotSim?: boolean;
     chartSim?: boolean;
+    /**
+     * HTTPS and WSS on `port` with the server's own self-signed certificate (generated into the
+     * config dir as ssl-cert.pem / ssl-key.pem); the plain port then only redirects. The harness's
+     * own requests accept that certificate.
+     */
+    ssl?: boolean;
   } = {},
 ): Promise<SignalKHarness> {
   if (!existsSync(join(PLUGIN_DIR, 'dist/index.js'))) throw new Error('run `npm run build` first');
@@ -322,32 +333,44 @@ export async function startSignalK(
     }),
   );
 
+  if (opts.ssl) {
+    // Settings are top level in settings.json; the ports come from the environment.
+    writeFileSync(join(config, 'settings.json'), JSON.stringify({ ssl: true }));
+    // The server's certificate is self-signed: this test process (only) accepts it.
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  }
   const port = opts.port ?? (await freePort());
-  const [nmeaPort, tcpPort] = [await freePort(), await freePort()];
-  const base = `http://127.0.0.1:${port}`;
+  const [nmeaPort, tcpPort, redirectPort] = [await freePort(), await freePort(), await freePort()];
+  const base = `${opts.ssl ? 'https' : 'http'}://127.0.0.1:${port}`;
   let log = '';
   const args = ['-c', config, '--securityenabled'];
   if (opts.sampleData) args.push('--sample-nmea0183-data');
-  const server: ChildProcess = spawn(bin, args, {
-    env: {
-      ...process.env,
-      PORT: String(port),
-      NMEA0183PORT: String(nmeaPort),
-      TCPSTREAMPORT: String(tcpPort),
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  server.stdout?.on('data', (d: Buffer) => (log += d.toString()));
-  server.stderr?.on('data', (d: Buffer) => (log += d.toString()));
+  let server: ChildProcess | undefined;
   const sockets: WsClient[] = [];
-  const stop = async () => {
+  const kill = async () => {
     sockets.forEach((s) => s.close());
-    server.kill('SIGTERM');
+    sockets.length = 0;
+    server?.kill('SIGTERM');
     await new Promise((r) => setTimeout(r, 500));
+  };
+  const stop = async () => {
+    await kill();
     rmSync(config, { recursive: true, force: true });
   };
-
-  try {
+  const launch = async () => {
+    server = spawn(bin, args, {
+      env: {
+        ...process.env,
+        ...(opts.ssl
+          ? { PORT: String(redirectPort), SSLPORT: String(port) }
+          : { PORT: String(port) }),
+        NMEA0183PORT: String(nmeaPort),
+        TCPSTREAMPORT: String(tcpPort),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    server.stdout?.on('data', (d: Buffer) => (log += d.toString()));
+    server.stderr?.on('data', (d: Buffer) => (log += d.toString()));
     for (let i = 0; ; i++) {
       if (i > 60) throw new Error(`server did not start:\n${log}`);
       const up = await fetch(`${base}/signalk`).then(
@@ -357,6 +380,10 @@ export async function startSignalK(
       if (up) break;
       await new Promise((r) => setTimeout(r, 500));
     }
+  };
+
+  try {
+    await launch();
   } catch (e) {
     await stop();
     throw e;
@@ -402,6 +429,10 @@ export async function startSignalK(
     admin,
     config,
     log: () => log,
+    restart: async () => {
+      await kill();
+      await launch();
+    },
     json,
     approve,
     deviceToken: async (clientId, permissions) => {
@@ -415,9 +446,10 @@ export async function startSignalK(
       return String((done.body.accessRequest as Record<string, unknown>).token);
     },
     stream: async (token) => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/signalk/v1/stream?subscribe=none`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const ws = new WebSocket(
+        `${opts.ssl ? 'wss' : 'ws'}://127.0.0.1:${port}/signalk/v1/stream?subscribe=none`,
+        { headers: { Authorization: `Bearer ${token}` }, rejectUnauthorized: false },
+      );
       sockets.push(ws);
       await new Promise<void>((resolve, reject) => {
         ws.once('open', () => resolve());

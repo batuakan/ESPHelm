@@ -121,6 +121,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 - **Display settings** in the editor: day and night brightness, start page, automatic day/night from the sun, and a screen timeout whose waking touch never presses a button. Instead of going dark, the screen can show a faint clock.
 - **Settings on the display itself:** the menu button in the footer opens a panel with three tabs. *Settings* has a brightness slider, Day / Dark / Night / Auto, the volume and touch sounds (on a display with a speaker) and *Screen off*, saved on the display. *Network* shows the Wi-Fi network and the SignalK server, and can forget either or pick another server. *Info* shows what the display knows: the SignalK server, how many deltas it has received, its layout and its clock (see [On the display](#-on-the-display)).
 - **No configuration in the firmware:** nothing about your boat is compiled in. A new display opens its own setup network, with a QR code on its screen; join it from your phone and pick the boat's Wi-Fi. It then finds the SignalK server by itself (mDNS) and stays with that server (see [Setting up a display](#-setting-up-a-display)).
+- **HTTPS and WSS:** a SignalK server with SSL is found and preferred. The display remembers the server's certificate the first time and refuses another one later, so its token can't go to a machine posing as the server; the *Network* tab shows the certificate's fingerprint. (Not on the CYD, which has no PSRAM to spare.)
 - **Offline first:** the last layout is cached on the display and shown at boot without a network; stale values are marked instead of frozen.
 - **Try it without a display:** the editor lists demo displays (480×480, 720×720, 400×300 black and white, and a small one without PSRAM), so you can design pages with your boat's live values before you have a display, and give the layout to a real display later. Turn them off in the plugin's settings.
 - **Firmware updates from the editor:** upload an update image, or fetch the latest release from GitHub with one button, and press *Update* on a display. It downloads the image from your SignalK server over the LAN, shows its progress, and restarts; a firmware that doesn't start gives way to the old one. Only the first install is over USB.
@@ -190,7 +191,7 @@ The firmware also builds for your desktop (`firmware/esphelm_sdl.yaml`), which i
 npm test               # schema, plugin, editor and firmware parser tests (needs g++ and git)
 npm run typecheck
 npm run lint
-npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 121 golden screenshots
+npm run e2e:sdl        # the firmware on your desktop against a real signalk-server, 124 golden screenshots
 npm run e2e:editor     # the editor in Chrome
 npm run e2e -w signalk-esphelm   # the plugin against a real signalk-server
 ```
