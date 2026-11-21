@@ -191,7 +191,7 @@ describe('editor', { timeout: 20000 }, () => {
     expect(server.layouts.get(layoutId)).toEqual({
       version: 1,
       id: layoutId,
-      theme: 'night',
+      theme: 'day',
       pages: [
         {
           kind: 'grid',
@@ -481,16 +481,16 @@ describe('editor', { timeout: 20000 }, () => {
     fireEvent.click(await screen.findByRole('option', { name: /navigation.speedOverGround/ }));
     const group = screen.getByRole('group', { name: 'Display theme' });
     const frame = () => screen.getByTestId('grid').closest('.display-frame') as HTMLElement;
-    expect(frame().dataset.themePreview).toBe('night'); // new layouts start at night
+    expect(frame().dataset.themePreview).toBe('day'); // new layouts start at day
     // The editor's own theme does not change the display's.
-    fireEvent.click(screen.getByRole('button', { name: 'light theme' }));
-    expect(frame().dataset.themePreview).toBe('night');
-    fireEvent.click(within(group).getByRole('button', { name: 'Day' }));
+    fireEvent.click(screen.getByRole('button', { name: 'night theme' }));
     expect(frame().dataset.themePreview).toBe('day');
-    expect(within(group).getByRole('button', { name: 'Day' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(within(group).getByRole('button', { name: 'Night' }));
+    expect(frame().dataset.themePreview).toBe('night');
+    expect(within(group).getByRole('button', { name: 'Night' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
     await screen.findByText(/Sent to/);
-    expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('day');
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.theme).toBe('night');
     // The dark theme (ADR-0034).
     fireEvent.click(within(group).getByRole('button', { name: 'Dark' }));
     expect(frame().dataset.themePreview).toBe('dark');

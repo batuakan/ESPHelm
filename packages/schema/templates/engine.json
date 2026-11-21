@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-engine",
   "name": "Engine",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

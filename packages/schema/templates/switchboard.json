@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-switchboard",
   "name": "Switchboard",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

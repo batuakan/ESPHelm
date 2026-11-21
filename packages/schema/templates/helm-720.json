@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-helm-720",
   "name": "Helm (large display)",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",

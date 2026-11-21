@@ -132,7 +132,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 <p align="center">
  <img width="360px" src="/docs/images/display-sailing-720-night.png">
 </p>
-<p align="center"><em>The "Sailing" template on a 720×720 display, night theme.</em></p>
+<p align="center"><em>The "Sailing" template on a 720×720 display, switched to the night theme.</em></p>
 
 ## 👆 On the display
 

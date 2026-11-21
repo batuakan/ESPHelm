@@ -73,7 +73,7 @@ export function newLayoutFor(device: DeviceRef): Layout {
     version: 1,
     id: layoutIdFor(device.id),
     ...(device.name ? { name: device.name } : {}),
-    theme: 'night',
+    theme: 'day',
     pages: [{ kind: 'grid', id: 'main', title: 'Main', grid: { cols: 2, rows: 2 }, tiles: [] }],
   };
 }

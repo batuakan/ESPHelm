@@ -2,7 +2,7 @@
   "version": 1,
   "id": "template-wind",
   "name": "Wind",
-  "theme": "night",
+  "theme": "day",
   "pages": [
     {
       "kind": "grid",
