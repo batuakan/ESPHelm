@@ -38,6 +38,8 @@ external_components:
     components: [esphelm_runtime, esphelm_tiles_color]
 
 signalk:
+  # No PSRAM: TLS would take about 33 KB of internal RAM (ADR-0043), so plain HTTP only.
+  tls: false
 
 lvgl:
   # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015).

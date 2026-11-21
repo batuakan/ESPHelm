@@ -253,6 +253,7 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
                                (state.ap_active != this->state_.ap_active || state.ap_ssid != this->state_.ap_ssid ||
                                 state.ap_password != this->state_.ap_password ||
                                 state.server_choice != this->state_.server_choice ||
+                                state.refused_certificate != this->state_.refused_certificate ||
                                 (this->listing_ && (state.scanning != this->state_.scanning ||
                                                     state.servers != this->state_.servers)));
   rebuild = rebuild || this->network_dirty_ || network_changed || state.theme != this->state_.theme ||
@@ -501,6 +502,14 @@ void SettingsPanel::build_network_(lv_obj_t *body, int32_t w, int32_t btn_h, int
       if (this->state_.ap_active)
         this->build_setup_network_(body, w);
     } else if (std::strcmp(section, SERVER_SECTION) == 0) {
+      if (!this->state_.refused_certificate.empty()) {
+        // Nothing goes to the server until this is settled: it may be another machine posing as it.
+        const std::string text = "The server presented another certificate: " + this->state_.refused_certificate +
+                                 ". If its certificate was changed, forget the server to trust the new one.";
+        lv_obj_t *l = label(body, small, c.text, text.c_str());
+        lv_obj_set_width(l, w);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+      }
       if (!this->state_.server_choice) {
         note("Set in the firmware.");
       } else if (this->confirm_ == Confirm::SERVER) {

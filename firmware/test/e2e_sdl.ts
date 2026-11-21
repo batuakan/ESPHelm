@@ -7,7 +7,7 @@
  * ~/venv/bin/python). Uses throwaway directories; never touches ~/.signalk.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import {
   chmodSync,
   copyFileSync,
@@ -62,6 +62,7 @@ function hostDeviceId(name: string, mac = [0x98, 0x35, 0x69, 0xab, 0xf6, 0x79]):
 }
 const DEVICE_ID = hostDeviceId('esphelm-sdl');
 const MONO_ID = hostDeviceId('esphelm-sdl-mono');
+const TLS_ID = hostDeviceId('esphelm-sdl-tls');
 
 let failures = 0;
 function check(label: string, ok: boolean, detail = ''): void {
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
     'firmware/esphelm_sdl_720.yaml',
     'firmware/esphelm_sdl_wide.yaml',
     'firmware/esphelm_sdl_mono.yaml',
+    'firmware/esphelm_sdl_tls.yaml',
   ]) {
     console.log(`compiling ${config} for SignalK at 127.0.0.1:${PORT} ...`);
     execFileSync(
@@ -191,7 +193,13 @@ async function main(): Promise<void> {
   }
   // Never let a test build talk to a real SignalK server (e.g. the default :3000): check that
   // the compiled code really uses the test port before starting any firmware.
-  for (const name of ['esphelm-sdl', 'esphelm-sdl-720', 'esphelm-sdl-wide', 'esphelm-sdl-mono']) {
+  for (const name of [
+    'esphelm-sdl',
+    'esphelm-sdl-720',
+    'esphelm-sdl-wide',
+    'esphelm-sdl-mono',
+    'esphelm-sdl-tls',
+  ]) {
     const main = readFileSync(join(FIRMWARE, `.esphome/build/${name}/src/main.cpp`), 'utf8');
     if (!main.includes(`set_port(${PORT});`) || !main.includes('set_host("127.0.0.1");'))
       throw new Error(`${name} was not built for 127.0.0.1:${PORT}; refusing to run it`);
@@ -217,6 +225,9 @@ async function main(): Promise<void> {
   const workMono = join(work, 'mono');
   mkdirSync(workMono);
   const fwMono = new Firmware(workMono, binary('esphelm-sdl-mono'));
+  const workTls = join(work, 'tls');
+  mkdirSync(workTls);
+  const fwTls = new Firmware(workTls, binary('esphelm-sdl-tls'));
   try {
     sk = await startSignalK({
       port: PORT,
@@ -2644,6 +2655,102 @@ async function main(): Promise<void> {
       'mono: and goes round to the first page',
       await fwMono.waitLog(firstPage, 15000, shownBefore + 1),
     );
+    await fwMono.stop();
+
+    // 16. HTTPS and WSS (ADR-0043): a server with SSL and its own self-signed certificate. The
+    //     display pins that certificate on first use, gets its token, says hello, fetches its layout
+    //     and streams over TLS; then the server gets another certificate, and the display refuses
+    //     it: nothing is sent, the cached layout stays, and the Network tab says why.
+    sk = await startSignalK({ port: PORT, ssl: true });
+    const tls = sk;
+    const certificate = () =>
+      new X509Certificate(readFileSync(join(tls.config, 'ssl-cert.pem'))).fingerprint256;
+    const tlsTap = (target: string) => writeFileSync(join(workTls, 'esphelm_tap_request'), target);
+    const tlsNext = (re: RegExp, ms = 15000) => fwTls.waitLog(re, ms, fwTls.count(re) + 1);
+    fwTls.start();
+    const pinned =
+      /Pinned the certificate of SignalK server 127\.0\.0\.1:\d+, SHA-256 ([0-9A-F:]+)/;
+    check('tls: pins the server certificate on first use', await fwTls.waitLog(pinned, 20000));
+    check(
+      'tls: the pin is the server certificate',
+      pinned.exec(fwTls.log())?.[1] === certificate(),
+      `${pinned.exec(fwTls.log())?.[1]} vs ${certificate()}`,
+    );
+    check(
+      'tls: asks for access over HTTPS',
+      await waitFor(() => fwTls.count(/Access request is pending approval/) > 0, 20000),
+    );
+    await tls.approve(TLS_ID, 'readwrite');
+    check('tls: says hello over HTTPS', await fwTls.waitLog(/pending adoption/, 20000));
+    const tlsLayout = fixture('valid/grid-2x2-values-480.json');
+    await tls.json(
+      'PUT',
+      `/plugins/esphelm/api/layouts/${String(tlsLayout.id)}`,
+      tls.admin,
+      tlsLayout,
+    );
+    await tls.json('PUT', `/plugins/esphelm/api/devices/${TLS_ID}`, tls.admin, {
+      state: 'adopted',
+      layoutId: tlsLayout.id,
+    });
+    check(
+      'tls: the version delta over WSS fetches the layout over HTTPS',
+      await fwTls.waitLog(/Showing fetched layout "grid-480" \(1 pages/),
+    );
+    const { ws: tlsWs } = await tls.stream(tls.admin);
+    await sleep(1000);
+    tlsWs.send(
+      JSON.stringify({
+        context: 'vessels.self',
+        updates: [
+          {
+            values: [
+              { path: 'navigation.speedOverGround', value: 5.0 },
+              { path: 'environment.wind.speedApparent', value: 7.2 },
+              { path: 'environment.wind.speedTrue', value: 6.0 },
+              { path: 'navigation.speedThroughWater', value: 4.8 },
+            ],
+          },
+        ],
+      }),
+    );
+    await sleep(1500);
+    await fwTls.screenshot('tls-01-values', shots);
+    tlsTap('@menu');
+    check('tls: the settings panel opens', await tlsNext(/Settings opened/));
+    tlsTap('@settings tab-network');
+    check('tls: the Network tab', await tlsNext(/Settings: network tab/));
+    await sleep(1500);
+    await fwTls.screenshot('tls-02-network', shots);
+    await fwTls.stop();
+
+    // The server gets another certificate (signalk-server makes one when it has none).
+    rmSync(join(tls.config, 'ssl-cert.pem'));
+    rmSync(join(tls.config, 'ssl-key.pem'));
+    await tls.restart();
+    fwTls.start();
+    check(
+      'tls: the cached layout comes back',
+      await fwTls.waitLog(/Showing cached layout "grid-480"/),
+    );
+    check(
+      'tls: refuses the new certificate',
+      await fwTls.waitLog(/presented another certificate: SHA-256 [0-9A-F:]+, pinned/, 20000),
+    );
+    await sleep(3000);
+    check(
+      'tls: and sends it nothing',
+      fwTls.count(/Showing fetched layout|pending adoption|Pinned the certificate/) === 0,
+    );
+    tlsTap('@menu');
+    check('tls: the settings panel opens again', await tlsNext(/Settings opened/));
+    tlsTap('@settings tab-network');
+    check('tls: the Network tab', await tlsNext(/Settings: network tab/));
+    await sleep(1500);
+    await fwTls.screenshot('tls-03-refused', shots);
+    await fwTls.stop();
+    await tls.stop();
+    sk = undefined;
   } finally {
     await fw.stop();
     await fw720.stop();
@@ -2651,6 +2758,7 @@ async function main(): Promise<void> {
     await fwBoot.stop();
     await fwSetup.stop();
     await fwMono.stop();
+    await fwTls.stop();
     if (sk) await sk.stop();
     if (failures > 0) {
       fw.saveLog();
@@ -2659,6 +2767,7 @@ async function main(): Promise<void> {
       fwBoot.saveLog();
       fwSetup.saveLog();
       fwMono.saveLog();
+      fwTls.saveLog();
       console.log(`\nkept ${work} (screenshots, firmware-*.log)`);
     } else {
       rmSync(work, { recursive: true, force: true });

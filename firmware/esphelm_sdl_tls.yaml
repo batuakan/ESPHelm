@@ -1,0 +1,18 @@
+# Runtime firmware on the desktop (SDL host build), 480x480, to a SignalK server with SSL: HTTPS and WSS
+# with the server's certificate pinned on first use (ADR-0043). For the e2e (section 16).
+#   ~/venv/bin/esphome -s signalk_host 127.0.0.1 -s signalk_port 3443 compile firmware/esphelm_sdl_tls.yaml
+substitutions:
+  # Repeated here on purpose: `-s` on the command line only overrides this file's own
+  # substitutions, not those of the included esphelm_sdl.yaml.
+  signalk_host: "127.0.0.1"
+  signalk_port: "3443"
+  signalk_ref: main
+
+packages:
+  base: !include esphelm_sdl.yaml
+
+esphome:
+  name: esphelm-sdl-tls
+
+signalk:
+  tls: true
