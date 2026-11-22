@@ -26,6 +26,10 @@ esp32:
   flash_size: 16MB
   framework:
     type: esp-idf
+    sdkconfig_options:
+      # mbedTLS's buffers (16 KB in, up to 16 KB out, the handshake) in PSRAM, not internal RAM:
+      # TLS to the SignalK server (ADR-0043) cost about 22 KB of internal RAM with them inside.
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
 
 psram:
   mode: octal

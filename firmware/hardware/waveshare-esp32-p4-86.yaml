@@ -48,6 +48,9 @@ esp32:
       # Code and constants run from PSRAM (copied at boot), so flash writes no longer turn the
       # cache off: the screen kept flickering while a firmware update was written (ADR-0036).
       CONFIG_SPIRAM_XIP_FROM_PSRAM: y
+      # mbedTLS's buffers (16 KB in, up to 16 KB out, the handshake) in PSRAM, not internal RAM:
+      # TLS to the SignalK server (ADR-0043) cost about 22 KB of internal RAM with them inside.
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
 
 logger:
   level: DEBUG
