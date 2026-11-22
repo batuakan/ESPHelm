@@ -29,3 +29,5 @@ firmware/test/.cache/
 
 # ESP32-C6 co-processor firmware for the P4 (download from esphome/esp-hosted-firmware, see README)
 firmware/network_adapter_esp32c6.bin
+# Copied from the root at publish time (npm.yml)
+packages/*/CHANGELOG.md

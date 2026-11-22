@@ -3,7 +3,9 @@ name: Release firmware
 # Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N, a prerelease) builds the firmware of every supported board
 # and creates a draft GitHub release with the binaries (ADR-0031). The tag must match the
 # firmware's ESPHELM_FIRMWARE_VERSION. manifest.json lists the update images for the plugin's
-# Check GitHub button (ADR-0036). Review the draft, check it on hardware, then publish it.
+# Check GitHub button (ADR-0036). The notes start with the release's section of CHANGELOG.md,
+# which the SignalK App Store shows as the plugin's changelog. Review the draft, check it on
+# hardware, then publish it.
 on:
   push:
     tags: ['v*']
@@ -25,8 +27,12 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       signalk_sha: ${{ steps.signalk.outputs.sha }}
+      notes: ${{ steps.changelog.outputs.notes }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Check the tag against FIRMWARE_VERSION
         id: version
         env:
@@ -44,6 +50,23 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [ "$version" != "$base" ]; then echo "prerelease=true"; else echo "prerelease=false"; fi >> "$GITHUB_OUTPUT"
+      - name: What changed, from CHANGELOG.md
+        id: changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          base="${VERSION%%-*}"
+          script=packages/plugin/scripts/changelog.ts
+          # A release needs its own section; a prerelease may still be "Unreleased".
+          if ! notes=$(node --experimental-strip-types "$script" notes "$base"); then
+            if [ "$VERSION" = "$base" ]; then exit 1; fi
+            notes=$(node --experimental-strip-types "$script" notes Unreleased)
+          fi
+          {
+            echo 'notes<<CHANGELOG_EOF'
+            printf '%s\n' "$notes"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
       - name: Pin ESPHomeSignalK
         id: signalk
         run: |
@@ -134,6 +157,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
           SIGNALK_SHA: ${{ needs.prepare.outputs.signalk_sha }}
+          NOTES: ${{ needs.prepare.outputs.notes }}
         run: |
           cd dist
           # manifest.json: what the plugin's Check GitHub reads (ADR-0036). Board, tile set and
@@ -156,7 +180,10 @@ jobs:
           cat manifest.json
           sha256sum *.bin manifest.json > SHA256SUMS
           cat SHA256SUMS
-          cat > ../notes.md <<EOF
+          {
+            printf '## What changed\n\n%s\n\n## Firmware\n\n' "$NOTES"
+          } > ../notes.md
+          cat >> ../notes.md <<EOF
           Firmware for the ESPHelm displays. Pick your board's files:
 
           | Board | Screen | First install (USB) | Update | Hardware |

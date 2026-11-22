@@ -35,6 +35,7 @@
     "units.json",
     "fixtures",
     "templates",
+    "CHANGELOG.md",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {

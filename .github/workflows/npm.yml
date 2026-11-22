@@ -2,6 +2,7 @@
 # Only code already on main is published, and only versions npm doesn't have yet, schema first.
 # Auth is npm trusted publishing (OIDC): no token is stored here; each package names this
 # workflow as its trusted publisher on npmjs.com. See docs/plugin-api.md (Publishing to npm).
+# CHANGELOG.md must name each version in a released section, and goes into both packages.
 name: npm
 
 on:
@@ -44,6 +45,8 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
       - run: npm install -g npm@11
       - run: npm ci
+      - name: CHANGELOG.md names the versions
+        run: npx tsx packages/plugin/scripts/changelog.ts check-npm
       - run: npm i -g signalk-server@${{ env.SIGNALK_SERVER_VERSION }}
       - run: npm run typecheck
       - run: npm run lint
@@ -53,6 +56,8 @@ jobs:
         run: npm run e2e -w signalk-esphelm
       - name: Publish the versions npm doesn't have
         run: |
+          # Each package lists CHANGELOG.md in "files"; the copies are gitignored.
+          for ws in packages/schema packages/plugin; do cp CHANGELOG.md "$ws/"; done
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
           published=0

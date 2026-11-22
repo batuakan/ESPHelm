@@ -175,9 +175,10 @@ The package is also a `signalk-webapp`: signalk-server serves `public/` (the edi
 ## Publishing to npm
 Two packages go to npm: `@esphelm/schema` (the contract, which the plugin depends on) and `signalk-esphelm` (plugin and editor). The `@esphelm` scope belongs to the `esphelm` npm organisation; scoped packages are private by default, so the schema's `publishConfig` sets `access: public`.
 
-1. Bump the versions on a branch and merge it to main. A changed schema gets a new version first, and the plugin's `@esphelm/schema` dependency names it exactly. npm never takes the same version twice.
+1. Bump the versions on a branch and merge it to main. A changed schema gets a new version first, and the plugin's `@esphelm/schema` dependency names it exactly. npm never takes the same version twice. In the same branch, turn `## Unreleased` in `CHANGELOG.md` into the release's section, headed by the versions (`Firmware 0.6.0 · signalk-esphelm 0.4.0 · @esphelm/schema 1.3.0`; ADR-0045).
 2. Move the `release` branch to that commit: `git push origin main:release`. The workflow `.github/workflows/npm.yml` then:
    - refuses a commit that isn't on main;
+   - refuses a package version that no released section of `CHANGELOG.md` names, and copies the file into both packages;
    - runs typecheck, lint, the unit tests, the build and the plugin end to end;
    - publishes each package whose version npm doesn't have yet, the schema before the plugin, with provenance, and tags it `npm/<name>@<version>` (not `v*`, which builds the firmware).
 
@@ -185,4 +186,4 @@ Two packages go to npm: `@esphelm/schema` (the contract, which the plugin depend
    Each package's `prepublishOnly` builds it first (the plugin's builds the schema, the plugin and the editor into `public/`), so a stale `dist/` is never published. `npm pack --dry-run -w <package>` shows what goes in.
 3. **Setup, once per package** (npm trusted publishing, no token in GitHub): on npmjs.com, the package's *Settings → Trusted publishing → GitHub Actions*: owner `batuakan`, repository `ESPHelm`, workflow `npm.yml`, environment `npm`. The `npm` environment in the repository's settings can require an approval before each publish.
 4. **By hand** (when CI can't): `npm login`, `npm ci`, then `npm publish -w @esphelm/schema` and `npm publish -w signalk-esphelm`.
-5. The SignalK App Store lists the plugin by its `signalk-node-server-plugin` keyword, usually within a few hours of publishing.
+5. The SignalK App Store lists the plugin by its `signalk-node-server-plugin` keyword, usually within a few hours of publishing. Its *Changelog* tab shows this repository's GitHub Releases, so the store shows a release's notes once its firmware release is published (ADR-0045).

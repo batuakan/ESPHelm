@@ -32,6 +32,7 @@
   "files": [
     "dist",
     "public",
+    "CHANGELOG.md",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {
