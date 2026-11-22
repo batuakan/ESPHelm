@@ -135,7 +135,8 @@ describe('editor', { timeout: 20000 }, () => {
   });
 
   it('shows when a display\'s SignalK access runs out, only when it has an expiry (ADR-0044)', async () => {
-    const soon = Math.round(Date.now() / 1000) + 5 * 24 * 3600;
+    // A minute short of 5 days: the editor rounds what is left up to whole days.
+    const soon = Math.floor(Date.now() / 1000) + 5 * 24 * 3600 - 60;
     const server = fakeServer([device('adopted')], [], { devices: [{ clientId: p4.deviceId, tokenExpiry: soon }] });
     render(<App api={server.api} live={fakeLive().factory} />);
     const list = await screen.findByRole('region', { name: 'Displays' });
