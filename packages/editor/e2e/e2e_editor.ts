@@ -1154,6 +1154,86 @@ async function main(): Promise<void> {
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', deviceToken, hello);
 
+    // Display access (ADR-0044): a spare display approved for 20 days is flagged, then removed in
+    // the editor, which revokes its SignalK access too.
+    const SPARE_ID = '0b0b0b0b-1111-2222-0ba2-0000ed170003';
+    const spareToken = await sk.deviceToken(SPARE_ID, 'readwrite', '20d');
+    await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', spareToken, {
+      ...hello,
+      deviceId: SPARE_ID,
+    });
+    await sk.json('PUT', `/plugins/esphelm/api/devices/${SPARE_ID}`, sk.admin, {
+      state: 'adopted',
+      name: 'Spare',
+    });
+    const skDevices = async () =>
+      ((await sk.json('GET', '/skServer/security/devices', sk.admin)).body as unknown as {
+        clientId: string;
+        tokenExpiry?: number;
+      }[]) ?? [];
+    // 2.17 and 2.19 don't record a token's expiry; then the editor has nothing to show.
+    const recordsExpiry = (await skDevices()).some(
+      (d) => d.clientId === SPARE_ID && typeof d.tokenExpiry === 'number',
+    );
+    await page.reload();
+    const spareRow = displays.getByRole('listitem').filter({ hasText: 'Spare' });
+    await spareRow.waitFor();
+    const warned = await spareRow
+      .getByText(/SignalK access ends in (19|20) days/)
+      .waitFor({ timeout: 10000 })
+      .then(
+        () => true,
+        () => false,
+      );
+    check(
+      recordsExpiry
+        ? 'access: a display approved for 20 days is warned about'
+        : `access: no expiry shown (SignalK ${sk.version} records none)`,
+      warned === recordsExpiry,
+      `recordsExpiry=${recordsExpiry} warned=${warned}`,
+    );
+    // The other two were approved with no expiration: only the spare has a line.
+    const accessLines = await displays.getByText(/SignalK access/).allInnerTexts();
+    check(
+      'access: displays approved with no expiration show no access line',
+      accessLines.length === (recordsExpiry ? 1 : 0),
+      accessLines.join(' | '),
+    );
+    await spareRow.locator('button.device').click();
+    await spareRow.getByRole('button', { name: 'Remove display' }).click();
+    await shot(page, '16-desktop-remove-display');
+    await spareRow
+      .getByRole('group', { name: 'Remove display' })
+      .getByRole('button', { name: 'Remove', exact: true })
+      .click();
+    await page.getByRole('status').filter({ hasText: 'Removed Spare' }).waitFor();
+    const statusText = (
+      await page.getByRole('status').filter({ hasText: 'Removed Spare' }).innerText()
+    ).trim();
+    const pluginDevices = (await sk.json('GET', '/plugins/esphelm/api/devices', sk.admin))
+      .body as unknown as { id: string }[];
+    check(
+      'access: Remove forgets the display and revokes its SignalK access',
+      /its SignalK access is revoked/.test(statusText) &&
+        !pluginDevices.some((d) => d.id === SPARE_ID) &&
+        !(await skDevices()).some((d) => d.clientId === SPARE_ID),
+      statusText,
+    );
+    const afterRevoke = await sk.json('POST', '/signalk/v1/api/esphelm/devices/hello', spareToken, {
+      ...hello,
+      deviceId: SPARE_ID,
+    });
+    check(
+      "access: the removed display's token is refused",
+      afterRevoke.status === 401,
+      String(afterRevoke.status),
+    );
+    check(
+      'access: the other displays stay',
+      pluginDevices.some((d) => d.id === DEVICE_ID) &&
+        pluginDevices.some((d) => d.id === DEVICE_ID2),
+    );
+
     check(
       'no errors in the browser console',
       consoleErrors.length === 0,

@@ -29,6 +29,7 @@ import {
   type TileType,
 } from '@esphelm/schema';
 import { ApiError, createApi, orderDevices, type Api, type ChartInfo, type Device, type PathInfo } from './api';
+import type { SignalkDevice } from './access';
 import { formatValue } from './format';
 import { createLiveSource, type LiveSource } from './live';
 import {
@@ -121,6 +122,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
   const api = useMemo(() => props.api ?? createApi(), [props.api]);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [devices, setDevices] = useState<Device[]>([]);
+  // SignalK's approved devices (ADR-0044); null while unknown or unreadable (security off).
+  const [access, setAccess] = useState<Map<string, SignalkDevice> | null>(null);
   const [paths, setPaths] = useState<PathInfo[]>([]);
   const serverZones = useMemo(() => new Map(paths.map((p) => [p.path, p.zones])), [paths]);
   const [catalog, setCatalog] = useState<string[]>(Object.keys(TILE_TYPES));
@@ -154,7 +157,27 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     setStatus({ kind: 'error', text: e instanceof Error ? e.message : String(e) });
   }, []);
 
+  // SignalK's device list is extra: a failure (security off, an old server) only hides it.
+  const loadAccess = useCallback(
+    () =>
+      api.signalkDevices().then(
+        (list) => {
+          const next = Array.isArray(list) ? new Map(list.map((d) => [d.clientId, d])) : null;
+          setAccess((cur) =>
+            JSON.stringify(cur && [...cur]) === JSON.stringify(next && [...next]) ? cur : next,
+          );
+          return next;
+        },
+        () => {
+          setAccess(null);
+          return null;
+        },
+      ),
+    [api],
+  );
+
   const refreshDevices = useCallback(async () => {
+    void loadAccess();
     try {
       const list = orderDevices(await api.devices());
       setDevices(list);
@@ -164,7 +187,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
       fail(e);
       return [];
     }
-  }, [api, fail]);
+  }, [api, fail, loadAccess]);
 
   // Initial load; paths refresh every 15 s (new sources appear while the editor is open), the
   // displays every 5 s (new displays appear, and a display turned on its Network tab reports its
@@ -180,20 +203,22 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     const loadPaths = () => api.paths().then(setPaths, () => undefined);
     void loadPaths();
     const pathsTimer = setInterval(loadPaths, 15000);
-    const pollDevices = () =>
-      api.devices().then(
+    const pollDevices = () => {
+      void loadAccess();
+      return api.devices().then(
         (all) => {
           const list = orderDevices(all);
           setDevices((cur) => (JSON.stringify(cur) === JSON.stringify(list) ? cur : list));
         },
         () => undefined,
       );
+    };
     const devicesTimer = setInterval(pollDevices, 5000);
     return () => {
       clearInterval(pathsTimer);
       clearInterval(devicesTimer);
     };
-  }, [api, refreshDevices]);
+  }, [api, refreshDevices, loadAccess]);
 
   // Load (or start) the layout of the selected display.
   useEffect(() => {
@@ -334,6 +359,39 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
     } catch (e) {
       fail(e);
     }
+  };
+
+  // Revoke first, then forget: a display removed only from the plugin would say hello again within
+  // seconds with its still valid token (ADR-0044).
+  const removeDisplay = async (id: string) => {
+    const d = devices.find((x) => x.id === id);
+    const name = d?.name ?? d?.hello.board ?? id;
+    let revoked = true;
+    const known = access ?? (await loadAccess());
+    if (known) {
+      try {
+        await api.revokeSignalkAccess(id);
+      } catch (e) {
+        // 404: SignalK has no such device any more, which is what revoking wants.
+        if (!(e instanceof ApiError && e.status === 404)) revoked = false;
+      }
+    }
+    try {
+      await api.deleteDevice(id);
+    } catch (e) {
+      fail(e);
+      return;
+    }
+    setDeviceId((cur) => (cur === id ? undefined : cur));
+    await refreshDevices();
+    setStatus(
+      revoked
+        ? { kind: 'ok', text: known ? `Removed ${name}; its SignalK access is revoked.` : `Removed ${name}.` }
+        : {
+            kind: 'info',
+            text: `Removed ${name} from ESPHelm. Its SignalK access could not be revoked: remove it under Security > Devices in SignalK.`,
+          },
+    );
   };
 
   const rename = async (id: string, name: string | null) => {
@@ -567,6 +625,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
             void api.requestUpdate(id, buildId).then(() => refreshDevices(), fail)
           }
           onClearUpdate={(id) => void api.clearUpdate(id).then(() => refreshDevices(), fail)}
+          onRemove={(id) => void removeDisplay(id)}
+          access={access}
         />
         <TileLibrary
           types={catalog}

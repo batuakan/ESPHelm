@@ -2,11 +2,41 @@
 import { useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react';
 import type { TileType } from '@esphelm/schema';
 import type { Device } from '../api';
+import { accessLine, type SignalkDevice } from '../access';
 
 /** The end of a display's id, to match against *Settings → Info → Display → Id* on the display. */
 export function shortId(id: string): string {
   const hex = id.replace(/[^0-9a-zA-Z]/g, '');
   return hex.length > 4 ? `…${hex.slice(-4)}` : id;
+}
+
+/** Removes the selected display after asking; its SignalK access is revoked too (ADR-0044). */
+function RemoveLine(props: { device: Device; onRemove(id: string): void }) {
+  const d = props.device;
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <div className="device-rename">
+        <button className="link" onClick={() => setAsking(true)}>
+          Remove display
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="device-confirm" role="group" aria-label="Remove display">
+      <span>
+        Remove {d.name ?? d.hello.board ?? d.id}? Its SignalK access is revoked too: to use it again,
+        approve its new access request in SignalK and adopt it here.
+      </span>
+      <button className="danger small" onClick={() => (setAsking(false), props.onRemove(d.id))}>
+        Remove
+      </button>
+      <button className="small" onClick={() => setAsking(false)}>
+        Cancel
+      </button>
+    </div>
+  );
 }
 
 /** Renames the selected display; an empty name clears it (the board is shown again). */
@@ -231,6 +261,9 @@ export function DeviceList(props: {
   onFirmware(): void;
   onUpdate(id: string, buildId: string): void;
   onClearUpdate(id: string): void;
+  onRemove(id: string): void;
+  /** SignalK's approved devices by client id; null when SignalK's list can't be read (ADR-0044). */
+  access?: Map<string, SignalkDevice> | null;
 }) {
   const real = props.devices.filter((d) => !d.demo);
   const demos = props.devices.filter((d) => d.demo);
@@ -255,6 +288,13 @@ export function DeviceList(props: {
             <span className="device-id">{shortId(d.id)}</span>
           </span>
         )}
+        {!d.demo &&
+          (() => {
+            const line = accessLine(props.access?.get(d.id)?.tokenExpiry, Date.now());
+            return line ? (
+              <span className={line.warning ? 'device-warning' : 'device-meta'}>{line.text}</span>
+            ) : null;
+          })()}
         {d.hello.recovery && (
           <span className="device-warning">
             A layout crashed this display; it shows an older one until you send a changed layout
@@ -267,6 +307,9 @@ export function DeviceList(props: {
         </button>
       )}
       {d.id === props.selectedId && <RenameLine key={d.id} device={d} onRename={props.onRename} />}
+      {d.id === props.selectedId && !d.demo && (
+        <RemoveLine key={`remove-${d.id}`} device={d} onRemove={props.onRemove} />
+      )}
       {d.state === 'adopted' && (d.update || d.updateAvailable) && (
         <UpdateLine device={d} onUpdate={props.onUpdate} onClearUpdate={props.onClearUpdate} />
       )}

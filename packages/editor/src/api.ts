@@ -1,8 +1,11 @@
 // Client for the signalk-esphelm editor API (docs/plugin-api.md). Same-origin requests carry
 // the SignalK login cookie; the editor API needs an admin login.
 import type { Hello, Layout, UnitDef, ValidationError } from '@esphelm/schema';
+import type { SignalkDevice } from './access';
 
 export const API = '/plugins/esphelm/api';
+/** signalk-server's own admin REST (its admin UI uses it); the editor's admin login covers it. */
+export const SIGNALK_SECURITY = '/skServer/security';
 
 export interface Device {
   id: string;
@@ -107,9 +110,9 @@ export class ApiError extends Error {
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init), base = API) {
-  async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function call<T>(method: string, path: string, body?: unknown, root = base): Promise<T> {
     const raw = body instanceof Blob;
-    const res = await fetchImpl(`${base}${path}`, {
+    const res = await fetchImpl(`${root}${path}`, {
       method,
       credentials: 'same-origin',
       headers:
@@ -188,6 +191,12 @@ export function createApi(fetchImpl: Fetch = (input, init) => fetch(input, init)
     requestUpdate: (id: string, buildId: string) =>
       call<{ device: Device }>('POST', `/devices/${encodeURIComponent(id)}/update`, { buildId }),
     clearUpdate: (id: string) => call<void>('DELETE', `/devices/${encodeURIComponent(id)}/update`),
+    deleteDevice: (id: string) => call<void>('DELETE', `/devices/${encodeURIComponent(id)}`),
+    /** SignalK's approved devices, with their tokens' expiry (ADR-0044). Fails with security off. */
+    signalkDevices: () => call<SignalkDevice[]>('GET', '/devices', undefined, SIGNALK_SECURITY),
+    /** Deletes the display's device in SignalK: its token stops working (ADR-0044). */
+    revokeSignalkAccess: (id: string) =>
+      call<unknown>('DELETE', `/devices/${encodeURIComponent(id)}`, undefined, SIGNALK_SECURITY),
   };
 }
 

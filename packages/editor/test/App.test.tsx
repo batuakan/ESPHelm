@@ -6,6 +6,7 @@ import type { Hello, Layout } from '@esphelm/schema';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { createApi, type Device, type FirmwareImage, type PathInfo } from '../src/api';
+import type { SignalkDevice } from '../src/access';
 import { layoutIdFor, pageTiles } from '../src/layoutOps';
 import { exportFile } from '../src/share';
 import type { LiveSource, ValueListener } from '../src/live';
@@ -14,7 +15,12 @@ const FIXTURES = join(__dirname, '../../schema/fixtures');
 const p4 = JSON.parse(readFileSync(join(FIXTURES, 'hello/valid/p4.json'), 'utf8')) as Hello;
 
 /** In-memory stand-in for the plugin's editor API, recording requests. */
-function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
+function fakeServer(
+  devices: Device[],
+  firmware: FirmwareImage[] = [],
+  // SignalK's own device list (ADR-0044); undefined answers 404, as with security off.
+  signalk?: { devices: SignalkDevice[]; revokeStatus?: number },
+) {
   const layouts = new Map<string, Layout>();
   const requests: { method: string; path: string; body?: unknown }[] = [];
   const paths: PathInfo[] = [
@@ -27,6 +33,15 @@ function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
     const method = init?.method ?? 'GET';
     const body = init?.body ? (JSON.parse(String(init.body)) as unknown) : undefined;
     requests.push({ method, path, body });
+    if (path === '/skServer/security/devices')
+      return signalk ? json(signalk.devices) : json('Security config not allowed', 401);
+    const skDev = /^\/skServer\/security\/devices\/(.+)$/.exec(path);
+    if (skDev && method === 'DELETE') {
+      if (!signalk) return json('Security config not allowed', 401);
+      if (signalk.revokeStatus) return json('Unable to delete device', signalk.revokeStatus);
+      signalk.devices = signalk.devices.filter((d) => d.clientId !== decodeURIComponent(skDev[1] ?? ''));
+      return new Response('Device deleted', { status: 200 });
+    }
     if (path === '/devices') return json(devices);
     if (path === '/paths') return json(paths);
     if (path === '/routes/home')
@@ -52,6 +67,12 @@ function fakeServer(devices: Device[], firmware: FirmwareImage[] = []) {
       return json({ device: d }, 202);
     }
     const dev = /^\/devices\/(.+)$/.exec(path);
+    if (dev && method === 'DELETE') {
+      const i = devices.findIndex((x) => x.id === decodeURIComponent(dev[1] ?? ''));
+      if (i < 0) return json({ error: 'UNKNOWN_DEVICE' }, 404);
+      devices.splice(i, 1);
+      return new Response(null, { status: 204 });
+    }
     if (dev && method === 'PUT') {
       const d = devices.find((x) => x.id === decodeURIComponent(dev[1] ?? ''))!;
       Object.assign(d, body);
@@ -111,6 +132,64 @@ describe('editor', { timeout: 20000 }, () => {
       expect(server.requests).toContainEqual({ method: 'PUT', path: `/devices/${p4.deviceId}`, body: { state: 'adopted' } }),
     );
     expect((await screen.findByRole('status')).textContent).toMatch(/adopted/);
+  });
+
+  it('shows when a display\'s SignalK access runs out, only when it has an expiry (ADR-0044)', async () => {
+    // A minute short of 5 days: the editor rounds what is left up to whole days.
+    const soon = Math.floor(Date.now() / 1000) + 5 * 24 * 3600 - 60;
+    const server = fakeServer([device('adopted')], [], { devices: [{ clientId: p4.deviceId, tokenExpiry: soon }] });
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    expect((await within(list).findByText(/SignalK access ends in 5 days/)).className).toBe('device-warning');
+    cleanup();
+
+    // Approved with no expiration: nothing to say.
+    const never = fakeServer([device('adopted')], [], { devices: [{ clientId: p4.deviceId }] });
+    render(<App api={never.api} live={fakeLive().factory} />);
+    const list2 = await screen.findByRole('region', { name: 'Displays' });
+    await waitFor(() => expect(never.requests.some((r) => r.path === '/skServer/security/devices')).toBe(true));
+    expect(within(list2).queryByText(/SignalK access/)).toBeNull();
+  });
+
+  it('removes a display: revokes its SignalK access first, then forgets it (ADR-0044)', async () => {
+    const signalk = { devices: [{ clientId: p4.deviceId }] as SignalkDevice[] };
+    const server = fakeServer([device('adopted')], [], signalk);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    fireEvent.click(await within(list).findByRole('button', { name: 'Remove display' }));
+    // Cancel sends nothing.
+    fireEvent.click(within(list).getByRole('button', { name: 'Cancel' }));
+    expect(server.requests.some((r) => r.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(within(list).getByRole('button', { name: 'Remove display' }));
+    const confirm = within(list).getByRole('group', { name: 'Remove display' });
+    expect(confirm.textContent).toMatch(/SignalK access is revoked too/);
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Remove' }));
+    expect((await screen.findByRole('status')).textContent).toMatch(/its SignalK access is revoked/);
+    const deletes = server.requests.filter((r) => r.method === 'DELETE').map((r) => r.path);
+    expect(deletes).toEqual([`/skServer/security/devices/${p4.deviceId}`, `/devices/${p4.deviceId}`]);
+    expect(signalk.devices).toEqual([]);
+    expect(within(list).queryByText(/…/)).toBeNull();
+  });
+
+  it('removes a display even when SignalK refuses to revoke it, and says what to do', async () => {
+    const server = fakeServer([device('adopted')], [], { devices: [{ clientId: p4.deviceId }], revokeStatus: 500 });
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    fireEvent.click(await within(list).findByRole('button', { name: 'Remove display' }));
+    fireEvent.click(within(list).getByRole('button', { name: 'Remove' }));
+    expect((await screen.findByRole('status')).textContent).toMatch(/could not be revoked: remove it under Security > Devices/);
+    expect(server.requests).toContainEqual({ method: 'DELETE', path: `/devices/${p4.deviceId}`, body: undefined });
+  });
+
+  it('removes a display without revoking when SignalK has no device list (security off)', async () => {
+    const server = fakeServer([device('pending')]);
+    render(<App api={server.api} live={fakeLive().factory} />);
+    const list = await screen.findByRole('region', { name: 'Displays' });
+    fireEvent.click(await within(list).findByRole('button', { name: 'Remove display' }));
+    fireEvent.click(within(list).getByRole('button', { name: 'Remove' }));
+    expect((await screen.findByRole('status')).textContent).toBe(`Removed ${p4.board}.`);
+    expect(server.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([`/devices/${p4.deviceId}`]);
   });
 
   it('renames a display and shows the end of its id', async () => {
@@ -212,10 +291,14 @@ describe('editor', { timeout: 20000 }, () => {
   it('opens on a demo display when there is no real one, saves it without sending (ADR-0041)', async () => {
     const demoHello: Hello = { ...p4, deviceId: 'de300000-0000-4000-8000-000000000480', board: 'demo', display: { width: 480, height: 480, rotation: 0 } };
     const demo: Device = { ...device('adopted'), id: demoHello.deviceId, hello: demoHello, name: 'Demo 480x480', demo: true };
-    const server = fakeServer([demo]);
+    // Even if SignalK listed its id with an expiry, a demo display has no access to show or revoke.
+    const server = fakeServer([demo], [], { devices: [{ clientId: demo.id, tokenExpiry: 1 }] });
     render(<App api={server.api} live={fakeLive().factory} />);
     const list = await screen.findByRole('region', { name: 'Displays' });
     expect(within(list).getByText(/No display has said hello yet.*demo display/)).toBeTruthy();
+    await waitFor(() => expect(server.requests.some((r) => r.path === '/skServer/security/devices')).toBe(true));
+    expect(within(list).queryByText(/SignalK access/)).toBeNull();
+    expect(within(list).queryByRole('button', { name: 'Remove display' })).toBeNull();
     // Without a real display the demo group is open.
     expect(within(list).getByRole('button', { name: 'Demo (1)' }).getAttribute('aria-expanded')).toBe('true');
     await screen.findByText(/Demo display: try the editor here/);

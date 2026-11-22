@@ -57,9 +57,9 @@ export interface SignalKHarness {
     headers?: Record<string, string>,
   ): Promise<JsonResponse>;
   /** Request access for a clientId and approve it; returns the device token. */
-  deviceToken(clientId: string, permissions: string): Promise<string>;
-  /** Approve an access request a device created itself. */
-  approve(clientId: string, permissions: string): Promise<JsonResponse>;
+  deviceToken(clientId: string, permissions: string, expiration?: string): Promise<string>;
+  /** Approve an access request a device created itself (`expiration` as in SignalK's UI, e.g. '20d'). */
+  approve(clientId: string, permissions: string, expiration?: string): Promise<JsonResponse>;
   /** Open a stream as the given token; returns the socket and every received message. */
   stream(token: string): Promise<{ ws: WsClient; messages: unknown[] }>;
   /** The throwaway config dir (plugin data under plugin-config-data/<plugin id>). */
@@ -415,10 +415,10 @@ export async function startSignalK(
   });
   const admin = String(login.body.token);
 
-  const approve: SignalKHarness['approve'] = (clientId, permissions) =>
+  const approve: SignalKHarness['approve'] = (clientId, permissions, expiration = 'NEVER') =>
     json('PUT', `/skServer/security/access/requests/${clientId}/approved`, admin, {
       permissions,
-      expiration: 'NEVER',
+      expiration,
     });
 
   return {
@@ -435,13 +435,13 @@ export async function startSignalK(
     },
     json,
     approve,
-    deviceToken: async (clientId, permissions) => {
+    deviceToken: async (clientId, permissions, expiration) => {
       const req = await json('POST', '/signalk/v1/access/requests', undefined, {
         clientId,
         description: `e2e ${permissions}`,
         permissions,
       });
-      await approve(clientId, permissions);
+      await approve(clientId, permissions, expiration);
       const done = await json('GET', String(req.body.href));
       return String((done.body.accessRequest as Record<string, unknown>).token);
     },
