@@ -1963,6 +1963,39 @@ async function main(): Promise<void> {
     await fw.waitLog(/Page 5\/5 "Pilot"/, 15000, 1);
     await sleep(1500);
 
+    // 9o. Access revoked in SignalK (ADR-0044: the editor's Remove deletes the display's device
+    //     there): the open stream is closed at its next token check (once a minute), the token is
+    //     refused, and the display drops it and asks for access again by itself. Approving again
+    //     brings it back on the same page.
+    const requestsBefore = fw.count(/Access request is pending approval/);
+    const streamsBefore = fw.count(/Connected to SignalK stream/);
+    const revoked = await sk.json('DELETE', `/skServer/security/devices/${DEVICE_ID}`, sk.admin);
+    check(
+      "revoke: SignalK deletes the display's device",
+      revoked.status === 200,
+      String(revoked.status),
+    );
+    // signalk-server checks a stream's token when it delivers a delta; on a boat they never stop,
+    // here the test sends them (a path no tile shows).
+    let tick = 0;
+    const ticker = setInterval(() => publish({ 'environment.e2e.tick': tick++ }), 2000);
+    const askedAgain = await waitFor(
+      () => fw.count(/Access request is pending approval/) > requestsBefore,
+      100000,
+    );
+    clearInterval(ticker);
+    check(
+      'revoke: the display drops its token and asks for access again',
+      askedAgain,
+      `token validation failed ${fw.count(/Token validation failed/)} times`,
+    );
+    await sk.approve(DEVICE_ID, 'readwrite');
+    check(
+      'revoke: approved again, it reconnects',
+      await waitFor(() => fw.count(/Connected to SignalK stream/) > streamsBefore, 30000),
+    );
+    await sleep(1500);
+
     // 10. Server gone: values and needles go stale, and the autopilot shows "offline" with
     //     every button disabled.
     await sk.stop();
