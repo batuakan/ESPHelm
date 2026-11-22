@@ -26,6 +26,9 @@ esp32:
       CONFIG_SPIRAM_RODATA: y
       CONFIG_ESP32S3_DATA_CACHE_64KB: y
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+      # mbedTLS's buffers (16 KB in, up to 16 KB out, the handshake) in PSRAM, not internal RAM:
+      # TLS to the SignalK server (ADR-0043) cost about 22 KB of internal RAM with them inside.
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
 
 logger:
   # The USB port goes through a USB-serial chip to UART0; GPIO19/20 (the S3's own USB) carry

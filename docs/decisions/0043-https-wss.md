@@ -38,12 +38,11 @@ TLS lives in ESPHomeSignalK (`tls:` option, `components/signalk/tls_pin.h`; PR b
   - **Discovery and pinning:** it found the server with mDNS and pinned its certificate; the fingerprint matched openssl's.
   - **Timing:** the WSS stream connected about 250 ms after starting. Each HTTPS request took about 220 ms, handshake included (no session reuse).
   - **Memory:** free internal RAM (the *Info* tab) was 318 KB with TLS and 340 KB plain, against the same server, the same layout and the stream open both times: TLS costs about 22 KB of internal RAM, with `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` off. A single reading moves by a few KB; an earlier pair taken before the plain stream had opened gave 33 KB.
+  - **mbedTLS in PSRAM:** the PSRAM boards (P4, Guition, RLCD) set `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` in their hardware files, so mbedTLS allocates its buffers and handshake state in PSRAM. On the P4 free internal RAM with TLS went from 318 KB to 342 KB (340 KB plain): TLS no longer costs measurable internal RAM there.
   - **Refusal:** after the server got a new certificate the display sent it nothing (no token check, no hello, no layout), kept its page, and after *Forget server* pinned the new certificate and asked for access again.
   - **Flash:** the certificate-bundle option ESPHome turns off by default is required for `crt_bundle_attach`; with an empty bundle it adds no measurable flash.
 - **Trust on first use has a window.** A server impersonated at the very first connection would be pinned instead. Approving the access request in the real server's admin UI narrows it: a fake server would have to forward that too. The fingerprint on the *Network* tab lets a careful user check it.
 - **A new certificate needs a user.** Renewing or regenerating the server's certificate (also restoring a config without `ssl-cert.pem`) makes every display refuse it until *Forget server* on each, and a fresh approval if the token doesn't carry over. Deliberately so: the display can't tell a renewal from an attacker.
 - **No CA-signed certificates.** A server with a real certificate (e.g. Let's Encrypt behind a proxy) is pinned the same way: renewing it every 90 days would mean forgetting the server each time. Accepting a CA chain is a possible later option.
-- **Not covered yet:**
-  - the Guition (S3) and the RLCD on hardware;
-  - `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` on the PSRAM boards (would move mbedTLS's buffers out of internal RAM).
+- **Not covered yet:** the Guition (S3) and the RLCD on hardware, with TLS and with mbedTLS in PSRAM (they compile with both).
 - **Testing:** the SDL e2e (section 16, `firmware/esphelm_sdl_tls.yaml`) runs against a real signalk-server with SSL. It pins, gets its token, says hello, fetches its layout and streams over TLS, then refuses a regenerated certificate. ESPHomeSignalK has its own `tools/e2e_tls.sh` and unit tests for the pin record and mDNS parsing.
