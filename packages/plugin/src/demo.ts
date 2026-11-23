@@ -28,6 +28,7 @@ export const COLOR_TILES = [
   'clock',
   'engine',
   'alarms',
+  'battery',
 ] as const;
 export const MONO_TILES = [
   'value',
@@ -39,6 +40,7 @@ export const MONO_TILES = [
   'gauge',
   'heading_tape',
   'graph',
+  'battery',
 ] as const;
 
 const FONTS = ['value', 'label', 'small'];

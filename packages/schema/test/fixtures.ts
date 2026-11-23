@@ -1,6 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AlarmSoundAction, AlarmSoundInput, ValueZone } from '../src/index.js';
+import type {
+  AlarmSoundAction,
+  AlarmSoundInput,
+  BatteryRows,
+  BatteryState,
+  ValueZone,
+} from '../src/index.js';
 import { PACKAGE_ROOT } from '../scripts/render.js';
 
 export interface ExpectedError {
@@ -211,3 +217,27 @@ export interface AlarmsCases {
 export const ALARMS_CASES = JSON.parse(
   readFileSync(join(FIXTURES, 'alarms.cases.json'), 'utf8'),
 ) as AlarmsCases;
+
+/** Battery tile cases (ADR-0046), shared by the TS and C++ tests. */
+export interface BatteryCases {
+  timeLeft: { seconds: number | null; expected: string }[];
+  states: { current: number | null; invert: boolean; expected: BatteryState | null }[];
+  modes: { mode: unknown; expected: string }[];
+  status: {
+    state: BatteryState | null;
+    seconds: number | null;
+    mode: string | null;
+    expected: string;
+  }[];
+  rows: {
+    width: number;
+    height: number;
+    ladder: number[];
+    want: { caption: boolean; power: boolean; status: boolean; solar: boolean };
+    expected: BatteryRows;
+  }[];
+}
+
+export const BATTERY_CASES = JSON.parse(
+  readFileSync(join(FIXTURES, 'battery.cases.json'), 'utf8'),
+) as BatteryCases;

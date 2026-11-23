@@ -58,6 +58,9 @@ import {
   withBrowserTimeZone,
   updateSlot,
   updateEngineSlot,
+  batteryIds,
+  setBattery,
+  updateBatteryValue,
   updateTile,
   type SlotName,
 } from './layoutOps';
@@ -336,7 +339,9 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
 
   const add = (type: TileType, at?: { x: number; y: number }) => {
     if (!layout) return;
-    const r = addTile(layout, index, type, at);
+    const r = addTile(layout, index, type, at, {
+      batteryId: batteryIds(paths.map((p) => p.path))[0],
+    });
     if (!r) return edit(null, 'No free cell there. Make the grid bigger or move a tile.');
     // A first clock gets this computer's time zone, so it shows what the clock on the wall does.
     edit(type === 'clock' ? withBrowserTimeZone(r.layout) : r.layout);
@@ -951,6 +956,8 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           onConfig={(patch) => edit(setTileConfig(layout, index, tile.id, patch))}
           onSlot={(slot, patch) => edit(updateSlot(layout, index, tile.id, slot, patch))}
           onEngineSlot={(slot, patch) => edit(updateEngineSlot(layout, index, tile.id, slot, patch))}
+          onBattery={(id) => edit(setBattery(layout, index, tile.id, id))}
+          onBatteryValue={(name, patch) => edit(updateBatteryValue(layout, index, tile.id, name, patch))}
           onDelete={() => {
             edit(removeTile(layout, index, tile.id));
             setSelection(undefined);

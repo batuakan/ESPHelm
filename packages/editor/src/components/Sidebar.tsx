@@ -208,6 +208,13 @@ const ICONS: Record<string, JSX.Element> = {
       <path d="M10 8v4.5M10 14.6v.4" />
     </svg>
   ),
+  battery: (
+    <svg viewBox="0 0 20 20">
+      <rect x="2" y="6" width="14" height="8" rx="2" />
+      <rect x="4" y="8" width="7" height="4" className="fill" />
+      <path d="M18 9v2" />
+    </svg>
+  ),
   clock: (
     <svg viewBox="0 0 20 20">
       <circle cx="10" cy="10" r="7.5" />
@@ -246,6 +253,7 @@ const TILE_INFO: Record<string, { title: string }> = {
   heading_tape: { title: 'Heading tape' },
   clock: { title: 'Clock' },
   alarms: { title: 'Alarms' },
+  battery: { title: 'Battery' },
   wind_rose: { title: 'Wind rose' },
   autopilot: { title: 'Autopilot' },
   chart: { title: 'Chart' },

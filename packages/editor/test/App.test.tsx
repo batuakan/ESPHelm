@@ -20,12 +20,14 @@ function fakeServer(
   firmware: FirmwareImage[] = [],
   // SignalK's own device list (ADR-0044); undefined answers 404, as with security off.
   signalk?: { devices: SignalkDevice[]; revokeStatus?: number },
+  extraPaths: PathInfo[] = [],
 ) {
   const layouts = new Map<string, Layout>();
   const requests: { method: string; path: string; body?: unknown }[] = [];
   const paths: PathInfo[] = [
     { path: 'navigation.speedOverGround', units: 'm/s', description: 'Speed over ground', zones: null, value: 2.5, timestamp: null },
     { path: 'environment.depth.belowTransducer', units: 'm', description: null, zones: null, value: 12.4, timestamp: null },
+    ...extraPaths,
   ];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetchImpl = async (url: string, init?: RequestInit) => {
@@ -53,7 +55,7 @@ function fakeServer(
       ]);
     if (path === '/widgets')
       return json({
-        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock', 'engine', 'alarms'],
+        tiles: ['value', 'gauge', 'bar', 'switch', 'position', 'wind_rose', 'autopilot', 'graph', 'heading_tape', 'clock', 'engine', 'alarms', 'battery'],
         tileSlots: { wind_rose: ['center1', 'center2', 'center3'] },
         units: {},
       });
@@ -738,6 +740,86 @@ describe('editor', { timeout: 20000 }, () => {
           h: 2,
           prefix: 'notifications.electrical',
           showAcknowledged: false,
+        },
+      ],
+    });
+  });
+
+  it('adds a battery tile from the server\'s first battery, previews it, switches battery and saves it', async () => {
+    const at = (path: string, units: string | null, value: unknown): PathInfo => ({
+      path,
+      units,
+      description: null,
+      zones: null,
+      value,
+      timestamp: null,
+    });
+    const server = fakeServer([device('adopted')], [], undefined, [
+      at('electrical.batteries.lithium.capacity.stateOfCharge', 'ratio', 0.5),
+      at('electrical.batteries.lithium.voltage', 'V', 12.8),
+      at('electrical.batteries.lithium.current', 'A', 1),
+      at('electrical.batteries.start.capacity.stateOfCharge', 'ratio', 0.9),
+    ]);
+    const live = fakeLive();
+    render(<App api={server.api} live={live.factory} />);
+    await screen.findByText('Add at least one tile.');
+    fireEvent.click(screen.getByRole('button', { name: /^Battery/ }));
+    const drawer = screen.getByRole('complementary', { name: 'Tile settings' });
+    // The first battery the server has (sorted), with SignalK's standard paths.
+    expect(live.paths()).toEqual([
+      'electrical.batteries.lithium.capacity.stateOfCharge',
+      'electrical.batteries.lithium.voltage',
+      'electrical.batteries.lithium.current',
+      'electrical.batteries.lithium.capacity.timeRemaining',
+    ]);
+    const preview = screen.getByTestId('battery-battery-1');
+    live.emit('electrical.batteries.lithium.capacity.stateOfCharge', 0.15);
+    live.emit('electrical.batteries.lithium.voltage', 12.8);
+    live.emit('electrical.batteries.lithium.current', -8.2);
+    await waitFor(() => expect(preview.textContent).toContain('15%'));
+    expect(screen.getByTestId('battery-fill-battery-1').getAttribute('class')).toContain('zone-alarm');
+    expect(preview.textContent).toContain('Lithium');
+    expect(preview.textContent).toContain('12.8 V');
+    expect(preview.textContent).toContain('-8.2 A');
+    expect(preview.textContent).toContain('-105 W'); // voltage times current
+    expect(preview.textContent).toContain('Discharging');
+    live.emit('electrical.batteries.lithium.capacity.timeRemaining', 51600);
+    await waitFor(() => expect(preview.textContent).toContain('14 h 20 left'));
+    // A publisher that sends negative while charging.
+    fireEvent.click(within(drawer).getByLabelText('Invert current'));
+    expect(preview.textContent).toContain('8.2 A');
+    expect(preview.textContent).not.toContain('-8.2 A');
+    expect(preview.textContent).toContain('Charging');
+    // Another battery: its paths, and its name as the label.
+    fireEvent.change(within(drawer).getByLabelText('Battery'), { target: { value: 'start' } });
+    expect(live.paths()).toContain('electrical.batteries.start.capacity.stateOfCharge');
+    expect(live.paths()).toContain('electrical.batteries.start.voltage');
+    // An optional value: shown with its own path picker, and taken away again.
+    const solar = within(drawer).getByTestId('battery-solar');
+    fireEvent.click(within(solar).getByRole('button', { name: 'Show solar' }));
+    within(solar).getByLabelText('Search SignalK paths');
+    fireEvent.click(within(solar).getByRole('button', { name: "Don't show solar" }));
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(`display-${p4.deviceId}`)!.pages[0]).toMatchObject({
+      tiles: [
+        {
+          type: 'battery',
+          id: 'battery-1',
+          w: 2,
+          h: 1,
+          path: 'electrical.batteries.start.capacity.stateOfCharge',
+          unit: 'pct',
+          label: 'Start',
+          invertCurrent: true,
+          voltage: { path: 'electrical.batteries.start.voltage', unit: 'V', decimals: 1 },
+          current: { path: 'electrical.batteries.start.current', unit: 'A', decimals: 1 },
+          timeRemaining: { path: 'electrical.batteries.start.capacity.timeRemaining' },
+          zones: [
+            { to: 20, state: 'alarm' },
+            { from: 20, to: 40, state: 'warn' },
+          ],
         },
       ],
     });

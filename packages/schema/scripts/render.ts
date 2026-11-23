@@ -205,6 +205,7 @@ function renderSizesHeader(
   chart: { buttons: number; info: number },
   engine: { slots: number; labels: number; minorTickPx: number },
   alarms: { rowHeight: number; ackWidth: number },
+  battery: { linePercent: number; lineWidths: number; minBody: number },
 ): string {
   return [
     `// ${GENERATED_NOTE}`,
@@ -265,6 +266,12 @@ function renderSizesHeader(
     '// Alarms tile (ADR-0038): row height in pixels, and the content width from which rows get an ACK button.',
     `inline constexpr int ALARMS_ROW_HEIGHT = ${alarms.rowHeight};`,
     `inline constexpr int ALARMS_ACK_WIDTH = ${alarms.ackWidth};`,
+    '',
+    "// Battery tile (ADR-0046): the rows' font (at most this % of the height, its line height this many",
+    "// times in the width), and the battery's least height before a row is dropped.",
+    `inline constexpr int BATTERY_LINE_PERCENT = ${battery.linePercent};`,
+    `inline constexpr int BATTERY_LINE_WIDTHS = ${battery.lineWidths};`,
+    `inline constexpr int BATTERY_MIN_BODY = ${battery.minBody};`,
     '',
     "// Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.",
     `inline constexpr int SERVER_ZONES_MAX_PER_PATH = ${serverZones.maxPerPath};`,
@@ -465,6 +472,7 @@ export async function renderAll(): Promise<Record<string, string>> {
     ENGINE_FIT,
     ENGINE_ICON_NAMES,
     ALARMS_FIT,
+    BATTERY_FIT,
   } = await import('../src/tiles.js');
   const { ENGINE_ARCS, ENGINE_GEOMETRY, ENGINE_ICONS } = await import('../src/engine.js');
   const engineShapes = renderEngineShapesHeader(
@@ -492,6 +500,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       CHART_FIT,
       ENGINE_FIT,
       ALARMS_FIT,
+      BATTERY_FIT,
     ),
     '../../firmware/components/esphelm_runtime/esphelm_sizes.h': renderSizesHeader(
       WIND_ROSE_FIT,
@@ -505,6 +514,7 @@ export async function renderAll(): Promise<Record<string, string>> {
       CHART_FIT,
       ENGINE_FIT,
       ALARMS_FIT,
+      BATTERY_FIT,
     ),
     'generated/esphelm_engine_shapes.h': engineShapes,
     '../../firmware/components/esphelm_runtime/esphelm_engine_shapes.h': engineShapes,

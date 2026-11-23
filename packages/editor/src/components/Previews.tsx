@@ -52,6 +52,7 @@ import { chartRuns, previewPoints, wrapped } from './HistoryPreview';
 import { CENTER_SLOTS, CORNER_SLOTS, headingTapeSettings, type SlotName } from '../layoutOps';
 import type { ChartInfo } from '../api';
 import { ChartPreview } from './ChartPreview';
+import { BatteryPreview } from './BatteryPreview';
 import { EnginePreview } from './EnginePreview';
 import type { AutopilotTier, RoseTier } from '../sizing';
 
@@ -81,7 +82,7 @@ function arc(cx: number, cy: number, r: number, from: number, to: number): strin
 export function withServerZones<T extends Tile>(tile: T, serverZones: Map<string, unknown> | undefined): T {
   if (!serverZones) return tile;
   const t: Tile = tile;
-  if (t.type === 'value' || t.type === 'graph') {
+  if (t.type === 'value' || t.type === 'graph' || t.type === 'battery') {
     const zones = serverZonesToDisplay(serverZones.get(t.path), t.unit);
     return zones.length > 0 ? { ...tile, zones } : tile;
   }
@@ -325,6 +326,8 @@ export function TilePreview(props: {
   alarmsBox?: { width: number; height: number };
   /** Alarms only: the night theme (ACK buttons are outlined at night). */
   night?: boolean;
+  /** Battery only: the tile's size on the display, in pixels (its rows depend on it). */
+  batteryBox?: { width: number; height: number };
 }) {
   const { values } = props;
   const tile = withServerZones(props.tile, props.serverZones);
@@ -354,6 +357,15 @@ export function TilePreview(props: {
         fontLines={props.fontLines}
         night={props.night}
       />;
+  if (tile.type === 'battery')
+    return (
+      <BatteryPreview
+        tile={tile}
+        values={values}
+        box={props.batteryBox ?? { width: 440, height: 200 }}
+        fontLines={props.fontLines}
+      />
+    );
   if (tile.type === 'engine')
     return (
       <EnginePreview
@@ -572,7 +584,7 @@ function useNow(): number {
  * its board.
  */
 /** Line height per font size of the display's Roboto (EnginePreview uses the same). */
-const LINE_PER_SIZE = 1.17;
+export const LINE_PER_SIZE = 1.17;
 const ALARM_STATES = ['alert', 'warn', 'alarm', 'emergency'] as const;
 
 /** The alarms panel's geometry on the display, in its pixels (widget_alarms.cpp, ADR-0038). */
@@ -610,7 +622,7 @@ const DISPLAY_FONT = "'ESPHelm Display', Roboto, system-ui, sans-serif";
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 
 /** Re-renders once the display font has loaded, so measured text cuts where the display's does. */
-function useDisplayFont(): void {
+export function useDisplayFont(): void {
   const [, setLoaded] = useState(false);
   useEffect(() => {
     let live = true;
@@ -625,7 +637,7 @@ function useDisplayFont(): void {
 }
 /** Width of `text` in pixels in the display's font of line height `line`: measured in Roboto by the
  *  browser where it can, else Roboto's estimate (textFit.ts; tests without a canvas). */
-function measure(text: string, line: number): number {
+export function measure(text: string, line: number): number {
   if (measureCtx === undefined) {
     try {
       measureCtx = document.createElement('canvas').getContext('2d');
@@ -639,7 +651,7 @@ function measure(text: string, line: number): number {
 }
 
 /** `text` cut with "..." to `max` pixels in the font of line height `line`, as LVGL's DOTS mode. */
-function elide(text: string, max: number, line: number): string {
+export function elide(text: string, max: number, line: number): string {
   if (measure(text, line) <= max) return text;
   let t = text;
   while (t.length > 0 && measure(`${t}...`, line) > max) t = t.slice(0, -1);

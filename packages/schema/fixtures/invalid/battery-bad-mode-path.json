@@ -1,0 +1,37 @@
+{
+  "description": "the charging mode is a SignalK path",
+  "expect": [
+    {
+      "code": "INVALID_PATH",
+      "pointer": "/pages/0/tiles/0/chargingModePath"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "minimal",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "energy",
+        "title": "Energy",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "battery",
+            "id": "b",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "electrical.batteries.house.capacity.stateOfCharge",
+            "chargingModePath": "chargers.*.mode"
+          }
+        ]
+      }
+    ]
+  }
+}

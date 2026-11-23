@@ -1842,7 +1842,8 @@ fieldset.modes {
   left: auto;
   right: 10px;
 }
-.tile-history-mark polyline {
+.tile-history-mark polyline,
+.battery-history-mark {
   fill: none;
   stroke: var(--tile-muted);
   stroke-width: 2;
@@ -2230,4 +2231,76 @@ button.link {
   fill: var(--canvas-bg);
   fill-opacity: 0.5;
   stroke-width: 2;
+}
+
+/* Battery tile preview (ADR-0046): an SVG in the display's pixels, as widget_battery.cpp draws it. */
+.tile-type-battery {
+  grid-template-rows: 0 1fr; /* no caption line: the tile writes its own label */
+}
+.tile-graphic.battery-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.battery-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.battery-preview text {
+  dominant-baseline: central;
+  font-family: 'ESPHelm Display', Roboto, system-ui, sans-serif;
+}
+.battery-paper {
+  fill: transparent;
+}
+.battery-text {
+  fill: var(--tile-text);
+}
+.battery-muted {
+  fill: var(--tile-muted);
+}
+.battery-outline {
+  fill: none;
+  stroke: var(--tile-text);
+}
+.battery-nub {
+  fill: var(--tile-text);
+}
+.battery-zone-stale .battery-outline {
+  stroke: var(--tile-muted);
+}
+.battery-zone-stale .battery-nub {
+  fill: var(--tile-muted);
+}
+/* The fill: normal is the value tile's normal (the text colour at night), the rest their zone's. */
+.battery-fill.zone-normal {
+  fill: var(--value-zone-normal);
+}
+.battery-fill.zone-warn {
+  fill: var(--zone-warn);
+}
+.battery-fill.zone-alarm {
+  fill: var(--zone-alarm);
+}
+.battery-fill.zone-emergency {
+  fill: var(--zone-emergency);
+}
+/* Black and white (ADR-0035): warn is a heavy frame, alarm an inverted tile. */
+.display-frame[data-display-kind='mono'] .tile:has(.battery-zone-warn) {
+  box-shadow: inset 0 0 0 6px var(--tile-text);
+}
+.display-frame[data-display-kind='mono'] .tile:has(.battery-zone-alarm),
+.display-frame[data-display-kind='mono'] .tile:has(.battery-zone-emergency) {
+  background: var(--tile-text);
+}
+.display-frame[data-display-kind='mono'] :is(.battery-zone-alarm, .battery-zone-emergency) .battery-text,
+.display-frame[data-display-kind='mono'] :is(.battery-zone-alarm, .battery-zone-emergency) .battery-muted,
+.display-frame[data-display-kind='mono'] :is(.battery-zone-alarm, .battery-zone-emergency) .battery-nub,
+.display-frame[data-display-kind='mono'] :is(.battery-zone-alarm, .battery-zone-emergency) .battery-fill {
+  fill: var(--tile-bg);
+}
+.display-frame[data-display-kind='mono'] :is(.battery-zone-alarm, .battery-zone-emergency) .battery-outline {
+  stroke: var(--tile-bg);
 }

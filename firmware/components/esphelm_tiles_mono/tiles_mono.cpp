@@ -16,7 +16,8 @@ Colors colors_for(esphelm::Theme theme) {
 }
 
 void tile_types(std::vector<const char *> &out, bool psram) {
-  for (const char *t : {"value", "bar", "clock", "position", "wind_rose", "engine", "gauge", "heading_tape", "graph"})
+  for (const char *t : {"value", "bar", "clock", "position", "wind_rose", "engine", "gauge", "heading_tape", "graph",
+                        "battery"})
     out.push_back(t);
 }
 
@@ -44,6 +45,8 @@ std::unique_ptr<Widget> make_tile_widget(lv_obj_t *cell, const esphelm::Tile &ti
       return mono::make_heading_tape(cell, tile, env);
     case esphelm::TileType::GRAPH:
       return mono::make_graph(cell, tile, env);
+    case esphelm::TileType::BATTERY:
+      return mono::make_battery(cell, tile, env);
     default:
       return mono::make_unsupported(cell, tile, env);
   }

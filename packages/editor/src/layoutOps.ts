@@ -6,6 +6,8 @@ import {
   posixTz,
   AUTOPILOT_DEFAULTS,
   ALARMS_DEFAULTS,
+  batteryDefaults,
+  type BatteryTile,
   CHART_DEFAULTS,
   ENGINE_DEFAULTS,
   type EngineSlot,
@@ -169,6 +171,7 @@ export function tilePaths(tile: Tile): string[] {
     return [t.headingPath, ...t.markers.map((m) => t.paths[m])];
   }
   if (tile.type === 'engine') return [tile.path, ...Object.values(tile.slots).map((s) => s.path)];
+  if (tile.type === 'battery') return batteryPaths(tile);
   if (tile.type !== 'wind_rose') return [tile.path];
   const cfg = { ...WIND_ROSE_DEFAULTS, ...tile.config };
   return [
@@ -206,7 +209,12 @@ function nextId(used: Set<string>, prefix: string): string {
 }
 
 /** Defaults for a new tile of each type; the path starts empty (the editor asks for one). */
-function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile {
+function newTile(
+  type: TileType,
+  id: string,
+  at: { x: number; y: number },
+  opts: AddTileOptions,
+): Tile {
   const place = { id, x: at.x, y: at.y, w: 1, h: 1 };
   switch (type) {
     case 'gauge':
@@ -230,6 +238,16 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
       return { type, ...place, show: 'both' };
     case 'alarms':
       return { type, ...place };
+    case 'battery':
+      // SignalK's paths of the first battery the server has, so it shows something at once.
+      return {
+        type,
+        ...place,
+        ...(structuredClone(batteryDefaults(opts.batteryId ?? 'house')) as Omit<
+          BatteryTile,
+          'type' | keyof Rect | 'id'
+        >),
+      };
     case 'chart':
       // The chart starts unset: the validator asks for one until it is picked.
       return { type, ...place, chart: '' };
@@ -245,16 +263,22 @@ function newTile(type: TileType, id: string, at: { x: number; y: number }): Tile
   }
 }
 
+/** What a new tile can start from: the battery a battery tile shows (else "house"). */
+export interface AddTileOptions {
+  batteryId?: string;
+}
+
 /**
  * Add a tile to page `index` at `at` (or the first free cell). Tiles are 1x1, except wind
- * roses, autopilots, charts and engines, which take 2x2, and positions, graphs and heading tapes, which take 2x1,
- * when that fits there.
+ * roses, autopilots, charts and engines, which take 2x2, and positions, graphs, heading tapes and
+ * batteries, which take 2x1, when that fits there.
  */
 export function addTile(
   layout: Layout,
   index: number,
   type: TileType,
   at?: { x: number; y: number },
+  opts: AddTileOptions = {},
 ): { layout: Layout; id: string } | null {
   const page = gridPage(layout, index);
   if (!page) return null;
@@ -279,9 +303,11 @@ export function addTile(
                     ? 'engine'
                     : type === 'alarms'
                       ? 'alarms'
-                      : 'tile';
+                      : type === 'battery'
+                        ? 'battery'
+                        : 'tile';
   const id = nextId(usedIds(layout), prefix);
-  const tile = newTile(type, id, cell);
+  const tile = newTile(type, id, cell, opts);
   const big =
     type === 'wind_rose' ||
     type === 'autopilot' ||
@@ -292,10 +318,10 @@ export function addTile(
     tile.w = 2;
     tile.h = 2;
   } else if (
-    (type === 'position' || type === 'graph' || type === 'heading_tape') &&
+    (type === 'position' || type === 'graph' || type === 'heading_tape' || type === 'battery') &&
     fits(page, { ...cell, w: 2, h: 1 })
   ) {
-    tile.w = 2; // two text lines, a time axis or a compass strip read better wide
+    tile.w = 2; // two text lines, a time axis, a compass strip or a battery read better wide
   }
   return {
     id,
@@ -614,6 +640,72 @@ export function isEngineCorner(slot: string): slot is EngineCornerName {
   return (ENGINE_CORNERS as readonly string[]).includes(slot);
 }
 
+// ---- battery tiles (ADR-0046) ----
+
+/** A battery tile's values besides its state of charge, in the drawer's order. */
+export const BATTERY_VALUES = ['voltage', 'current', 'power', 'timeRemaining', 'solar'] as const;
+export type BatteryValueName = (typeof BATTERY_VALUES)[number];
+
+/** The paths a battery tile follows. */
+function batteryPaths(tile: BatteryTile): string[] {
+  return [
+    tile.path,
+    ...BATTERY_VALUES.flatMap((k) => (tile[k] ? [tile[k].path] : [])),
+    ...(tile.chargingModePath ? [tile.chargingModePath] : []),
+  ];
+}
+
+/** The battery ids the server has (electrical.batteries.<id>.…), sorted. */
+export function batteryIds(paths: readonly string[]): string[] {
+  const ids = new Set<string>();
+  for (const p of paths) {
+    const m = /^electrical\.batteries\.([A-Za-z0-9_-]+)\./.exec(p);
+    if (m) ids.add(m[1]!);
+  }
+  return [...ids].sort();
+}
+
+/** A battery tile's value `name` merged with `patch`, or removed (null). */
+export function updateBatteryValue(
+  layout: Layout,
+  index: number,
+  id: string,
+  name: BatteryValueName,
+  patch: Record<string, unknown> | null,
+): Layout {
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => {
+      if (t.id !== id || t.type !== 'battery') return t;
+      const next = { ...t };
+      if (patch === null) delete next[name];
+      else next[name] = merge<DataItem>(t[name] ?? { path: '' }, patch);
+      return next;
+    }),
+  }));
+}
+
+/**
+ * Point a battery tile at battery `batteryId`: the state of charge and SignalK's standard paths
+ * of the values it has (voltage, current, time remaining) move there; units, zones and the other
+ * values stay. A label that was the old battery's name becomes the new one's.
+ */
+export function setBattery(layout: Layout, index: number, id: string, batteryId: string): Layout {
+  const d = batteryDefaults(batteryId);
+  return withGrid(layout, index, (p) => ({
+    ...p,
+    tiles: p.tiles.map((t) => {
+      if (t.id !== id || t.type !== 'battery') return t;
+      const old = /^electrical\.batteries\.([A-Za-z0-9_-]+)\./.exec(t.path)?.[1];
+      const next: BatteryTile = { ...t, path: d.path };
+      if (!t.label || (old && t.label === batteryDefaults(old).label)) next.label = d.label;
+      for (const k of ['voltage', 'current', 'timeRemaining'] as const)
+        if (t[k]) next[k] = { ...t[k], path: d[k].path };
+      return next;
+    }),
+  }));
+}
+
 /** `tile` with `name` in its history list or not, in ROSE_HISTORY_KEYS order; [] removes it. */
 function withHistory(tile: WindRoseTile, name: RoseHistoryKey, on: boolean): WindRoseTile {
   const names = new Set(tile.history ?? []);
@@ -736,6 +828,14 @@ export function layoutPathRefs(layout: Layout): PathRef[] {
           add(t.path, ...at, 'path');
           for (const [name, slot] of Object.entries(t.slots))
             if (slot) add(slot.path, ...at, 'slots', name, 'path');
+          return;
+        case 'battery':
+          add(t.path, ...at, 'path');
+          for (const name of BATTERY_VALUES) {
+            const item = t[name];
+            if (item) add(item.path, ...at, name, 'path');
+          }
+          if (t.chargingModePath) add(t.chargingModePath, ...at, 'chargingModePath');
           return;
         default:
           return add(t.path, ...at, 'path');

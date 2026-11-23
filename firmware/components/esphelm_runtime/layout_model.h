@@ -39,7 +39,8 @@ enum class TileType : uint8_t {
   CLOCK,
   CHART,
   ENGINE,
-  ALARMS
+  ALARMS,
+  BATTERY
 };
 enum class AutopilotMode : uint8_t { AUTO, WIND, ROUTE };
 enum class Orientation : uint8_t { HORIZONTAL, VERTICAL };
@@ -174,6 +175,20 @@ inline constexpr const char *ENGINE_SLOT_NAMES[EngineConfig::SLOTS] = {"left", "
 inline constexpr const char *ENGINE_CORNER_NAMES[EngineConfig::CORNERS] = {"topLeft", "topRight", "bottomLeft",
                                                                            "bottomRight"};
 
+/// Battery settings (ADR-0046): its other values (the state of charge is the tile's own data,
+/// zones and history, as a value tile's).
+struct BatteryConfig {
+  static constexpr int VALUES = 5;
+  static constexpr int VOLTAGE = 0, CURRENT = 1, POWER = 2, TIME = 3, SOLAR = 4;
+  bool has[VALUES]{};
+  DataItem values[VALUES];
+  std::string mode_path;  // empty: none
+  bool invert_current{false};
+};
+/// A battery tile's value names, in BatteryConfig order.
+inline constexpr const char *BATTERY_VALUE_NAMES[BatteryConfig::VALUES] = {"voltage", "current", "power",
+                                                                           "timeRemaining", "solar"};
+
 struct Tile {
   TileType type;
   std::string id;
@@ -186,7 +201,7 @@ struct Tile {
   std::vector<Zone> zones;  // value tiles too, with open ends as -inf / +inf; the server's if it has any
   std::vector<Zone> own_zones;  // the layout's, used when the server has none (ADR-0020)
   ValueColor color{ValueColor::NONE};  // value
-  bool history{false};                 // value: records its history, tap for the graph (ADR-0018/0019)
+  bool history{false};  // value, battery: records its history, tap for the graph (ADR-0018/0019)
   Orientation orientation{Orientation::HORIZONTAL};
   // gauge / bar: centred on zero, filled from zero to the value (ADR-0023)
   bool center_zero{false};
@@ -207,6 +222,8 @@ struct Tile {
   std::shared_ptr<const ChartConfig> chart;
   // engine: the RPM in data, min, max and zones like a gauge; the slots here
   std::shared_ptr<const EngineConfig> engine;
+  // battery: the state of charge in data and zones; the rest here
+  std::shared_ptr<const BatteryConfig> battery;
 };
 
 /// A grid page, the only page kind (the wind rose and the chart were page kinds; ADR-0010, ADR-0030).

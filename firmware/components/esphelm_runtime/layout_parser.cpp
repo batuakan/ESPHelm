@@ -647,6 +647,24 @@ void check_engine(Checker &chk, JsonObjectConst obj, const std::string &ptr, Eng
   }
 }
 
+/// A battery tile's other values (ADR-0046); its state of charge is parsed like a value tile's.
+void check_battery(Checker &chk, JsonObjectConst obj, const std::string &ptr, BatteryConfig &battery) {
+  for (int i = 0; i < BatteryConfig::VALUES; i++) {
+    const char *key = BATTERY_VALUE_NAMES[i];
+    if (!has(obj, key))
+      continue;
+    const std::string kp = ptr + "/" + key;
+    if (!obj[key].is<JsonObjectConst>()) {
+      chk.add(kp, "INVALID_TYPE");
+      continue;
+    }
+    data_item_fields(chk, obj[key].as<JsonObjectConst>(), kp, battery.values[i]);
+    battery.has[i] = true;
+  }
+  string_field(chk, obj, ptr, "chargingModePath", false, StrKind::PATH, battery.mode_path);
+  bool_field(chk, obj, ptr, "invertCurrent", battery.invert_current);
+}
+
 void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile &tile) {
   JsonVariantConst type = obj["type"];
   const char *t = type.is<const char *>() ? type.as<const char *>() : nullptr;
@@ -676,6 +694,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     tile.type = TileType::ENGINE;
   } else if (t != nullptr && std::strcmp(t, "alarms") == 0) {
     tile.type = TileType::ALARMS;
+  } else if (t != nullptr && std::strcmp(t, "battery") == 0) {
+    tile.type = TileType::BATTERY;
   } else {
     chk.add(ptr + "/type", "UNKNOWN_TILE_TYPE");
     return;
@@ -767,8 +787,8 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     return;
   }
   data_item_fields(chk, obj, ptr, tile.data);
-  // Value and graph zones may leave an end open (no min/max to fall back on).
-  const bool value = tile.type == TileType::VALUE || tile.type == TileType::GRAPH;
+  // Value, graph and battery zones may leave an end open (no min/max to fall back on).
+  const bool value = tile.type == TileType::VALUE || tile.type == TileType::GRAPH || tile.type == TileType::BATTERY;
   if (tile.type == TileType::GRAPH) {
     int w = enum_field(chk, obj, ptr, "window", false, GRAPH_WINDOWS, 3);
     if (w >= 0)
@@ -778,6 +798,11 @@ void check_tile(Checker &chk, JsonObjectConst obj, const std::string &ptr, Tile 
     number_field(chk, obj, ptr, "min", false, tile.min);
     number_field(chk, obj, ptr, "max", false, tile.max);
     tile.has_range = has(obj, "min") || has(obj, "max");
+  } else if (tile.type == TileType::BATTERY) {
+    bool_field(chk, obj, ptr, "history", tile.history);
+    auto battery = std::make_shared<BatteryConfig>();
+    check_battery(chk, obj, ptr, *battery);
+    tile.battery = std::move(battery);
   } else if (tile.type == TileType::VALUE) {
     int c = enum_field(chk, obj, ptr, "color", false, VALUE_COLORS, 6);
     if (c >= 0)
@@ -1029,7 +1054,7 @@ void check_semantics(Checker &chk, const Layout &layout) {
       }
       if (t.type == TileType::GRAPH && t.has_range && !(t.min < t.max))
         chk.add(tp + (std::isnan(t.min) ? "/min" : "/max"), "INVALID_RANGE");  // the missing end, else max
-      if (t.type == TileType::VALUE || t.type == TileType::GRAPH) {
+      if (t.type == TileType::VALUE || t.type == TileType::GRAPH || t.type == TileType::BATTERY) {
         for (size_t k = 0; k < t.zones.size(); k++) {
           const Zone &z = t.zones[k];
           // Missing ends are infinite: both infinite means neither was given.
