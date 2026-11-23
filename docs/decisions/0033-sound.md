@@ -39,7 +39,7 @@ Status: **Accepted** (2026-11-10)
 **Controls, like brightness (ADR-0015, ADR-0025):**
 - **Layout:** `settings.sound: { volume 10–100 %, touch }` (defaults 60 % and on), set in the editor's *Display settings → Sound*.
 - **On the display:** the *Settings* tab's *Volume* slider and *Touch sounds* button override the layout's values, saved in the display's choices (record `v=2`; `v=1` records still read). They're dropped when the layout brings other values.
-- **Volume floor:** 10 %, so a volume setting never mutes alarms.
+- **Volume floor:** 10 %, so a volume setting never mutes alarms. (A deliberate mute of all sound came later: ADR-0047.)
 - **How it's applied:** the speaker's volume, which goes to the ES8311; without a speaker in the config, rtttl's gain.
 
 ## Consequences

@@ -31,6 +31,7 @@ struct Input {
   uint32_t played_generation{0};
   uint32_t last_start_ms{0};
   uint32_t now_ms{0};
+  bool muted{false};  // all sound off (settings.sound.mute, ADR-0047): no tune, emergencies too
 };
 
 enum class Action : uint8_t { NONE, STOP, PLAY };
@@ -38,7 +39,7 @@ enum class Action : uint8_t { NONE, STOP, PLAY };
 /// What to do now; with PLAY, `play` is the level whose tune to (re)start.
 inline Action alarm_sound(const Input &i, Level &play) {
   play = Level::NONE;
-  if (!i.online || i.level == Level::NONE)
+  if (!i.online || i.muted || i.level == Level::NONE)
     return i.playing != Level::NONE ? Action::STOP : Action::NONE;
   if (i.generation != i.played_generation) {
     play = i.level;

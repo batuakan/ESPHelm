@@ -54,6 +54,8 @@ export function SettingsDrawer(props: {
   canRotate: boolean;
   /** The display has a speaker (hello.capabilities.sound). */
   sound: boolean;
+  /** The firmware takes settings.sound.mute (hello.capabilities.mute, ADR-0047). */
+  canMute: boolean;
   paths: PathInfo[];
   values: Map<string, unknown>;
   onChange(patch: SettingsPatch): void;
@@ -65,6 +67,7 @@ export function SettingsDrawer(props: {
   const timeout = s.screenTimeout ?? SETTINGS_DEFAULTS.screenTimeout;
   const volume = s.sound?.volume ?? SETTINGS_DEFAULTS.soundVolume;
   const touchSounds = s.sound?.touch ?? SETTINGS_DEFAULTS.soundTouch;
+  const muted = s.sound?.mute ?? SETTINGS_DEFAULTS.soundMute;
   const auto = (s.autoTheme ?? SETTINGS_DEFAULTS.autoTheme) === 'sun';
   const sunPath = s.autoThemePath ?? SETTINGS_DEFAULTS.autoThemePath;
   const sunNow = props.values.get(sunPath);
@@ -149,6 +152,26 @@ export function SettingsDrawer(props: {
         {!props.sound && (
           <p className="warn">This display has no speaker; sound settings are ignored.</p>
         )}
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={muted}
+            disabled={!props.sound || (!props.canMute && !muted)}
+            // Off removes the field: older firmware refuses a layout that has it.
+            onChange={(e) => props.onChange({ sound: { mute: e.target.checked || undefined } })}
+            aria-label="Mute all sound"
+          />
+          Mute all sound
+        </label>
+        {props.sound && !props.canMute && (
+          <small className="hint">Needs newer firmware on this display.</small>
+        )}
+        {muted && (
+          <p className="warn">
+            No alarm tones, not even emergencies, and no touch clicks. The alarm banner still shows
+            alarms.
+          </p>
+        )}
         <label className="field">
           <span>
             Volume <output>{volume} %</output>
@@ -159,7 +182,7 @@ export function SettingsDrawer(props: {
             max={100}
             step={5}
             value={volume}
-            disabled={!props.sound}
+            disabled={!props.sound || muted}
             onChange={(e) => props.onChange({ sound: { volume: Number(e.target.value) } })}
             aria-label="Volume"
           />
@@ -168,7 +191,7 @@ export function SettingsDrawer(props: {
           <input
             type="checkbox"
             checked={touchSounds}
-            disabled={!props.sound}
+            disabled={!props.sound || muted}
             onChange={(e) => props.onChange({ sound: { touch: e.target.checked } })}
             aria-label="Touch sounds"
           />

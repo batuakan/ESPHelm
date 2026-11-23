@@ -905,6 +905,7 @@ void check_settings(Checker &chk, JsonVariantConst v, Settings &settings) {
       if (int_field(chk, so, sop, "volume", false, 10, 100, n))
         settings.sound_volume = static_cast<uint8_t>(n);
       bool_field(chk, so, sop, "touch", settings.sound_touch);
+      bool_field(chk, so, sop, "mute", settings.sound_mute);
     }
   }
   if (has(obj, "rotation")) {

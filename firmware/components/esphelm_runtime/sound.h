@@ -35,6 +35,9 @@ class SoundPlayer {
   /// Volume in % (10..100), applied to the speaker (or rtttl's gain without one).
   void set_volume(int percent);
   void set_touch(bool on) { this->touch_ = on; }
+  /// All sound off (ADR-0047): no alarm tune (emergencies too), no clicks. Switched back on, the
+  /// worst alarm asking for sound plays at once.
+  void set_muted(bool muted);
 
   /// The worst unacknowledged notification asking for sound, the banner's sound generation and
   /// whether the server's values are live; starts, repeats or stops the alarm tune.
@@ -52,6 +55,7 @@ class SoundPlayer {
 #endif
   std::string tunes_[5];  // click, alert, warn, alarm, emergency
   bool touch_{true};
+  bool muted_{false};
   int volume_{-1};
   esphelm::sound::Level alarm_{esphelm::sound::Level::NONE};  // the alarm tune started last
   uint32_t played_generation_{0};

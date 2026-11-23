@@ -89,6 +89,7 @@ export const DEMO_DISPLAYS: readonly DemoDisplay[] = [
       backlight: true,
       rotation: true,
       sound: true,
+      mute: true,
       darkTheme: true,
     },
   }),

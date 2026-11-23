@@ -116,6 +116,7 @@ void EsphelmRuntime::setup() {
     b.port = 3443;
     this->test_server_list_ = {a, b};
   }
+  this->test_sound_ = std::getenv("ESPHELM_TEST_SOUND") != nullptr;
   const char *setup_test = std::getenv("ESPHELM_TEST_SETUP");
   this->test_setup_ = setup_test != nullptr ? setup_test : "";
 
@@ -397,8 +398,10 @@ void EsphelmRuntime::send_hello_() {
   doc["capabilities"]["rotation"] = false;
 #endif
   // Only when there is one, so a display without a speaker still says hello to an older plugin.
-  if (this->has_sound_())
+  if (this->has_sound_()) {
     doc["capabilities"]["sound"] = true;
+    doc["capabilities"]["mute"] = true;  // ADR-0047
+  }
 #ifdef USE_ESPHELM_OTA
   if (this->ota_ != nullptr)
     doc["capabilities"]["ota"] = true;  // only then, like sound: older plugins still accept the hello
@@ -1034,7 +1037,7 @@ bool EsphelmRuntime::has_sound_() const {
 #ifdef USE_ESPHELM_SOUND
   return true;
 #else
-  return false;
+  return this->test_sound_;
 #endif
 }
 
@@ -1046,11 +1049,18 @@ bool EsphelmRuntime::sound_touch_() const {
   return this->prefs_.touch >= 0 ? this->prefs_.touch == 1 : this->layout_.settings.sound_touch;
 }
 
+bool EsphelmRuntime::sound_mute_() const {
+  return this->prefs_.mute >= 0 ? this->prefs_.mute == 1 : this->layout_.settings.sound_mute;
+}
+
 void EsphelmRuntime::apply_sound_() {
 #ifdef USE_ESPHELM_SOUND
   this->sound_.set_volume(this->sound_volume_());
   this->sound_.set_touch(this->sound_touch_());
+  this->sound_.set_muted(this->sound_mute_());
 #endif
+  // The footer's crossed-out speaker (ADR-0047), from the next page built on.
+  this->renderer_.set_muted(this->has_sound_() && this->sound_mute_());
 }
 
 void EsphelmRuntime::tick_sound_(uint32_t now, bool online) {
@@ -1112,6 +1122,7 @@ SettingsPanel::State EsphelmRuntime::panel_state_() const {
   s.sound = this->has_sound_();
   s.volume = this->sound_volume_();
   s.touch_sounds = this->sound_touch_();
+  s.muted = this->sound_mute_();
 #ifdef USE_ESPHELM_WIFI_SETUP
   s.wifi = true;
 #endif
@@ -1329,6 +1340,16 @@ void EsphelmRuntime::tick_panel_(uint32_t now) {
     this->prefs_.set_base(this->layout_.settings, this->base_theme_);
     this->apply_sound_();
     this->save_prefs_();
+  }
+  bool muted;
+  if (this->panel_.take_mute(muted)) {
+    ESP_LOGI(TAG, "Sound %s on the display", muted ? "off" : "on");
+    this->prefs_.mute = muted ? 1 : 0;
+    this->prefs_.set_base(this->layout_.settings, this->base_theme_);
+    this->apply_sound_();
+    this->save_prefs_();
+    if (this->has_layout_)
+      this->build_page_(this->page_);  // the footer's crossed-out speaker
   }
   if (this->panel_.take_sleep()) {
     ESP_LOGI(TAG, "Screen off from the settings");

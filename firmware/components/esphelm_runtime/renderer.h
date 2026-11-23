@@ -45,6 +45,9 @@ class Renderer {
   /// height; the page area takes the freed strip.
   void set_footer_visible(bool visible) { this->footer_visible_ = visible; }
   bool footer_visible() const { return this->footer_visible_; }
+  /// All sound is off (ADR-0047): the footer shows a crossed-out speaker from the next page built on.
+  void set_muted(bool muted) { this->muted_ = muted; }
+  bool muted() const { return this->muted_; }
 
   /// Keep the top `px` of the screen free (the alarm banner), so nothing on the page sits under
   /// it. The page is laid out again, not rebuilt; true if the inset changed (the widgets then
@@ -56,10 +59,13 @@ class Renderer {
   void build_footer_(const esphelm::Layout &layout, size_t index, const Colors &colors);
   /// The settings menu button (ADR-0025): three bars, as the fonts have no symbols.
   lv_obj_t *menu_button_(lv_obj_t *parent, int32_t w, int32_t h, const Colors &c, lv_color_t bg);
+  /// A crossed-out speaker, `size` px square, drawn in `color` (the footer while muted).
+  lv_obj_t *mute_icon_(lv_obj_t *parent, int32_t size, lv_color_t color);
 
   lv_obj_t *container_{nullptr};
   int32_t top_inset_{0};
   bool footer_visible_{true};
+  bool muted_{false};
   Fonts fonts_;
   std::function<void(int)> navigate_;
   std::function<void()> menu_;

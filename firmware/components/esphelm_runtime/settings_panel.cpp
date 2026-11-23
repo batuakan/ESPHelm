@@ -162,13 +162,16 @@ void SettingsPanel::tap(const std::string &part) {
       this->sleep_wanted_ = true;
   } else if (part.compare(0, 7, "volume=") == 0) {
     const int v = std::atoi(part.c_str() + 7);
-    if (this->state_.sound && v >= esphelm::PREFS_MIN_VOLUME && v <= 100) {
+    if (this->state_.sound && !this->state_.muted && v >= esphelm::PREFS_MIN_VOLUME && v <= 100) {
       this->pending_volume_ = v;
       this->volume_done_ = true;
     }
   } else if (part == "touch-sounds") {
-    if (this->state_.sound)
+    if (this->state_.sound && !this->state_.muted)
       this->pending_touch_ = this->state_.touch_sounds ? 0 : 1;
+  } else if (part == "mute") {
+    if (this->state_.sound)
+      this->pending_mute_ = this->state_.muted ? 0 : 1;
   } else if (part.compare(0, 11, "brightness=") == 0) {
     const int v = std::atoi(part.c_str() + 11);
     if (v >= this->state_.min_brightness && v <= 100) {
@@ -227,6 +230,14 @@ bool SettingsPanel::take_touch_sounds(bool &on) {
   return true;
 }
 
+bool SettingsPanel::take_mute(bool &muted) {
+  if (this->pending_mute_ < 0)
+    return false;
+  muted = this->pending_mute_ == 1;
+  this->pending_mute_ = -1;
+  return true;
+}
+
 bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
   if (this->root_ == nullptr)
     return false;
@@ -259,6 +270,7 @@ bool SettingsPanel::tick(uint32_t now, const State &state, int32_t top) {
   rebuild = rebuild || this->network_dirty_ || network_changed || state.theme != this->state_.theme ||
             state.can_sleep != this->state_.can_sleep || state.min_brightness != this->state_.min_brightness ||
             state.sound != this->state_.sound || state.touch_sounds != this->state_.touch_sounds ||
+            state.muted != this->state_.muted ||
             top != this->top_;
   this->network_dirty_ = false;
   const State before = this->state_;
@@ -440,9 +452,13 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
   }
   this->style_choices_();
   if (this->state_.sound) {
-    // Sound (ADR-0033): the volume, saved when let go, and touch clicks on or off.
+    // Sound (ADR-0033): all sound on or off (ADR-0047), the volume, saved when let go, and touch
+    // clicks on or off; the last two greyed while the sound is off.
     lv_obj_t *gap = box(body, w);
     lv_obj_set_height(gap, 8);
+    lv_obj_t *mute = button(body, c, w, btn_h);
+    lv_obj_center(label(mute, big, c.text, this->state_.muted ? "Sound: off" : "Sound: on"));
+    on_part(mute, this, "mute");
     this->volume_slider_ = slider_row("Volume", esphelm::PREFS_MIN_VOLUME, this->state_.volume, this->volume_value_);
     lv_obj_add_event_cb(
         this->volume_slider_,
@@ -460,8 +476,15 @@ void SettingsPanel::build_settings_(lv_obj_t *body, int32_t w, int32_t btn_h) {
         },
         LV_EVENT_RELEASED, this);
     lv_obj_t *touch = button(body, c, w, btn_h);
-    lv_obj_center(label(touch, big, c.text, this->state_.touch_sounds ? "Touch sounds: on" : "Touch sounds: off"));
+    lv_obj_center(label(touch, big, this->state_.muted ? c.muted : c.text,
+                        this->state_.touch_sounds ? "Touch sounds: on" : "Touch sounds: off"));
     on_part(touch, this, "touch-sounds");
+    if (this->state_.muted) {
+      lv_obj_add_state(this->volume_slider_, LV_STATE_DISABLED);
+      lv_obj_set_style_opa(this->volume_slider_, LV_OPA_40, LV_PART_MAIN);  // the whole slider, faded
+      lv_obj_set_style_text_color(this->volume_value_, c.muted, LV_PART_MAIN);
+      lv_obj_add_state(touch, LV_STATE_DISABLED);
+    }
   }
   if (this->state_.can_sleep) {
     lv_obj_t *sleep = button(body, c, w, btn_h);

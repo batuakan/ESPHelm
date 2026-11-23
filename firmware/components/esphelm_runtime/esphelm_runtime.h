@@ -190,6 +190,7 @@ class EsphelmRuntime : public Component {
   bool has_sound_() const;
   int sound_volume_() const;
   bool sound_touch_() const;
+  bool sound_mute_() const;
   void apply_sound_();
   void tick_sound_(uint32_t now, bool online);
   void attach_click_();
@@ -288,6 +289,7 @@ class EsphelmRuntime : public Component {
   bool test_servers_{false};
   std::vector<signalk::ServerCandidate> test_server_list_;
   std::string test_setup_;
+  bool test_sound_{false};  // test hook ESPHELM_TEST_SOUND=1: the settings and footer of a display with a speaker
   std::vector<std::unique_ptr<Widget>> widgets_;
   esphelm::Theme theme_{esphelm::Theme::NIGHT};
   std::string etag_;

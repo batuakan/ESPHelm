@@ -200,6 +200,60 @@ lv_obj_t *Renderer::menu_button_(lv_obj_t *parent, int32_t w, int32_t h, const C
   return menu;
 }
 
+lv_obj_t *Renderer::mute_icon_(lv_obj_t *parent, int32_t size, lv_color_t color) {
+  lv_obj_t *icon = lv_obj_create(parent);
+  plain(icon);
+  lv_obj_remove_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_size(icon, size, size);
+  lv_obj_set_style_line_color(icon, color, LV_PART_MAIN);  // carries the colour to the callback
+  lv_obj_add_event_cb(
+      icon,
+      [](lv_event_t *e) {
+        auto *obj = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
+        lv_layer_t *layer = lv_event_get_layer(e);
+        lv_area_t a;
+        lv_obj_get_coords(obj, &a);
+        const lv_color_t col = lv_obj_get_style_line_color(obj, LV_PART_MAIN);
+        const float s = static_cast<float>(lv_area_get_width(&a));
+        const auto pt = [&](float x, float y) {
+          return lv_point_precise_t{static_cast<lv_value_precise_t>(a.x1 + x * s),
+                                    static_cast<lv_value_precise_t>(a.y1 + y * s)};
+        };
+        // The speaker: a box and its cone, two triangles each, on the left 55 %.
+        lv_draw_triangle_dsc_t t;
+        lv_draw_triangle_dsc_init(&t);
+        t.color = col;
+        t.opa = LV_OPA_COVER;
+        const lv_point_precise_t quads[2][4] = {
+            {pt(0.05f, 0.36f), pt(0.22f, 0.36f), pt(0.22f, 0.64f), pt(0.05f, 0.64f)},
+            {pt(0.22f, 0.36f), pt(0.50f, 0.12f), pt(0.50f, 0.88f), pt(0.22f, 0.64f)},
+        };
+        for (const auto &q : quads) {
+          t.p[0] = q[0];
+          t.p[1] = q[1];
+          t.p[2] = q[2];
+          lv_draw_triangle(layer, &t);
+          t.p[1] = q[2];
+          t.p[2] = q[3];
+          lv_draw_triangle(layer, &t);
+        }
+        // The cross, on the right.
+        lv_draw_line_dsc_t l;
+        lv_draw_line_dsc_init(&l);
+        l.color = col;
+        l.width = std::max<int32_t>(2, static_cast<int32_t>(s / 10));
+        l.round_start = l.round_end = 1;
+        l.p1 = pt(0.62f, 0.34f);
+        l.p2 = pt(0.94f, 0.66f);
+        lv_draw_line(layer, &l);
+        l.p1 = pt(0.94f, 0.34f);
+        l.p2 = pt(0.62f, 0.66f);
+        lv_draw_line(layer, &l);
+      },
+      LV_EVENT_DRAW_MAIN, nullptr);
+  return icon;
+}
+
 void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const Colors &c) {
   lv_obj_t *footer = lv_obj_create(this->container_);
   plain(footer);
@@ -251,6 +305,13 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
   lv_obj_set_height(menu, lv_pct(100));
   lv_obj_align(menu, LV_ALIGN_RIGHT_MID, pages ? -(btn_w + 8) : 0, 0);
 
+  // All sound off (ADR-0047): a crossed-out speaker left of the menu button, in the warn colour.
+  const int32_t icon = this->muted_ ? (h - 12) * 6 / 10 : 0;
+  if (this->muted_) {
+    lv_obj_t *mute = this->mute_icon_(footer, icon, c.zone[static_cast<int>(esphelm::ZoneState::WARN)]);
+    lv_obj_align(mute, LV_ALIGN_RIGHT_MID, -((pages ? 2 * btn_w + 16 : btn_w + 8) + 6), 0);
+  }
+
   const esphelm::Page &page = layout.pages[index];
   std::string title = page.title.empty() ? page.id : page.title;
   if (pages)
@@ -260,7 +321,7 @@ void Renderer::build_footer_(const esphelm::Layout &layout, size_t index, const 
   const int32_t pad = 8;  // the footer's
   const int32_t screen_w = lv_display_get_horizontal_resolution(lv_display_get_default());
   const int32_t left = btn_w + 8;
-  const int32_t right = pages ? 2 * btn_w + 16 : btn_w + 8;
+  const int32_t right = (pages ? 2 * btn_w + 16 : btn_w + 8) + (icon > 0 ? icon + 12 : 0);
   const int32_t space = std::max<int32_t>(btn_w, screen_w - 2 * pad - left - right);
   lv_obj_set_size(label, space, lv_font_get_line_height(this->fonts_.small));
   lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
