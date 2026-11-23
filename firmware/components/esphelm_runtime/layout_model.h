@@ -237,6 +237,7 @@ struct Settings {
   // Sound on displays with a speaker (ADR-0033).
   uint8_t sound_volume{60};  // %, 10..100
   bool sound_touch{true};    // a click when a button or tile is touched
+  bool sound_mute{false};    // no sound at all: alarm tones (emergencies too) and clicks (ADR-0047)
 };
 
 struct Layout {

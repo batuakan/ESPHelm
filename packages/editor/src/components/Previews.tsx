@@ -999,7 +999,16 @@ export function WindRosePreview(props: {
  * The display's page footer: the page title and the settings menu button (ADR-0025), and with
  * several pages the page buttons and "n/m".
  */
-export function FooterPreview({ layout, index }: { layout: Layout; index: number }) {
+export function FooterPreview({
+  layout,
+  index,
+  muted = false,
+}: {
+  layout: Layout;
+  index: number;
+  /** All sound off on a display with a speaker (ADR-0047): the crossed-out speaker. */
+  muted?: boolean;
+}) {
   const page = layout.pages[index];
   const pages = layout.pages.length > 1;
   return (
@@ -1010,6 +1019,13 @@ export function FooterPreview({ layout, index }: { layout: Layout; index: number
         {pages && ` ${index + 1}/${layout.pages.length}`}
       </span>
       <span className="fend">
+        {muted && (
+          // renderer.cpp's mute_icon_(): a speaker and a cross, in the warn colour.
+          <svg className="fmute" viewBox="0 0 20 20" width="20" height="20" role="img" aria-label="Sound off">
+            <path d="M1 7.2h3.4l5.6-4.8v15.2l-5.6-4.8H1z" fill="currentColor" />
+            <path d="M12.4 6.8l6.4 6.4M18.8 6.8l-6.4 6.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        )}
         <span className="fbtn fmenu" title="Settings on the display">
           <svg viewBox="0 0 16 12" width="16" height="12" aria-hidden="true">
             <path d="M1 1h14M1 6h14M1 11h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

@@ -95,6 +95,12 @@ export const Settings = Type.Object(
           touch: Type.Optional(
             Type.Boolean({ description: 'A click when a button or tile is touched.' }),
           ),
+          mute: Type.Optional(
+            Type.Boolean({
+              description:
+                'No sound at all: alarm tones (emergencies too) and touch clicks. The alarm banner still shows alarms (ADR-0047).',
+            }),
+          ),
         },
         {
           additionalProperties: false,
@@ -121,6 +127,7 @@ export const SETTINGS_DEFAULTS = {
   rotation: 0,
   soundVolume: 60,
   soundTouch: true,
+  soundMute: false,
   /** Shortest timeout a display applies (a smaller value would make it hard to use). */
   minScreenTimeout: 10,
 } as const;

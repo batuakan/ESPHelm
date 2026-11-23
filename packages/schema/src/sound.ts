@@ -37,6 +37,8 @@ export interface AlarmSoundInput {
   /** When the last alarm tune started, ms (uint32 milliseconds, wrapping). */
   lastStartMs: number;
   nowMs: number;
+  /** All sound is off on this display (settings.sound.mute, ADR-0047): no tune plays, emergencies too. */
+  muted?: boolean;
 }
 
 /** What to do now: nothing, stop the alarm tune, or (re)start a level's tune. */
@@ -45,7 +47,9 @@ export type AlarmSoundAction = 'none' | 'stop' | AlarmLevel;
 const rank = (l: AlarmLevel) => ALARM_LEVELS.indexOf(l);
 
 export function alarmSound(i: AlarmSoundInput): AlarmSoundAction {
-  if (!i.online || i.level === null) return i.playing !== null ? 'stop' : 'none';
+  // Offline (states unknown, can't be acknowledged) or muted: no tune; one playing stops.
+  if (!i.online || i.muted === true || i.level === null)
+    return i.playing !== null ? 'stop' : 'none';
   // Something new asks for sound: play the worst tune now, even over one that is playing.
   if (i.generation !== i.playedGeneration) return i.level;
   // The tune playing is for an alarm that was acknowledged or cleared.

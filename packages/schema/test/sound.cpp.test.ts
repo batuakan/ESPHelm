@@ -41,7 +41,7 @@ describe.skipIf(!compiler)('firmware alarm tones (esphelm_sound.h)', () => {
   it('reproduces every shared case', () => {
     const lines = SOUND_CASES.cases.map((c) => {
       const i = c.input;
-      return `check(${JSON.stringify(c.name)}, {${level(i.level)}, ${i.generation}u, ${i.online}, ${level(i.playing)}, ${i.playedGeneration}u, ${i.lastStartMs}u, ${i.nowMs}u}, ${action(c.expected)});`;
+      return `check(${JSON.stringify(c.name)}, {${level(i.level)}, ${i.generation}u, ${i.online}, ${level(i.playing)}, ${i.playedGeneration}u, ${i.lastStartMs}u, ${i.nowMs}u, ${i.muted === true}}, ${action(c.expected)});`;
     });
     const src = join(dir, 'sound_test.cpp');
     writeFileSync(

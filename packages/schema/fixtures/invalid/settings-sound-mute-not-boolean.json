@@ -1,0 +1,40 @@
+{
+  "description": "settings.sound.mute is a boolean",
+  "expect": [
+    {
+      "code": "INVALID_TYPE",
+      "pointer": "/settings/sound/mute"
+    }
+  ],
+  "layout": {
+    "version": 1,
+    "id": "settings-sound-mute-not-boolean",
+    "theme": "day",
+    "pages": [
+      {
+        "kind": "grid",
+        "id": "main",
+        "grid": {
+          "cols": 1,
+          "rows": 1
+        },
+        "tiles": [
+          {
+            "type": "value",
+            "id": "sog",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "path": "navigation.speedOverGround"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "sound": {
+        "mute": "yes"
+      }
+    }
+  }
+}

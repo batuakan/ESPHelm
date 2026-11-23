@@ -25,13 +25,14 @@ int main() {
   p.brightness_night = 12;
   p.set_base(s, esphelm::Theme::DAY);
   const std::string text = esphelm::encode_prefs(p);
-  CHECK(text == "v=3;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
+  CHECK(text == "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;mu=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=0");
 
   DisplayPrefs q;
   CHECK(esphelm::decode_prefs(text, q));
   CHECK(q.theme == 1 && q.brightness_day == -1 && q.brightness_night == 12);
   CHECK(q.base_theme == esphelm::Theme::DAY && q.base_day == 100 && q.base_night == 30);
   CHECK(q.volume == -1 && q.touch == -1 && q.base_volume == 60 && q.base_touch);
+  CHECK(q.mute == -1 && !q.base_mute);
   CHECK(q.day_side == -1);
 
   // The dark theme (ADR-0034): chosen, as the day side, and as the layout's theme, round-trips.
@@ -40,7 +41,7 @@ int main() {
   dp.day_side = static_cast<int8_t>(esphelm::Theme::DARK);
   dp.set_base(s, esphelm::Theme::DARK);
   DisplayPrefs dq;
-  CHECK(esphelm::encode_prefs(dp) == "v=3;th=2;ds=2;bd=-1;bn=-1;vo=-1;to=-1;Bt=2;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1");
+  CHECK(esphelm::encode_prefs(dp) == "v=4;th=2;ds=2;bd=-1;bn=-1;vo=-1;to=-1;mu=-1;Bt=2;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=0");
   CHECK(esphelm::decode_prefs(esphelm::encode_prefs(dp), dq));
   CHECK(dq.theme == 2 && dq.day_side == 2 && dq.base_theme == esphelm::Theme::DARK && !dq.empty());
   DisplayPrefs only_side;
@@ -56,6 +57,20 @@ int main() {
   CHECK(sq.volume == 25 && sq.touch == 0 && sq.theme == 1 && sq.brightness_night == 12);
   CHECK(!sq.empty());
 
+  // The mute (ADR-0047) round-trips, and alone makes the record non-empty.
+  DisplayPrefs mp;
+  mp.mute = 1;
+  mp.set_base(s, esphelm::Theme::DAY);
+  CHECK(!mp.empty());
+  DisplayPrefs mq;
+  CHECK(esphelm::decode_prefs(esphelm::encode_prefs(mp), mq));
+  CHECK(mq.mute == 1 && !mq.base_mute && mq.touch == -1);
+
+  // A record saved before the mute (version 3) still reads, with no mute override.
+  DisplayPrefs v3;
+  CHECK(esphelm::decode_prefs("v=3;th=2;ds=2;bd=-1;bn=-1;vo=30;to=0;Bt=2;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1", v3));
+  CHECK(v3.theme == 2 && v3.volume == 30 && v3.touch == 0 && v3.mute == -1 && !v3.base_mute);
+
   // A record saved before the dark theme (version 2) still reads, with no day side.
   DisplayPrefs v2;
   CHECK(esphelm::decode_prefs("v=2;th=1;bd=-1;bn=12;vo=25;to=0;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1", v2));
@@ -69,7 +84,11 @@ int main() {
   // Refused, and `out` left as it was.
   const char *bad[] = {
       "",
-      "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // unknown version
+      "v=5;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;mu=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=0",  // unknown version
+      "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // version 4 without mu, Bm
+      "v=3;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;mu=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=0",  // version 3 with them
+      "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;mu=2;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=0",   // mute not 0/1
+      "v=4;th=1;ds=-1;bd=-1;bn=12;vo=-1;to=-1;mu=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1;Bm=-1", // base mute not 0/1
       "v=3;th=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",        // version 3 without ds
       "v=3;th=1;ds=1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",   // night as the day side
       "v=3;th=3;ds=-1;bd=-1;bn=12;vo=-1;to=-1;Bt=0;Ba=0;Bd=100;Bn=30;Bv=60;Bo=1",  // no such theme
@@ -140,6 +159,15 @@ int main() {
   s4.sound_touch = false;
   CHECK(esphelm::reconcile_prefs(so, s4, esphelm::Theme::DAY));
   CHECK(so.touch == -1 && !so.base_touch);
+
+  // Muted on the display; the editor then sets mute itself: the override goes.
+  DisplayPrefs mo = mq;
+  esphelm::Settings s5 = s;
+  CHECK(!esphelm::reconcile_prefs(mo, s5, esphelm::Theme::DAY));
+  CHECK(mo.mute == 1);
+  s5.sound_mute = true;
+  CHECK(esphelm::reconcile_prefs(mo, s5, esphelm::Theme::DAY));
+  CHECK(mo.mute == -1 && mo.base_mute && mo.empty());
 
   // Nothing overridden: nothing to drop, whatever the layout says.
   DisplayPrefs e;

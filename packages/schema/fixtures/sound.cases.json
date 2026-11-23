@@ -247,6 +247,62 @@
         "nowMs": 60000
       },
       "expected": "none"
+    },
+    {
+      "name": "muted: a new alarm stays silent",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 0,
+        "lastStartMs": 0,
+        "nowMs": 1000,
+        "muted": true
+      },
+      "expected": "none"
+    },
+    {
+      "name": "muted: an emergency stays silent too",
+      "input": {
+        "level": "emergency",
+        "generation": 2,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 0,
+        "lastStartMs": 0,
+        "nowMs": 1000,
+        "muted": true
+      },
+      "expected": "none"
+    },
+    {
+      "name": "muted while a tune plays: it stops",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": "alarm",
+        "playedGeneration": 1,
+        "lastStartMs": 0,
+        "nowMs": 1000,
+        "muted": true
+      },
+      "expected": "stop"
+    },
+    {
+      "name": "unmuted with the generation reset: the alarm plays at once",
+      "input": {
+        "level": "alarm",
+        "generation": 1,
+        "online": true,
+        "playing": null,
+        "playedGeneration": 0,
+        "lastStartMs": 0,
+        "nowMs": 1000,
+        "muted": false
+      },
+      "expected": "alarm"
     }
   ]
 }

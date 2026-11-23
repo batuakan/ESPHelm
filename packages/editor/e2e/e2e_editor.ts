@@ -731,6 +731,63 @@ async function main(): Promise<void> {
       JSON.stringify(withSettings.body.settings),
     );
 
+    // Mute (ADR-0047): the display reports it takes the mute; muted, the footer shows it and the
+    // display gets sound.mute; unmuted, the field is gone again.
+    const mute = settingsDrawer.getByLabel('Mute all sound');
+    await mute.check();
+    await page.getByRole('img', { name: 'Sound off' }).waitFor();
+    await page.waitForTimeout(300);
+    await shot(page, '09b-desktop-sound-muted');
+    await save.click();
+    let muted = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    for (
+      let i = 0;
+      i < 20 && !(muted.body.settings as { sound?: unknown } | undefined)?.sound;
+      i++
+    ) {
+      await page.waitForTimeout(250);
+      muted = await sk.json(
+        'GET',
+        `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+        deviceToken,
+      );
+    }
+    const mutedSound = (muted.body.settings as { sound?: unknown } | undefined)?.sound;
+    check(
+      'the display gets the mute, and the footer preview shows it',
+      JSON.stringify(mutedSound) === JSON.stringify({ mute: true }),
+      JSON.stringify(mutedSound),
+    );
+    await mute.uncheck();
+    await save.click();
+    let unmuted = await sk.json(
+      'GET',
+      `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+      deviceToken,
+    );
+    for (
+      let i = 0;
+      i < 20 && (unmuted.body.settings as { sound?: unknown } | undefined)?.sound;
+      i++
+    ) {
+      await page.waitForTimeout(250);
+      unmuted = await sk.json(
+        'GET',
+        `/signalk/v1/api/esphelm/devices/${DEVICE_ID}/layout`,
+        deviceToken,
+      );
+    }
+    check(
+      'unmuted, the layout has no sound settings again',
+      (unmuted.body.settings as { sound?: unknown } | undefined)?.sound === undefined &&
+        (await page.getByRole('img', { name: 'Sound off' }).count()) === 0,
+      JSON.stringify(unmuted.body.settings),
+    );
+
     // A position tile on a new page, in degrees, minutes and seconds.
     await page.getByRole('button', { name: 'Close settings' }).click();
     await page.getByRole('button', { name: 'Add page' }).click();

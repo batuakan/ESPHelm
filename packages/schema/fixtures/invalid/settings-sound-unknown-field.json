@@ -1,5 +1,5 @@
 {
-  "description": "settings.sound has only volume and touch",
+  "description": "settings.sound has only volume, touch and mute",
   "expect": [
     {
       "code": "UNKNOWN_FIELD",

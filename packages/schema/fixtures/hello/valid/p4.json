@@ -58,6 +58,7 @@
     "backlight": true,
     "rotation": true,
     "sound": true,
+    "mute": true,
     "darkTheme": true
   },
   "layoutEtag": "\"7f3a9c\""

@@ -42,6 +42,7 @@ class SettingsPanel {
     bool sound{false};
     int volume{60};  // %
     bool touch_sounds{true};
+    bool muted{false};  // all sound off (ADR-0047): Volume and Touch sounds greyed
     // Network tab (ADR-0026)
     bool wifi{false};          // the board has Wi-Fi (not the host build)
     bool ap_active{false};     // the setup network is up
@@ -82,6 +83,8 @@ class SettingsPanel {
   bool take_volume(int &percent, bool &done);
   /// Touch sounds switched on or off.
   bool take_touch_sounds(bool &on);
+  /// Sound switched on or off (ADR-0047); `muted` true: all sound off.
+  bool take_mute(bool &muted);
   bool take_sleep() { return take(this->sleep_wanted_); }
   /// Confirmed: a factory reset (ESPHome's, then a restart), or forget the SignalK server.
   bool take_factory_reset() { return take(this->factory_reset_); }
@@ -130,6 +133,7 @@ class SettingsPanel {
   int pending_volume_{-1};
   bool volume_done_{false};
   int8_t pending_touch_{-1};
+  int8_t pending_mute_{-1};
   bool sleep_wanted_{false};
   // Network tab: what it shows (changed in tap(), rebuilt in tick()) and what was confirmed.
   Confirm confirm_{Confirm::NONE};

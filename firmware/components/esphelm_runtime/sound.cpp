@@ -42,6 +42,16 @@ void SoundPlayer::set_volume(int percent) {
     this->rtttl_->set_gain(percent / 100.0f);
 }
 
+void SoundPlayer::set_muted(bool muted) {
+  if (muted == this->muted_)
+    return;
+  this->muted_ = muted;
+  ESP_LOGI(TAG, "Sound %s", muted ? "off" : "on");
+  // Switched back on: the next tick takes every alarm asking for sound as new and plays it now.
+  if (!muted)
+    this->played_generation_ = ~this->played_generation_;
+}
+
 void SoundPlayer::tick(Level level, uint32_t generation, bool online, uint32_t now) {
   if (this->rtttl_ == nullptr)
     return;
@@ -56,6 +66,7 @@ void SoundPlayer::tick(Level level, uint32_t generation, bool online, uint32_t n
   in.played_generation = this->played_generation_;
   in.last_start_ms = this->last_start_ms_;
   in.now_ms = now;
+  in.muted = this->muted_;
   Level play;
   switch (esphelm::sound::alarm_sound(in, play)) {
     case Action::STOP:
@@ -80,7 +91,7 @@ void SoundPlayer::tick(Level level, uint32_t generation, bool online, uint32_t n
 }
 
 void SoundPlayer::click(bool force) {
-  if (this->rtttl_ == nullptr || (!this->touch_ && !force) || this->alarm_ != Level::NONE)
+  if (this->rtttl_ == nullptr || this->muted_ || (!this->touch_ && !force) || this->alarm_ != Level::NONE)
     return;
   this->rtttl_->play(this->tunes_[0]);
 }

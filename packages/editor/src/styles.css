@@ -966,6 +966,11 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.footer-preview .fmute {
+  align-self: center;
+  color: var(--zone-warn);
+  margin-right: 4px;
+}
 .footer-preview .fmenu {
   display: inline-flex;
   align-items: center;

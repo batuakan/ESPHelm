@@ -109,6 +109,12 @@ export const Hello = Type.Object(
               'The firmware renders theme "dark" (ADR-0034); older firmware refuses such a layout and keeps its last good one.',
           }),
         ),
+        mute: Type.Optional(
+          Type.Boolean({
+            description:
+              'The firmware takes settings.sound.mute (ADR-0047); older firmware refuses such a layout and keeps its last good one.',
+          }),
+        ),
       },
       { additionalProperties: false },
     ),

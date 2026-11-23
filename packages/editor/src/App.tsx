@@ -858,7 +858,11 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
                   onDragNewEnd={() => setNewTileDrag(null)}
                 />
               )}
-              <FooterPreview layout={layout} index={index} />
+              <FooterPreview
+                layout={layout}
+                index={index}
+                muted={layout.settings?.sound?.mute === true && device?.hello.capabilities.sound === true}
+              />
             </div>
             <section className="problems" aria-label="Problems">
               {problems.length === 0 ? (
@@ -896,6 +900,7 @@ export function App(props: { api?: Api; live?: () => LiveSource }) {
           backlight={device?.hello.capabilities.backlight === true}
           canRotate={device?.hello.capabilities.rotation === true}
           sound={device?.hello.capabilities.sound === true}
+          canMute={device?.hello.capabilities.mute === true}
           paths={paths}
           values={shownValues}
           onChange={(patch) => edit(updateSettings(layout, patch))}

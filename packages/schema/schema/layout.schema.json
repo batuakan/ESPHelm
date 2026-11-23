@@ -3345,6 +3345,10 @@
             "touch": {
               "type": "boolean",
               "description": "A click when a button or tile is touched."
+            },
+            "mute": {
+              "type": "boolean",
+              "description": "No sound at all: alarm tones (emergencies too) and touch clicks. The alarm banner still shows alarms (ADR-0047)."
             }
           },
           "additionalProperties": false,

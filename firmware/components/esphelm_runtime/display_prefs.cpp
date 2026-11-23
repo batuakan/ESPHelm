@@ -13,13 +13,16 @@ void DisplayPrefs::set_base(const Settings &s, Theme layout_theme) {
   this->base_night = s.brightness_night;
   this->base_volume = s.sound_volume;
   this->base_touch = s.sound_touch;
+  this->base_mute = s.sound_mute;
 }
 
 std::string encode_prefs(const DisplayPrefs &p) {
-  char buf[128];
-  std::snprintf(buf, sizeof(buf), "v=3;th=%d;ds=%d;bd=%d;bn=%d;vo=%d;to=%d;Bt=%d;Ba=%d;Bd=%d;Bn=%d;Bv=%d;Bo=%d",
-                p.theme, p.day_side, p.brightness_day, p.brightness_night, p.volume, p.touch, static_cast<int>(p.base_theme),
-                static_cast<int>(p.base_auto), p.base_day, p.base_night, p.base_volume, p.base_touch ? 1 : 0);
+  char buf[160];
+  std::snprintf(buf, sizeof(buf),
+                "v=4;th=%d;ds=%d;bd=%d;bn=%d;vo=%d;to=%d;mu=%d;Bt=%d;Ba=%d;Bd=%d;Bn=%d;Bv=%d;Bo=%d;Bm=%d", p.theme,
+                p.day_side, p.brightness_day, p.brightness_night, p.volume, p.touch, p.mute,
+                static_cast<int>(p.base_theme), static_cast<int>(p.base_auto), p.base_day, p.base_night, p.base_volume,
+                p.base_touch ? 1 : 0, p.base_mute ? 1 : 0);
   return buf;
 }
 
@@ -52,8 +55,8 @@ static bool override_ok(int v, int lo, int hi) { return v == -1 || (v >= lo && v
 bool decode_prefs(const std::string &text, DisplayPrefs &out) {
   size_t pos = 0;
   int v, th, bd, bn, bt, ba, bday, bnight;
-  int ds = -1, vo = -1, to = -1, bv = out.base_volume, bo = out.base_touch ? 1 : 0;
-  if (!field(text, pos, "v", 1, 3, v))
+  int ds = -1, vo = -1, to = -1, mu = -1, bv = out.base_volume, bo = out.base_touch ? 1 : 0, bm = out.base_mute ? 1 : 0;
+  if (!field(text, pos, "v", 1, 4, v))
     return false;
   // Themes are 0..1 before version 3 (no dark), 0..2 since.
   const int max_theme = v >= 3 ? static_cast<int>(Theme::DARK) : static_cast<int>(Theme::NIGHT);
@@ -65,10 +68,14 @@ bool decode_prefs(const std::string &text, DisplayPrefs &out) {
     return false;
   if (v >= 2 && (!field(text, pos, "vo", -1, 100, vo) || !field(text, pos, "to", -1, 1, to)))
     return false;
+  if (v >= 4 && !field(text, pos, "mu", -1, 1, mu))
+    return false;
   if (!field(text, pos, "Bt", 0, max_theme, bt) || !field(text, pos, "Ba", 0, 1, ba) ||
       !field(text, pos, "Bd", PREFS_MIN_DAY, 100, bday) || !field(text, pos, "Bn", PREFS_MIN_NIGHT, 100, bnight))
     return false;
   if (v >= 2 && (!field(text, pos, "Bv", PREFS_MIN_VOLUME, 100, bv) || !field(text, pos, "Bo", 0, 1, bo)))
+    return false;
+  if (v >= 4 && !field(text, pos, "Bm", 0, 1, bm))
     return false;
   if (pos != text.size() || text.back() == ';' || !override_ok(bd, PREFS_MIN_DAY, 100) ||
       !override_ok(bn, PREFS_MIN_NIGHT, 100) || !override_ok(vo, PREFS_MIN_VOLUME, 100) ||
@@ -80,12 +87,14 @@ bool decode_prefs(const std::string &text, DisplayPrefs &out) {
   out.brightness_night = static_cast<int16_t>(bn);
   out.volume = static_cast<int16_t>(vo);
   out.touch = static_cast<int8_t>(to);
+  out.mute = static_cast<int8_t>(mu);
   out.base_theme = static_cast<Theme>(bt);
   out.base_auto = static_cast<AutoTheme>(ba);
   out.base_day = static_cast<uint8_t>(bday);
   out.base_night = static_cast<uint8_t>(bnight);
   out.base_volume = static_cast<uint8_t>(bv);
   out.base_touch = bo == 1;
+  out.base_mute = bm == 1;
   return true;
 }
 
@@ -110,6 +119,10 @@ bool reconcile_prefs(DisplayPrefs &p, const Settings &s, Theme layout_theme) {
   }
   if (p.touch >= 0 && p.base_touch != s.sound_touch) {
     p.touch = -1;
+    dropped = true;
+  }
+  if (p.mute >= 0 && p.base_mute != s.sound_mute) {
+    p.mute = -1;
     dropped = true;
   }
   // What is kept was chosen against values equal to this layout's.

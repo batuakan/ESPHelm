@@ -1058,6 +1058,44 @@ describe('editor', { timeout: 20000 }, () => {
     });
   });
 
+  it('mutes all sound, warns, shows it in the footer and drops the field when unmuted (ADR-0047)', async () => {
+    const d = { ...device('adopted'), layoutId: `display-${p4.deviceId}` };
+    const server = fakeServer([d]);
+    const { settings: _s, ...twoPages } = JSON.parse(
+      readFileSync(join(FIXTURES, 'valid/settings.json'), 'utf8'),
+    ) as Layout;
+    void _s;
+    server.layouts.set(d.layoutId, { ...twoPages, id: d.layoutId });
+    render(<App api={server.api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Display settings' }));
+    const drawer = screen.getByRole('complementary', { name: 'Display settings' });
+    expect(screen.queryByRole('img', { name: 'Sound off' })).toBeNull();
+    fireEvent.click(within(drawer).getByLabelText('Mute all sound'));
+    within(drawer).getByText(/not even emergencies/);
+    expect((within(drawer).getByRole('slider', { name: 'Volume' }) as HTMLInputElement).disabled).toBe(true);
+    expect((within(drawer).getByLabelText('Touch sounds') as HTMLInputElement).disabled).toBe(true);
+    screen.getByRole('img', { name: 'Sound off' });
+    await screen.findByText('No problems');
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await screen.findByText(/Sent to/);
+    expect(server.layouts.get(d.layoutId)!.settings?.sound).toEqual({ mute: true });
+    fireEvent.click(within(drawer).getByLabelText('Mute all sound'));
+    expect(screen.queryByRole('img', { name: 'Sound off' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save & send' }));
+    await waitFor(() => expect(server.layouts.get(d.layoutId)!.settings?.sound).toBeUndefined());
+  });
+
+  it('offers mute only to firmware that takes it', async () => {
+    const d = device('adopted');
+    d.hello = { ...p4, capabilities: { touch: true, put: true, backlight: true, sound: true } };
+    render(<App api={fakeServer([d]).api} live={fakeLive().factory} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Display settings' }));
+    const drawer = screen.getByRole('complementary', { name: 'Display settings' });
+    within(drawer).getByText(/Needs newer firmware/);
+    expect((within(drawer).getByLabelText('Mute all sound') as HTMLInputElement).disabled).toBe(true);
+    expect((within(drawer).getByLabelText('Touch sounds') as HTMLInputElement).disabled).toBe(false);
+  });
+
   it('says when a display cannot dim its backlight', async () => {
     const d = device('adopted');
     d.hello = { ...p4, capabilities: { touch: true, put: true } };

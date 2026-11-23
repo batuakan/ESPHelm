@@ -991,7 +991,7 @@ async function main(): Promise<void> {
     fw.start();
     check(
       'panel: the choices come back after a restart',
-      (await fw.waitLog(/Display choices: v=3;th=1;ds=0;bd=-1;bn=15;vo=-1;to=-1;/)) &&
+      (await fw.waitLog(/Display choices: v=4;th=1;ds=0;bd=-1;bn=15;vo=-1;to=-1;mu=-1;/)) &&
         (await fw.waitLog(/Showing cached layout "settings"/)) &&
         (await fw.waitLog(/Brightness 15 % \(no backlight configured\)/)),
     );
@@ -1069,6 +1069,70 @@ async function main(): Promise<void> {
     check(
       'dark: and back to dark, the automatic theme by day',
       await waitNext(/Theme on the display: automatic \(dark\)/),
+    );
+    // 9c3. Mute (ADR-0047): the host build has no speaker, so ESPHELM_TEST_SOUND=1 shows the
+    //      settings and footer of one that has. Sound: off greys Volume and Touch sounds, the
+    //      footer shows a crossed-out speaker, the choice survives a restart, and the editor
+    //      setting mute itself replaces it.
+    await fw.stop();
+    fw.start({ ESPHELM_TEST_SOUND: '1' });
+    await fw.waitLog(/Showing cached layout "settings"/);
+    await fw.waitLog(/Sending hello/, 15000);
+    await sleep(1500);
+    const soundDevices = (await json('GET', '/plugins/esphelm/api/devices', admin))
+      .body as unknown as {
+      id: string;
+      hello: { capabilities: { sound?: boolean; mute?: boolean } };
+    }[];
+    const soundCaps = soundDevices.find((d) => d.id === DEVICE_ID)?.hello.capabilities;
+    check(
+      'mute: hello says the firmware takes the mute',
+      soundCaps?.sound === true && soundCaps.mute === true,
+      JSON.stringify(soundCaps),
+    );
+    writeFileSync(join(fw.workDir, 'esphelm_tap_request'), '@menu');
+    check('mute: the settings open on a display with a speaker', await waitNext(/Settings opened/));
+    await sleep(1000);
+    await fw.screenshot('mute-01-settings-sound-on', shots);
+    settingsTap('mute');
+    check('mute: Sound: off mutes the display', await waitNext(/Sound off on the display/));
+    await sleep(1000);
+    await fw.screenshot('mute-02-settings-sound-off', shots);
+    const volumes = fw.count(/Volume chosen on the display/);
+    settingsTap('volume=50');
+    settingsTap('touch-sounds');
+    await sleep(500);
+    check(
+      'mute: Volume and Touch sounds do nothing while muted',
+      fw.count(/Volume chosen on the display/) === volumes &&
+        fw.count(/Touch sounds (on|off) on the display/) === 0,
+    );
+    settingsTap('close');
+    await waitNext(/Settings closed/);
+    await sleep(1000);
+    await fw.screenshot('mute-03-footer-muted', shots);
+    await fw.stop();
+    fw.start({ ESPHELM_TEST_SOUND: '1' });
+    check(
+      'mute: the choice comes back after a restart',
+      (await fw.waitLog(/Display choices: v=4;.*;mu=1;/)) &&
+        (await fw.waitLog(/Showing cached layout "settings"/)),
+    );
+    await fw.waitLog(/Sending hello/, 15000);
+    const muteSettings = settings.settings as Record<string, unknown>;
+    settings.settings = { ...muteSettings, sound: { mute: true } };
+    const drops = fw.count(/dropping what was chosen on the display/);
+    await json('PUT', '/plugins/esphelm/api/layouts/settings', admin, settings);
+    check(
+      "mute: the editor muting the layout replaces the display's choice",
+      await fw.waitLog(/dropping what was chosen on the display/, 15000, drops + 1),
+    );
+    settings.settings = muteSettings;
+    await json('PUT', '/plugins/esphelm/api/layouts/settings', admin, settings);
+    await fw.waitLog(
+      /Showing fetched layout "settings"/,
+      15000,
+      fw.count(/Showing fetched layout "settings"/) + 1,
     );
     await fw.stop();
     writeFileSync(join(fw.workDir, 'esphelm_prefs.bin'), cacheRecord('v=1;th=5', 'prefs'));
