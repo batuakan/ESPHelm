@@ -57,6 +57,12 @@ inline constexpr int ENGINE_MINOR_TICK_PX = 5;
 inline constexpr int ALARMS_ROW_HEIGHT = 48;
 inline constexpr int ALARMS_ACK_WIDTH = 220;
 
+// Battery tile (ADR-0046): the rows' font (at most this % of the height, its line height this many
+// times in the width), and the battery's least height before a row is dropped.
+inline constexpr int BATTERY_LINE_PERCENT = 15;
+inline constexpr int BATTERY_LINE_WIDTHS = 8;
+inline constexpr int BATTERY_MIN_BODY = 40;
+
 // Zones read from SignalK metadata (ADR-0020): how many of a path's zones are used.
 inline constexpr int SERVER_ZONES_MAX_PER_PATH = 16;
 

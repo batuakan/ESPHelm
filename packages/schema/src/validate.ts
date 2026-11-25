@@ -247,7 +247,7 @@ function validateSemantics(layout: Layout): ValidationError[] {
           });
         }
       }
-      if (tile.type === 'value' || tile.type === 'graph') {
+      if (tile.type === 'value' || tile.type === 'graph' || tile.type === 'battery') {
         // Open-ended ranges: at least one end, and from below to when both are given.
         (tile.zones ?? []).forEach((zone, k) => {
           const zp = `${tbase}/zones/${k}`;

@@ -84,10 +84,11 @@ A value bound to one SignalK path. It is used by `value`/`gauge`/`bar` tiles and
 | `heading_tape` | `label?`, `span?`, `markers?`, `config?`, `staleAfter?` | compass strip that scrolls with the heading, see below |
 | `clock` | `label?`, `show?`, `hour12?`, `seconds?`, `dateFormat?`, `utc?` | the display's time and/or date, see below |
 | `engine` | DataItem + `min`, `max`, `zones?`, `slots` | a large RPM arc with three small gauges inside it, see below |
+| `battery` | DataItem + `zones?` (value zones), `history?`, `voltage?`, `current?`, `power?`, `timeRemaining?`, `solar?`, `chargingModePath?`, `invertCurrent?` | a battery filled to its state of charge, with what it is doing, see below |
 
 `min`, `max` and zones are in **display units**. A `Zone` is `{ from, to, state }` with `state` one of `normal`, `warn`, `alarm`, `emergency` (the SignalK alarm states). The theme supplies the colours; layouts never carry hex colours.
 
-**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, and of an `engine` tile's RPM (not its slots), on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
+**Zones on the server (ADR-0020):** when the SignalK server has usable zones in a path's metadata (`meta.zones`), they replace the `zones` of every `value`, `gauge`, `bar` and `graph` tile on that path, of an `engine` tile's RPM (not its slots) and of a `battery` tile's state of charge, on the display and in the editor's preview. A tile's own `zones` apply when the server has none. The layout itself doesn't change.
 
 ### Centre-zero gauges and bars (ADR-0023)
 For values either side of zero: rudder angle, heel, rate of turn, battery current, trim.
@@ -314,6 +315,39 @@ Every active SignalK notification (`notifications.*` in a state above `normal`/`
   "label": "Engine room", "prefix": "notifications.propulsion", "showAcknowledged": false }
 ```
 
+### Battery tiles
+A battery outline filled to the state of charge, the % beside it, and rows for the rest (ADR-0046). The tile's own DataItem is the **state of charge**, a SignalK ratio: the fill uses it as 0..1 whatever the display unit, and the number is shown in its unit (`pct` gives "78%"). Its `zones` (value zones, open ends allowed, in that unit) colour the fill, and the server's zones replace them as on a value tile. `history: true` records it, and a tap opens its graph (colour displays).
+
+| Field | Notes |
+|---|---|
+| `voltage` | DataItem, top right beside the label |
+| `current` | DataItem, below the battery; its sign says charging or discharging |
+| `power` | DataItem beside the current; without it the display shows voltage times current (in W) while both are fresh |
+| `timeRemaining` | DataItem, seconds until empty (`capacity.timeRemaining`), shown as "14 h 20 left" while discharging; its unit and decimals are not used |
+| `solar` | DataItem on the last row, captioned by its label or "Solar" |
+| `chargingModePath` | a text path such as `electrical.chargers.<id>.chargingMode`: "bulk" shows as "Charging: Bulk" |
+| `invertCurrent` | `true`: negative current (and power) means charging. Absent: positive is charging, as Victron and most BMS plugins publish. Current and power are always shown with positive meaning charging. |
+
+- **Text** (`timeLeft()`, `batteryState()`, `chargingModeText()`, `batteryStatus()` in `battery.ts`, mirrored by the firmware's `esphelm_battery.h`, shared cases in `fixtures/battery.cases.json`):
+  - The time left is "< 1 min", "45 min", "3 h 05" or "2 d 4 h"; nothing when negative or over 99 days.
+  - Within 0.1 A either way the battery is idle.
+  - The state line: "Charging: Bulk" or "Charging"; "14 h 20 left" or "Discharging"; the charger's mode or "Idle"; without a current, the time left or the mode.
+  - A mode is shown without a leading "charging ", capitalised. Nothing for "unknown", "other", over 20 characters or characters the fonts lack.
+- **Rows are the device's business** (`batteryRows()` with `BATTERY_FIT`, generated into `esphelm_sizes.h`):
+  - Their font is the largest at most 15 % of the content height whose line height fits 8 times in the width.
+  - Rows are dropped (solar, the state line, current and power, then the label row) while the battery would be under 40 px tall. A 1x1 tile on a small display shows the battery and its % only.
+- **Defaults:** the editor fills a new tile with `batteryDefaults(id)`: SignalK's paths under `electrical.batteries.<id>` for the state of charge in %, voltage, current and time remaining, the id as label, alarm below 20 % and warn to 40 %.
+
+```json
+{ "type": "battery", "id": "house", "x": 0, "y": 0, "w": 2, "h": 1,
+  "path": "electrical.batteries.house.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "House",
+  "zones": [{ "to": 20, "state": "alarm" }, { "from": 20, "to": 40, "state": "warn" }],
+  "voltage": { "path": "electrical.batteries.house.voltage", "unit": "V", "decimals": 1 },
+  "current": { "path": "electrical.batteries.house.current", "unit": "A", "decimals": 1 },
+  "timeRemaining": { "path": "electrical.batteries.house.capacity.timeRemaining" },
+  "chargingModePath": "electrical.chargers.main.chargingMode" }
+```
+
 ### Autopilot tiles
 Shows the autopilot state, target and heading, with course and mode buttons that send PUTs (classic SignalK autopilot paths, as the legacy app). Safety rules: ADR-0011.
 
@@ -469,6 +503,7 @@ See `packages/schema/fixtures/valid/`:
 - `rose-and-engine-720.json`, `two-roses.json`: roses sharing pages with other tiles and with each other.
 - `autopilot.json`: a full-screen autopilot, one next to a rose, and a status-only one with custom modes and paths.
 - `chart-page.json`: a page with a default chart tile filling it, an anchor page with every path set, and a value page.
+- `battery.json`: a house battery with every value, a minimal one, and an inverted BMS in `ratio` (ADR-0046).
 - `alarms.json`: a full-width alarms panel and a narrow one filtered to `notifications.electrical` without acknowledged alarms (ADR-0038).
 - `chart-route.json`: a chart with the route on (the default), one with every route path set, and one with `route: false` (ADR-0037).
 - `chart-tiles.json`: a 2x2 chart beside a wind rose and a 1x1 chart of the same chart (they share their map tiles), and a value page.

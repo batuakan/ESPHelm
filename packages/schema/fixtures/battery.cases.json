@@ -1,0 +1,423 @@
+{
+  "description": "Battery tile (ADR-0046): timeLeft(), batteryState(), chargingModeText(), batteryStatus() and batteryRows() in src/battery.ts and esphelm_battery.h must both reproduce these.",
+  "timeLeft": [
+    {
+      "seconds": null,
+      "expected": ""
+    },
+    {
+      "seconds": -1,
+      "expected": ""
+    },
+    {
+      "seconds": 0,
+      "expected": "< 1 min"
+    },
+    {
+      "seconds": 59,
+      "expected": "< 1 min"
+    },
+    {
+      "seconds": 60,
+      "expected": "1 min"
+    },
+    {
+      "seconds": 3599,
+      "expected": "59 min"
+    },
+    {
+      "seconds": 3600,
+      "expected": "1 h 00"
+    },
+    {
+      "seconds": 51600,
+      "expected": "14 h 20"
+    },
+    {
+      "seconds": 86399,
+      "expected": "23 h 59"
+    },
+    {
+      "seconds": 86400,
+      "expected": "1 d 0 h"
+    },
+    {
+      "seconds": 187200,
+      "expected": "2 d 4 h"
+    },
+    {
+      "seconds": 8553600,
+      "expected": "99 d 0 h"
+    },
+    {
+      "seconds": 8553601,
+      "expected": ""
+    }
+  ],
+  "states": [
+    {
+      "current": 8.2,
+      "invert": false,
+      "expected": "charging"
+    },
+    {
+      "current": -8.2,
+      "invert": false,
+      "expected": "discharging"
+    },
+    {
+      "current": 0.05,
+      "invert": false,
+      "expected": "idle"
+    },
+    {
+      "current": -0.1,
+      "invert": false,
+      "expected": "idle"
+    },
+    {
+      "current": 0.11,
+      "invert": false,
+      "expected": "charging"
+    },
+    {
+      "current": 8.2,
+      "invert": true,
+      "expected": "discharging"
+    },
+    {
+      "current": -3,
+      "invert": true,
+      "expected": "charging"
+    },
+    {
+      "current": null,
+      "invert": false,
+      "expected": null
+    }
+  ],
+  "modes": [
+    {
+      "mode": "bulk",
+      "expected": "Bulk"
+    },
+    {
+      "mode": "charging bulk",
+      "expected": "Bulk"
+    },
+    {
+      "mode": "Charging Float",
+      "expected": "Float"
+    },
+    {
+      "mode": "absorption",
+      "expected": "Absorption"
+    },
+    {
+      "mode": "external control",
+      "expected": "External control"
+    },
+    {
+      "mode": "  float ",
+      "expected": "Float"
+    },
+    {
+      "mode": "unknown",
+      "expected": ""
+    },
+    {
+      "mode": "Other",
+      "expected": ""
+    },
+    {
+      "mode": "",
+      "expected": ""
+    },
+    {
+      "mode": "a very long charging state",
+      "expected": ""
+    },
+    {
+      "mode": "bülk",
+      "expected": ""
+    },
+    {
+      "mode": 42,
+      "expected": ""
+    },
+    {
+      "mode": null,
+      "expected": ""
+    }
+  ],
+  "status": [
+    {
+      "state": "charging",
+      "seconds": null,
+      "mode": "bulk",
+      "expected": "Charging: Bulk"
+    },
+    {
+      "state": "charging",
+      "seconds": null,
+      "mode": null,
+      "expected": "Charging"
+    },
+    {
+      "state": "discharging",
+      "seconds": 51600,
+      "mode": null,
+      "expected": "14 h 20 left"
+    },
+    {
+      "state": "discharging",
+      "seconds": null,
+      "mode": "float",
+      "expected": "Discharging"
+    },
+    {
+      "state": "discharging",
+      "seconds": -5,
+      "mode": null,
+      "expected": "Discharging"
+    },
+    {
+      "state": "idle",
+      "seconds": null,
+      "mode": "float",
+      "expected": "Float"
+    },
+    {
+      "state": "idle",
+      "seconds": 51600,
+      "mode": null,
+      "expected": "Idle"
+    },
+    {
+      "state": null,
+      "seconds": 51600,
+      "mode": null,
+      "expected": "14 h 20 left"
+    },
+    {
+      "state": null,
+      "seconds": null,
+      "mode": "absorption",
+      "expected": "Absorption"
+    },
+    {
+      "state": null,
+      "seconds": null,
+      "mode": null,
+      "expected": ""
+    }
+  ],
+  "rows": [
+    {
+      "width": 440,
+      "height": 200,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true
+      },
+      "expected": {
+        "line": 26,
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true,
+        "top": 26,
+        "height": 96
+      }
+    },
+    {
+      "width": 200,
+      "height": 200,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true
+      },
+      "expected": {
+        "line": 26,
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true,
+        "top": 26,
+        "height": 96
+      }
+    },
+    {
+      "width": 200,
+      "height": 120,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true
+      },
+      "expected": {
+        "line": 26,
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": false,
+        "top": 26,
+        "height": 42
+      }
+    },
+    {
+      "width": 200,
+      "height": 80,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true
+      },
+      "expected": {
+        "line": 26,
+        "caption": true,
+        "power": false,
+        "status": false,
+        "solar": false,
+        "top": 26,
+        "height": 54
+      }
+    },
+    {
+      "width": 100,
+      "height": 50,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": true,
+        "solar": true
+      },
+      "expected": {
+        "line": 26,
+        "caption": false,
+        "power": false,
+        "status": false,
+        "solar": false,
+        "top": 0,
+        "height": 50
+      }
+    },
+    {
+      "width": 700,
+      "height": 500,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": true,
+        "power": true,
+        "status": false,
+        "solar": false
+      },
+      "expected": {
+        "line": 75,
+        "caption": true,
+        "power": true,
+        "status": false,
+        "solar": false,
+        "top": 75,
+        "height": 350
+      }
+    },
+    {
+      "width": 300,
+      "height": 300,
+      "ladder": [
+        26,
+        38,
+        56,
+        75,
+        113
+      ],
+      "want": {
+        "caption": false,
+        "power": false,
+        "status": false,
+        "solar": false
+      },
+      "expected": {
+        "line": 26,
+        "caption": false,
+        "power": false,
+        "status": false,
+        "solar": false,
+        "top": 0,
+        "height": 300
+      }
+    },
+    {
+      "width": 440,
+      "height": 200,
+      "ladder": [
+        56,
+        26,
+        38
+      ],
+      "want": {
+        "caption": false,
+        "power": true,
+        "status": true,
+        "solar": false
+      },
+      "expected": {
+        "line": 26,
+        "caption": false,
+        "power": true,
+        "status": true,
+        "solar": false,
+        "top": 0,
+        "height": 148
+      }
+    }
+  ]
+}

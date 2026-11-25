@@ -25,7 +25,8 @@
     "clock",
     "chart",
     "engine",
-    "alarms"
+    "alarms",
+    "battery"
   ],
   "fonts": [
     "tiny",

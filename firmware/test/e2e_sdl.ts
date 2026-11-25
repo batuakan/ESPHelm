@@ -84,6 +84,58 @@ const fixture = (rel: string) =>
     pages: { tiles: Record<string, unknown>[] }[];
   };
 
+/**
+ * The battery fixture (ADR-0046) for the e2e: the house battery with every value (its state of
+ * charge going stale after 3 s), a start battery in % with an alarm zone, and an inverted BMS.
+ */
+function batteryLayout(id: string) {
+  const l = fixture('valid/battery.json');
+  const [house, start, bms] = l.pages[0]!.tiles;
+  return {
+    ...l,
+    id,
+    pages: [
+      {
+        ...l.pages[0]!,
+        tiles: [
+          { ...house, staleAfter: 3 },
+          {
+            ...start,
+            unit: 'pct',
+            decimals: 0,
+            label: 'Start',
+            zones: [{ to: 20, state: 'alarm' }],
+          },
+          { ...bms, label: 'BMS' },
+        ],
+      },
+    ],
+  };
+}
+/** Battery values: the house discharging with 14 h 20 left, the start battery low, the BMS charging. */
+const BATTERY_VALUES: Record<string, number | string> = {
+  'electrical.batteries.house.capacity.stateOfCharge': 0.78,
+  'electrical.batteries.house.voltage': 12.8,
+  'electrical.batteries.house.current': -8.2,
+  'electrical.batteries.house.power': -105,
+  'electrical.batteries.house.capacity.timeRemaining': 51600,
+  'electrical.solar.main.panelPower': 120,
+  'electrical.chargers.main.chargingMode': 'float',
+  'electrical.batteries.start.capacity.stateOfCharge': 0.15,
+  'electrical.batteries.bms.capacity.stateOfCharge': 0.55,
+  'electrical.batteries.bms.current': -12, // inverted: charging
+};
+/** The house battery charging in bulk, with more sun. */
+const BATTERY_CHARGING: Record<string, number | string> = {
+  ...BATTERY_VALUES,
+  'electrical.batteries.house.capacity.stateOfCharge': 0.32, // warn
+  'electrical.batteries.house.voltage': 13.9,
+  'electrical.batteries.house.current': 15.3,
+  'electrical.batteries.house.power': 213,
+  'electrical.solar.main.panelPower': 240,
+  'electrical.chargers.main.chargingMode': 'bulk',
+};
+
 class Firmware {
   private proc: ChildProcess | undefined;
   private out = '';
@@ -869,6 +921,46 @@ async function main(): Promise<void> {
     publish({ 'environment.depth.belowTransducer': 4.6 });
     await sleep(1500);
     await fw.screenshot('94-alarms-none', shots);
+
+    // 9b3. Battery tiles (ADR-0046): the house battery discharging with every row, a start battery
+    //      in its alarm zone (1x1), an inverted BMS charging; then the house charging in bulk in
+    //      its warn zone, its state of charge going stale, and the night theme.
+    const battery = batteryLayout('battery');
+    await json('PUT', '/plugins/esphelm/api/layouts/battery', admin, battery);
+    await json('PUT', `/plugins/esphelm/api/devices/${DEVICE_ID}`, admin, { layoutId: 'battery' });
+    check(
+      'battery: the layout renders',
+      await fw.waitLog(/Showing fetched layout "battery" \(1 pages/),
+    );
+    await sleep(1500); // subscribed
+    publish(BATTERY_VALUES);
+    await sleep(1500);
+    await fw.screenshot('95-battery', shots);
+    publish(BATTERY_CHARGING);
+    await sleep(1500);
+    await fw.screenshot('96-battery-charging', shots);
+    const withoutSoc = Object.fromEntries(
+      Object.entries(BATTERY_CHARGING).filter(
+        ([path]) => path !== 'electrical.batteries.house.capacity.stateOfCharge',
+      ),
+    );
+    publish(withoutSoc);
+    await sleep(2000);
+    publish(withoutSoc); // the rest stays fresh while the house's charge goes stale (3 s)
+    await sleep(2000);
+    await fw.screenshot('97-battery-stale', shots);
+    await json('PUT', '/plugins/esphelm/api/layouts/battery', admin, {
+      ...battery,
+      theme: 'night',
+    });
+    check(
+      'battery: the night layout renders',
+      await fw.waitLog(/Showing fetched layout "battery" \(1 pages/, 15000, 2),
+    );
+    await sleep(1500);
+    publish(BATTERY_VALUES);
+    await sleep(1500);
+    await fw.screenshot('98-battery-night', shots);
 
     // 9c. Display settings (ADR-0015): the start page, day/night by environment.sun, and the
     //     screen switching off without a touch (woken by an alarm and by a touch). The SDL
@@ -2126,6 +2218,19 @@ async function main(): Promise<void> {
     await fw720.screenshot('720-04-value-sizes', shots);
     await fw720.stop();
 
+    // 12b2. The energy starter layout at 720 (offline): the battery tile's outline and rows at
+    //       the P4-86's fonts, every value "--" without a server.
+    const energy720 = readFileSync(join(REPO, 'packages/schema/templates/energy.json'), 'utf8');
+    writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(energy720, '"seed-energy"'));
+    fw720.start();
+    check(
+      '720 build shows the energy template',
+      await fw720.waitLog(/Showing cached layout "template-energy" \(1 pages/),
+    );
+    await sleep(1500);
+    await fw720.screenshot('720-05-energy', shots);
+    await fw720.stop();
+
     // 12c. The history popup at 720 (offline, seeded SOG history).
     const history720 = readFileSync(join(FIXTURES, 'valid/value-history.json'), 'utf8');
     writeFileSync(join(work720, 'esphelm_cur.bin'), cacheRecord(history720, '"seed-history"'));
@@ -2412,10 +2517,10 @@ async function main(): Promise<void> {
     }[];
     const monoHello = monoDevices.find((d) => d.id === MONO_ID)?.hello;
     check(
-      'mono: hello says mono and lists its nine tile types',
+      'mono: hello says mono and lists its ten tile types',
       monoHello?.display.kind === 'mono' &&
         JSON.stringify(monoHello.widgets) ===
-          '["value","bar","clock","position","wind_rose","engine","gauge","heading_tape","graph"]',
+          '["value","bar","clock","position","wind_rose","engine","gauge","heading_tape","graph","battery"]',
       JSON.stringify(monoHello),
     );
     const monoLayout = fixture('valid/mono-400.json');
@@ -2721,6 +2826,33 @@ async function main(): Promise<void> {
     });
     await sleep(2500);
     await monoShot('mono-12-helm-alarm');
+
+    // 15a2. The mono battery tile (ADR-0046): the start battery's alarm zone inverted, then the
+    //       house charging in its warn zone with a heavy frame.
+    const monoBattery = { ...batteryLayout('mono-battery'), theme: 'day' };
+    await mono.json('PUT', '/plugins/esphelm/api/layouts/mono-battery', mono.admin, monoBattery);
+    const batteryLinked = await mono.json(
+      'PUT',
+      `/plugins/esphelm/api/devices/${MONO_ID}`,
+      mono.admin,
+      { state: 'adopted', layoutId: 'mono-battery' },
+    );
+    check(
+      'mono: the plugin takes a layout with battery tiles',
+      batteryLinked.status === 200,
+      JSON.stringify(batteryLinked.body).slice(0, 300),
+    );
+    check(
+      'mono: the battery layout is shown',
+      await fwMono.waitLog(/Showing fetched layout "mono-battery" \(1 pages/),
+    );
+    await sleep(1500); // subscribed
+    publishMono(BATTERY_VALUES);
+    await sleep(2500);
+    await monoShot('mono-13-battery');
+    publishMono(BATTERY_CHARGING);
+    await sleep(2500);
+    await monoShot('mono-14-battery-charging');
     await fwMono.stop();
     await mono.stop();
     sk = undefined;

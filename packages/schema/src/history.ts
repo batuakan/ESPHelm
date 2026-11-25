@@ -13,7 +13,8 @@ import { WRAP_EPSILON } from './units.js';
 /**
  * Value history helpers (ADR-0018, ADR-0019), mirrored in the firmware (value_history.h and
  * the history popup). Nothing records unless switched on: `history: true` on a value tile, or
- * the names in a wind rose's `history`. A graph tile always records (ADR-0021).
+ * the names in a wind rose's `history`. A graph tile always records (ADR-0021); a battery tile's
+ * `history` records its state of charge (ADR-0046).
  */
 
 /** Whether a value tile records its history (absent means off). */
@@ -77,7 +78,10 @@ export function historySeries(layout: Pick<Layout, 'pages'>): HistorySeries[] {
   const out: HistorySeries[] = [];
   for (const page of layout.pages) {
     for (const tile of page.tiles) {
-      if ((tile.type === 'value' && historyEnabled(tile)) || tile.type === 'graph') {
+      if (
+        ((tile.type === 'value' || tile.type === 'battery') && historyEnabled(tile)) ||
+        tile.type === 'graph'
+      ) {
         out.push({
           key: tile.id,
           tileId: tile.id,

@@ -8,27 +8,70 @@
       "kind": "grid",
       "id": "energy",
       "title": "Energy",
-      "grid": { "cols": 2, "rows": 3 },
+      "grid": {
+        "cols": 2,
+        "rows": 3
+      },
       "tiles": [
         {
-          "type": "gauge", "id": "soc", "x": 0, "y": 0, "w": 2, "h": 2,
-          "path": "electrical.batteries.shunt.capacity.stateOfCharge", "unit": "pct", "decimals": 0, "label": "House SoC",
-          "min": 0, "max": 100,
+          "type": "battery",
+          "id": "house",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 2,
+          "path": "electrical.batteries.shunt.capacity.stateOfCharge",
+          "unit": "pct",
+          "decimals": 0,
+          "label": "House",
           "zones": [
-            { "from": 0, "to": 30, "state": "alarm" },
-            { "from": 30, "to": 40, "state": "warn" }
-          ]
+            {
+              "to": 30,
+              "state": "alarm"
+            },
+            {
+              "from": 30,
+              "to": 40,
+              "state": "warn"
+            }
+          ],
+          "voltage": {
+            "path": "electrical.batteries.shunt.voltage",
+            "unit": "V",
+            "decimals": 1
+          },
+          "current": {
+            "path": "electrical.batteries.shunt.current",
+            "unit": "A",
+            "decimals": 1
+          },
+          "timeRemaining": {
+            "path": "electrical.batteries.shunt.capacity.timeRemaining"
+          }
         },
         {
-          "type": "bar", "id": "voltage", "x": 0, "y": 2, "w": 1, "h": 1,
-          "path": "electrical.batteries.shunt.voltage", "unit": "V", "decimals": 1, "label": "Volts",
-          "min": 10, "max": 15, "orientation": "horizontal",
+          "type": "graph",
+          "id": "voltage",
+          "x": 0,
+          "y": 2,
+          "w": 2,
+          "h": 1,
+          "path": "electrical.batteries.shunt.voltage",
+          "unit": "V",
+          "decimals": 1,
+          "label": "Volts",
+          "window": "1h",
           "zones": [
-            { "from": 10, "to": 11.8, "state": "alarm" },
-            { "from": 14.6, "to": 15, "state": "warn" }
+            {
+              "to": 11.8,
+              "state": "alarm"
+            },
+            {
+              "from": 14.6,
+              "state": "warn"
+            }
           ]
-        },
-        { "type": "value", "id": "current", "x": 1, "y": 2, "w": 1, "h": 1, "path": "electrical.batteries.shunt.current", "unit": "A", "decimals": 1, "label": "Current" }
+        }
       ]
     }
   ]

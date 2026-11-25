@@ -53,6 +53,7 @@ std::unique_ptr<Widget> make_engine(lv_obj_t *cell, const esphelm::Tile &tile, c
 std::unique_ptr<Widget> make_gauge(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_heading_tape(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 std::unique_ptr<Widget> make_graph(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
+std::unique_ptr<Widget> make_battery(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 /// A tile type this set doesn't render (the plugin doesn't send one; a cached layout might).
 std::unique_ptr<Widget> make_unsupported(lv_obj_t *cell, const esphelm::Tile &tile, const WidgetEnv &env);
 

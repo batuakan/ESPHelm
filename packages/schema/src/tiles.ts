@@ -760,6 +760,71 @@ export const ENGINE_DEFAULTS = {
  */
 export const ENGINE_FIT = { slots: 260, labels: 160, minorTickPx: 5 } as const;
 
+/**
+ * Battery (ADR-0046): a battery outline filled to the state of charge, the % beside it, and below
+ * it the current and power, what the battery is doing ("14 h 20 left", "Charging: Bulk") and solar.
+ * The tile's own DataItem is the state of charge, a SignalK ratio (0..1; the fill uses it as such,
+ * the number is shown in its unit, % by default); its zones colour the fill and the server's zones
+ * replace them (ADR-0020), as on a value tile. Positive current means charging (Victron and most
+ * BMSes); `invertCurrent` turns that round. battery.ts defines the text; the firmware mirrors it.
+ */
+export const BatteryTile = Type.Object(
+  {
+    type: Type.Literal('battery'),
+    ...Placement,
+    ...DataItem.properties,
+    zones: Type.Optional(Type.Array(ValueZone)),
+    history: Type.Optional(
+      Type.Boolean({
+        description:
+          'Record the state of charge; a tap on the tile shows its graph (ADR-0018). Absent means false.',
+      }),
+    ),
+    voltage: Type.Optional(DataItem),
+    current: Type.Optional(DataItem),
+    // absent: voltage times current, while both are fresh
+    power: Type.Optional(DataItem),
+    // seconds until empty (capacity.timeRemaining), shown as "14 h 20 left"; no unit or decimals
+    timeRemaining: Type.Optional(DataItem),
+    solar: Type.Optional(DataItem),
+    // a text path such as electrical.chargers.<id>.chargingMode: "bulk" shows as "Charging: Bulk"
+    chargingModePath: Type.Optional(SkPath),
+    invertCurrent: Type.Optional(
+      Type.Boolean({
+        description:
+          'Negative current (and power) means charging. Absent: false, positive is charging.',
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** The fields a new battery tile gets for battery `id` (electrical.batteries.<id>, SignalK's paths). */
+export function batteryDefaults(id: string) {
+  const base = `electrical.batteries.${id}`;
+  return {
+    path: `${base}.capacity.stateOfCharge`,
+    unit: 'pct',
+    decimals: 0,
+    label: id.charAt(0).toUpperCase() + id.slice(1),
+    zones: [
+      { to: 20, state: 'alarm' },
+      { from: 20, to: 40, state: 'warn' },
+    ],
+    voltage: { path: `${base}.voltage`, unit: 'V', decimals: 1 },
+    current: { path: `${base}.current`, unit: 'A', decimals: 1 },
+    timeRemaining: { path: `${base}.capacity.timeRemaining` },
+  } as const satisfies Omit<Type.Static<typeof BatteryTile>, 'type' | 'id' | 'x' | 'y' | 'w' | 'h'>;
+}
+
+/**
+ * How a battery tile shares its content height (ADR-0046), in device pixels: its text lines use the
+ * largest font at most `linePercent` % of the height whose line height fits `lineWidths` times in
+ * the width; a row is dropped (solar, then the state, the current and power, the caption) while the
+ * battery would be less than `minBody` tall. Generated into esphelm_sizes.h; battery.ts batteryRows().
+ */
+export const BATTERY_FIT = { linePercent: 15, lineWidths: 8, minBody: 40 } as const;
+
 /** Every grid tile type, keyed by its `type` value. Used by the validator to dispatch. */
 export const TILE_TYPES = {
   value: ValueTile,
@@ -775,6 +840,7 @@ export const TILE_TYPES = {
   chart: ChartTile,
   engine: EngineTile,
   alarms: AlarmsTile,
+  battery: BatteryTile,
 } as const;
 export type TileType = keyof typeof TILE_TYPES;
 
@@ -798,6 +864,7 @@ export const Tile = Type.Union([
   ChartTile,
   EngineTile,
   AlarmsTile,
+  BatteryTile,
 ]);
 export type ValueTile = Type.Static<typeof ValueTile>;
 export type GaugeTile = Type.Static<typeof GaugeTile>;
@@ -812,4 +879,5 @@ export type ClockTile = Type.Static<typeof ClockTile>;
 export type ChartTile = Type.Static<typeof ChartTile>;
 export type EngineTile = Type.Static<typeof EngineTile>;
 export type AlarmsTile = Type.Static<typeof AlarmsTile>;
+export type BatteryTile = Type.Static<typeof BatteryTile>;
 export type Tile = Type.Static<typeof Tile>;

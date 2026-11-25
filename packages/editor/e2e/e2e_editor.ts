@@ -304,6 +304,21 @@ async function main(): Promise<void> {
         subscribe: [{ path: versionPath, policy: 'instant' }],
       }),
     );
+    // A battery on the server (ADR-0046), for the battery tile further down to find.
+    ws.send(
+      JSON.stringify({
+        context: 'vessels.self',
+        updates: [
+          {
+            values: [
+              { path: 'electrical.batteries.dock.capacity.stateOfCharge', value: 0.64 },
+              { path: 'electrical.batteries.dock.voltage', value: 12.9 },
+              { path: 'electrical.batteries.dock.current', value: -4.5 },
+            ],
+          },
+        ],
+      }),
+    );
     const etag = served.headers.get('etag');
     const gotVersion = await waitFor(
       () => JSON.stringify(messages).includes(JSON.stringify(etag).slice(1, -1)),
@@ -644,6 +659,37 @@ async function main(): Promise<void> {
         .getAttribute('open')) !== null,
     );
     await shot(page, '07e-desktop-night-engine-corners');
+    await engineDrawer.getByRole('button', { name: 'Close settings' }).click();
+
+    // A battery tile (ADR-0046) on its own page: the drawer offers the server's battery, picking
+    // it fills SignalK's paths, and the preview shows its live charge.
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await page.getByRole('menuitem', { name: 'Grid page', exact: true }).click();
+    await page
+      .getByRole('region', { name: 'Tiles' })
+      .getByRole('button', { name: /^Battery/ })
+      .click();
+    const batteryDrawer = page.getByRole('complementary', { name: 'Tile settings' });
+    const batteryPick = batteryDrawer.getByLabel('Battery', { exact: true });
+    // The editor refreshes the server's paths every 15 s.
+    await batteryPick
+      .locator('option[value="dock"]')
+      .waitFor({ state: 'attached', timeout: 20000 });
+    await batteryPick.selectOption('dock');
+    const batteryPreview = page.locator('[data-testid^="battery-battery-"]').first();
+    let batteryShown = '';
+    for (let i = 0; i < 40 && !batteryShown.includes('64%'); i++) {
+      batteryShown = (await batteryPreview.textContent()) ?? '';
+      if (!batteryShown.includes('64%')) await page.waitForTimeout(250);
+    }
+    check(
+      "the battery preview shows the server's battery",
+      batteryShown.includes('64%') &&
+        batteryShown.includes('12.9 V') &&
+        batteryShown.includes('-4.5 A'),
+      batteryShown,
+    );
+    await shot(page, '07f-desktop-night-battery');
     await page.getByText('No problems').waitFor();
     await save.click();
     await page.getByRole('status').filter({ hasText: 'Sent to' }).waitFor();
@@ -674,6 +720,17 @@ async function main(): Promise<void> {
         besideServed.x === 1 &&
         besideServed.path === 'navigation.speedOverGround',
       JSON.stringify(chartPageServed),
+    );
+    const batteryServed = (withChart.body.pages as { tiles: Record<string, unknown>[] }[])
+      .flatMap((p) => p.tiles)
+      .find((t) => t.type === 'battery');
+    check(
+      'the display gets the battery tile with the paths of the battery picked',
+      batteryServed?.path === 'electrical.batteries.dock.capacity.stateOfCharge' &&
+        batteryServed.label === 'Dock' &&
+        JSON.stringify(batteryServed.voltage) ===
+          JSON.stringify({ path: 'electrical.batteries.dock.voltage', unit: 'V', decimals: 1 }),
+      JSON.stringify(batteryServed),
     );
     await page.getByRole('tab', { name: 'Helm' }).click();
 

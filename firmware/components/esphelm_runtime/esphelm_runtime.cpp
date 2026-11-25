@@ -1752,7 +1752,8 @@ void EsphelmRuntime::on_value_(const std::string &path, ArduinoJson::JsonVariant
 static bool has_zones(const esphelm::Tile &tile) {
   return tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GAUGE ||
          tile.type == esphelm::TileType::BAR || tile.type == esphelm::TileType::GRAPH ||
-         tile.type == esphelm::TileType::ENGINE;  // its RPM (ADR-0032); its slots keep their own
+         tile.type == esphelm::TileType::ENGINE ||  // its RPM (ADR-0032); its slots keep their own
+         tile.type == esphelm::TileType::BATTERY;   // its state of charge (ADR-0046)
 }
 
 bool EsphelmRuntime::on_visible_page_(const std::string &path) const {
@@ -1887,7 +1888,8 @@ static const char *const ROSE_HISTORY_TITLES[esphelm::RoseConfig::HISTORY_KEYS] 
 /// a value tile with history on, a graph tile (it always records, ADR-0021), or a wind rose's
 /// `history` names whose slot is filled.
 static void tile_series(const esphelm::Tile &tile, std::vector<HistorySeries> &out) {
-  if (tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GRAPH) {
+  if (tile.type == esphelm::TileType::VALUE || tile.type == esphelm::TileType::GRAPH ||
+      tile.type == esphelm::TileType::BATTERY) {
     if (tile.history || tile.type == esphelm::TileType::GRAPH)
       out.push_back({tile.id, "", tile.data.label, tile.data, tile.zones, tile.color});
     return;

@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "id": "battery",
+  "name": "Battery tiles",
+  "theme": "day",
+  "pages": [
+    {
+      "kind": "grid",
+      "id": "energy",
+      "title": "Energy",
+      "grid": {
+        "cols": 2,
+        "rows": 2
+      },
+      "tiles": [
+        {
+          "type": "battery",
+          "id": "house",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 1,
+          "path": "electrical.batteries.house.capacity.stateOfCharge",
+          "unit": "pct",
+          "decimals": 0,
+          "label": "House",
+          "zones": [
+            {
+              "to": 20,
+              "state": "alarm"
+            },
+            {
+              "from": 20,
+              "to": 40,
+              "state": "warn"
+            }
+          ],
+          "history": true,
+          "voltage": {
+            "path": "electrical.batteries.house.voltage",
+            "unit": "V",
+            "decimals": 1
+          },
+          "current": {
+            "path": "electrical.batteries.house.current",
+            "unit": "A",
+            "decimals": 1
+          },
+          "power": {
+            "path": "electrical.batteries.house.power",
+            "unit": "W",
+            "decimals": 0
+          },
+          "timeRemaining": {
+            "path": "electrical.batteries.house.capacity.timeRemaining",
+            "staleAfter": 60
+          },
+          "solar": {
+            "path": "electrical.solar.main.panelPower",
+            "unit": "W",
+            "decimals": 0,
+            "label": "Solar"
+          },
+          "chargingModePath": "electrical.chargers.main.chargingMode"
+        },
+        {
+          "type": "battery",
+          "id": "start",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.start.capacity.stateOfCharge"
+        },
+        {
+          "type": "battery",
+          "id": "bms",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "path": "electrical.batteries.bms.capacity.stateOfCharge",
+          "unit": "ratio",
+          "decimals": 2,
+          "current": {
+            "path": "electrical.batteries.bms.current",
+            "unit": "A"
+          },
+          "invertCurrent": true
+        }
+      ]
+    }
+  ]
+}

@@ -133,6 +133,7 @@ describe('layoutPathRefs and replacePath', () => {
         'nextPointPath',
         'previousPointPath',
         'distancePath', // chart route (ADR-0037)
+        'chargingModePath', // battery (ADR-0046)
         'autoThemePath',
         'clockPath', // settings
       ].sort(),

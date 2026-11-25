@@ -8,6 +8,9 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   pageTiles,
+  batteryIds,
+  setBattery,
+  updateBatteryValue,
   updateChartTile,
   addPage,
   addTemplatePages,
@@ -611,5 +614,74 @@ describe('engine tiles', () => {
       tileId: 'engine-1',
       slot: 'bottom',
     });
+  });
+});
+
+describe('battery tiles (ADR-0046)', () => {
+  const base = newLayoutFor({ id: 'b', name: 'B' });
+  const withBattery = (batteryId?: string) => {
+    const r = addTile(base, 0, 'battery', undefined, { batteryId });
+    if (!r) throw new Error('no room');
+    return r;
+  };
+  const battery = (l: Layout) => {
+    const t = pageTiles(l.pages[0]!)[0]!;
+    if (t.type !== 'battery') throw new Error('not a battery');
+    return t;
+  };
+
+  it('finds the batteries the server has', () => {
+    expect(
+      batteryIds([
+        'electrical.batteries.start.voltage',
+        'electrical.batteries.house.capacity.stateOfCharge',
+        'electrical.batteries.house.voltage',
+        'electrical.solar.main.panelPower',
+        'electrical.batteries',
+      ]),
+    ).toEqual(['house', 'start']);
+  });
+
+  it('starts on house without one, 2x1, and is valid', () => {
+    const { layout, id } = withBattery();
+    expect(id).toBe('battery-1');
+    expect(battery(layout)).toMatchObject({ w: 2, h: 1, label: 'House' });
+    expect(validateLayout(layout).errors).toEqual([]);
+  });
+
+  it('moves the standard paths to another battery, keeping a label of its own', () => {
+    const { layout, id } = withBattery('house');
+    let l = updateTile(layout, 0, id, { unit: 'ratio' });
+    l = setBattery(l, 0, id, 'start');
+    expect(battery(l)).toMatchObject({
+      path: 'electrical.batteries.start.capacity.stateOfCharge',
+      unit: 'ratio',
+      label: 'Start',
+      voltage: { path: 'electrical.batteries.start.voltage' },
+      timeRemaining: { path: 'electrical.batteries.start.capacity.timeRemaining' },
+    });
+    l = updateTile(l, 0, id, { label: 'Bow thruster' });
+    l = setBattery(l, 0, id, 'house');
+    expect(battery(l).label).toBe('Bow thruster');
+  });
+
+  it('adds and removes a value, and lists every path it follows', () => {
+    const { layout, id } = withBattery('house');
+    let l = updateBatteryValue(layout, 0, id, 'solar', {
+      path: 'electrical.solar.main.panelPower',
+      unit: 'W',
+    });
+    l = updateBatteryValue(l, 0, id, 'voltage', null);
+    l = updateTile(l, 0, id, { chargingModePath: 'electrical.chargers.main.chargingMode' });
+    const t = battery(l);
+    expect(t.voltage).toBeUndefined();
+    expect(tilePaths(t)).toEqual([
+      'electrical.batteries.house.capacity.stateOfCharge',
+      'electrical.batteries.house.current',
+      'electrical.batteries.house.capacity.timeRemaining',
+      'electrical.solar.main.panelPower',
+      'electrical.chargers.main.chargingMode',
+    ]);
+    expect(validateLayout(l).errors).toEqual([]);
   });
 });

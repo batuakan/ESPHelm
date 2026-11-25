@@ -55,6 +55,7 @@ import {
   type PositionFormat,
   type PositionTile,
   type AlarmsTile,
+  type BatteryTile,
   type RoseHistoryKey,
   type Tile,
   type UnitId,
@@ -67,7 +68,16 @@ import {
 } from '@esphelm/schema';
 import type { ChartInfo, PathInfo } from '../api';
 import { preferredUnit } from '../format';
-import { ENGINE_CORNERS, ENGINE_SLOTS, headingTapeSettings, WIND_ROSE_SLOTS, type SlotName } from '../layoutOps';
+import {
+  BATTERY_VALUES,
+  batteryIds,
+  ENGINE_CORNERS,
+  ENGINE_SLOTS,
+  headingTapeSettings,
+  WIND_ROSE_SLOTS,
+  type BatteryValueName,
+  type SlotName,
+} from '../layoutOps';
 import { HistoryPreview, type PreviewSeries } from './HistoryPreview';
 import { withServerZones } from './Previews';
 
@@ -493,7 +503,7 @@ function HistoryPreviewButton(props: { series: PreviewSeries[]; theme: Layout['t
 
 /** Whether the value tile records, so a tap opens its graph on the display (ADR-0018). */
 function ValueHistoryField(props: {
-  tile: ValueTile;
+  tile: ValueTile | BatteryTile;
   value: unknown;
   theme: Layout['theme'];
   count: HistoryCount;
@@ -1679,6 +1689,152 @@ function EngineFields(
   );
 }
 
+const BATTERY_VALUE_TITLES: Record<BatteryValueName, string> = {
+  voltage: 'Voltage',
+  current: 'Current',
+  power: 'Power',
+  timeRemaining: 'Time remaining',
+  solar: 'Solar',
+};
+const BATTERY_VALUE_HINTS: Record<BatteryValueName, string> = {
+  voltage: 'Shown at the top right.',
+  current: 'Below the battery, and whether it charges or discharges.',
+  power: 'Without one, the display shows voltage times current.',
+  timeRemaining: 'Seconds until empty, shown as "14 h 20 left" while discharging.',
+  solar: 'A solar charger, e.g. electrical.solar.<id>.panelPower, shown on the last row.',
+};
+
+/** Battery tiles (ADR-0046): the battery, its state of charge with zones, and its other values. */
+function BatteryFields(
+  props: Common & {
+    tile: BatteryTile;
+    mono: boolean;
+    theme: Layout['theme'];
+    count: HistoryCount;
+    serverZones: unknown;
+    onChange(patch: Patch): void;
+    onBattery(batteryId: string): void;
+    onValue(name: BatteryValueName, patch: Patch | null): void;
+  },
+) {
+  const { tile } = props;
+  const ids = batteryIds(props.paths.map((p) => p.path));
+  const current = /^electrical\.batteries\.([A-Za-z0-9_-]+)\./.exec(tile.path)?.[1] ?? '';
+  const zones = tile.zones ?? [];
+  return (
+    <>
+      <label className="field">
+        <span>Battery</span>
+        <select
+          value={ids.includes(current) ? current : ''}
+          onChange={(e) => e.target.value && props.onBattery(e.target.value)}
+          aria-label="Battery"
+        >
+          <option value="">{ids.length > 0 ? 'other paths' : 'none on this server'}</option>
+          {ids.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
+        <small className="hint">
+          Picks SignalK's paths under electrical.batteries.&lt;id&gt;; each one can be changed below.
+        </small>
+      </label>
+      <details className="slot-section" open data-testid="battery-soc">
+        <summary>
+          State of charge
+          <span className="now">{tile.path || 'no path yet'}</span>
+        </summary>
+        <DataItemFields item={tile} paths={props.paths} values={props.values} showFormat onChange={props.onChange} />
+        <fieldset className="zones">
+          <legend>{props.mono ? 'Zones' : 'Fill colour by charge'}</legend>
+          <small className="hint">
+            In {tile.unit ?? 'the value as received'}; leave a bound empty for no limit.
+            {props.mono ? ' Warn shows as a heavy frame, alarm as an inverted tile.' : ''}
+          </small>
+          <ServerZones zones={serverZonesToDisplay(props.serverZones, tile.unit)} unit={tile.unit} />
+          <ZoneList
+            zones={zones}
+            openEnds
+            onChange={(next) => props.onChange({ zones: next.length > 0 ? next : undefined })}
+            newZone={() => ({ to: 20, state: 'alarm' })}
+          />
+        </fieldset>
+        {!props.mono && (
+          <ValueHistoryField
+            tile={tile}
+            value={tile.path ? props.values.get(tile.path) : undefined}
+            theme={props.theme}
+            count={props.count}
+            serverZones={new Map(props.paths.map((p) => [p.path, p.zones]))}
+            onChange={props.onChange}
+          />
+        )}
+      </details>
+      {BATTERY_VALUES.map((name) => {
+        const item = tile[name];
+        return (
+          <details key={name} className="slot-section" data-testid={`battery-${name}`}>
+            <summary>
+              {BATTERY_VALUE_TITLES[name]}
+              <span className="now">{item ? item.path || 'no path yet' : 'not shown'}</span>
+            </summary>
+            <small className="hint">{BATTERY_VALUE_HINTS[name]}</small>
+            {item ? (
+              <>
+                <DataItemFields
+                  item={item}
+                  paths={props.paths}
+                  values={props.values}
+                  showFormat={name !== 'timeRemaining'}
+                  onChange={(patch) => props.onValue(name, patch)}
+                />
+                <button className="small" onClick={() => props.onValue(name, null)}>
+                  Don't show {BATTERY_VALUE_TITLES[name].toLowerCase()}
+                </button>
+              </>
+            ) : (
+              <button className="small" onClick={() => props.onValue(name, {})}>
+                Show {BATTERY_VALUE_TITLES[name].toLowerCase()}
+              </button>
+            )}
+          </details>
+        );
+      })}
+      <details className="slot-section" data-testid="battery-mode">
+        <summary>
+          Charging mode
+          <span className="now">{tile.chargingModePath ?? 'not shown'}</span>
+        </summary>
+        <PathPicker
+          path={tile.chargingModePath ?? ''}
+          paths={props.paths}
+          values={props.values}
+          label="Charging mode path"
+          placeholder="e.g. electrical.chargers.<id>.chargingMode"
+          onPick={(path) => props.onChange({ chargingModePath: path || undefined })}
+        />
+        <small className="hint">Text such as "bulk" or "float": shown as "Charging: Bulk".</small>
+        {tile.chargingModePath && (
+          <button className="small" onClick={() => props.onChange({ chargingModePath: undefined })}>
+            Don't show the charging mode
+          </button>
+        )}
+      </details>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={tile.invertCurrent === true}
+          onChange={(e) => props.onChange({ invertCurrent: e.target.checked ? true : undefined })}
+          aria-label="Invert current"
+        />
+        Invert current: negative means charging (most publishers send positive while charging)
+      </label>
+    </>
+  );
+}
+
 export function TileDrawer(
   props: Common & {
     /** Any tile but a chart (ChartDrawer). */
@@ -1698,6 +1854,8 @@ export function TileDrawer(
     onConfig(patch: Patch): void;
     onSlot(slot: SlotName, patch: Patch | null): void;
     onEngineSlot(slot: EngineSlotName | EngineCornerName, patch: Patch | null): void;
+    onBattery?(batteryId: string): void;
+    onBatteryValue?(name: BatteryValueName, patch: Patch | null): void;
     onDelete(): void;
   },
 ) {
@@ -1711,6 +1869,8 @@ export function TileDrawer(
         ? 'Autopilot'
         : tile.type === 'alarms'
         ? tile.label || 'Alarms'
+        : tile.type === 'battery'
+        ? tile.label || 'Battery'
         : tile.label ||
           (tile.type === 'position' ? 'Position' : tile.type === 'clock' ? 'Clock' : tile.id);
   return (
@@ -1745,6 +1905,20 @@ export function TileDrawer(
           values={props.values}
           sizeHint={props.sizeHint}
           onChange={onChange}
+          onClose={props.onClose}
+        />
+      ) : tile.type === 'battery' ? (
+        <BatteryFields
+          tile={tile}
+          paths={props.paths}
+          values={props.values}
+          mono={props.mono === true}
+          theme={props.theme ?? 'day'}
+          count={props.historyCount}
+          serverZones={props.paths.find((p) => p.path === tile.path)?.zones}
+          onChange={onChange}
+          onBattery={(id) => props.onBattery?.(id)}
+          onValue={(name, patch) => props.onBatteryValue?.(name, patch)}
           onClose={props.onClose}
         />
       ) : tile.type === 'clock' ? (

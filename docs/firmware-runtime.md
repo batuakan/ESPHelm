@@ -257,6 +257,7 @@ Any refusal keeps the current layout on screen and is logged with its code. A la
 | `clock` tile (ADR-0024) | up to four labels and a few bytes of state; nothing per update. The screen saver adds two labels to the sleep cover, created on first use |
 | Wind rose performance graphics (ADR-0029) | four more bindings per rose (about 4 × 60 B plus their path strings), always made, subscribed only when their graphic is on; no LVGL objects (drawn on the markers overlay), nothing per update |
 | `engine` tile (ADR-0032) | one LVGL object (≈5.2 KB with its cell on the host build, a full-screen tile), its RPM ticks worked out at layout time (≤ 81 ticks, ≈1.3 KB), four bindings, the slots' zones and an A8 mask per icon (side², ≈3.7 KB each at a full 720 tile, ≈1.7 KB at 480); nothing per update |
+| `battery` tile (ADR-0046) | 13 LVGL objects (12 mono), made once whatever rows show: ≈7 KB on the host build (a 2x1 tile and two 1x1 tiles = 21,600 B); six bindings and a few bytes of state; nothing per update (the fill is resized, the labels set) |
 | `heading_tape` tile (ADR-0022) | four LVGL objects; the ticks are drawn in its draw callback from a stack list (at most 37) |
 | History popup | about 25 LVGL objects while open (plus one button per wind rose value), none when closed; a 2 KB point buffer inside the runtime |
 | Alarm banner | a fixed table (16 entries with PSRAM, 8 without; under 200 B each) and six LVGL objects, created on the first alarm |
@@ -306,19 +307,20 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
   15. **the boot guard** (`ESPHELM_TEST_CRASH_ON=<tile id>` makes the host build abort while building that tile):
       - a fetched layout that crashes the display is skipped after one crash, refused when fetched again, and reported in the hello
       - offline, a cached layout that crashes is tried twice, then the last known good layout is shown, also after a normal restart
-  16. **alarms**: a depth alarm and a battery warning show in the banner (worst first, "+1"); tapping shows the next; ACK goes to the plugin, which silences the alarm on the server; both acknowledged give the strip; an escalation to `emergency` shows the full banner again; back to `normal` clears it
+  16. **battery tiles** (`fixtures/valid/battery.json`, ADR-0046): the house battery discharging with every row ("14 h 20 left"), a 1x1 start battery in its alarm zone and an inverted BMS charging (`95-battery`); the house charging in bulk in its warn zone (`96`); its state of charge stale while the other values stay fresh (`97`); the night theme (`98`); the energy template at 720 offline (`720-05-energy`); the mono set's battery, alarm inverted and warn as a heavy frame (`mono-13`, `mono-14`)
+  17. **alarms**: a depth alarm and a battery warning show in the banner (worst first, "+1"); tapping shows the next; ACK goes to the plugin, which silences the alarm on the server; both acknowledged give the strip; an escalation to `emergency` shows the full banner again; back to `normal` clears it
 
-  17. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); switching the theme on the display (`esphelm_tap_request @theme`) from night to day holds while the sun stays down and is handed back to `autoTheme` at sunrise
+  18. **display settings**: a layout with `startPage`, `autoTheme: sun` and a 10 s `screenTimeout` opens on its start page; `environment.sun` = dusk switches to night with the night brightness; the screen goes off after 10 s, an alarm switches it on, and so does a touch (`esphelm_tap_request @screen`); switching the theme on the display (`esphelm_tap_request @theme`) from night to day holds while the sun stays down and is handed back to `autoTheme` at sunrise
 
   17b. **settings panel** (ADR-0025): the footer's menu button (`@menu`) opens it on *Settings* (screenshots by day and at night, at 720 too), and `@settings tab-info` shows *Info* (by day, and at 720); `@settings tab-network` shows *Network* ("Set in the firmware" at 480; at 720 with `ESPHELM_TEST_SERVERS=fixed`: the server buttons, the list of two made-up servers, picking one, the *Forget server* question, *Cancel* and *Yes*); *Night* and the slider (`@settings night`, `@settings brightness=15`) are applied and saved, come back after a restart (the sun's first value doesn't undo them), and another night brightness from the editor replaces the display's; *Auto* hands the theme back; *Screen off* switches off at once; *Dark* (ADR-0034, screenshots of the panel and of the page with an alarm) keeps the day brightness, becomes the day side so dusk shows night and sunrise dark again, and the footer toggle goes dark to night and back to automatic (dark); a saved record that is not valid is ignored. `ESPHELM_TEST_INFO=fixed` writes "test" for the values that change by themselves
 
-  18. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
+  19. **position tiles**: the four formats of one live position (two wide tiles, two single cells in a smaller font), then a value that isn't a position (`--`)
 
-  19. **value tile colours**: six fixed colours, a depth in its warn zone, a voltage in its alarm zone over the tile's own blue, an engine temperature in a normal zone; by day, at night and in the dark theme
+  20. **value tile colours**: six fixed colours, a depth in its warn zone, a voltage in its alarm zone over the tile's own blue, an engine temperature in a normal zone; by day, at night and in the dark theme
 
-  20. **text sizes** (`fixtures/valid/value-sizes.json`): a full-width, a 2x2 and four single-cell value tiles at 480 with live values (a temperature of "500" steps down a size), and the same layout offline at 720
+  21. **text sizes** (`fixtures/valid/value-sizes.json`): a full-width, a 2x2 and four single-cell value tiles at 480 with live values (a temperature of "500" steps down a size), and the same layout offline at 720
 
-  21. **value history**: a tile without `history` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the wind roses (a mark on the one that records, a tap on the other does nothing, its first value recording live, the popup's value buttons, the apparent wind angle and a heading tile across north without a jump); the popup and a rose's popup at 720
+  22. **value history**: a tile without `history` opens nothing; a tile on page 2 without values shows "Collecting..."; the close button closes the popup; a live SOG sent every second becomes points of the graph; with a seeded curve (`ESPHELM_TEST_HISTORY`): the page with the marks, the 10 min and 1 h windows, an alarm banner over the popup, night, and the page unchanged after closing; the wind roses (a mark on the one that records, a tap on the other does nothing, its first value recording live, the popup's value buttons, the apparent wind angle and a heading tile across north without a jump); the popup and a rose's popup at 720
   21b. **zones from the server** (ADR-0020): zones put on the server replace a value tile's and a gauge's own and reach a bar without any, with no new layout fetched; a changed zone is followed; rubbish and an emptied list bring the tile's own back, pixel for pixel.
   21c. **graph tiles** (ADR-0021, `fixtures/valid/graph.json`): a live SOG becomes a line on its tile; with seeded curves, a 2x2 depth graph with a zone band, a fixed-range SOG, a heading across north and a 6 h barometer without axis labels, by day and at night; a tap opens the popup on its value; the same page offline at 720, and in the dark theme
   21d. **heading tapes** (ADR-0022, `fixtures/valid/heading-tape.json`): three tapes at 480 with live values (across north, COG right of centre, the target left, the waypoint bearing off the left edge; a magnetic 60° tape; a 1x1 tape without markers), a turn to 20°, a marker gone stale on its own, night; and offline at 720 (muted, "--", no markers)
@@ -369,21 +371,27 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - ACK is easy to hit. After ACK, apps that play sounds (e.g. the SignalK admin's notification sound, or KIP) go quiet, and the banner shrinks to a strip.
     - Make the alarm worse (`alarm` → `emergency`): the full banner comes back.
     - At night, the banner is dark with red text, with no bright area.
-13. **Display settings.** In the editor's display settings, set day brightness 100 %, night 10 %, a 30 s screen timeout and *Auto day/night*. Save & send.
+13. **Battery.** Add a *Battery* tile in the editor; it should pick your battery by itself (check the paths in its drawer). Save & send.
+    - The fill follows the state of charge, and its colour changes at 40 % and 20 % (or at your server's zones).
+    - The current's sign: while charging, the state line says *Charging* (with the charger's mode if you set its path). If it says *Discharging* while the charger runs, tick *Invert current*.
+    - The time left looks like your battery monitor's. Without a power path, the power is voltage times current.
+    - The text fits at the tile sizes you use, 1x1 included (it keeps the battery and its % only when short).
+    - On the RLCD: the fill and the inverted alarm tile read well in sunlight.
+14. **Display settings.** In the editor's display settings, set day brightness 100 %, night 10 %, a 30 s screen timeout and *Auto day/night*. Save & send.
     - Without touching, the backlight turns off after 30 s. One tap turns it on again **without** pressing anything under your finger (try it over a switch tile).
     - A new alarm turns the screen on.
     - Switch the display theme (or wait for dusk with the derived-data plugin's `environment.sun`): night is clearly dimmer, and day goes back to full brightness. Check that 10 % is still readable in the dark and that the backlight doesn't flicker at low brightness (the LEDC runs at 100 Hz).
-14. **Position tile.** Add a *Position* tile (it uses `navigation.position`) and try each format in the drawer; the display should show the same text as the editor's preview. Check that a 1×1 tile on the 720×720 display is still readable, and that unplugging the GPS turns it to `--` after the stale time.
-15. **Day/night on the display.** Replaced by step 24 (the settings panel, ADR-0025); holding the page title does nothing any more.
-16. **Value tile colours.** Give a few value tiles a colour, and a depth tile zones such as "3 or less warn, 2 or less alarm".
+15. **Position tile.** Add a *Position* tile (it uses `navigation.position`) and try each format in the drawer; the display should show the same text as the editor's preview. Check that a 1×1 tile on the 720×720 display is still readable, and that unplugging the GPS turns it to `--` after the stale time.
+16. **Day/night on the display.** Replaced by step 25 (the settings panel, ADR-0025); holding the page title does nothing any more.
+17. **Value tile colours.** Give a few value tiles a colour, and a depth tile zones such as "3 or less warn, 2 or less alarm".
     - By day, check that every colour is readable in sunlight, yellow in particular.
     - At night everything is red; check that a warn and an alarm value can still be told apart from normal.
-17. **Text sizes.** Assign `packages/schema/fixtures/valid/value-sizes.json`.
+18. **Text sizes.** Assign `packages/schema/fixtures/valid/value-sizes.json`.
     - The full-width SOG and the 2x2 depth use the large digit fonts, and the captions grow with the numbers.
     - A value tile on a boolean path shows "on"/"off" in a full font (the digit fonts have no letters).
     - In the single cells nothing is clipped. An RPM in the thousands or a 3-digit heading may shrink one size when its first value arrives.
     - Captions and units are readable at arm's length, and the editor's preview shows the same proportions.
-18. **Value history.** Assign `packages/schema/fixtures/valid/value-history.json` with a live SOG, depth, wind and heading.
+19. **Value history.** Assign `packages/schema/fixtures/valid/value-history.json` with a live SOG, depth, wind and heading.
     - Value tiles with `history: true` show a small sparkline mark bottom-left; the HDG tile (no `history`) has none.
     - Tap SOG: the popup opens below any alarm banner. Touching the graph or the empty space does nothing; only **X** closes it, and the page is as before.
     - Over 10 minutes the 10 min graph fills from the right; switch to 1 h and 6 h. A steady value draws a flat line, not gaps.
@@ -392,41 +400,41 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - Sail or turn across north: the AWA and HDG2 graphs stay smooth, their labels read e.g. 350, 0, 10.
     - Check the log for `History: N values, 3 windows, … bytes` and that the free heap stays healthy.
 
-19. **Zones from the server (ADR-0020).** Show a value tile and a gauge with live values, then edit their path's zones in the SignalK admin UI (*Data Browser → Meta Data*).
+20. **Zones from the server (ADR-0020).** Show a value tile and a gauge with live values, then edit their path's zones in the SignalK admin UI (*Data Browser → Meta Data*).
     - Within a few seconds, or about a minute at most, the tile's colour and the gauge's bands follow. The page redraws once; check that this isn't disturbing.
     - The log says `Tile <id>: <n> zones, from the server`. No `Showing fetched layout` line comes with it.
     - A value inside an alarm zone also brings the alarm banner, from the server's own notification.
     - Remove the zones: the tile's own come back.
 
-20. **Graph tiles (ADR-0021).** Assign `packages/schema/fixtures/valid/graph.json` with a live depth, SOG, heading and pressure.
+21. **Graph tiles (ADR-0021).** Assign `packages/schema/fixtures/valid/graph.json` with a live depth, SOG, heading and pressure.
     - Each graph shows "Collecting..." for about 10 s after the layout arrives, then its line fills from the right. The page doesn't stutter every 5 s when points close.
     - The depth graph has its y range, "-10 m" and "now"; the small HDG and Baro tiles show the line only.
     - Turning across north, the HDG line stays smooth.
     - Tap a graph: the history popup opens on that value.
 
-21. **Heading tapes (ADR-0022).** Assign `packages/schema/fixtures/valid/heading-tape.json` with a live heading, COG and, if you have them, a route and an autopilot.
+22. **Heading tapes (ADR-0022).** Assign `packages/schema/fixtures/valid/heading-tape.json` with a live heading, COG and, if you have them, a route and an autopilot.
     - Turning the boat scrolls the tape smoothly, without tearing, and the number matches the chart plotter's heading.
     - The COG triangle sits where the plotter draws COG. With a route active, the waypoint diamond points the way to steer; off the tape it's an arrow at the edge on the side of the shorter turn.
     - The magnetic tape shows "M" after its number.
     - At night all markers are red; check that their shapes can still be told apart.
 
-22. **Centre-zero gauges and bars (ADR-0023).** Assign `packages/schema/fixtures/valid/center-zero.json` with a live rudder angle and battery currents if you have them.
+23. **Centre-zero gauges and bars (ADR-0023).** Assign `packages/schema/fixtures/valid/center-zero.json` with a live rudder angle and battery currents if you have them.
     - The rudder needle and its fill follow the helm smoothly; the fill is red to port and green to starboard, and the value reads e.g. "12 ° P".
     - The house current bar fills left of the middle when discharging ("-30.0 A") and right when charging, and never past 20.
     - At night all fills are red; check that P and S (and − and +) can still be told apart.
 
-23. **Clocks and the screen saver (ADR-0024).** Assign `packages/schema/fixtures/valid/clock.json` (Stockholm time, the screen saver with the time and date after 30 s) with a GPS sending `navigation.datetime`; pick your own zone in the editor's display settings first if you like.
+24. **Clocks and the screen saver (ADR-0024).** Assign `packages/schema/fixtures/valid/clock.json` (Stockholm time, the screen saver with the time and date after 30 s) with a GPS sending `navigation.datetime`; pick your own zone in the editor's display settings first if you like.
     - The Local and 12 h tiles match your phone's clock, the UTC tile is your phone's time minus your zone's offset, and the seconds tick evenly.
     - Without touching it, after 30 s the screen dims to a faint time and date that are readable up close and change each minute; the rest of the screen is black.
     - One touch wakes it at full brightness without pressing anything under your finger.
     - Unplug the network: the clocks keep running. Reboot without the network: they show "--" until a time arrives (no clock without a source).
-24. **The settings panel (ADR-0025).** On any layout (a one-page one too), the footer has a button with three bars on the right, left of **>**.
+25. **The settings panel (ADR-0025).** On any layout (a one-page one too), the footer has a button with three bars on the right, left of **>**.
     - A tap opens the panel on its *Settings* tab, with *Info* beside it. Drag the brightness slider: the backlight follows while you drag. Let go, close the panel, and reboot: the brightness stays.
     - *Night* switches to the red theme at once and *Auto* back to the layout's (or the sun's). The night brightness slider is separate from the day one.
     - The *Info* tab shows the display's IP and Wi-Fi signal (check them against your router), the SignalK server's address, and a *Deltas* count that rises while you watch.
     - Change the night brightness in the editor and Save & send: the display takes the editor's value.
     - Check that the menu button, the slider and the three theme buttons are easy to hit with a wet thumb, and that the panel is readable at night.
-25. **Setup without configuration (ADR-0026).** Erase the flash first (`esptool.py erase_flash`, or `esphome run` after an erase): this wipes the token and the layout, so the display has to be approved and adopted again.
+26. **Setup without configuration (ADR-0026).** Erase the flash first (`esptool.py erase_flash`, or `esphome run` after an erase): this wipes the token and the layout, so the display has to be approved and adopted again.
     - **Setup screen:** it shows *Set up Wi-Fi* with a QR code, the network `esphelm-p4-` + six characters and a password. Scan the QR code with a phone camera: the phone joins, and the portal page opens (else go to http://192.168.4.1). Pick your network.
     - **Server:** the display joins, finds your SignalK server ("Looking for a SignalK server", then "Approve this display") and, once approved and adopted, shows its layout.
     - **Reboot:** it rejoins and goes back to the same server without asking for approval again.
@@ -434,37 +442,37 @@ Flash with `~/venv/bin/esphome run firmware/esphelm_p4.yaml`, then check:
     - **Mistyped password:** at the bottom of the panel's *Network* tab, *Factory reset* → *Yes*: the display restarts into its setup network (and must be approved again in SignalK afterwards). Enter a wrong password in the portal. Power-cycle: within about 2 minutes the setup network is back; it disappears 10 minutes after power-up.
     - **Server list:** *Change server* lists your server(s) (with the address and port); *Forget server* → *Yes* makes the display ask for approval again (new entry under *Access Requests*).
     - Check that the QR code scans from about 30 cm by day and at night.
-26. **Rotation (ADR-0028).** In the editor, *Display settings → Mounted → Turned 90° clockwise*, then *Save & send*:
+27. **Rotation (ADR-0028).** In the editor, *Display settings → Mounted → Turned 90° clockwise*, then *Save & send*:
     - The display's picture turns clockwise and touch follows it (the buttons react where you press).
     - The editor showed the turned screen as soon as you picked it, and its size stays so after the display's next hello.
     - Power-cycle: the display starts turned, before the page appears. Set *As built (0°)* and *Save & send* to go back.
-27. **Wind rose performance (ADR-0029).** Give a wind rose *Laylines* and *Waypoint* in the editor's *Performance* section (the *Wind* starter has them), with live wind and heading, and a route if you have one:
+28. **Wind rose performance (ADR-0029).** Give a wind rose *Laylines* and *Waypoint* in the editor's *Performance* section (the *Wind* starter has them), with live wind and heading, and a route if you have one:
     - Close-hauled, the line for your tack (green on starboard tack, red on port) lies on the bow, and the other one shows the heading after a tack, about twice the beat angle away.
     - Bear away past the beam: the lines jump to the gybe angle, behind the beam.
     - Without a polar plugin they use the fixed angles (45° / 150°, or the ones set in the drawer); with one, they follow `performance.beatAngle` / `gybeAngle`.
     - W points at the active waypoint, as on the heading tape. Unplug the wind sensor: within 15 s the laylines go, and the rose doesn't show stale guidance.
-28. **Chart tiles (ADR-0030).** Put a chart tile beside the rose (2x2) and a small one elsewhere, of the same chart:
+29. **Chart tiles (ADR-0030).** Put a chart tile beside the rose (2x2) and a small one elsewhere, of the same chart:
     - Both draw around the vessel; the small one has no zoom buttons, and with anchor watch on it is framed red in an alarm.
     - Zoom the big one: only it changes, and its new zoom fills in; the small one stays.
     - Move (or drive the position): both pan smoothly, without blank flashes for tiles that stay in view. Note how a full screen of tiles draws compared with the old chart page.
     - Info tab: free PSRAM after switching between pages a few times stays put (the store keeps its tiles, it doesn't grow).
-29. **Engine tile (ADR-0032).** Apply the *Engine* starter (one engine tile) with a running engine, or live `propulsion.p0.*` and `tanks.fuel.0.currentLevel`:
+30. **Engine tile (ADR-0032).** Apply the *Engine* starter (one engine tile) with a running engine, or live `propulsion.p0.*` and `tanks.fuel.0.currentLevel`:
     - It looks like the editor's preview: the RPM arc with its coloured band, "RPM" and "x100" in the centre, oil on the left, fuel on the right, coolant at the bottom.
     - The needles follow the values smoothly; the RPM needle crosses the labels without leaving marks.
     - The icons are clear at full size; at night everything is red.
     - Unplug a sensor (or stop its value): after its stale time its needle and icon turn dim, the others carry on.
-30. **Sound (ADR-0033).** Connect an 8 Ω speaker to the speaker connector (MX1.25):
+31. **Sound (ADR-0033).** Connect an 8 Ω speaker to the speaker connector (MX1.25):
     - **Touch:** a tile that opens its history, the footer's buttons and the settings panel's controls click; an empty page background doesn't, and neither does the touch that wakes a dark screen. *Settings → Touch sounds: off* silences them (and survives a reboot).
     - **Alarms:** publish `notifications.test` with `{"state":"alarm","method":["visual","sound"],"message":"Test"}`: a tone at once, then every 5 s; *ACK* stops it. `emergency` repeats without a pause; `warn` beeps twice, once. With `method: ["visual"]` it stays silent.
     - **Volume:** the *Volume* slider changes the loudness and clicks at the new volume when let go; the editor's *Display settings → Sound → Volume* applies after *Save & send* (and drops the display's own choice).
     - **Mute (ADR-0047):** with the test alarm sounding, *Settings → Sound: off*: the tone stops at once, the footer shows an amber crossed-out speaker, the banner stays. Publish an `emergency`: no tone. Touch a tile: no click. Restart: still muted. *Sound: on*: the emergency's tone starts at once. Then the editor's *Mute all sound* and *Save & send*: muted again, and unticking it brings the sound back.
     - **Noise:** no hiss or hum from the speaker while nothing plays (the amplifier is always on). If nothing sounds at all, the pins are the first suspect (logged: `esphelm.sound` and `i2s_audio`).
-31. **Firmware updates (ADR-0036).** Flash the build with OTA over USB once (`esphome run firmware/esphelm_p4.yaml`), and remove any bare `ota:` from the hardware file first. Then build again with a change (bump `ESPHELM_FIRMWARE_VERSION`, e.g. to 0.4.1) and upload `firmware/.esphome/build/esphelm-p4/build/firmware.ota.bin` in the editor (*Firmware* → *Upload .bin*):
+32. **Firmware updates (ADR-0036).** Flash the build with OTA over USB once (`esphome run firmware/esphelm_p4.yaml`), and remove any bare `ota:` from the hardware file first. Then build again with a change (bump `ESPHELM_FIRMWARE_VERSION`, e.g. to 0.4.1) and upload `firmware/.esphome/build/esphelm-p4/build/firmware.ota.bin` in the editor (*Firmware* → *Upload .bin*):
     - **Update:** the display shows *Update to 0.4.1*; press it and confirm. The panel closes, *Updating firmware* counts up to 100 %, *Restarting*, and within about a minute the new version is on the Info tab and in the editor (*Updated to 0.4.1*). The log shows `Firmware update written`.
     - **A factory image** (`firmware.factory.bin`) is refused at upload with a hint.
     - **Rollback:** build once with an `on_boot:` lambda that crashes (`- lambda: 'abort();'`, priority 600), upload it and update. The display restarts into it, crashes, and the bootloader starts the old firmware again; the editor says *came back on its old firmware*. Remove the lambda afterwards.
     - **Server gone mid-download:** pull the server's network during *Updating firmware*: after up to 10 s *Update failed*, then the page again on the old firmware.
-32. **Route on the chart (ADR-0037).** Activate a route in Freeboard-SK (or another plotter that uses SignalK's course API) with a chart tile on screen:
+33. **Route on the chart (ADR-0037).** Activate a route in Freeboard-SK (or another plotter that uses SignalK's course API) with a chart tile on screen:
     - The route shows in magenta (red at night), a dot at each point; legs already sailed are faint, the leg being sailed bold, with a thin line from the vessel to the next waypoint.
     - Zoom in until the next waypoint leaves the chart: a small arrow at the edge points at it, with the distance in nm on a chart of 260 px or more.
     - Advance to the next point (or reverse the route): the bold leg moves; the log shows no new `Route ...: N points` unless the route itself changed.
