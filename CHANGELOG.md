@@ -2,7 +2,8 @@
 
 What changed in each ESPHelm release: the display firmware, the SignalK plugin `signalk-esphelm` with its editor, and the layout contract `@esphelm/schema`. They are released together. Each GitHub release starts with its section from this file, and the SignalK App Store shows those notes on the plugin's *Changelog* tab.
 
-## Unreleased
+## 0.6.0 (2026-11-25)
+Firmware 0.6.0 · signalk-esphelm 0.4.0 · @esphelm/schema 1.3.0
 
 ### New
 - **Battery tile.** A battery filled to its state of charge, with the % beside it, the voltage, current and power, the time left or the charger's mode ("Charging: Bulk") and solar. In the editor, pick a battery the server has and its paths fill in; each stays editable. Zones colour the fill, and a tap shows the charge's history. On colour and black-and-white displays. The *Energy* starter layout now uses it, with a graph of the voltage.

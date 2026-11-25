@@ -1,6 +1,6 @@
 {
   "name": "signalk-esphelm",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ESPHelm: configure ESP32 SignalK displays at runtime. Stores layouts and serves them to devices.",
   "license": "MIT",
   "repository": {
@@ -41,7 +41,7 @@
     "prepublishOnly": "npm run build --prefix ../.."
   },
   "dependencies": {
-    "@esphelm/schema": "1.2.0",
+    "@esphelm/schema": "1.3.0",
     "jpeg-js": "^0.4.4",
     "pngjs": "^7.0.0"
   },
