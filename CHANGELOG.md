@@ -7,6 +7,7 @@ What changed in each ESPHelm release: the display firmware, the SignalK plugin `
 ### New
 - **HTTPS and WSS to the SignalK server.** A server with SSL is found and preferred. The display trusts the server's certificate the first time it connects, and refuses another one later, so its token can't go to a machine posing as the server. The *Network* tab shows the certificate's fingerprint. A server that really got a new certificate is trusted again with *Forget server*. Not on the cheap yellow display (CYD), which has no PSRAM to spare.
 - **Display access in the editor.** The editor warns when a display's SignalK access is about to run out (when it was approved with an expiration). *Remove display* removes a display from ESPHelm and revokes its SignalK access, so a lost display can't read or change anything on the boat.
+- **Mute all sound.** One switch, on the display (*Settings → Sound*) or in the editor (*Display settings → Sound*), silences every alarm tone, emergencies included, and the touch clicks. The alarm banner still shows every alarm, the footer shows a crossed-out speaker, and switching the sound back on plays any alarm still waiting at once. Needs this firmware; the editor offers it only to displays that have it.
 
 ### Changed
 - The starter layouts, and new layouts, start on the **Day** theme. Night (red on black, dimmed) looked like a dead screen in daylight. It's one tap away in the editor.
