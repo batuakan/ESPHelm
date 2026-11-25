@@ -166,6 +166,8 @@ npm run build
 
 **Plugin and editor:** install *ESPHelm* from your SignalK server's *Appstore* (the npm package [`signalk-esphelm`](https://www.npmjs.com/package/signalk-esphelm)), restart SignalK and enable *ESPHelm* under *Server → Plugin Config*. The editor is then at `/signalk-esphelm/` on your server. No display yet? Pick one of the demo displays there to try it. To run this checkout instead, symlink `packages/plugin` into your SignalK config dir as `node_modules/signalk-esphelm` and add `"signalk-esphelm": "*"` to that dir's `package.json` dependencies.
 
+What changed in each release: [CHANGELOG.md](CHANGELOG.md).
+
 **Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040, the cheap yellow display or the RLCD-4.2) and write it over USB with `esptool.py write_flash 0x0 <file>`. That's the only time: later versions install from the editor (*Firmware* above the display list), from an uploaded `.ota.bin` or with *Check GitHub for updates*.
 
 Or build it yourself: the [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware v2.9.3](https://github.com/esphome/esp-hosted-firmware/releases/tag/v2.9.3) (the release matching its pinned checksum; it is not in this repository). Then:

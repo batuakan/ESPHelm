@@ -335,9 +335,9 @@ The heap left on a C3 at runtime (after Wi-Fi and the 10 % LVGL buffer) hasn't b
 ## Releases (ADR-0031)
 `.github/workflows/release.yml` builds the P4-86, Guition 4848S040, CYD and RLCD firmware on a pushed tag and creates a **draft** GitHub release with each board's `.factory.bin` (esptool, at 0x0) and `.ota.bin` (for updates from the editor, ADR-0036, or the captive portal's upload), `manifest.json` (board, tile set, version, size, md5 and sha256 of each `.ota.bin`, read from its image marker; what the plugin's *Check GitHub* reads) and `SHA256SUMS`.
 
-1. Bump `ESPHELM_FIRMWARE_VERSION` in `esphelm_runtime.h` in a PR and merge it.
+1. Bump `ESPHELM_FIRMWARE_VERSION` in `esphelm_runtime.h` in a PR, with the release's section in `CHANGELOG.md` (from `## Unreleased`, ADR-0045), and merge it.
 2. Tag the merge commit and push the tag: `git tag v0.5.0 && git push origin v0.5.0`. A tag that doesn't match `ESPHELM_FIRMWARE_VERSION` fails before building; `v0.5.0-rc.1` makes a draft prerelease.
-3. The run pins ESPHomeSignalK's `main` to one commit for every board (`-s signalk_ref <sha>`; the board files default to `main`) and names it in the notes. The P4 gets esp-hosted-firmware v2.9.3, checked against the sha256 in `hardware/waveshare-esp32-p4-86.yaml`. When that pin changes, change `ESP_HOSTED_VERSION` in the workflow with it.
+3. The notes start with *What changed*, the release's section of `CHANGELOG.md` (a tag without one fails; a prerelease may use *Unreleased*); the SignalK App Store shows them as the plugin's changelog. The run pins ESPHomeSignalK's `main` to one commit for every board (`-s signalk_ref <sha>`; the board files default to `main`) and names it in the notes. The P4 gets esp-hosted-firmware v2.9.3, checked against the sha256 in `hardware/waveshare-esp32-p4-86.yaml`. When that pin changes, change `ESP_HOSTED_VERSION` in the workflow with it.
 4. Flash the draft's files on hardware, then publish the release.
 
 ## Hardware check (P4-86)
