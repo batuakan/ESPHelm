@@ -2,6 +2,11 @@
 
 What changed in each ESPHelm release: the display firmware, the SignalK plugin `signalk-esphelm` with its editor, and the layout contract `@esphelm/schema`. They are released together. Each GitHub release starts with its section from this file, and the SignalK App Store shows those notes on the plugin's *Changelog* tab.
 
+## Unreleased
+
+### New
+- **Waveshare ESP32-S3-Touch-LCD-4.** A firmware for this 4" 480×480 touch display, built with every release (`esphelm-ws-lcd4-<version>.factory.bin`). Same tiles and fonts as the Guition 4848S040; its buzzer isn't used, so no alarm tones. Not yet tested on hardware.
+
 ## 0.6.0 (2026-11-25)
 Firmware 0.6.0 · signalk-esphelm 0.4.0 · @esphelm/schema 1.3.0
 

@@ -155,7 +155,7 @@ It works on a phone too, and has day, dark and night (red) themes of its own, se
 
 ## 🚀 Getting started
 
-> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards, the Guition 4848S040, the cheap yellow display and the RLCD-4.2 aren't tested on hardware yet (their builds compile). Expect rough edges, and please report them.
+> **Status:** the runtime-configurable ESPHelm is tested end to end on the desktop build and against real signalk-server versions, and runs on the Waveshare ESP32-P4-86. The S3 and C3/C6 boards, the Guition 4848S040, the Waveshare S3-Touch-LCD-4, the cheap yellow display and the RLCD-4.2 aren't tested on hardware yet (their builds compile). Expect rough edges, and please report them.
 
 You need a SignalK server, Node 22, and [ESPHome](https://esphome.io/) for the firmware.
 
@@ -170,20 +170,21 @@ npm run build
 
 What changed in each release: [CHANGELOG.md](CHANGELOG.md).
 
-**Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040, the cheap yellow display or the RLCD-4.2) and write it over USB with `esptool.py write_flash 0x0 <file>`. That's the only time: later versions install from the editor (*Firmware* above the display list), from an uploaded `.ota.bin` or with *Check GitHub for updates*.
+**Firmware:** nothing to configure. Download your board's `esphelm-<board>-<version>.factory.bin` from [Releases](https://github.com/batuakan/ESPHelm/releases) (P4-86, Guition 4848S040, Waveshare S3-Touch-LCD-4, the cheap yellow display or the RLCD-4.2) and write it over USB with `esptool.py write_flash 0x0 <file>`. That's the only time: later versions install from the editor (*Firmware* above the display list), from an uploaded `.ota.bin` or with *Check GitHub for updates*.
 
 Or build it yourself: the [EspHomeSignalK](https://github.com/batuakan/ESPHomeSignalK) component is fetched from GitHub when you build. The P4 board also needs its Wi-Fi co-processor firmware, `firmware/network_adapter_esp32c6.bin`, from [esphome/esp-hosted-firmware v2.9.3](https://github.com/esphome/esp-hosted-firmware/releases/tag/v2.9.3) (the release matching its pinned checksum; it is not in this repository). Then:
 
 ```bash
 esphome run firmware/esphelm_p4.yaml                # Waveshare ESP32-P4-86
 esphome run firmware/esphelm_guition_4848s040.yaml  # Guition ESP32-S3-4848S040
+esphome run firmware/esphelm_waveshare_s3_lcd4.yaml # Waveshare ESP32-S3-Touch-LCD-4
 esphome run firmware/esphelm_cyd.yaml               # ESP32-2432S028R (cheap yellow display)
 esphome run firmware/esphelm_rlcd.yaml              # Waveshare ESP32-S3-RLCD-4.2 (black and white)
 ```
 
 ### 📶 Setting up a display
 
-1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-`, `esphelm-guition-` or `esphelm-cyd-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
+1. **Join its setup network.** A display without a saved network shows *Set up Wi-Fi* with a QR code, its network's name (`esphelm-p4-`, `esphelm-guition-`, `esphelm-ws-lcd4-`, `esphelm-cyd-` or `esphelm-rlcd-` and six characters) and a password made for that display. Scan the QR code with your phone's camera, or type the password.
 2. **Pick the boat's Wi-Fi** on the page that opens (or at http://192.168.4.1). The display joins it and closes its setup network.
 3. **Approve it in SignalK.** The display finds the server with mDNS and asks for access: grant read/write under *Security → Access Requests*. It stays with that server from then on, also after a restart.
 4. **Adopt it in the editor**, name it (*Rename*; the end of its id on the display's *Info* tab tells two of the same board apart) and assign a layout.

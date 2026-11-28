@@ -91,6 +91,9 @@ jobs:
           - board: guition
             yaml: esphelm_guition_4848s040.yaml
             node: esphelm-guition
+          - board: ws-lcd4
+            yaml: esphelm_waveshare_s3_lcd4.yaml
+            node: esphelm-ws-lcd4
           - board: cyd
             yaml: esphelm_cyd.yaml
             node: esphelm-cyd
@@ -190,6 +193,7 @@ jobs:
           |---|---|---|---|---|
           | Waveshare ESP32-P4-86 | 720×720, PSRAM | \`esphelm-p4-$VERSION.factory.bin\` | \`esphelm-p4-$VERSION.ota.bin\` | tested |
           | Guition ESP32-S3-4848S040 | 480×480, PSRAM | \`esphelm-guition-$VERSION.factory.bin\` | \`esphelm-guition-$VERSION.ota.bin\` | not yet tested |
+          | Waveshare ESP32-S3-Touch-LCD-4 | 480×480, PSRAM | \`esphelm-ws-lcd4-$VERSION.factory.bin\` | \`esphelm-ws-lcd4-$VERSION.ota.bin\` | not yet tested |
           | ESP32-2432S028R (cheap yellow display) | 320×240, no PSRAM, no charts | \`esphelm-cyd-$VERSION.factory.bin\` | \`esphelm-cyd-$VERSION.ota.bin\` | not yet tested |
           | Waveshare ESP32-S3-RLCD-4.2 | 400×300 black and white, buttons, no touch | \`esphelm-rlcd-$VERSION.factory.bin\` | \`esphelm-rlcd-$VERSION.ota.bin\` | not yet tested |
 
