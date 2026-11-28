@@ -1,0 +1,61 @@
+# Runtime firmware for the Waveshare ESP32-S3-Touch-LCD-4 (4", 480x480, PSRAM).
+#   ~/venv/bin/esphome run firmware/esphelm_waveshare_s3_lcd4.yaml
+# Wi-Fi is set up through the captive portal (wifi.yaml), the SignalK server is found with mDNS.
+# The 480 font sizes of fonts.yaml, as the SDL build (and its goldens) use.
+substitutions:
+  # ESPHomeSignalK git ref; release builds pin a commit with `-s signalk_ref <sha>` (ADR-0031).
+  signalk_ref: main
+
+packages:
+  hardware: !include hardware/waveshare-esp32-s3-touch-lcd-4.yaml
+  wifi: !include wifi.yaml
+  ota: !include ota.yaml
+  fonts: !include fonts.yaml
+
+esphome:
+  name: esphelm-ws-lcd4
+  name_add_mac_suffix: true
+  friendly_name: "ESPHelm display"
+
+external_components:
+  # ESPHomeSignalK from GitHub (see CLAUDE.md §3).
+  - source:
+      type: git
+      url: https://github.com/batuakan/ESPHomeSignalK
+      ref: ${signalk_ref}
+      path: components
+    components: [signalk]
+  - source:
+      type: local
+      path: components
+    components: [esphelm_runtime, esphelm_tiles_color]
+
+signalk:
+
+lvgl:
+  # The runtime switches the screen off itself (layout settings.screenTimeout, ADR-0015).
+  # Lets the runtime turn the picture and touch to the layout's rotation, set in the editor for
+  # how the display is mounted (ADR-0028). The second draw buffer it needs goes in PSRAM.
+  rotation: 0
+  pages:
+    - id: esphelm_page
+      widgets:
+        - obj:
+            id: esphelm_container
+            width: 100%
+            height: 100%
+
+# The tiles this display renders (ADR-0035): the colour tile set.
+esphelm_tiles_color:
+
+esphelm_runtime:
+  container: esphelm_container
+  fonts:
+    value: esphelm_font_value
+    label: esphelm_font_label
+    small: esphelm_font_small
+    extra: [esphelm_font_medium, esphelm_font_huge]
+    digits: [esphelm_font_digits_large, esphelm_font_digits_huge]
+  board: waveshare-esp32-s3-touch-lcd-4
+  backlight: display_backlight
+  touch: true
